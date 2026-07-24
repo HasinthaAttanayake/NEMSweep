@@ -43,8 +43,10 @@ namespace NemSim.Tests
 
             double cellTemperature = 25.0 + 25.0;
             double temperatureFactor = 1.0 + (-0.0027) * (cellTemperature - 25.0);
-            double expected = 100.0 / 1000.0 * 1000.0 * 0.95 * temperatureFactor;
-            result[0].Megawatts.Should().BeApproximately(expected, Tolerance(expected));
+            Power expected = Power.FromMegawatts(100.0) * 0.95 * temperatureFactor;
+            result[0].Megawatts.Should().BeApproximately(
+                expected.Megawatts,
+                Tolerance(expected.Megawatts));
         }
 
         [Fact]
