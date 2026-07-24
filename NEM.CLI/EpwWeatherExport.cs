@@ -23,9 +23,12 @@ internal static class EpwWeatherExport
             weather.DryBulbTemperature,
             weather.SolarZenith,
             Power.FromMegawatts(1));
+        FlowSeries windProductionAtOneMegawattInstalled = WindPowerCurve.Calculate(
+            weather.WindSpeed,
+            Power.FromMegawatts(1));
 
         return new WeatherDataDTO(
-            4,
+            5,
             sourceFile,
             new WeatherLocation(
                 header.City,
@@ -42,7 +45,8 @@ internal static class EpwWeatherExport
                 ZenithValuesOf(weather.SolarZenith),
                 ValuesOf(weather.DryBulbTemperature),
                 ValuesOf(weather.WindSpeed),
-                MegawattValuesOf(solarProductionAtOneMegawattAc)));
+                MegawattValuesOf(solarProductionAtOneMegawattAc),
+                MegawattValuesOf(windProductionAtOneMegawattInstalled)));
     }
 
     public static void WriteJson(WeatherDataDTO weatherData, string path)

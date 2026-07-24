@@ -1,6 +1,8 @@
 using FluentAssertions;
 using NEM.Contracts;
+using NEM.Model.PowerCurves;
 using NEM.Model.Series;
+using NEM.Model.Units;
 using System.Text.Json;
 
 namespace NEM.CLI.Tests;
@@ -54,7 +56,7 @@ public sealed class EpwWeatherExportTests
         WeatherDataDTO? roundTripped = JsonSerializer.Deserialize<WeatherDataDTO>(json);
 
         roundTripped.Should().NotBeNull();
-        roundTripped!.SchemaVersion.Should().Be(4);
+        roundTripped!.SchemaVersion.Should().Be(5);
         roundTripped.SourceFile.Should().Be("sydney.epw");
         roundTripped.Location.City.Should().Be("Sydney Observatory Hill");
         roundTripped.Location.Wmo.Should().Be("947680");
@@ -70,6 +72,12 @@ public sealed class EpwWeatherExportTests
         roundTripped.DataSeries.DryBulbTemperatureDegreesCelsius.Should().Equal(18.2, 24.6, 27.1);
         roundTripped.DataSeries.WindSpeedMetresPerSecond.Should().Equal(4.2, 6.8, 5.1);
         roundTripped.DataSeries.SolarProductionMegawattsAtOneMegawattAc.Should().Equal(0, 0, 0);
+        FlowSeries expectedWindProduction = WindPowerCurve.Calculate(
+            weather.WindSpeed,
+            Power.FromMegawatts(1));
+        roundTripped.DataSeries.WindProductionMegawattsAtOneMegawattInstalled.Should().Equal(
+            Enumerable.Range(0, expectedWindProduction.Length)
+                .Select(index => expectedWindProduction[index].Megawatts));
     }
 
     [Fact]
