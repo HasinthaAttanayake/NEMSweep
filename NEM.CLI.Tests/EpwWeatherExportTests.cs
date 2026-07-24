@@ -1,8 +1,9 @@
 using FluentAssertions;
 using NEM.Contracts;
-using NEM.Model.PowerCurves;
+using NEM.Model.Generation.Wind;
 using NEM.Model.Series;
 using NEM.Model.Units;
+using NEM.Model.Weather;
 using System.Text.Json;
 
 namespace NEM.CLI.Tests;

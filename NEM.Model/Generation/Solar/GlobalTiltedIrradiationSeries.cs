@@ -1,6 +1,8 @@
 using NEM.Model.Series;
+using NEM.Model.Units;
+using NEM.Model.Weather;
 
-namespace NEM.Model.PowerCurves
+namespace NEM.Model.Generation.Solar
 {
     /// <summary>
     /// Global tilted irradiation received by a dual-axis tracking array during each
@@ -18,7 +20,8 @@ namespace NEM.Model.PowerCurves
         {
         }
 
-        public double this[int index] => RawValue(index);
+        public Irradiation this[int index] =>
+            Irradiation.FromWattHoursPerSquareMetre(RawValue(index));
 
         public static GlobalTiltedIrradiationSeries Calculate(
             TraceSeries globalHorizontalRadiation,

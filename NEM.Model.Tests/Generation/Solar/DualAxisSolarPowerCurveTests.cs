@@ -1,9 +1,10 @@
 using FluentAssertions;
-using NEM.Model.PowerCurves;
+using NEM.Model.Generation.Solar;
 using NEM.Model.Series;
 using NEM.Model.Units;
+using NEM.Model.Weather;
 
-namespace NemSim.Tests
+namespace NEM.Model.Tests.Generation.Solar
 {
     public class DualAxisSolarPowerCurveTests
     {
@@ -43,8 +44,10 @@ namespace NemSim.Tests
 
             double cellTemperature = 25.0 + 25.0;
             double temperatureFactor = 1.0 + (-0.0027) * (cellTemperature - 25.0);
-            double expected = 100.0 / 1000.0 * 1000.0 * 0.95 * temperatureFactor;
-            result[0].Megawatts.Should().BeApproximately(expected, Tolerance(expected));
+            Power expected = Power.FromMegawatts(100.0) * 0.95 * temperatureFactor;
+            result[0].Megawatts.Should().BeApproximately(
+                expected.Megawatts,
+                Tolerance(expected.Megawatts));
         }
 
         [Fact]

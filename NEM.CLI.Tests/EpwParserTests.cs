@@ -1,5 +1,5 @@
 using FluentAssertions;
-using NEM.Model.Series;
+using NEM.Model.Weather;
 
 namespace NEM.CLI.Tests;
 

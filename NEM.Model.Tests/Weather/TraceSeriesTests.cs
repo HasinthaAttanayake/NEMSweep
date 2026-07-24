@@ -1,7 +1,7 @@
 using FluentAssertions;
-using NEM.Model.Series;
+using NEM.Model.Weather;
 
-namespace NemSim.Tests
+namespace NEM.Model.Tests.Weather
 {
     public class TraceSeriesTests
     {

@@ -1,7 +1,7 @@
 using FluentAssertions;
 using NEM.Model.Series;
 
-namespace NemSim.Tests
+namespace NEM.Model.Tests.Series
 {
     // TimeSeries is abstract, so its base invariants are exercised through FlowSeries,
     // the simplest concrete series. These tests cover construction and index-to-instant

@@ -1,7 +1,8 @@
 using NEM.Model.Series;
 using NEM.Model.Units;
+using NEM.Model.Weather;
 
-namespace NEM.Model.PowerCurves
+namespace NEM.Model.Generation.Solar
 {
     /// <summary>
     /// Converts dual-axis global tilted irradiation and dry-bulb temperature into
@@ -9,7 +10,8 @@ namespace NEM.Model.PowerCurves
     /// </summary>
     public static class DualAxisSolarPowerCurve
     {
-        public const double StandardTestIrradianceWattsPerSquareMetre = 1000.0;
+        public static Irradiance StandardTestIrradiance { get; } =
+            Irradiance.FromWattsPerSquareMetre(1000.0);
         public const double SystemFactor = 0.95;
         public const double CellTemperatureRiseAboveDryBulbDegreesCelsius = 25.0;
         public const double ReferenceCellTemperatureDegreesCelsius = 25.0;
@@ -56,12 +58,11 @@ namespace NEM.Model.PowerCurves
 
             globalTiltedIrradiation.RequireAligned(dryBulbTemperature);
 
-            double intervalHours = globalTiltedIrradiation.Resolution.TotalHours;
             var megawatts = new double[globalTiltedIrradiation.Length];
             for (int index = 0; index < megawatts.Length; index++)
             {
-                double averageIrradianceWattsPerSquareMetre =
-                    globalTiltedIrradiation[index] / intervalHours;
+                Irradiance averageIrradiance =
+                    globalTiltedIrradiation[index] / globalTiltedIrradiation.Resolution;
 
                 double cellTemperatureDegreesCelsius =
                     dryBulbTemperature[index]
@@ -72,14 +73,13 @@ namespace NEM.Model.PowerCurves
                     * (cellTemperatureDegreesCelsius - ReferenceCellTemperatureDegreesCelsius);
                 double lossFactor = SystemFactor * temperatureFactor;
 
-                double unconstrainedPowerMegawatts =
-                    acCapacity.Megawatts
-                    / StandardTestIrradianceWattsPerSquareMetre
-                    * averageIrradianceWattsPerSquareMetre
-                    * lossFactor;
+                double irradianceFactor = averageIrradiance / StandardTestIrradiance;
+                Power unconstrainedPower = acCapacity * irradianceFactor * lossFactor;
+                Power output = Power.Min(
+                    Power.Max(unconstrainedPower, Power.Zero),
+                    acCapacity);
 
-                megawatts[index] = Math.Clamp(
-                    unconstrainedPowerMegawatts, 0.0, acCapacity.Megawatts);
+                megawatts[index] = output.Megawatts;
             }
 
             return new FlowSeries(

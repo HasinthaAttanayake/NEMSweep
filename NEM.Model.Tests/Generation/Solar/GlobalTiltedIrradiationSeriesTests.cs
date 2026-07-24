@@ -1,8 +1,8 @@
 using FluentAssertions;
-using NEM.Model.PowerCurves;
-using NEM.Model.Series;
+using NEM.Model.Generation.Solar;
+using NEM.Model.Weather;
 
-namespace NemSim.Tests
+namespace NEM.Model.Tests.Generation.Solar
 {
     public class GlobalTiltedIrradiationSeriesTests
     {
@@ -31,7 +31,8 @@ namespace NemSim.Tests
                 + 100.0 * ((1.0 + Math.Cos(panelTiltRadians)) / 2.0)
                 + 800.0 * 0.2 * ((1.0 - Math.Cos(panelTiltRadians)) / 2.0);
 
-            result[0].Should().BeApproximately(expected, Tolerance(expected));
+            result[0].WattHoursPerSquareMetre.Should().BeApproximately(
+                expected, Tolerance(expected));
             result.Start.Should().Be(DaytimeStart);
             result.Resolution.Should().Be(Hour);
         }
@@ -48,7 +49,7 @@ namespace NemSim.Tests
                 DiffuseHorizontal(NightStart, Hour, 100.0),
                 solarZenith);
 
-            result[0].Should().Be(0.0);
+            result[0].WattHoursPerSquareMetre.Should().Be(0.0);
         }
 
         [Fact]

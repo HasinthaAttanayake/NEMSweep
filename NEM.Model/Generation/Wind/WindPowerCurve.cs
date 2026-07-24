@@ -1,18 +1,9 @@
 using NEM.Model.Series;
 using NEM.Model.Units;
+using NEM.Model.Weather;
 
-namespace NEM.Model.PowerCurves
+namespace NEM.Model.Generation.Wind
 {
-    public sealed record WindPowerCurveSettings
-    {
-        public static WindPowerCurveSettings Default { get; } = new();
-
-        public double HubHeightMetres { get; init; } = WindPowerCurve.DefaultHubHeightMetres;
-        public double ShearExponent { get; init; } = WindPowerCurve.DefaultShearExponent;
-        public double CutOutWindSpeedMetresPerSecond { get; init; } =
-            WindPowerCurve.DefaultCutOutWindSpeedMetresPerSecond;
-    }
-
     /// <summary>
     /// Converts a measured wind-speed trace into power using a digitized Goldwind
     /// GW 140/3MW(S) 3.4 MW reference curve and piecewise-linear interpolation.
