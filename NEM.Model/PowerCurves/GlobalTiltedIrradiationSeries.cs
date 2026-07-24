@@ -1,4 +1,5 @@
 using NEM.Model.Series;
+using NEM.Model.Units;
 
 namespace NEM.Model.PowerCurves
 {
@@ -18,7 +19,8 @@ namespace NEM.Model.PowerCurves
         {
         }
 
-        public double this[int index] => RawValue(index);
+        public Irradiation this[int index] =>
+            Irradiation.FromWattHoursPerSquareMetre(RawValue(index));
 
         public static GlobalTiltedIrradiationSeries Calculate(
             TraceSeries globalHorizontalRadiation,

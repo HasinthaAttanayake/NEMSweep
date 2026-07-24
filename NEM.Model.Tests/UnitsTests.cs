@@ -29,6 +29,27 @@ namespace NemSim.Tests
             energy.MegawattHours.Should().BeApproximately(power.Megawatts, Tolerance);
         }
 
+        [Fact]
+        public void IrradiationDividedByInterval_ShouldGiveAverageIrradiance()
+        {
+            Irradiation irradiation = Irradiation.FromWattHoursPerSquareMetre(500.0);
+
+            Irradiance irradiance = irradiation / TimeSpan.FromMinutes(30);
+
+            irradiance.WattsPerSquareMetre.Should().BeApproximately(1000.0, Tolerance);
+        }
+
+        [Fact]
+        public void IrradianceDividedByIrradiance_ShouldGiveDimensionlessRatio()
+        {
+            Irradiance actual = Irradiance.FromWattsPerSquareMetre(750.0);
+            Irradiance reference = Irradiance.FromWattsPerSquareMetre(1000.0);
+
+            double ratio = actual / reference;
+
+            ratio.Should().BeApproximately(0.75, Tolerance);
+        }
+
         [Theory]
         [InlineData(double.NaN)]
         [InlineData(double.PositiveInfinity)]
