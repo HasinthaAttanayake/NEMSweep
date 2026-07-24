@@ -79,6 +79,8 @@ namespace NEM.Model.Series
             double[] metresPerSecond,
             double measurementHeightMetres)
         {
+            ArgumentNullException.ThrowIfNull(metresPerSecond);
+
             if (double.IsNaN(measurementHeightMetres)
                 || double.IsInfinity(measurementHeightMetres)
                 || measurementHeightMetres <= 0)
@@ -87,6 +89,17 @@ namespace NEM.Model.Series
                     nameof(measurementHeightMetres),
                     measurementHeightMetres,
                     "Wind-speed traces require a positive measurement height.");
+            }
+
+            for (int index = 0; index < metresPerSecond.Length; index++)
+            {
+                if (metresPerSecond[index] < 0.0)
+                {
+                    throw new ArgumentOutOfRangeException(
+                        nameof(metresPerSecond),
+                        metresPerSecond[index],
+                        $"Wind speed cannot be negative (index {index}).");
+                }
             }
 
             return new TraceSeries(

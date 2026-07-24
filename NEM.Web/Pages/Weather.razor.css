@@ -5,7 +5,8 @@
     --wind-soft: #e9f7f1;
     --temperature: #b33a3a;
     --temperature-soft: #fff0f0;
-    --production: #2563a8;
+    --solar-production: #2563a8;
+    --wind-production: #087f5b;
     --ink: #17212b;
     --muted: #5d6873;
     max-width: 1180px;
@@ -209,10 +210,14 @@
 
 .production-summary strong {
     margin-top: 0.2rem;
-    color: var(--production);
+    color: var(--solar-production);
     font-family: Georgia, "Times New Roman", serif;
     font-size: 1.35rem;
     font-weight: 600;
+}
+
+.wind-production-summary strong {
+    color: var(--wind-production);
 }
 
 @media (max-width: 760px) {

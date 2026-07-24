@@ -32,6 +32,20 @@ namespace NemSim.Tests
         }
 
         [Fact]
+        public void WindSpeedTrace_RejectsNegativeValueAtConstruction()
+        {
+            var act = () => TraceSeries.WindSpeed(
+                NemStart,
+                Hour,
+                [5.0, -0.1, 7.0],
+                measurementHeightMetres: 10.0);
+
+            act.Should().Throw<ArgumentOutOfRangeException>()
+                .WithMessage("*index 1*")
+                .Which.ParamName.Should().Be("metresPerSecond");
+        }
+
+        [Fact]
         public void DirectNormalRadiationTrace_HasNoHeightAndWattHourUnit()
         {
             var trace = TraceSeries.DirectNormalRadiation(NemStart, Hour, new[] { 0.0, 350.0, 800.0 });

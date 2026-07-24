@@ -61,4 +61,5 @@ public readonly record struct WeatherSeriesData(
     double[] SolarZenithDegrees,
     double[] DryBulbTemperatureDegreesCelsius,
     double[] WindSpeedMetresPerSecond,
-    double[] SolarProductionMegawattsAtOneMegawattAc);
+    double[] SolarProductionMegawattsAtOneMegawattAc,
+    double[] WindProductionMegawattsAtOneMegawattInstalled);
