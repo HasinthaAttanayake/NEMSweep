@@ -1,6 +1,6 @@
-using NEM.Model.Units;
+using NEM.Model.Series;
 
-namespace NEM.Model.Series
+namespace NEM.Model.Weather
 {
     /// <summary>
     /// Calculated geometric solar zenith angles for aligned intervals. Each value is

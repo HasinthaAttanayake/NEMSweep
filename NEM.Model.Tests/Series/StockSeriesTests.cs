@@ -1,7 +1,7 @@
 using FluentAssertions;
 using NEM.Model.Series;
 
-namespace NemSim.Tests
+namespace NEM.Model.Tests.Series
 {
     public class StockSeriesTests
     {

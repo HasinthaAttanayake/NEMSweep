@@ -1,7 +1,7 @@
 using FluentAssertions;
-using NEM.Model.Units;
+using NEM.Model.Weather;
 
-namespace NemSim.Tests
+namespace NEM.Model.Tests.Weather
 {
     public class SolarZenithTests
     {
