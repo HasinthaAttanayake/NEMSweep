@@ -142,6 +142,66 @@
                     <MudChart ChartType="ChartType.Line"
                               ChartSeries="_solarProductionSeries"
                               ChartLabels="_xAxisLabels"
+                              ChartOptions="_solarProductionChartOptions"
+                              Width="100%"
+                              Height="420px" />
+                </section>
+            </MudTabPanel>
+            <MudTabPanel Text="Wind production">
+                <section class="chart-section production-chart wind-production-chart">
+                    <div class="chart-heading production-heading">
+                        <div>
+                            <h2>Wind production</h2>
+                            <p>Modelled output for @_windCapacityMegawatts.ToString("N1") MW using the Goldwind GW 140/3MW(S) 3.4 MW variant at 120 m hub height</p>
+                        </div>
+                        <div class="capacity-control" aria-label="Installed wind capacity">
+                            <MudTooltip Text="Decrease capacity">
+                                <MudIconButton Icon="@Icons.Material.Filled.Remove"
+                                               Size="Size.Small"
+                                               OnClick="@(() => AdjustWindCapacity(-1))"
+                                               Disabled="@(_windCapacityMegawatts <= MinimumWindCapacityMegawatts)"
+                                               aria-label="Decrease wind capacity" />
+                            </MudTooltip>
+                            <MudNumericField T="double"
+                                             Label="Installed capacity"
+                                             Value="_windCapacityMegawatts"
+                                             ValueChanged="OnWindCapacityChanged"
+                                             Min="MinimumWindCapacityMegawatts"
+                                             Max="MaximumWindCapacityMegawatts"
+                                             Step="1"
+                                             Immediate="true"
+                                             HideSpinButtons="true"
+                                             Variant="Variant.Outlined"
+                                             Adornment="Adornment.End"
+                                             AdornmentText="MW"
+                                             Class="capacity-input" />
+                            <MudTooltip Text="Increase capacity">
+                                <MudIconButton Icon="@Icons.Material.Filled.Add"
+                                               Size="Size.Small"
+                                               OnClick="@(() => AdjustWindCapacity(1))"
+                                               Disabled="@(_windCapacityMegawatts >= MaximumWindCapacityMegawatts)"
+                                               aria-label="Increase wind capacity" />
+                            </MudTooltip>
+                        </div>
+                    </div>
+                    <div class="production-summary wind-production-summary" aria-label="Wind production summary">
+                        <div>
+                            <span>Peak output</span>
+                            <strong>@_peakWindProductionMegawatts.ToString("N2") MW</strong>
+                        </div>
+                        <div>
+                            <span>Energy produced</span>
+                            <strong>@_windEnergyMegawattHours.ToString("N0") MWh</strong>
+                        </div>
+                        <div>
+                            <span>Capacity factor</span>
+                            <strong>@_windCapacityFactor.ToString("P1")</strong>
+                        </div>
+                    </div>
+                    <MudChart ChartType="ChartType.Line"
+                              ChartSeries="_windProductionSeries"
+                              ChartLabels="_xAxisLabels"
+                              ChartOptions="_windProductionChartOptions"
                               Width="100%"
                               Height="420px" />
                 </section>
@@ -233,6 +293,8 @@
 @code {
     private const double MinimumSolarCapacityMegawatts = 0.1;
     private const double MaximumSolarCapacityMegawatts = 10000;
+    private const double MinimumWindCapacityMegawatts = 0.1;
+    private const double MaximumWindCapacityMegawatts = 10000;
 
     private static readonly MonthOption[] Months =
     [
@@ -260,6 +322,9 @@
     private List<ChartSeries<double>> _windSeries = [];
     private List<ChartSeries<double>> _temperatureSeries = [];
     private List<ChartSeries<double>> _solarProductionSeries = [];
+    private List<ChartSeries<double>> _windProductionSeries = [];
+    private LineChartOptions _solarProductionChartOptions = BuildProductionChartOptions(1);
+    private LineChartOptions _windProductionChartOptions = BuildProductionChartOptions(1);
     private string[] _xAxisLabels = [];
     private int _rawPointCount;
     private int _displayPointCount;
@@ -274,6 +339,10 @@
     private double _peakSolarProductionMegawatts;
     private double _solarEnergyMegawattHours;
     private double _solarCapacityFactor;
+    private double _windCapacityMegawatts = 1;
+    private double _peakWindProductionMegawatts;
+    private double _windEnergyMegawattHours;
+    private double _windCapacityFactor;
     private string _periodLabel = string.Empty;
 
     protected override async Task OnInitializedAsync()
@@ -291,9 +360,9 @@
                 return;
             }
 
-            if (_weather.SchemaVersion != 4)
+            if (_weather.SchemaVersion != 5)
             {
-                _errorMessage = $"Weather data schema {_weather.SchemaVersion} is not supported; expected schema 4.";
+                _errorMessage = $"Weather data schema {_weather.SchemaVersion} is not supported; expected schema 5.";
                 return;
             }
 
@@ -304,13 +373,15 @@
             int temperatureLength = _weather.DataSeries.DryBulbTemperatureDegreesCelsius.Length;
             int windLength = _weather.DataSeries.WindSpeedMetresPerSecond.Length;
             int solarProductionLength = _weather.DataSeries.SolarProductionMegawattsAtOneMegawattAc.Length;
+            int windProductionLength = _weather.DataSeries.WindProductionMegawattsAtOneMegawattInstalled.Length;
             if (dniLength == 0
                 || ghiLength != dniLength
                 || dhiLength != dniLength
                 || zenithLength != dniLength
                 || temperatureLength != dniLength
                 || windLength != dniLength
-                || solarProductionLength != dniLength)
+                || solarProductionLength != dniLength
+                || windProductionLength != dniLength)
             {
                 _errorMessage = "Weather traces are empty or misaligned.";
                 return;
@@ -348,6 +419,20 @@
         OnSolarCapacityChanged(_solarCapacityMegawatts + deltaMegawatts);
     }
 
+    private void OnWindCapacityChanged(double capacityMegawatts)
+    {
+        _windCapacityMegawatts = Math.Clamp(
+            capacityMegawatts,
+            MinimumWindCapacityMegawatts,
+            MaximumWindCapacityMegawatts);
+        BuildCharts();
+    }
+
+    private void AdjustWindCapacity(double deltaMegawatts)
+    {
+        OnWindCapacityChanged(_windCapacityMegawatts + deltaMegawatts);
+    }
+
     private void BuildCharts()
     {
         if (_weather is null)
@@ -362,6 +447,8 @@
         double[] wind = _weather.DataSeries.WindSpeedMetresPerSecond;
         double[] solarProductionAtOneMegawattAc =
             _weather.DataSeries.SolarProductionMegawattsAtOneMegawattAc;
+        double[] windProductionAtOneMegawattInstalled =
+            _weather.DataSeries.WindProductionMegawattsAtOneMegawattInstalled;
         var selectedIndexes = new List<int>();
 
         for (int index = 0; index < dni.Length; index++)
@@ -428,6 +515,18 @@
                     .ToArray(),
             },
         ];
+        _solarProductionChartOptions = BuildProductionChartOptions(_solarCapacityMegawatts);
+        _windProductionSeries =
+        [
+            new ChartSeries<double>
+            {
+                Name = $"Wind production ({_windCapacityMegawatts:N1} MW installed)",
+                Data = displayedIndexes
+                    .Select(index => windProductionAtOneMegawattInstalled[index] * _windCapacityMegawatts)
+                    .ToArray(),
+            },
+        ];
+        _windProductionChartOptions = BuildProductionChartOptions(_windCapacityMegawatts);
 
         _xAxisLabels = BuildLabels(displayedIndexes);
         double[] selectedDni = selectedIndexes.Select(index => dni[index]).ToArray();
@@ -436,6 +535,9 @@
         double[] selectedTemperature = selectedIndexes.Select(index => temperature[index]).ToArray();
         double[] selectedSolarProduction = selectedIndexes
             .Select(index => solarProductionAtOneMegawattAc[index] * _solarCapacityMegawatts)
+            .ToArray();
+        double[] selectedWindProduction = selectedIndexes
+            .Select(index => windProductionAtOneMegawattInstalled[index] * _windCapacityMegawatts)
             .ToArray();
         _peakDni = selectedDni.Max();
         _meanDaylightDni = daylightDni.Length == 0 ? 0 : daylightDni.Average();
@@ -452,6 +554,14 @@
         _solarCapacityFactor = maximumEnergyMegawattHours == 0
             ? 0
             : _solarEnergyMegawattHours / maximumEnergyMegawattHours;
+        _peakWindProductionMegawatts = selectedWindProduction.Max();
+        _windEnergyMegawattHours =
+            selectedWindProduction.Sum() * _weather.Resolution.TotalHours;
+        double maximumWindEnergyMegawattHours =
+            _windCapacityMegawatts * selectedWindProduction.Length * _weather.Resolution.TotalHours;
+        _windCapacityFactor = maximumWindEnergyMegawattHours == 0
+            ? 0
+            : _windEnergyMegawattHours / maximumWindEnergyMegawattHours;
         _periodLabel = _selectedMonth == 0
             ? "Representative full year"
             : Months.Single(month => month.Number == _selectedMonth).Name;
@@ -483,6 +593,15 @@
     private DateTimeOffset InstantAt(int index)
     {
         return _weather!.Start + TimeSpan.FromTicks(_weather.Resolution.Ticks * index);
+    }
+
+    private static LineChartOptions BuildProductionChartOptions(double capacityMegawatts)
+    {
+        return new LineChartOptions
+        {
+            YAxisTicks = Math.Clamp((int)Math.Ceiling(capacityMegawatts / 5.0), 2, 25),
+            YAxisSuggestedMax = capacityMegawatts,
+        };
     }
 
     private sealed record MonthOption(int Number, string Name);
