@@ -38,7 +38,12 @@ namespace NEM.CLI
                 Console.WriteLine(
                     $"Daylight DNI shares total: {report.DaylightDniSourceShares.Values.Sum():F2}%");
                 Console.WriteLine(
-                    $"Constructed {weather.DirectNormalRadiation.Length} DNI and {weather.WindSpeed.Length} wind values.");
+                    $"Constructed {weather.GlobalHorizontalRadiation.Length} GHI, " +
+                    $"{weather.DirectNormalRadiation.Length} DNI, " +
+                    $"{weather.DiffuseHorizontalRadiation.Length} DHI, " +
+                    $"{weather.SolarZenith.Length} solar zenith, " +
+                    $"{weather.DryBulbTemperature.Length} dry-bulb temperature, and " +
+                    $"{weather.WindSpeed.Length} wind values.");
                 Console.WriteLine($"Wrote provenance report to: {Path.GetFullPath(provenanceOutputPath)}");
                 Console.WriteLine($"Wrote weather data to: {Path.GetFullPath(weatherDataOutputPath)}");
                 return 0;
@@ -48,7 +53,11 @@ namespace NEM.CLI
             {
                 EpwWeatherSeries weather = EpwParser.ReadTimeSeries(args[1]);
                 Console.WriteLine(
-                    $"DNI: {weather.DirectNormalRadiation.Length} hourly values; " +
+                    $"GHI: {weather.GlobalHorizontalRadiation.Length}; " +
+                    $"DNI: {weather.DirectNormalRadiation.Length}; " +
+                    $"DHI: {weather.DiffuseHorizontalRadiation.Length}; " +
+                    $"Solar zenith: {weather.SolarZenith.Length}; " +
+                    $"Dry bulb: {weather.DryBulbTemperature.Length}; " +
                     $"Wind: {weather.WindSpeed.Length} hourly values; " +
                     $"First timestamp: {weather.DirectNormalRadiation.InstantAt(0):o}");
                 return 0;
@@ -170,7 +179,8 @@ namespace NEM.CLI
         {
             EpwRow row = rows[rowNumber - 1];
             Console.WriteLine(
-                $"Row {rowNumber}: DNI={row.DirectNormalRadiation}; WindSpeed={row.WindSpeed}");
+                $"Row {rowNumber}: DryBulb={row.DryBulbTemperature}; " +
+                $"DNI={row.DirectNormalRadiation}; WindSpeed={row.WindSpeed}");
         }
 
         static string GetDefaultOutputPath()

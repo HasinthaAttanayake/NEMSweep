@@ -124,7 +124,7 @@ namespace NEM.Model.Series
         /// Throws if <paramref name="other"/> is not aligned to this series on start,
         /// resolution and length, naming the mismatch. Never coerces or truncates.
         /// </summary>
-        protected void RequireAligned(TimeSeries other)
+        internal void RequireAligned(TimeSeries other)
         {
             ArgumentNullException.ThrowIfNull(other);
 
