@@ -1,7 +1,8 @@
 using NEM.Model.Series;
 using NEM.Model.Units;
+using NEM.Model.Weather;
 
-namespace NEM.Model.PowerCurves
+namespace NEM.Model.Generation.Solar
 {
     /// <summary>
     /// Global tilted irradiation received by a dual-axis tracking array during each

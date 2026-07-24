@@ -1,9 +1,10 @@
 using FluentAssertions;
-using NEM.Model.PowerCurves;
+using NEM.Model.Generation.Wind;
 using NEM.Model.Series;
 using NEM.Model.Units;
+using NEM.Model.Weather;
 
-namespace NemSim.Tests
+namespace NEM.Model.Tests.Generation.Wind
 {
     public class WindPowerCurveTests
     {

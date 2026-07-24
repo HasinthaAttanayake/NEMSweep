@@ -1,6 +1,6 @@
 using CsvHelper;
 using CsvHelper.Configuration;
-using NEM.Model.Series;
+using NEM.Model.Weather;
 using System.Globalization;
 
 namespace NEM.CLI;

@@ -2,7 +2,7 @@ using FluentAssertions;
 using NEM.Model.Series;
 using NEM.Model.Units;
 
-namespace NemSim.Tests
+namespace NEM.Model.Tests.Series
 {
     public class FlowSeriesTests
     {

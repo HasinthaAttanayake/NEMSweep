@@ -1,35 +1,8 @@
-namespace NEM.Model.Series
+using NEM.Model.Series;
+using NEM.Model.Units;
+
+namespace NEM.Model.Weather
 {
-    /// <summary>
-    /// Unit of a resource trace. A series-level tag, not a scalar wrapper — there is no
-    /// trace arithmetic to protect.
-    /// </summary>
-    public enum TraceUnit
-    {
-        /// <summary>Wind speed in metres per second (m/s).</summary>
-        MetresPerSecond,
-
-        /// <summary>
-        /// Direct Normal Radiation, already integrated over the hour,
-        /// in watt-hours per square metre (Wh/m²): energy from the solar disk normal to
-        /// the sun's rays. This is the field a 2-axis tracking array receives. The unit
-        /// tag names the component, not just Wh/m², because Global Horizontal and
-        /// Diffuse Horizontal share the unit but are physically distinct — feeding
-        /// one to a curve expecting another is dimensionally valid and wrong.
-        /// </summary>
-        DirectNormalRadiationWattHoursPerSquareMetre,
-
-        /// <summary>Global Horizontal Radiation in watt-hours per square metre (Wh/m²).</summary>
-        GlobalHorizontalRadiationWattHoursPerSquareMetre,
-
-        /// <summary>Diffuse Horizontal Radiation in watt-hours per square metre (Wh/m²).</summary>
-        DiffuseHorizontalRadiationWattHoursPerSquareMetre,
-
-        /// <summary>Dry-bulb air temperature in degrees Celsius (°C).</summary>
-        DryBulbTemperatureDegreesCelsius,
-
-    }
-
     /// <summary>
     /// A resource trace: wind speed (m/s) or EPW radiation (Wh/m²). Traces are inputs
     /// to conversion, not participants in arithmetic — read at index <c>t</c>, feed to a
