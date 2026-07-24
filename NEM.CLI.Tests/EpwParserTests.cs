@@ -57,11 +57,11 @@ public sealed class EpwParserTests
 
             epw.Rows.Should().HaveCount(48);
             epw.Rows[0].Should().Be(new EpwRow(
-                DefaultSourceYear, 1, 1, 1, "FLAGS-0", 100, 200, 3));
+                DefaultSourceYear, 1, 1, 1, "FLAGS-0", 10, 100, 200, 50, 3));
             epw.Rows[23].Should().Be(new EpwRow(
-                DefaultSourceYear, 1, 1, 24, "FLAGS-23", 123, 246, 5.3));
+                DefaultSourceYear, 1, 1, 24, "FLAGS-23", 12.3, 123, 246, 73, 5.3));
             epw.Rows[47].Should().Be(new EpwRow(
-                DefaultSourceYear, 1, 2, 24, "FLAGS-47", 147, 294, 7.7));
+                DefaultSourceYear, 1, 2, 24, "FLAGS-47", 14.7, 147, 294, 97, 7.7));
         }
         finally
         {
@@ -153,13 +153,47 @@ public sealed class EpwParserTests
         }
     }
 
+    [Theory]
+    [InlineData(-70, false)]
+    [InlineData(70, false)]
+    [InlineData(-70.1, true)]
+    [InlineData(70.1, true)]
+    [InlineData(99.9, true)]
+    public void ReadRows_ValidatesDryBulbTemperatureRange(double temperature, bool shouldThrow)
+    {
+        string path = new EpwFixture()
+            .AddRow(DefaultSourceYear, 1, 1, 1, dryBulbTemperature: temperature)
+            .Write();
+
+        try
+        {
+            var act = () => EpwParser.ReadRows(path);
+
+            if (shouldThrow)
+            {
+                act.Should().Throw<EpwGapException>()
+                    .Which.Gaps.Should().ContainSingle(gap =>
+                        gap.FieldName == "Dry Bulb Temperature");
+            }
+            else
+            {
+                act.Should().NotThrow();
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     [Fact]
-    public void ReadRows_ThrowsSingleCompleteManifest_WhenThreeGapsExist()
+    public void ReadRows_ThrowsSingleCompleteManifest_WhenRadiationAndWindGapsExist()
     {
         string path = new EpwFixture()
             .AddRow(DefaultSourceYear, 1, 1, 1, globalHorizontalRadiation: 9999)
             .AddRow(DefaultSourceYear, 1, 1, 2, directNormalRadiation: -1)
             .AddRow(DefaultSourceYear, 1, 1, 3, windSpeed: 41)
+            .AddRow(DefaultSourceYear, 1, 1, 4, diffuseHorizontalRadiation: 9999)
             .Write();
 
         try
@@ -167,10 +201,11 @@ public sealed class EpwParserTests
             var act = () => EpwParser.ReadRows(path);
 
             var exception = act.Should().Throw<EpwGapException>().Which;
-            exception.Gaps.Should().HaveCount(3);
-            exception.Gaps.Select(gap => gap.RowNumber).Should().Equal(1, 2, 3);
+            exception.Gaps.Should().HaveCount(4);
+            exception.Gaps.Select(gap => gap.RowNumber).Should().Equal(1, 2, 3, 4);
             exception.Message.Should().Contain("Global Horizontal Radiation");
             exception.Message.Should().Contain("Direct Normal Radiation");
+            exception.Message.Should().Contain("Diffuse Horizontal Radiation");
             exception.Message.Should().Contain("Wind Speed");
         }
         finally
@@ -338,10 +373,24 @@ public sealed class EpwParserTests
         {
             EpwWeatherSeries weather = EpwParser.ReadTimeSeries(path);
 
+            weather.GlobalHorizontalRadiation.Length.Should().Be(8760);
+            weather.GlobalHorizontalRadiation.Unit.Should().Be(
+                TraceUnit.GlobalHorizontalRadiationWattHoursPerSquareMetre);
             weather.DirectNormalRadiation.Length.Should().Be(8760);
             weather.DirectNormalRadiation.Unit.Should().Be(
                 TraceUnit.DirectNormalRadiationWattHoursPerSquareMetre);
             weather.DirectNormalRadiation[0].Should().Be(0);
+            weather.DiffuseHorizontalRadiation.Length.Should().Be(8760);
+            weather.DiffuseHorizontalRadiation.Unit.Should().Be(
+                TraceUnit.DiffuseHorizontalRadiationWattHoursPerSquareMetre);
+            weather.SolarZenith.Length.Should().Be(8760);
+            weather.SolarZenith.Latitude.Should().Be(-33.86);
+            weather.SolarZenith.Longitude.Should().Be(151.21);
+            weather.SolarZenith[0].Degrees.Should().BeInRange(0, 180);
+            weather.SolarZenith[weather.SolarZenith.Length - 1].Degrees.Should().BeInRange(0, 180);
+            weather.DryBulbTemperature.Length.Should().Be(8760);
+            weather.DryBulbTemperature.Unit.Should().Be(TraceUnit.DryBulbTemperatureDegreesCelsius);
+            weather.DryBulbTemperature[0].Should().Be(20);
             weather.WindSpeed.Length.Should().Be(8760);
             weather.WindSpeed.Unit.Should().Be(TraceUnit.MetresPerSecond);
             weather.WindSpeed[0].Should().Be(5);
@@ -460,7 +509,9 @@ public sealed class EpwParserTests
                 100 + index,
                 200 + 2 * index,
                 3 + index / 10.0,
-                $"FLAGS-{index}");
+                50 + index,
+                $"FLAGS-{index}",
+                dryBulbTemperature: 10 + index / 10.0);
         }
     }
 }

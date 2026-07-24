@@ -22,14 +22,20 @@ internal sealed record EpwRow(
     int Day,
     int Hour,
     string DataSourceAndUncertaintyFlags,
+    double DryBulbTemperature,
     double GlobalHorizontalRadiation,
     double DirectNormalRadiation,
+    double DiffuseHorizontalRadiation,
     double WindSpeed);
 
 internal sealed record EpwFile(EpwHeader Header, IReadOnlyList<EpwRow> Rows);
 
 internal sealed record EpwWeatherSeries(
+    TraceSeries GlobalHorizontalRadiation,
     TraceSeries DirectNormalRadiation,
+    TraceSeries DiffuseHorizontalRadiation,
+    SolarZenithSeries SolarZenith,
+    TraceSeries DryBulbTemperature,
     TraceSeries WindSpeed);
 
 internal sealed record EpwGap(
@@ -180,8 +186,10 @@ internal static class EpwParser
                 ParseInt(fields[2], "Day", lineNumber),
                 ParseInt(fields[3], "Hour", lineNumber),
                 fields[5],
+                ParseDouble(fields[6], "Dry Bulb Temperature", lineNumber),
                 ParseDouble(fields[13], "Global Horizontal Radiation", lineNumber),
                 ParseDouble(fields[14], "Direct Normal Radiation", lineNumber),
+                ParseDouble(fields[15], "Diffuse Horizontal Radiation", lineNumber),
                 ParseDouble(fields[21], "Wind Speed", lineNumber)));
         }
 
@@ -204,30 +212,67 @@ internal static class EpwParser
     public static EpwWeatherSeries ReadTimeSeries(string path)
     {
         EpwFile epw = ReadValidated(path);
+        double[] globalHorizontalRadiation = epw.Rows
+            .Select(row => row.GlobalHorizontalRadiation)
+            .ToArray();
         double[] directNormalRadiation = epw.Rows
             .Select(row => row.DirectNormalRadiation)
+            .ToArray();
+        double[] diffuseHorizontalRadiation = epw.Rows
+            .Select(row => row.DiffuseHorizontalRadiation)
+            .ToArray();
+        double[] dryBulbTemperature = epw.Rows
+            .Select(row => row.DryBulbTemperature)
             .ToArray();
         double[] windSpeed = epw.Rows
             .Select(row => row.WindSpeed)
             .ToArray();
 
+        TraceSeries globalHorizontalRadiationSeries = TraceSeries.GlobalHorizontalRadiation(
+            SyntheticNonLeapStart,
+            HourlyResolution,
+            globalHorizontalRadiation);
         TraceSeries directNormalRadiationSeries = TraceSeries.DirectNormalRadiation(
             SyntheticNonLeapStart,
             HourlyResolution,
             directNormalRadiation);
+        TraceSeries diffuseHorizontalRadiationSeries = TraceSeries.DiffuseHorizontalRadiation(
+            SyntheticNonLeapStart,
+            HourlyResolution,
+            diffuseHorizontalRadiation);
+        SolarZenithSeries solarZenithSeries = SolarZenithSeries.Calculate(
+            SyntheticNonLeapStart,
+            HourlyResolution,
+            epw.Rows.Count,
+            epw.Header.Latitude,
+            epw.Header.Longitude);
+        TraceSeries dryBulbTemperatureSeries = TraceSeries.DryBulbTemperature(
+            SyntheticNonLeapStart,
+            HourlyResolution,
+            dryBulbTemperature);
         TraceSeries windSpeedSeries = TraceSeries.WindSpeed(
             SyntheticNonLeapStart,
             HourlyResolution,
             windSpeed,
             EpwWindMeasurementHeightMetres);
 
-        if (directNormalRadiationSeries.Resolution != HourlyResolution
+        if (globalHorizontalRadiationSeries.Resolution != HourlyResolution
+            || directNormalRadiationSeries.Resolution != HourlyResolution
+            || diffuseHorizontalRadiationSeries.Resolution != HourlyResolution
+            || solarZenithSeries.Resolution != HourlyResolution
+            || dryBulbTemperatureSeries.Resolution != HourlyResolution
             || windSpeedSeries.Resolution != HourlyResolution)
         {
             throw new InvalidOperationException("EPW traces must retain their native hourly resolution.");
         }
 
-        return new EpwWeatherSeries(directNormalRadiationSeries, windSpeedSeries);
+        return new EpwWeatherSeries(
+            globalHorizontalRadiationSeries,
+            directNormalRadiationSeries,
+            diffuseHorizontalRadiationSeries,
+            solarZenithSeries,
+            dryBulbTemperatureSeries,
+            windSpeedSeries);
     }
 
     public static EpwProvenanceReport ReadProvenance(string path)
@@ -315,7 +360,12 @@ internal static class EpwParser
         for (int index = 0; index < rows.Count; index++)
         {
             EpwRow row = rows[index];
-            if (row.GlobalHorizontalRadiation >= 9999)
+            if (row.DryBulbTemperature < -70 || row.DryBulbTemperature > 70)
+            {
+                AddGap(gaps, index, row, "Dry Bulb Temperature", row.DryBulbTemperature);
+            }
+
+            if (row.GlobalHorizontalRadiation >= 9999 || row.GlobalHorizontalRadiation < 0)
             {
                 AddGap(gaps, index, row, "Global Horizontal Radiation", row.GlobalHorizontalRadiation);
             }
@@ -323,6 +373,11 @@ internal static class EpwParser
             if (row.DirectNormalRadiation >= 9999 || row.DirectNormalRadiation < 0)
             {
                 AddGap(gaps, index, row, "Direct Normal Radiation", row.DirectNormalRadiation);
+            }
+
+            if (row.DiffuseHorizontalRadiation >= 9999 || row.DiffuseHorizontalRadiation < 0)
+            {
+                AddGap(gaps, index, row, "Diffuse Horizontal Radiation", row.DiffuseHorizontalRadiation);
             }
 
             if (row.WindSpeed >= 999 || row.WindSpeed < 0 || row.WindSpeed > 40)
