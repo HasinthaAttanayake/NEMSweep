@@ -9,7 +9,8 @@ main {
 }
 
 .sidebar {
-    background-image: linear-gradient(180deg, rgb(5, 39, 103) 0%, #3a0647 70%);
+    background: #18342f;
+    border-right: 1px solid #102723;
 }
 
 .top-row {
@@ -35,6 +36,15 @@ main {
         overflow: hidden;
         text-overflow: ellipsis;
     }
+
+.top-row ::deep .repository-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: #244940;
+    font-size: 0.88rem;
+    font-weight: 700;
+}
 
 @media (max-width: 640.98px) {
     .top-row {

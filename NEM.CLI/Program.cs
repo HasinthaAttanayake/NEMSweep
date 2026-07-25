@@ -1,18 +1,10 @@
-﻿using CsvHelper;
-using CsvHelper.Configuration;
-using CsvHelper.Configuration.Attributes;
-using CsvHelper.TypeConversion;
-using System.Globalization;
-using System.Text.Json;
+﻿using System.Text.Json;
 using NEM.Contracts;
 
 namespace NEM.CLI
 {
     class Program
     {
-        // AEMO NEM time is UTC+10 fixed, no daylight saving
-        private static readonly TimeSpan NemOffset = TimeSpan.FromHours(10);
-
         static int Main(string[] args)
         {
             if (args.Length == 2 && args[0] == "--epw-report")
@@ -107,70 +99,33 @@ namespace NEM.CLI
                 return 0;
             }
 
-            Console.WriteLine("Reading files in data folder");
-
-            string dataPath = @"./data";
-            if (!Directory.Exists(dataPath))
-            {
-                Directory.CreateDirectory(dataPath);
-                Console.WriteLine($"Created data directory at {Path.GetFullPath(dataPath)}");
-            }
-
-            string[] files = Directory.GetFiles(dataPath);
-
-            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
-            {
-                PrepareHeaderForMatch = args => args.Header.ToLower(),
-            };
-
-            var rawDemandRecord = files.SelectMany(filePath =>
-            {
-                Console.WriteLine(filePath);
-                using var reader = new StreamReader(filePath);
-                using var csv = new CsvReader(reader, config);
-                // materialize here so we don't return an enumerable that uses a disposed reader
-                return csv.GetRecords<AemoPriceAndDemand>().ToList();
-            }).ToList();
-
-            Console.WriteLine($"Lines of Demand Data Read: {rawDemandRecord.Count}");
-
-            Scenario scenario = new Scenario("nsw demand only june 2026","nsw",rawDemandRecord.Min(x => x.SettlementDate), rawDemandRecord.Max(x => x.SettlementDate), rawDemandRecord.ElementAt(1).SettlementDate - rawDemandRecord.ElementAt(0).SettlementDate,"no agg");
-            Sources dataSources = new Sources(files.Select(Path.GetFileName).ToArray()!);
-            Series dataSeries = new Series(rawDemandRecord.Select(x => x.TotalDemand).ToArray());
-
-            ModelInputOutputDTO modelOutputDTO = new ModelInputOutputDTO(1, scenario, DateTimeOffset.UtcNow,dataSources,dataSeries);
-
-            // Write results to JSON
-            string outputPath = args.Length > 0 
-                ? args[0] 
-                : GetDefaultOutputPath();
-
             try
             {
-                string directory = Path.GetDirectoryName(outputPath)!;
-                if (!Directory.Exists(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
+                OperationalDemandSettings settings = ReadOperationalDemandSettings();
+                string archiveDirectory = Path.GetFullPath(
+                    settings.ArchiveDirectory,
+                    AppContext.BaseDirectory);
+                OperationalDemandData demandData = OperationalDemandParser.ReadFinancialYear(
+                    archiveDirectory,
+                    settings.Region,
+                    settings.PeriodStart);
+                ModelInputOutputDTO output = OperationalDemandExport.Create(demandData);
+                string outputPath = args.Length > 0 ? args[0] : GetDefaultOutputPath();
+                OperationalDemandExport.WriteJson(output, outputPath);
 
-                var options = new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                    WriteIndented = true
-                };
-
-                string json = JsonSerializer.Serialize(modelOutputDTO, options);
-                File.WriteAllText(outputPath, json);
-
-                string absolutePath = Path.GetFullPath(outputPath);
-                Console.WriteLine($"\nSuccessfully wrote results to: {absolutePath}");
-                Console.WriteLine($"Data points: {dataSeries.DemandMw.Length}");
+                Console.WriteLine(
+                    $"Loaded {demandData.Demand.Length} half-hour operational-demand intervals "
+                    + $"for {demandData.Region} from {demandData.SourceArchives.Count} archives.");
+                Console.WriteLine(
+                    $"Period: {demandData.Demand.Start:o} to "
+                    + $"{output.Scenario.PeriodEnd:o} (end exclusive).");
+                Console.WriteLine($"Wrote demand data to: {Path.GetFullPath(outputPath)}");
 
                 return 0;
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"\nError writing JSON file: {ex.Message}");
+                Console.Error.WriteLine($"Operational-demand import failed: {ex.Message}");
                 return 1;
             }
         }
@@ -203,38 +158,24 @@ namespace NEM.CLI
 
             return Path.Combine(solutionRoot, "NEM.Web", "wwwroot", "data", "results.json");
         }
-    }
 
-    // Custom type converter for NEM timestamps (UTC+10 fixed)
-    public class NemDateTimeOffsetConverter : DefaultTypeConverter
-    {
-        private static readonly TimeSpan NemOffset = TimeSpan.FromHours(10);
-
-        public override object? ConvertFromString(string? text, IReaderRow row, MemberMapData memberMapData)
+        private static OperationalDemandSettings ReadOperationalDemandSettings()
         {
-            if (string.IsNullOrWhiteSpace(text))
-                return null;
-
-            // Parse as DateTime first with explicit format
-            var dt = DateTime.ParseExact(text, "yyyy/MM/dd HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None);
-
-            // Construct DateTimeOffset with explicit NEM offset
-            return new DateTimeOffset(dt, NemOffset);
+            string settingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(settingsPath));
+            JsonElement section = document.RootElement.GetProperty("operationalDemand");
+            return new OperationalDemandSettings(
+                section.GetProperty("archiveDirectory").GetString()
+                    ?? throw new FormatException("operationalDemand.archiveDirectory is required."),
+                section.GetProperty("region").GetString()
+                    ?? throw new FormatException("operationalDemand.region is required."),
+                section.GetProperty("periodStart").GetDateTimeOffset());
         }
     }
 
-    // AEMO Data Class 
-    public class AemoPriceAndDemand
-    {
-        public string Region { get; set; } = string.Empty;
-
-        [TypeConverter(typeof(NemDateTimeOffsetConverter))]
-        public DateTimeOffset SettlementDate { get; set; }
-
-        // TODO: TotalDemand is power in MW (interval average), not energy in MWh despite the name. Wrap in Power and convert via Energy.From.
-        public Double TotalDemand { get; set; }
-        public Double Rrp {  get; set; }
-        public string PeriodType { get; set; } = string.Empty;
-    }
+    internal sealed record OperationalDemandSettings(
+        string ArchiveDirectory,
+        string Region,
+        DateTimeOffset PeriodStart);
 }
 

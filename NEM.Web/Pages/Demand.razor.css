@@ -1,0 +1,171 @@
+.demand-page {
+    --demand: #176b5b;
+    --demand-soft: #e8f5f1;
+    --ink: #17212b;
+    --muted: #5d6873;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 1.5rem 1.25rem 3rem;
+    color: var(--ink);
+}
+
+.demand-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 2rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid #dce1e5;
+}
+
+.eyebrow {
+    margin: 0 0 0.35rem;
+    color: var(--demand);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0;
+}
+
+.demand-header h1 {
+    margin: 0;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: clamp(2rem, 4vw, 3.4rem);
+    font-weight: 600;
+    letter-spacing: 0;
+}
+
+.scope-line,
+.chart-heading p {
+    margin: 0.4rem 0 0;
+    color: var(--muted);
+}
+
+.demand-controls {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.75rem;
+}
+
+.view-select,
+.date-field input {
+    width: 190px;
+}
+
+.date-field {
+    display: grid;
+    gap: 0.35rem;
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.date-field input {
+    padding: 0.75rem;
+    border: 1px solid #aeb7bf;
+    border-radius: 4px;
+    background: #fff;
+    color: var(--ink);
+    font: inherit;
+}
+
+.status-block {
+    display: grid;
+    min-height: 420px;
+    place-items: center;
+}
+
+.metric-strip {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin-top: 1.5rem;
+    border-top: 1px solid #dce1e5;
+    border-bottom: 1px solid #dce1e5;
+}
+
+.metric-strip div {
+    min-width: 0;
+    padding: 1rem 1.15rem;
+    border-right: 1px solid #dce1e5;
+}
+
+.metric-strip div:last-child {
+    border-right: 0;
+}
+
+.metric-strip span,
+.metric-strip small {
+    display: block;
+    color: var(--muted);
+    font-size: 0.8rem;
+}
+
+.metric-strip strong {
+    display: inline-block;
+    margin: 0.2rem 0.3rem 0 0;
+    color: var(--demand);
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 1.75rem;
+    font-weight: 600;
+}
+
+.trace-context {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    padding: 1rem 0 0.5rem;
+    color: var(--muted);
+    font-size: 0.85rem;
+}
+
+.chart-section {
+    padding-top: 1rem;
+}
+
+.chart-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.chart-heading h2 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.unit-badge {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid #9ac8be;
+    border-radius: 4px;
+    background: var(--demand-soft);
+    color: var(--demand);
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+@media (max-width: 760px) {
+    .demand-header,
+    .demand-controls {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .view-select,
+    .date-field input {
+        width: 100%;
+    }
+
+    .metric-strip {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .metric-strip div:nth-child(2) {
+        border-right: 0;
+    }
+
+    .metric-strip div:nth-child(-n + 2) {
+        border-bottom: 1px solid #dce1e5;
+    }
+}
