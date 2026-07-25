@@ -27,6 +27,19 @@ namespace NEM.Model.Tests.Series
         }
 
         [Fact]
+        public void SummingMegawattSamples_DoesNotProduceEnergy()
+        {
+            var demand = new FlowSeries(NemStart, HalfHour, new[] { 400.0, 600.0 });
+
+            double invalidSumOfMegawattSamples = demand[0].Megawatts + demand[1].Megawatts;
+            double energyMegawattHours = demand.Integrate().MegawattHours;
+
+            invalidSumOfMegawattSamples.Should().Be(1000);
+            energyMegawattHours.Should().BeApproximately(500, Tolerance(500));
+            invalidSumOfMegawattSamples.Should().NotBe(energyMegawattHours);
+        }
+
+        [Fact]
         public void ResampleToHourly_TakesMeanOfEachHour()
         {
             var flow = new FlowSeries(NemStart, HalfHour, new[] { 400.0, 600.0 });
@@ -41,11 +54,18 @@ namespace NEM.Model.Tests.Series
         [Fact]
         public void ResampleToHourly_PreservesEnergy()
         {
-            var flow = new FlowSeries(NemStart, HalfHour, new[] { 400.0, 600.0 });
+            var flow = new FlowSeries(
+                NemStart,
+                HalfHour,
+                new[] { 400.0, 600.0, 800.0, 600.0 });
 
             var before = flow.Integrate().MegawattHours;
-            var after = flow.ResampleToHourly().Integrate().MegawattHours;
+            FlowSeries hourly = flow.ResampleToHourly();
+            var after = hourly.Integrate().MegawattHours;
 
+            hourly[0].Megawatts.Should().BeApproximately(500, Tolerance(500));
+            hourly[1].Megawatts.Should().BeApproximately(700, Tolerance(700));
+            before.Should().BeApproximately(1200, Tolerance(1200));
             after.Should().BeApproximately(before, Tolerance(before));
         }
 
