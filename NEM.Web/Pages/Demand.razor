@@ -278,19 +278,23 @@
 
     private string[] BuildLabels(IReadOnlyList<DateTimeOffset> timestamps)
     {
-        int labelCount = Math.Min(15, timestamps.Count);
+        const int MaximumLabelCount = 7;
+        int labelCount = Math.Min(MaximumLabelCount, timestamps.Count);
         int labelStride = Math.Max(1, timestamps.Count / labelCount);
         var labels = new string[timestamps.Count];
+        string? previousLabel = null;
         for (int index = 0; index < timestamps.Count; index++)
         {
             if (index % labelStride == 0 || index == timestamps.Count - 1)
             {
-                labels[index] = timestamps[index].ToString(_selectedView switch
+                string label = timestamps[index].ToString(_selectedView switch
                 {
                     -1 => "HH:mm",
                     0 => "MMM yyyy",
                     _ => "dd MMM",
                 });
+                labels[index] = label == previousLabel ? string.Empty : label;
+                previousLabel = label;
             }
             else
             {

@@ -67,7 +67,7 @@
             </div>
             <MudChart ChartType="ChartType.Line"
                       ChartSeries="_zenithSeries"
-                      ChartLabels="HourLabels"
+                      ChartLabels="ChartHourLabels"
                       Width="100%"
                       Height="460px" />
         </section>
@@ -77,6 +77,10 @@
 @code {
     private static readonly string[] HourLabels =
         Enumerable.Range(0, 24).Select(hour => $"{hour:D2}:30").ToArray();
+    private static readonly string[] ChartHourLabels =
+        Enumerable.Range(0, 24)
+            .Select(hour => hour % 3 == 0 || hour == 23 ? $"{hour:D2}:30" : string.Empty)
+            .ToArray();
 
     private bool _isLoading = true;
     private string? _errorMessage;
