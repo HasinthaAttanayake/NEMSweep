@@ -1,135 +1,88 @@
 ﻿@page "/"
-@using NEM.Contracts
-@using System.Text.Json
-@inject HttpClient Http
 
-<PageTitle>Home</PageTitle>
+<PageTitle>NemSim</PageTitle>
 
-<h1>NEM (National Energy Market) Sim - Coming Soon!</h1>
+<div class="home-page">
+    <header class="project-header">
+        <p class="eyebrow">Open National Electricity Market simulation</p>
+        <h1>NemSim</h1>
+        <p class="lead">
+            An open model of Australia's National Electricity Market, being built in public one
+            validated layer at a time.
+        </p>
+        <div class="build-status" role="status">
+            <span>Under active construction</span>
+            <p>
+                Development is sequential: each dataset and model component is added, tested, and
+                exposed before the next part of the simulation is introduced.
+            </p>
+        </div>
+        <div class="project-actions">
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Href="https://github.com/users/HasinthaAttanayake/projects/11"
+                       Target="_blank"
+                       rel="noopener noreferrer"
+                       StartIcon="@Icons.Material.Filled.TrackChanges">
+                Track project
+            </MudButton>
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Primary"
+                       Href="https://github.com/HasinthaAttanayake/NemSim"
+                       Target="_blank"
+                       rel="noopener noreferrer"
+                       StartIcon="@Icons.Material.Filled.Code">
+                View source
+            </MudButton>
+        </div>
+    </header>
 
-<section>
-    <p>The purpose of this project is to answer the following questions regarding Australia's National Energy Market:</p>
+    <section class="question-section">
+        <div>
+            <p class="section-label">Research focus</p>
+            <h2>Questions the model is built to test</h2>
+        </div>
 
-    <ul>
-        <li>What is the cost of electricity in 2030 should we achieve the 82% Renewable Energy Generation Target?</li>
-        <li>How does a data centre boom affect this given that operators are governed by <a href="https://www.industry.gov.au/publications/expectations-data-centres-and-ai-infrastructure-developers" target="_blank">expectations not legislation</a>?</li>
-    </ul>
-</section>
+        <ol>
+            <li>What could electricity cost in 2030 if Australia achieves its 82% renewable generation target?</li>
+            <li>
+                How could data-centre growth affect that outcome under the Australian Government's
+                <a href="https://www.industry.gov.au/publications/expectations-data-centres-and-ai-infrastructure-developers"
+                   target="_blank"
+                   rel="noopener noreferrer">expectations for developers</a>?
+            </li>
+        </ol>
+    </section>
 
-<section>
-    <p>Whilst models, projections, reports and news headlines already exist in this space this work is set out as an open, rather than a black, box.</p>
-</section>
+    <section class="explore-section">
+        <div class="section-heading">
+            <div>
+                <p class="section-label">Available now</p>
+                <h2>Validated inputs published so far</h2>
+            </div>
+            <p>
+                These are the layers currently exposed in the site. New views will appear here as
+                the sequential build reaches each part of the model.
+            </p>
+        </div>
 
-<section>
-    <h2>Demand Profile</h2>
-    @if (_isLoading)
-    {
-        <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
-    }
-    else if (_errorMessage != null)
-    {
-        <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
-    }
-    else if (_series.Count == 0)
-    {
-        <MudAlert Severity="Severity.Info">No data available</MudAlert>
-    }
-    else
-    {
-        <p>Showing @(_displayPointCount) of @_rawPointCount points (downsampled) | @_scenario</p>
-        <MudChart ChartType="ChartType.Line" 
-                  ChartSeries="@_series" 
-                  ChartLabels="@_xAxisLabels"
-                  Width="100%" 
-                  Height="500px">
-        </MudChart>
-    }
-</section>
-
-@code {
-    private bool _isLoading = true;
-    private string? _errorMessage;
-    private List<ChartSeries<double>> _series = new();
-    private string[] _xAxisLabels = Array.Empty<string>();
-    private int _rawPointCount;
-    private int _displayPointCount;
-    private string _scenario = string.Empty;
-
-    protected override async Task OnInitializedAsync()
-    {
-        try
-        {
-            var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
-            var result = await Http.GetFromJsonAsync<ModelInputOutputDTO>("data/results.json", options);
-
-            if (result == null)
-            {
-                _errorMessage = "Failed to load results.json";
-                return;
-            }
-
-            var demandMw = result.DataSeries.DemandMw;
-            _rawPointCount = demandMw.Length;
-            _scenario = $"{result.Scenario.Region.ToUpper()} | {result.Scenario.PeriodStart:MMM yyyy}";
-
-            if (_rawPointCount == 0)
-            {
-                return;
-            }
-
-            var periodStart = result.Scenario.PeriodStart;
-            var periodEnd = result.Scenario.PeriodEnd;
-            var resolution = result.Scenario.Resolution;
-
-            // Downsample: target ~500 points from ~8600
-            var stride = Math.Max(1, _rawPointCount / 500);
-
-            var chartData = new List<double>();
-            var allTimestamps = new List<DateTimeOffset>();
-
-            for (int i = 0; i < _rawPointCount; i += stride)
-            {
-                var timestamp = periodStart.AddTicks(resolution.Ticks * i);
-                chartData.Add(demandMw[i]);
-                allTimestamps.Add(timestamp);
-            }
-
-            _displayPointCount = chartData.Count;
-
-            // Create strategic X-axis labels: show ~15-20 labels spread across the date range
-            var labelCount = Math.Min(15, _displayPointCount);
-            var labelStride = Math.Max(1, _displayPointCount / labelCount);
-            _xAxisLabels = new string[_displayPointCount];
-
-            for (int i = 0; i < _displayPointCount; i++)
-            {
-                // Only show labels at strategic points
-                if (i % labelStride == 0 || i == _displayPointCount - 1)
-                {
-                    var ts = allTimestamps[i];
-                    // Show date for first occurrence of each day, otherwise empty
-                    _xAxisLabels[i] = ts.Hour == 0 || i % labelStride == 0 
-                        ? ts.ToString("MMM dd") 
-                        : "";
-                }
-                else
-                {
-                    _xAxisLabels[i] = "";
-                }
-            }
-
-            _series = new List<ChartSeries<double>>
-            {
-                new ChartSeries<double> { Name = "Demand (MW)", Data = chartData.ToArray() }
-            };
-        }
-        catch (Exception ex)
-        {
-            _errorMessage = $"Error loading data: {ex.Message}";
-        }
-        finally
-        {
-            _isLoading = false;
-        }
-    }
-}
+        <div class="explore-links">
+            <a href="demand">
+                <MudIcon Icon="@Icons.Material.Filled.ElectricBolt" />
+                <span>
+                    <strong>Operational demand</strong>
+                    <small>New South Wales demand by year, month, or day</small>
+                </span>
+                <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
+            </a>
+            <a href="weather">
+                <MudIcon Icon="@Icons.Material.Filled.WbSunny" />
+                <span>
+                    <strong>Weather resources</strong>
+                    <small>Solar, wind, temperature, and modelled generation</small>
+                </span>
+                <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
+            </a>
+        </div>
+    </section>
+</div>
