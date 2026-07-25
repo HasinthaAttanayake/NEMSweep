@@ -1,0 +1,340 @@
+@page "/demand"
+@using NEM.Contracts
+@using System.Globalization
+@using System.Text.Json
+@inject HttpClient Http
+
+<PageTitle>Operational demand</PageTitle>
+
+<div class="demand-page">
+    <header class="demand-header">
+        <div>
+            <p class="eyebrow">Actual operational demand</p>
+            <h1>Demand</h1>
+            @if (!_isLoading && _errorMessage is null)
+            {
+                <p class="scope-line">
+                    @_regionName (@_regionCode) · Single region · Not a NEM-wide aggregate
+                </p>
+            }
+        </div>
+
+        @if (!_isLoading && _errorMessage is null)
+        {
+            <div class="demand-controls">
+                <MudSelect T="int"
+                           Label="View"
+                           Value="_selectedView"
+                           ValueChanged="OnViewChanged"
+                           Variant="Variant.Outlined"
+                           Class="view-select">
+                    <MudSelectItem T="int" Value="0">Full financial year</MudSelectItem>
+                    <MudSelectItem T="int" Value="-1">Single day</MudSelectItem>
+                    @foreach (MonthOption month in _months)
+                    {
+                        <MudSelectItem T="int" Value="month.Month">@month.Label</MudSelectItem>
+                    }
+                </MudSelect>
+
+                @if (_selectedView == -1)
+                {
+                    <label class="date-field">
+                        <span>Day</span>
+                        <input type="date"
+                               min="@_minimumDate"
+                               max="@_maximumDate"
+                               value="@_selectedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)"
+                               @onchange="OnDateChanged" />
+                    </label>
+                }
+            </div>
+        }
+    </header>
+
+    @if (_isLoading)
+    {
+        <div class="status-block">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        </div>
+    }
+    else if (_errorMessage is not null)
+    {
+        <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
+    }
+    else
+    {
+        <section class="metric-strip" aria-label="Selected demand period summary">
+            <div>
+                <span>Peak demand</span>
+                <strong>@_peakDemandMw.ToString("N0")</strong>
+                <small>MW</small>
+            </div>
+            <div>
+                <span>Mean demand</span>
+                <strong>@_meanDemandMw.ToString("N0")</strong>
+                <small>MW</small>
+            </div>
+            <div>
+                <span>Minimum demand</span>
+                <strong>@_minimumDemandMw.ToString("N0")</strong>
+                <small>MW</small>
+            </div>
+            <div>
+                <span>Energy supplied</span>
+                <strong>@_energyMegawattHours.ToString("N0")</strong>
+                <small>MWh</small>
+            </div>
+        </section>
+
+        <div class="trace-context">
+            <span>@_periodLabel</span>
+            <span>@_rawPointCount half-hour intervals</span>
+            <span>@_displayPointCount @_displayPointDescription</span>
+        </div>
+
+        <section class="chart-section">
+            <div class="chart-heading">
+                <div>
+                    <h2>@_chartTitle</h2>
+                    <p>@_chartDescription</p>
+                </div>
+                <span class="unit-badge">MW</span>
+            </div>
+            <MudChart ChartType="ChartType.Line"
+                      ChartSeries="_series"
+                      ChartLabels="_xAxisLabels"
+                      Width="100%"
+                      Height="500px" />
+        </section>
+    }
+</div>
+
+@code {
+    private bool _isLoading = true;
+    private string? _errorMessage;
+    private List<ChartSeries<double>> _series = [];
+    private string[] _xAxisLabels = [];
+    private int _rawPointCount;
+    private int _displayPointCount;
+    private string _regionCode = string.Empty;
+    private string _regionName = string.Empty;
+    private string _periodLabel = string.Empty;
+    private string _chartTitle = string.Empty;
+    private string _chartDescription = string.Empty;
+    private string _displayPointDescription = string.Empty;
+    private string _minimumDate = string.Empty;
+    private string _maximumDate = string.Empty;
+    private double _peakDemandMw;
+    private double _meanDemandMw;
+    private double _minimumDemandMw;
+    private double _energyMegawattHours;
+    private double[] _demandMw = [];
+    private DateTimeOffset _periodStart;
+    private DateTimeOffset _periodEnd;
+    private TimeSpan _resolution;
+    private int _selectedView;
+    private DateTime _selectedDate;
+    private List<MonthOption> _months = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+            ModelInputOutputDTO? result =
+                await Http.GetFromJsonAsync<ModelInputOutputDTO>("data/results.json", options);
+
+            if (result is null)
+            {
+                _errorMessage = "Failed to load results.json";
+                return;
+            }
+
+            if (result.SchemaVersion != 2)
+            {
+                _errorMessage = $"Demand data schema {result.SchemaVersion} is not supported; expected schema 2.";
+                return;
+            }
+
+            double[] demandMw = result.DataSeries.DemandMw;
+            DateTimeOffset periodStart = result.Scenario.PeriodStart;
+            DateTimeOffset periodEnd = result.Scenario.PeriodEnd;
+            TimeSpan resolution = result.Scenario.Resolution;
+            if (demandMw is null
+                || demandMw.Length == 0
+                || resolution <= TimeSpan.Zero
+                || periodEnd <= periodStart
+                || (periodEnd - periodStart).Ticks % resolution.Ticks != 0
+                || (periodEnd - periodStart).Ticks / resolution.Ticks != demandMw.Length)
+            {
+                _errorMessage = "Operational-demand timestamps and values are empty or misaligned.";
+                return;
+            }
+
+            _demandMw = demandMw;
+            _periodStart = periodStart;
+            _periodEnd = periodEnd;
+            _resolution = resolution;
+            _selectedDate = periodStart.Date;
+            _minimumDate = periodStart.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            _maximumDate = periodEnd.AddTicks(-1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            _regionCode = result.Scenario.Region.ToUpperInvariant();
+            _regionName = RegionName(_regionCode);
+            _months = BuildMonthOptions(periodStart, periodEnd);
+            BuildChart();
+        }
+        catch (Exception exception)
+        {
+            _errorMessage = $"Error loading demand data: {exception.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void OnViewChanged(int view)
+    {
+        _selectedView = view;
+        BuildChart();
+    }
+
+    private void OnDateChanged(ChangeEventArgs args)
+    {
+        if (DateTime.TryParseExact(
+            args.Value?.ToString(),
+            "yyyy-MM-dd",
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out DateTime selectedDate)
+            && selectedDate >= _periodStart.Date
+            && selectedDate < _periodEnd.Date)
+        {
+            _selectedDate = selectedDate;
+            BuildChart();
+        }
+    }
+
+    private void BuildChart()
+    {
+        int[] selectedIndexes = Enumerable.Range(0, _demandMw.Length)
+            .Where(IsSelected)
+            .ToArray();
+
+        _rawPointCount = selectedIndexes.Length;
+        _peakDemandMw = selectedIndexes.Max(index => _demandMw[index]);
+        _meanDemandMw = selectedIndexes.Average(index => _demandMw[index]);
+        _minimumDemandMw = selectedIndexes.Min(index => _demandMw[index]);
+        _energyMegawattHours = selectedIndexes.Sum(index => _demandMw[index]) * _resolution.TotalHours;
+        DateTimeOffset selectedStart = InstantAt(selectedIndexes[0]);
+        DateTimeOffset selectedEnd = InstantAt(selectedIndexes[^1]) + _resolution;
+        _periodLabel = _selectedView == -1
+            ? selectedStart.ToString("dddd, dd MMMM yyyy")
+            : $"{selectedStart:dd MMM yyyy} to {selectedEnd.AddTicks(-1):dd MMM yyyy}";
+
+        int targetDisplayPoints = _selectedView == -1 ? selectedIndexes.Length : 600;
+        int bucketSize = Math.Max(1, (int)Math.Ceiling((double)_rawPointCount / targetDisplayPoints));
+        var chartData = new List<double>();
+        var timestamps = new List<DateTimeOffset>();
+
+        for (int bucketStart = 0; bucketStart < _rawPointCount; bucketStart += bucketSize)
+        {
+            int bucketEnd = Math.Min(bucketStart + bucketSize, _rawPointCount);
+            double bucketAverage = selectedIndexes[bucketStart..bucketEnd]
+                .Average(index => _demandMw[index]);
+            chartData.Add(bucketAverage);
+            timestamps.Add(InstantAt(selectedIndexes[bucketStart]));
+        }
+
+        _displayPointCount = chartData.Count;
+        _displayPointDescription = _selectedView == -1 ? "displayed values" : "displayed averages";
+        _chartTitle = _selectedView == -1 ? "Demand through the day" : "Demand profile";
+        _chartDescription = _selectedView == -1
+            ? "Every half-hour interval is shown in NEM market time (UTC+10)"
+            : "Contiguous half-hour intervals are averaged into display buckets";
+        _xAxisLabels = BuildLabels(timestamps);
+        _series =
+        [
+            new ChartSeries<double>
+            {
+                Name = _selectedView == -1
+                    ? "Operational demand (MW)"
+                    : "Average operational demand (MW)",
+                Data = chartData.ToArray(),
+            },
+        ];
+    }
+
+    private bool IsSelected(int index)
+    {
+        DateTimeOffset instant = InstantAt(index);
+        return _selectedView switch
+        {
+            -1 => instant.Date == _selectedDate.Date,
+            0 => true,
+            _ => instant.Month == _selectedView,
+        };
+    }
+
+    private string[] BuildLabels(IReadOnlyList<DateTimeOffset> timestamps)
+    {
+        int labelCount = Math.Min(15, timestamps.Count);
+        int labelStride = Math.Max(1, timestamps.Count / labelCount);
+        var labels = new string[timestamps.Count];
+        for (int index = 0; index < timestamps.Count; index++)
+        {
+            if (index % labelStride == 0 || index == timestamps.Count - 1)
+            {
+                labels[index] = timestamps[index].ToString(_selectedView switch
+                {
+                    -1 => "HH:mm",
+                    0 => "MMM yyyy",
+                    _ => "dd MMM",
+                });
+            }
+            else
+            {
+                labels[index] = string.Empty;
+            }
+        }
+
+        return labels;
+    }
+
+    private DateTimeOffset InstantAt(int index) =>
+        _periodStart.AddTicks(_resolution.Ticks * index);
+
+    private static List<MonthOption> BuildMonthOptions(
+        DateTimeOffset periodStart,
+        DateTimeOffset periodEnd)
+    {
+        var months = new List<MonthOption>();
+        var monthStart = new DateTimeOffset(
+            periodStart.Year,
+            periodStart.Month,
+            1,
+            0,
+            0,
+            0,
+            periodStart.Offset);
+        while (monthStart < periodEnd)
+        {
+            months.Add(new MonthOption(monthStart.Month, monthStart.ToString("MMMM yyyy")));
+            monthStart = monthStart.AddMonths(1);
+        }
+
+        return months;
+    }
+
+    private static string RegionName(string regionCode) => regionCode switch
+    {
+        "NSW1" => "New South Wales",
+        "QLD1" => "Queensland",
+        "SA1" => "South Australia",
+        "TAS1" => "Tasmania",
+        "VIC1" => "Victoria",
+        _ => regionCode,
+    };
+
+    private sealed record MonthOption(int Month, string Label);
+}
