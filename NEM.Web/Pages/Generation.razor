@@ -1,0 +1,343 @@
+@page "/generation"
+@using NEM.Contracts
+@using System.Globalization
+@using System.Text.Json
+@inject HttpClient Http
+
+<PageTitle>Generation fleet</PageTitle>
+
+<main class="generation-page">
+    <header class="generation-header">
+        <div>
+            <p class="eyebrow">AEMO generation information</p>
+            <h1>Generation fleet</h1>
+            @if (_data is not null)
+            {
+                <p class="source-line">@_data.SourceFile · @_data.Rows.Length source units</p>
+            }
+        </div>
+
+        @if (!_isLoading && _errorMessage is null)
+        {
+            <div class="filters" aria-label="Generation filters">
+                <label>
+                    <span>Date</span>
+                    <input type="date"
+                           value="@_selectedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)"
+                           @onchange="OnDateChanged" />
+                </label>
+                <label>
+                    <span>Region</span>
+                    <select value="@_selectedRegion" @onchange="OnRegionChanged">
+                        <option value="All">All NEM regions</option>
+                        @foreach (string region in _regions)
+                        {
+                            <option value="@region">@region</option>
+                        }
+                    </select>
+                </label>
+                <label>
+                    <span>Minimum site capacity</span>
+                    <div class="number-field">
+                        <input type="number"
+                               min="0"
+                               step="1"
+                               value="@_minimumSiteCapacityMw.ToString(CultureInfo.InvariantCulture)"
+                               @onchange="OnMinimumCapacityChanged" />
+                        <span>MW AC</span>
+                    </div>
+                </label>
+            </div>
+        }
+    </header>
+
+    @if (_isLoading)
+    {
+        <div class="status-block"><MudProgressCircular Color="Color.Primary" Indeterminate="true" /></div>
+    }
+    else if (_errorMessage is not null)
+    {
+        <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
+    }
+    else
+    {
+        <section class="metric-strip" aria-label="Filtered generation summary">
+            <div><span>Included units</span><strong>@_filteredRows.Count.ToString("N0")</strong></div>
+            <div><span>Sites</span><strong>@_siteCount.ToString("N0")</strong></div>
+            <div><span>Nameplate AC</span><strong>@_totalAcMw.ToString("N1")</strong><small>MW · nearest 0.1 MW</small></div>
+            <div><span>Storage</span><strong>@_totalStorageMwh.ToString("N1")</strong><small>MWh · nearest 0.1 MWh</small></div>
+        </section>
+
+        <p class="filter-summary">
+            In-service units active on @_selectedDate.ToString("d MMMM yyyy") at sites of
+            @_minimumSiteCapacityMw.ToString("N0") MW AC or greater
+            @(_selectedRegion == "All" ? "across the NEM" : $"in {_selectedRegion}").
+        </p>
+
+        @if (_technologyAggregates.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info">No units match the selected filters.</MudAlert>
+        }
+        else
+        {
+            <section class="visual-grid" aria-label="Technology visualisations">
+                <div class="visual-panel">
+                    <div class="section-heading">
+                        <div><p class="section-index">01</p><h2>AC capacity share</h2></div>
+                        <span>MW AC · nearest 0.1 MW</span>
+                    </div>
+                    <MudChart T="double"
+                              ChartType="ChartType.Donut"
+                              ChartSeries="_acShareSeries"
+                              ChartLabels="_donutLabels"
+                              ChartOptions="_donutOptions"
+                              Width="100%"
+                              Height="360px" />
+                    <ul class="technology-legend" aria-label="AC capacity by technology">
+                        @foreach (TechnologyAggregate technology in _technologyAggregates)
+                        {
+                            <li>
+                                <span class="legend-swatch" style="background-color: @TechnologyColor(technology.TechnologyType)"></span>
+                                <span>@technology.TechnologyType</span>
+                            </li>
+                        }
+                    </ul>
+                </div>
+
+                <div class="visual-panel">
+                    <div class="section-heading">
+                        <div><p class="section-index">02</p><h2>Nameplate comparison</h2></div>
+                        <span>MW · nearest 0.1 MW</span>
+                    </div>
+                    <MudChart T="double"
+                              ChartType="ChartType.Bar"
+                              ChartSeries="_capacitySeries"
+                              ChartLabels="_technologyLabels"
+                              Width="100%"
+                              Height="360px" />
+                </div>
+            </section>
+
+            <section class="technology-section">
+                <div class="section-heading">
+                    <div><p class="section-index">03</p><h2>Technology breakdown</h2></div>
+                    <span>Aggregates rounded to nearest 0.1 MW / MWh</span>
+                </div>
+                <div class="table-scroll">
+                    <table class="aggregate-table">
+                        <thead>
+                            <tr>
+                                <th>Technology</th><th>Units</th><th>Sites</th>
+                                <th>DC capacity (MW)</th><th>AC capacity (MW)</th><th>Storage (MWh)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (TechnologyAggregate technology in _technologyAggregates)
+                            {
+                                <tr>
+                                    <th>@technology.TechnologyType</th>
+                                    <td>@technology.UnitCount.ToString("N0")</td>
+                                    <td>@technology.SiteCount.ToString("N0")</td>
+                                    <td>@technology.CapacityDcMw.ToString("N1")</td>
+                                    <td>@technology.CapacityAcMw.ToString("N1")</td>
+                                    <td>@technology.StorageMwh.ToString("N1")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="source-section">
+                <div class="section-heading">
+                    <div><p class="section-index">04</p><h2>Filtered source table</h2></div>
+                    <span>Columns A-Z</span>
+                </div>
+                <MudTable Items="_filteredRows" Dense="true" Hover="true" FixedHeader="true" Height="520px" RowsPerPage="25">
+                    <HeaderContent>
+                        <MudTh>Survey ID</MudTh><MudTh>Site</MudTh><MudTh>KCI ID</MudTh><MudTh>Owner</MudTh>
+                        <MudTh>Custodian</MudTh><MudTh>Region</MudTh><MudTh>Max site AC</MudTh><MudTh>Unit ID</MudTh>
+                        <MudTh>Unit</MudTh><MudTh>Technology</MudTh><MudTh>Detail</MudTh><MudTh>Gas fuel</MudTh>
+                        <MudTh>DUID</MudTh><MudTh>Dispatch</MudTh><MudTh>Unit count</MudTh><MudTh>Unit DC</MudTh>
+                        <MudTh>Unit AC</MudTh><MudTh>Agg DC</MudTh><MudTh>Agg AC</MudTh><MudTh>Agg storage</MudTh>
+                        <MudTh>Status</MudTh><MudTh>Commercial use</MudTh><MudTh>Closure year</MudTh><MudTh>Closure date</MudTh>
+                        <MudTh>Survey requested</MudTh><MudTh>Survey updated</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.AemoSurveyId</MudTd><MudTd>@context.SiteName</MudTd><MudTd>@context.AemoKciId</MudTd><MudTd>@context.SiteOwner</MudTd>
+                        <MudTd>@context.Custodian</MudTd><MudTd>@context.Region</MudTd><MudTd>@FormatNumber(context.MaxSiteCapacityAcMw)</MudTd><MudTd>@context.GenInfoUnitId</MudTd>
+                        <MudTd>@context.UnitName</MudTd><MudTd>@context.TechnologyType</MudTd><MudTd>@context.TechnologyDetail</MudTd><MudTd>@context.GasTurbineFuelType</MudTd>
+                        <MudTd>@context.Duid</MudTd><MudTd>@context.DispatchType</MudTd><MudTd>@FormatNumber(context.UnitCount)</MudTd><MudTd>@FormatNumber(context.UnitCapacityDcMw)</MudTd>
+                        <MudTd>@FormatNumber(context.UnitCapacityAcMw)</MudTd><MudTd>@FormatNumber(context.AggregateNameplateCapacityDcMw)</MudTd><MudTd>@FormatNumber(context.AggregateNameplateCapacityAcMw)</MudTd><MudTd>@FormatNumber(context.AggregateNameplateStorageCapacityMwh)</MudTd>
+                        <MudTd>@context.CommitmentStatus</MudTd><MudTd>@FormatDate(context.FullCommercialUseDate)</MudTd><MudTd>@context.ExpectedClosureYear</MudTd><MudTd>@FormatDate(context.ClosureDate)</MudTd>
+                        <MudTd>@FormatDate(context.SurveyLastRequestedDate)</MudTd><MudTd>@FormatDate(context.SurveyLatestUpdateDate)</MudTd>
+                    </RowTemplate>
+                    <PagerContent><MudTablePager PageSizeOptions="@(new[] { 25, 50, 100 })" /></PagerContent>
+                </MudTable>
+            </section>
+        }
+    }
+</main>
+
+@code {
+    private bool _isLoading = true;
+    private string? _errorMessage;
+    private GenerationInformationDTO? _data;
+    private DateOnly _selectedDate = DateOnly.FromDateTime(DateTime.Today);
+    private string _selectedRegion = "All";
+    private double _minimumSiteCapacityMw = 30;
+    private string[] _regions = [];
+    private List<GenerationInformationRow> _filteredRows = [];
+    private List<TechnologyAggregate> _technologyAggregates = [];
+    private string[] _technologyLabels = [];
+    private string[] _donutLabels = [];
+    private double[] _acCapacityByTechnology = [];
+    private List<ChartSeries<double>> _acShareSeries = [];
+    private List<ChartSeries<double>> _capacitySeries = [];
+    private DonutChartOptions _donutOptions = new()
+    {
+        ShowLegend = false,
+        TooltipTitleFormat = "{{Y_VALUE}}",
+    };
+    private int _siteCount;
+    private double _totalAcMw;
+    private double _totalStorageMwh;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _data = await Http.GetFromJsonAsync<GenerationInformationDTO>(
+                "data/generation-information.json",
+                new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+            if (_data is null || _data.SchemaVersion != 1)
+            {
+                _errorMessage = "Generation information is missing or has an unsupported schema.";
+                return;
+            }
+
+            _regions = _data.Rows.Select(row => row.Region).Distinct().Order().ToArray();
+            ApplyFilters();
+        }
+        catch (Exception exception)
+        {
+            _errorMessage = $"Error loading generation information: {exception.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void OnDateChanged(ChangeEventArgs args)
+    {
+        if (DateOnly.TryParseExact(args.Value?.ToString(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateOnly date))
+        {
+            _selectedDate = date;
+            ApplyFilters();
+        }
+    }
+
+    private void OnRegionChanged(ChangeEventArgs args)
+    {
+        _selectedRegion = args.Value?.ToString() ?? "All";
+        ApplyFilters();
+    }
+
+    private void OnMinimumCapacityChanged(ChangeEventArgs args)
+    {
+        if (double.TryParse(args.Value?.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out double capacity) && capacity >= 0)
+        {
+            _minimumSiteCapacityMw = capacity;
+            ApplyFilters();
+        }
+    }
+
+    private void ApplyFilters()
+    {
+        if (_data is null) return;
+
+        _filteredRows = _data.Rows
+            .Where(row => row.CommitmentStatus.Equals("In Service", StringComparison.OrdinalIgnoreCase))
+            .Where(row => row.MaxSiteCapacityAcMw is double capacityMw
+                && capacityMw >= _minimumSiteCapacityMw)
+            .Where(row => _selectedRegion == "All" || row.Region == _selectedRegion)
+            .Where(row => row.FullCommercialUseDate is not DateOnly commercialUseDate
+                || commercialUseDate <= _selectedDate)
+            .Where(row => row.ExpectedClosureYear is not int closureYear
+                || _selectedDate.Year <= closureYear)
+            .OrderBy(row => row.TechnologyType)
+            .ThenBy(row => row.SiteName)
+            .ToList();
+
+        _technologyAggregates = _filteredRows
+            .GroupBy(row => row.TechnologyType)
+            .Select(group => new TechnologyAggregate(
+                group.Key,
+                group.Count(),
+                group.Select(row => row.AemoSurveyId).Distinct().Count(),
+                RoundAggregate(group.Sum(row => row.AggregateNameplateCapacityDcMw ?? 0)),
+                RoundAggregate(group.Sum(row => row.AggregateNameplateCapacityAcMw ?? 0)),
+                RoundAggregate(group.Sum(row => row.AggregateNameplateStorageCapacityMwh ?? 0))))
+            .OrderByDescending(item => item.CapacityAcMw)
+            .ToList();
+
+        _siteCount = _filteredRows.Select(row => row.AemoSurveyId).Distinct().Count();
+        _totalAcMw = RoundAggregate(_technologyAggregates.Sum(item => item.CapacityAcMw));
+        _totalStorageMwh = RoundAggregate(_technologyAggregates.Sum(item => item.StorageMwh));
+        _technologyLabels = _technologyAggregates.Select(item => item.TechnologyType).ToArray();
+        _acCapacityByTechnology = _technologyAggregates.Select(item => item.CapacityAcMw).ToArray();
+        _donutLabels = _technologyAggregates
+            .Select(item => $"{item.TechnologyType}: {item.CapacityAcMw:N1} MW ({CapacityPercentage(item.CapacityAcMw):N1}%)")
+            .ToArray();
+        _acShareSeries =
+        [
+            new ChartSeries<double>
+            {
+                Name = "AC capacity",
+                Data = _acCapacityByTechnology,
+                TooltipTitleFormat = "{{X_VALUE}}",
+                TooltipSubtitleFormat = string.Empty,
+            },
+        ];
+        _donutOptions = new DonutChartOptions
+        {
+            ShowLegend = false,
+            TooltipTitleFormat = "{{Y_VALUE}}",
+            ChartPalette = _technologyAggregates
+                .Select(item => TechnologyColor(item.TechnologyType))
+                .ToArray(),
+        };
+        _capacitySeries =
+        [
+            new ChartSeries<double> { Name = "DC capacity", Data = _technologyAggregates.Select(item => item.CapacityDcMw).ToArray() },
+            new ChartSeries<double> { Name = "AC capacity", Data = _acCapacityByTechnology },
+        ];
+    }
+
+    private static double RoundAggregate(double value) =>
+        Math.Round(value, 1, MidpointRounding.AwayFromZero);
+    private static string FormatNumber(double? value) => value?.ToString("N2") ?? "—";
+    private static string FormatDate(DateOnly? value) => value?.ToString("dd MMM yyyy") ?? "—";
+    private double CapacityPercentage(double capacityMw) =>
+        _totalAcMw == 0 ? 0 : capacityMw / _totalAcMw * 100;
+
+    private static string TechnologyColor(string technologyType) => technologyType switch
+    {
+        "Coal" => "#3f474d",
+        "Wind" => "#147d79",
+        "Gas Turbine" => "#d06b28",
+        "Solar PV" => "#e3aa18",
+        "Hydro" => "#2878b8",
+        "Battery Storage" => "#a94f76",
+        _ => "#7b8790",
+    };
+
+    private sealed record TechnologyAggregate(
+        string TechnologyType,
+        int UnitCount,
+        int SiteCount,
+        double CapacityDcMw,
+        double CapacityAcMw,
+        double StorageMwh);
+}
