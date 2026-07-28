@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using NEM.Model.Series;
+using NEM.Model.Units;
 
 namespace NEM.Model.Grid
 {
@@ -35,6 +36,17 @@ namespace NEM.Model.Grid
                     FlowSeries hourlyComponent = component.ResampleToHourly();
                     hourlyComponents.Add(name, hourlyComponent);
                     totalDemand = totalDemand.Add(hourlyComponent);
+                }
+            }
+
+            for (int index = 0; index < totalDemand.Length; index++)
+            {
+                if (totalDemand[index] < Power.Zero)
+                {
+                    throw new ArgumentOutOfRangeException(
+                        nameof(baseDemand),
+                        totalDemand[index].Megawatts,
+                        $"Total demand (base plus additive components) at index {index} cannot be negative.");
                 }
             }
 

@@ -30,11 +30,21 @@ namespace NEM.Model.Series
             return Combine(other, static (a, b) => a + b);
         }
 
+        public FlowSeries Add(Power constant)
+        {
+            return Map(v => v + constant.Megawatts);
+        }
+
         /// <summary>Element-wise difference of two aligned flows (e.g. residual demand).</summary>
         public FlowSeries Subtract(FlowSeries other)
         {
             RequireAligned(other);
             return Combine(other, static (a, b) => a - b);
+        }
+
+        public FlowSeries Subtract(Power constant)
+        {
+            return Map(v => v - constant.Megawatts);
         }
 
         /// <summary>The non-negative part of each value (residual deficit).</summary>

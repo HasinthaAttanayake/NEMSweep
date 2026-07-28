@@ -169,6 +169,38 @@ namespace NEM.Model.Tests.Series
             residual[1].Megawatts.Should().BeApproximately(500, Tolerance(500));
         }
 
+        [Fact]
+        public void AddPower_AddsConstantToEveryValue()
+        {
+            var flow = new FlowSeries(NemStart, HalfHour, new[] { 100.0, -50.0, 0.0 });
+
+            FlowSeries result = flow.Add(Power.FromMegawatts(25));
+
+            result.Start.Should().Be(NemStart);
+            result.Resolution.Should().Be(HalfHour);
+            result.Length.Should().Be(3);
+            result[0].Megawatts.Should().Be(125);
+            result[1].Megawatts.Should().Be(-25);
+            result[2].Megawatts.Should().Be(25);
+            flow[0].Megawatts.Should().Be(100);
+        }
+
+        [Fact]
+        public void SubtractPower_SubtractsConstantFromEveryValue()
+        {
+            var flow = new FlowSeries(NemStart, HalfHour, new[] { 100.0, -50.0, 0.0 });
+
+            FlowSeries result = flow.Subtract(Power.FromMegawatts(25));
+
+            result.Start.Should().Be(NemStart);
+            result.Resolution.Should().Be(HalfHour);
+            result.Length.Should().Be(3);
+            result[0].Megawatts.Should().Be(75);
+            result[1].Megawatts.Should().Be(-75);
+            result[2].Megawatts.Should().Be(-25);
+            flow[0].Megawatts.Should().Be(100);
+        }
+
         public enum Mismatch { Start, Resolution, Length }
 
         [Theory]
