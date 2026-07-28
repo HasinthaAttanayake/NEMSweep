@@ -7,6 +7,26 @@ namespace NEM.CLI
     {
         static int Main(string[] args)
         {
+            if (args.Length == 2 && args[0] == "--generation-information")
+            {
+                try
+                {
+                    IReadOnlyList<GenerationInformationRow> rows =
+                        GenerationInformationParser.Read(args[1]);
+                    GenerationInformationDTO output = GenerationInformationExport.Create(args[1], rows);
+                    string outputPath = GetWebDataPath("generation-information.json");
+                    GenerationInformationExport.WriteJson(output, outputPath);
+                    Console.WriteLine($"Loaded {rows.Count} generation-information rows.");
+                    Console.WriteLine($"Wrote generation information to: {Path.GetFullPath(outputPath)}");
+                    return 0;
+                }
+                catch (Exception exception)
+                {
+                    Console.Error.WriteLine($"Generation-information import failed: {exception.Message}");
+                    return 1;
+                }
+            }
+
             if (args.Length == 2 && args[0] == "--epw-report")
             {
                 EpwWeatherSeries weather = EpwParser.ReadTimeSeries(args[1]);
@@ -140,6 +160,11 @@ namespace NEM.CLI
 
         static string GetDefaultOutputPath()
         {
+            return GetWebDataPath("results.json");
+        }
+
+        static string GetWebDataPath(string fileName)
+        {
             // Find solution root by looking for NEM.Web project directory
             string currentDir = AppContext.BaseDirectory;
             string solutionRoot = currentDir;
@@ -156,7 +181,7 @@ namespace NEM.CLI
                 solutionRoot = parent;
             }
 
-            return Path.Combine(solutionRoot, "NEM.Web", "wwwroot", "data", "results.json");
+            return Path.Combine(solutionRoot, "NEM.Web", "wwwroot", "data", fileName);
         }
 
         private static OperationalDemandSettings ReadOperationalDemandSettings()
