@@ -1,6 +1,7 @@
 using FluentAssertions;
 using NEM.Model.Grid;
 using NEM.Model.Series;
+using NEM.Model.Units;
 
 namespace NEM.Model.Tests.Grid
 {
@@ -14,7 +15,7 @@ namespace NEM.Model.Tests.Grid
         {
             var bareDemand = HourlyFlow(1_000, 1_100);
 
-            var region = new Region("NSW1", bareDemand);
+            var region = new Region("NSW1", [TestFleet()], bareDemand);
 
             region.Demand.BaseDemand.Should().BeSameAs(bareDemand);
             region.Demand.TotalDemand.Should().BeSameAs(bareDemand);
@@ -114,9 +115,19 @@ namespace NEM.Model.Tests.Grid
         }
 
         [Fact]
+        public void Construction_RejectsNegativeTotalDemand()
+        {
+            var act = () => new DemandProfile(HourlyFlow(100, -1));
+
+            act.Should().Throw<ArgumentOutOfRangeException>()
+                .WithParameterName("baseDemand")
+                .WithMessage("*Total demand (base plus additive components) at index 1 cannot be negative.*");
+        }
+
+        [Fact]
         public void Region_RejectsBlankRegionId()
         {
-            var act = () => new Region(" ", HourlyFlow(1_000, 1_100));
+            var act = () => new Region(" ", [TestFleet()], HourlyFlow(1_000, 1_100));
 
             act.Should().Throw<ArgumentException>();
         }
@@ -126,5 +137,8 @@ namespace NEM.Model.Tests.Grid
 
         private static FlowSeries HalfHourlyFlow(params double[] megawatts) =>
             new(NemStart, TimeSpan.FromMinutes(30), megawatts);
+
+        private static GeneratingFleet TestFleet() =>
+            new(TechnologyKey.Coal, Power.FromMegawatts(1_000));
     }
 }
