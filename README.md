@@ -28,6 +28,8 @@ The currently validated and published layers are:
   year, month, or day.
 - **Weather resources:** solar radiation, wind, temperature, solar geometry, and
   modelled solar and wind generation.
+- **Baseline dispatch:** hourly merit-order generation by technology against New
+  South Wales operational demand, including curtailment and reliability metrics.
 
 New views will be published as the sequential build reaches each part of the
 model. Follow progress on the [NEM Sim Development Board](https://github.com/users/HasinthaAttanayake/projects/11).
@@ -52,3 +54,13 @@ dotnet run --project .\NEM.Web\NEM.Web.csproj
 ```
 
 The web project is then available at the URL printed by `dotnet run`.
+
+Regenerate the committed dispatch artifact from the committed demand and weather
+inputs with:
+
+```powershell
+dotnet run --project .\NEM.CLI\NEM.CLI.csproj -- --run-scenario
+```
+
+The versioned contract is documented in
+[`docs/results-schema-v1.md`](docs/results-schema-v1.md).

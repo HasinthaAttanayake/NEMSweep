@@ -8,6 +8,27 @@ namespace NEM.CLI
     {
         static int Main(string[] args)
         {
+            if (args.Length == 1 && args[0] == "--run-scenario")
+            {
+                try
+                {
+                    ScenarioRunnerSettings settings = ReadScenarioSettings();
+                    DispatchResultsDTO result = ScenarioRunner.Run(settings, FindSolutionRoot());
+                    string outputPath = GetDefaultOutputPath();
+                    DispatchResultsExport.WriteJson(result, outputPath);
+                    Console.WriteLine(
+                        $"Dispatched {result.DataSeries.DemandMw.Length} hourly intervals for "
+                        + $"{result.Scenario.Region}.");
+                    Console.WriteLine($"Wrote scenario results to: {Path.GetFullPath(outputPath)}");
+                    return 0;
+                }
+                catch (Exception exception)
+                {
+                    Console.Error.WriteLine($"Scenario run failed: {exception.Message}");
+                    return 1;
+                }
+            }
+
             if (args.Length == 2 && args[0] == "--generation-information")
             {
                 try
@@ -166,23 +187,24 @@ namespace NEM.CLI
 
         static string GetWebDataPath(string fileName)
         {
-            // Find solution root by looking for NEM.Web project directory
-            string currentDir = AppContext.BaseDirectory;
-            string solutionRoot = currentDir;
+            return Path.Combine(FindSolutionRoot(), "NEM.Web", "wwwroot", "data", fileName);
+        }
 
-            // Navigate up from bin/Debug/net10.0 to project root, then to solution root
-            for (int i = 0; i < 10; i++)
+        private static string FindSolutionRoot()
+        {
+            string solutionRoot = AppContext.BaseDirectory;
+            for (int index = 0; index < 10; index++)
             {
                 if (Directory.Exists(Path.Combine(solutionRoot, "NEM.Web")))
                 {
-                    break;
+                    return solutionRoot;
                 }
-                string? parent = Directory.GetParent(solutionRoot)?.FullName;
-                if (parent == null) break;
-                solutionRoot = parent;
+
+                solutionRoot = Directory.GetParent(solutionRoot)?.FullName
+                    ?? throw new DirectoryNotFoundException("Could not locate the NemSim solution root.");
             }
 
-            return Path.Combine(solutionRoot, "NEM.Web", "wwwroot", "data", fileName);
+            throw new DirectoryNotFoundException("Could not locate the NemSim solution root.");
         }
 
         private static OperationalDemandSettings ReadOperationalDemandSettings()
@@ -196,6 +218,25 @@ namespace NEM.CLI
                 section.GetProperty("region").GetString()
                     ?? throw new FormatException("operationalDemand.region is required."),
                 section.GetProperty("periodStart").GetDateTimeOffset());
+        }
+
+        private static ScenarioRunnerSettings ReadScenarioSettings()
+        {
+            string settingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(settingsPath));
+            JsonElement section = document.RootElement.GetProperty("scenario");
+            JsonSerializerOptions options = new() { PropertyNameCaseInsensitive = true };
+            FleetScenarioSettings[] fleets = section.GetProperty("fleets")
+                .Deserialize<FleetScenarioSettings[]>(options)
+                ?? throw new FormatException("scenario.fleets is required.");
+            return new ScenarioRunnerSettings(
+                section.GetProperty("demandFile").GetString()
+                    ?? throw new FormatException("scenario.demandFile is required."),
+                section.GetProperty("weatherFile").GetString()
+                    ?? throw new FormatException("scenario.weatherFile is required."),
+                section.GetProperty("description").GetString()
+                    ?? throw new FormatException("scenario.description is required."),
+                fleets);
         }
     }
 

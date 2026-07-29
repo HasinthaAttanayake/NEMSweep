@@ -1,0 +1,313 @@
+@page "/dispatch"
+@using NEM.Contracts
+@using System.Globalization
+@using System.Text.Json
+@inject HttpClient Http
+
+<PageTitle>Dispatch</PageTitle>
+
+<main class="dispatch-page">
+    <header class="dispatch-header">
+        <div>
+            <p class="eyebrow">Merit-order simulation</p>
+            <h1>Dispatch</h1>
+            @if (_result is not null)
+            {
+                <p class="scope-line">@RegionName(_result.Scenario.Region) · @_result.Assumptions.Description</p>
+            }
+        </div>
+        @if (!_isLoading && _errorMessage is null)
+        {
+            <div class="dispatch-controls">
+                <MudSelect T="int" Label="View" Value="_selectedView" ValueChanged="OnViewChanged"
+                           Variant="Variant.Outlined" Class="view-select">
+                    <MudSelectItem T="int" Value="0">Full financial year</MudSelectItem>
+                    <MudSelectItem T="int" Value="-1">Single day</MudSelectItem>
+                    @foreach (MonthOption month in _months)
+                    {
+                        <MudSelectItem T="int" Value="month.Month">@month.Label</MudSelectItem>
+                    }
+                </MudSelect>
+                @if (_selectedView == -1)
+                {
+                    <label class="date-field">
+                        <span>Day</span>
+                        <input type="date" min="@_minimumDate" max="@_maximumDate"
+                               value="@_selectedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)"
+                               @onchange="OnDateChanged" />
+                    </label>
+                }
+            </div>
+        }
+    </header>
+
+    @if (_isLoading)
+    {
+        <div class="status-block"><MudProgressCircular Color="Color.Primary" Indeterminate="true" /></div>
+    }
+    else if (_errorMessage is not null)
+    {
+        <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
+    }
+    else
+    {
+        <section class="metric-strip" aria-label="Selected dispatch period summary">
+            <div><span>Peak demand</span><strong>@_peakDemandMw.ToString("N0")</strong><small>MW</small></div>
+            <div><span>Energy delivered</span><strong>@_deliveredEnergyMwh.ToString("N0")</strong><small>MWh</small></div>
+            <div><span>Renewable share</span><strong>@_renewableSharePercent.ToString("N1")</strong><small>% of delivered generation</small></div>
+            <div><span>Unserved energy</span><strong>@_unservedEnergyMwh.ToString("N0")</strong><small>MWh · @_hoursServedPercent.ToString("N1")% hours served</small></div>
+        </section>
+
+        <div class="trace-context">
+            <span>@_periodLabel</span>
+            <span>@_rawPointCount hourly intervals</span>
+            <span>@_displayPointCount displayed averages</span>
+            <span>Schema v@_result!.SchemaVersion</span>
+        </div>
+
+        <section class="chart-section">
+            <div class="chart-heading">
+                <div><h2>Generation against demand</h2><p>Delivered generation is stacked by technology; the demand trace reveals any supply gap.</p></div>
+                <span class="unit-badge">MW</span>
+            </div>
+            <div class="dispatch-chart">
+                <svg viewBox="0 0 1000 440" role="img" aria-label="Stacked generation by technology against operational demand">
+                    @for (int tick = 0; tick <= 4; tick++)
+                    {
+                        double y = ChartY(_chartMaximumMw * tick / 4);
+                        <line class="grid-line" x1="64" y1="@y" x2="984" y2="@y" />
+                    }
+                    @foreach (AreaLayer area in _areas)
+                    {
+                        <polygon points="@area.Points" fill="@area.Color"><title>@area.Name</title></polygon>
+                    }
+                    <polyline class="demand-line" points="@_demandPoints" />
+                </svg>
+                <div class="chart-axis-labels"><span>@_firstLabel</span><span>@_middleLabel</span><span>@_lastLabel</span></div>
+            </div>
+            <div class="chart-legend" aria-label="Chart series">
+                @foreach (AreaLayer area in _areas)
+                {
+                    <span><i style="background-color: @area.Color"></i>@area.Name</span>
+                }
+                <span><i class="demand-key"></i>Demand</span>
+            </div>
+        </section>
+
+        <section class="assumption-band">
+            <div><span>Scenario fleet</span><strong>@string.Join(" · ", _result!.Assumptions.Fleets.Select(fleet => $"{fleet.Technology} {fleet.NameplateCapacityMw:N0} MW"))</strong></div>
+            <div><span>Generation cost</span><strong>@_result.Cost.Status</strong></div>
+        </section>
+    }
+</main>
+
+@code {
+    private const double ChartLeft = 64;
+    private const double ChartRight = 984;
+    private const double ChartTop = 12;
+    private const double ChartBottom = 408;
+    private static readonly string[] PreferredTechnologyOrder = ["Solar", "Wind", "Hydro", "Coal", "Gas"];
+    private static readonly Dictionary<string, string> TechnologyColors = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Solar"] = "#e8b84a",
+        ["Wind"] = "#5aa8a1",
+        ["Hydro"] = "#4f7db8",
+        ["Coal"] = "#59636e",
+        ["Gas"] = "#c76d4d",
+    };
+
+    private bool _isLoading = true;
+    private string? _errorMessage;
+    private DispatchResultsDTO? _result;
+    private List<AreaLayer> _areas = [];
+    private string _demandPoints = string.Empty;
+    private string _firstLabel = string.Empty;
+    private string _middleLabel = string.Empty;
+    private string _lastLabel = string.Empty;
+    private string _periodLabel = string.Empty;
+    private string _minimumDate = string.Empty;
+    private string _maximumDate = string.Empty;
+    private double _chartMaximumMw = 1;
+    private double _peakDemandMw;
+    private double _deliveredEnergyMwh;
+    private double _renewableSharePercent;
+    private double _unservedEnergyMwh;
+    private double _hoursServedPercent;
+    private int _rawPointCount;
+    private int _displayPointCount;
+    private int _selectedView;
+    private DateTime _selectedDate;
+    private List<MonthOption> _months = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _result = await Http.GetFromJsonAsync<DispatchResultsDTO>(
+                "data/results.json",
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (_result is null || _result.SchemaVersion != 1)
+            {
+                _errorMessage = "Dispatch results are missing or use an unsupported schema; expected schema 1.";
+                return;
+            }
+
+            int length = _result.DataSeries.DemandMw.Length;
+            if (length == 0
+                || _result.Scenario.Resolution <= TimeSpan.Zero
+                || _result.DataSeries.UnservedDemandMw.Length != length
+                || _result.DataSeries.GenerationByTechnologyMw.Values.Any(values => values.Length != length))
+            {
+                _errorMessage = "Dispatch result series are empty or misaligned.";
+                return;
+            }
+
+            _selectedDate = _result.Scenario.PeriodStart.Date;
+            _minimumDate = _result.Scenario.PeriodStart.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            _maximumDate = _result.Scenario.PeriodEnd.AddTicks(-1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            _months = BuildMonthOptions(_result.Scenario.PeriodStart, _result.Scenario.PeriodEnd);
+            BuildChart();
+        }
+        catch (Exception exception)
+        {
+            _errorMessage = $"Error loading dispatch results: {exception.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void OnViewChanged(int view)
+    {
+        _selectedView = view;
+        BuildChart();
+    }
+
+    private void OnDateChanged(ChangeEventArgs args)
+    {
+        if (DateTime.TryParseExact(args.Value?.ToString(), "yyyy-MM-dd", CultureInfo.InvariantCulture,
+            DateTimeStyles.None, out DateTime selectedDate))
+        {
+            _selectedDate = selectedDate;
+            BuildChart();
+        }
+    }
+
+    private void BuildChart()
+    {
+        DispatchResultsDTO result = _result!;
+        int[] selectedIndexes = Enumerable.Range(0, result.DataSeries.DemandMw.Length)
+            .Where(IsSelected).ToArray();
+        _rawPointCount = selectedIndexes.Length;
+        _peakDemandMw = selectedIndexes.Max(index => result.DataSeries.DemandMw[index]);
+        _unservedEnergyMwh = selectedIndexes.Sum(index => result.DataSeries.UnservedDemandMw[index])
+            * result.Scenario.Resolution.TotalHours;
+        _hoursServedPercent = 100.0 * selectedIndexes.Count(index => result.DataSeries.UnservedDemandMw[index] == 0)
+            / selectedIndexes.Length;
+
+        string[] technologies = PreferredTechnologyOrder
+            .Where(result.DataSeries.GenerationByTechnologyMw.ContainsKey)
+            .Concat(result.DataSeries.GenerationByTechnologyMw.Keys.Except(PreferredTechnologyOrder))
+            .ToArray();
+        _deliveredEnergyMwh = technologies.Sum(technology => selectedIndexes.Sum(
+            index => result.DataSeries.GenerationByTechnologyMw[technology][index]))
+            * result.Scenario.Resolution.TotalHours;
+        double renewableEnergyMwh = technologies
+            .Where(technology => technology is "Solar" or "Wind")
+            .Sum(technology => selectedIndexes.Sum(
+                index => result.DataSeries.GenerationByTechnologyMw[technology][index]))
+            * result.Scenario.Resolution.TotalHours;
+        _renewableSharePercent = _deliveredEnergyMwh == 0 ? 0 : 100 * renewableEnergyMwh / _deliveredEnergyMwh;
+
+        int targetPoints = _selectedView == -1 ? selectedIndexes.Length : 480;
+        int bucketSize = Math.Max(1, (int)Math.Ceiling((double)selectedIndexes.Length / targetPoints));
+        var timestamps = new List<DateTimeOffset>();
+        var demand = new List<double>();
+        var generation = technologies.ToDictionary(technology => technology, _ => new List<double>());
+        for (int offset = 0; offset < selectedIndexes.Length; offset += bucketSize)
+        {
+            int[] bucket = selectedIndexes[offset..Math.Min(offset + bucketSize, selectedIndexes.Length)];
+            timestamps.Add(InstantAt(bucket[0]));
+            demand.Add(bucket.Average(index => result.DataSeries.DemandMw[index]));
+            foreach (string technology in technologies)
+            {
+                generation[technology].Add(bucket.Average(
+                    index => result.DataSeries.GenerationByTechnologyMw[technology][index]));
+            }
+        }
+
+        _displayPointCount = demand.Count;
+        double[] cumulative = new double[demand.Count];
+        _chartMaximumMw = Math.Max(demand.Max(), Enumerable.Range(0, demand.Count)
+            .Max(index => technologies.Sum(technology => generation[technology][index])));
+        _chartMaximumMw = Math.Ceiling(_chartMaximumMw / 1000) * 1000;
+        _areas = [];
+        foreach (string technology in technologies)
+        {
+            double[] baseline = cumulative.ToArray();
+            for (int index = 0; index < cumulative.Length; index++)
+            {
+                cumulative[index] += generation[technology][index];
+            }
+            _areas.Add(new AreaLayer(
+                technology,
+                TechnologyColors.GetValueOrDefault(technology, "#8a7d72"),
+                AreaPoints(baseline, cumulative)));
+        }
+        _demandPoints = LinePoints(demand);
+
+        DateTimeOffset selectedStart = InstantAt(selectedIndexes[0]);
+        DateTimeOffset selectedEnd = InstantAt(selectedIndexes[^1]) + result.Scenario.Resolution;
+        _periodLabel = _selectedView == -1
+            ? selectedStart.ToString("dddd, dd MMMM yyyy")
+            : $"{selectedStart:dd MMM yyyy} to {selectedEnd.AddTicks(-1):dd MMM yyyy}";
+        string labelFormat = _selectedView == -1 ? "HH:mm" : _selectedView == 0 ? "MMM yyyy" : "dd MMM";
+        _firstLabel = timestamps[0].ToString(labelFormat);
+        _middleLabel = timestamps[timestamps.Count / 2].ToString(labelFormat);
+        _lastLabel = timestamps[^1].ToString(labelFormat);
+    }
+
+    private string AreaPoints(double[] baseline, double[] top) => string.Join(" ",
+        top.Select((value, index) => Point(index, value, top.Length))
+            .Concat(baseline.Select((value, index) => Point(index, value, baseline.Length)).Reverse()));
+
+    private string LinePoints(IReadOnlyList<double> values) => string.Join(" ",
+        values.Select((value, index) => Point(index, value, values.Count)));
+
+    private string Point(int index, double value, int count) => FormattableString.Invariant(
+        $"{ChartLeft + ((ChartRight - ChartLeft) * index / Math.Max(1, count - 1)):F2},{ChartY(value):F2}");
+
+    private double ChartY(double value) => ChartBottom - ((ChartBottom - ChartTop) * value / _chartMaximumMw);
+
+    private bool IsSelected(int index)
+    {
+        DateTimeOffset instant = InstantAt(index);
+        return _selectedView switch { -1 => instant.Date == _selectedDate.Date, 0 => true, _ => instant.Month == _selectedView };
+    }
+
+    private DateTimeOffset InstantAt(int index) =>
+        _result!.Scenario.PeriodStart.AddTicks(_result.Scenario.Resolution.Ticks * index);
+
+    private static List<MonthOption> BuildMonthOptions(DateTimeOffset start, DateTimeOffset end)
+    {
+        var months = new List<MonthOption>();
+        var month = new DateTimeOffset(start.Year, start.Month, 1, 0, 0, 0, start.Offset);
+        while (month < end)
+        {
+            months.Add(new MonthOption(month.Month, month.ToString("MMMM yyyy")));
+            month = month.AddMonths(1);
+        }
+        return months;
+    }
+
+    private static string RegionName(string region) => region switch
+    {
+        "NSW1" => "New South Wales (NSW1)", "QLD1" => "Queensland (QLD1)",
+        "SA1" => "South Australia (SA1)", "TAS1" => "Tasmania (TAS1)",
+        "VIC1" => "Victoria (VIC1)", _ => region,
+    };
+
+    private sealed record AreaLayer(string Name, string Color, string Points);
+    private sealed record MonthOption(int Month, string Label);
+}

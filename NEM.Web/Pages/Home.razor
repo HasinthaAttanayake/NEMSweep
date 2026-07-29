@@ -58,15 +58,23 @@
         <div class="section-heading">
             <div>
                 <p class="section-label">Available now</p>
-                <h2>Validated inputs published so far</h2>
+                <h2>Explore the current model</h2>
             </div>
             <p>
-                These are the layers currently exposed in the site. New views will appear here as
-                the sequential build reaches each part of the model.
+                Inspect the source inputs, generation fleet, and first hourly dispatch output.
+                Each view exposes the latest validated layer of the build.
             </p>
         </div>
 
         <div class="explore-links">
+            <a href="dispatch">
+                <MudIcon Icon="@Icons.Material.Filled.AreaChart" />
+                <span>
+                    <strong>Baseline dispatch</strong>
+                    <small>Stacked generation by technology against operational demand</small>
+                </span>
+                <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
+            </a>
             <a href="demand">
                 <MudIcon Icon="@Icons.Material.Filled.ElectricBolt" />
                 <span>
@@ -80,6 +88,22 @@
                 <span>
                     <strong>Weather resources</strong>
                     <small>Solar, wind, temperature, and modelled generation</small>
+                </span>
+                <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
+            </a>
+            <a href="generation">
+                <MudIcon Icon="@Icons.Material.Filled.Factory" />
+                <span>
+                    <strong>Generation fleet</strong>
+                    <small>Installed capacity and source units by technology</small>
+                </span>
+                <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
+            </a>
+            <a href="solar-zenith">
+                <MudIcon Icon="@Icons.Material.Filled.ShowChart" />
+                <span>
+                    <strong>Solar geometry</strong>
+                    <small>Hourly solar zenith for the Sydney weather location</small>
                 </span>
                 <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
             </a>
