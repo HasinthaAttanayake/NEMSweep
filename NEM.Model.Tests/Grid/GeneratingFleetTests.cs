@@ -29,23 +29,51 @@ namespace NEM.Model.Tests.Grid
             fleet.NameplateCapacity.Should().Be(Power.Zero);
         }
 
-        [Theory]
-        [InlineData(-1)]
-        [InlineData(101)]
-        public void Construction_RejectsAvailabilityOutsideNameplateBounds(double availableMw)
+        [Fact]
+        public void Construction_RejectsHydroWithoutMonthlyCapacityFactors()
         {
-            var availability = new FlowSeries(
-                NemStart,
-                TimeSpan.FromHours(1),
-                [availableMw]);
+            var act = () => new GeneratingFleet(
+                TechnologyKey.Hydro,
+                Power.FromMegawatts(100));
 
+            act.Should().Throw<ArgumentException>()
+                .WithParameterName("monthlyCapacityFactors")
+                .WithMessage("*Hydro requires monthly capacity factors*");
+        }
+
+        [Theory]
+        [InlineData(-0.01)]
+        [InlineData(1.01)]
+        [InlineData(double.NaN)]
+        public void Construction_RejectsInvalidMonthlyCapacityFactor(double capacityFactor)
+        {
+            var act = () => new GeneratingFleet(
+                TechnologyKey.Hydro,
+                Power.FromMegawatts(100),
+                monthlyCapacityFactors: new Dictionary<DateOnly, double>
+                {
+                    [new DateOnly(2026, 7, 1)] = capacityFactor,
+                });
+
+            act.Should().Throw<ArgumentOutOfRangeException>()
+                .WithParameterName("monthlyCapacityFactors");
+        }
+
+        [Fact]
+        public void Construction_RejectsMonthlyCapacityFactorsForNonHydroFleet()
+        {
             var act = () => new GeneratingFleet(
                 TechnologyKey.Wind,
                 Power.FromMegawatts(100),
-                availability);
+                monthlyCapacityFactors: new Dictionary<DateOnly, double>
+                {
+                    [new DateOnly(2026, 7, 1)] = 0.5,
+                });
 
-            act.Should().Throw<ArgumentOutOfRangeException>()
-                .WithParameterName("availableGeneration");
+            act.Should().Throw<ArgumentException>()
+                .WithParameterName("monthlyCapacityFactors")
+                .WithMessage("*only be supplied for a hydro fleet*");
         }
+
     }
 }

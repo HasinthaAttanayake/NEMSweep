@@ -30,14 +30,6 @@ internal sealed record EpwRow(
 
 internal sealed record EpwFile(EpwHeader Header, IReadOnlyList<EpwRow> Rows);
 
-internal sealed record EpwWeatherSeries(
-    TraceSeries GlobalHorizontalRadiation,
-    TraceSeries DirectNormalRadiation,
-    TraceSeries DiffuseHorizontalRadiation,
-    SolarZenithSeries SolarZenith,
-    TraceSeries DryBulbTemperature,
-    TraceSeries WindSpeed);
-
 internal sealed record EpwGap(
     int RowNumber,
     int Month,
@@ -209,7 +201,7 @@ internal static class EpwParser
         return epw;
     }
 
-    public static EpwWeatherSeries ReadTimeSeries(string path)
+    public static RegionalResourceProfile ReadTimeSeries(string path)
     {
         EpwFile epw = ReadValidated(path);
         double[] globalHorizontalRadiation = epw.Rows
@@ -266,7 +258,7 @@ internal static class EpwParser
             throw new InvalidOperationException("EPW traces must retain their native hourly resolution.");
         }
 
-        return new EpwWeatherSeries(
+        return new RegionalResourceProfile(
             globalHorizontalRadiationSeries,
             directNormalRadiationSeries,
             diffuseHorizontalRadiationSeries,

@@ -46,13 +46,16 @@ namespace NEM.Model.Simulation
             // NEM-013: Implementation of Dispatch Order (Crude):
             foreach (var fleet in region.Fleets.OrderBy(f => f.ShortRunMarginalCost))
             {
-                FlowSeries availableGeneration = fleet.AvailableGenerationFor(region.Demand.TotalDemand);
-                var balance = unservedMw.Subtract(availableGeneration);
+                FlowSeries availableCapacity = fleet.AvailableCapacityFor(
+                    region.ResourceProfile,
+                    region.Demand.TotalDemand);
+                var balance = unservedMw.Subtract(availableCapacity);
                 var remainingUnservedMw = balance.PositivePart();
-                var fleetGeneration = unservedMw.Subtract(remainingUnservedMw);
+                var candidateGeneration = unservedMw.Subtract(remainingUnservedMw);
+                var fleetGeneration = fleet.ApplyEnergyBudget(candidateGeneration);
 
                 perFleetGeneration.Add(fleet.TechnologyKey, fleetGeneration);
-                unservedMw = remainingUnservedMw;
+                unservedMw = unservedMw.Subtract(fleetGeneration);
                 if (fleet.IsIntermittentRenewable)
                 {
                     var curtailedGenerationMw = balance.NegativePart();

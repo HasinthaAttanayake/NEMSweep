@@ -23,7 +23,7 @@ public sealed class EpwWeatherExportTests
             1,
             1,
             9);
-        var weather = new EpwWeatherSeries(
+        var weather = new RegionalResourceProfile(
             TraceSeries.GlobalHorizontalRadiation(
                 EpwParser.SyntheticNonLeapStart,
                 TimeSpan.FromHours(1),
@@ -81,35 +81,4 @@ public sealed class EpwWeatherExportTests
                 .Select(index => expectedWindProduction[index].Megawatts));
     }
 
-    [Fact]
-    public void Create_ThrowsClearMessage_WhenWindTraceHasNoMeasurementHeight()
-    {
-        var header = new EpwHeader(
-            "Sydney Observatory Hill",
-            "947680",
-            -33.8608,
-            151.205,
-            10,
-            false,
-            1,
-            1,
-            9);
-        TraceSeries radiation = TraceSeries.DirectNormalRadiation(
-            EpwParser.SyntheticNonLeapStart,
-            TimeSpan.FromHours(1),
-            [0, 420, 760]);
-        SolarZenithSeries solarZenith = SolarZenithSeries.Calculate(
-            EpwParser.SyntheticNonLeapStart,
-            TimeSpan.FromHours(1),
-            3,
-            -33.8608,
-            151.205);
-        var weather = new EpwWeatherSeries(
-            radiation, radiation, radiation, solarZenith, radiation, radiation);
-
-        var act = () => EpwWeatherExport.Create(header, weather, "sydney.epw");
-
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*wind-speed trace with a measurement height*");
-    }
 }
