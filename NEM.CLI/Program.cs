@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using NEM.Contracts;
+using NEM.Model.Weather;
 
 namespace NEM.CLI
 {
@@ -29,7 +30,7 @@ namespace NEM.CLI
 
             if (args.Length == 2 && args[0] == "--epw-report")
             {
-                EpwWeatherSeries weather = EpwParser.ReadTimeSeries(args[1]);
+                RegionalResourceProfile weather = EpwParser.ReadTimeSeries(args[1]);
                 EpwProvenanceReport report = EpwParser.ReadProvenance(args[1]);
                 string outputDirectory = Path.GetDirectoryName(GetDefaultOutputPath())!;
                 string provenanceOutputPath = Path.Combine(
@@ -63,7 +64,7 @@ namespace NEM.CLI
 
             if (args.Length == 2 && args[0] == "--epw-series")
             {
-                EpwWeatherSeries weather = EpwParser.ReadTimeSeries(args[1]);
+                RegionalResourceProfile weather = EpwParser.ReadTimeSeries(args[1]);
                 Console.WriteLine(
                     $"GHI: {weather.GlobalHorizontalRadiation.Length}; " +
                     $"DNI: {weather.DirectNormalRadiation.Length}; " +

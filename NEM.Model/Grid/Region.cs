@@ -1,4 +1,5 @@
 using NEM.Model.Series;
+using NEM.Model.Weather;
 
 namespace NEM.Model.Grid
 {
@@ -8,12 +9,14 @@ namespace NEM.Model.Grid
         public string RegionId { get; }
         public DemandProfile Demand { get; }
         public IReadOnlyList<GeneratingFleet> Fleets { get; }
+        public RegionalResourceProfile? ResourceProfile { get; }
 
         public Region(
             string regionId,
             IReadOnlyList<GeneratingFleet> fleets,
             FlowSeries baseDemand,
-            IReadOnlyDictionary<string, FlowSeries>? additiveDemandComponents = null)
+            IReadOnlyDictionary<string, FlowSeries>? additiveDemandComponents = null,
+            RegionalResourceProfile? resourceProfile = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(regionId);
             ArgumentNullException.ThrowIfNull(fleets);
@@ -34,9 +37,20 @@ namespace NEM.Model.Grid
                     nameof(fleets));
             }
 
+            if (fleets.Any(fleet => fleet.IsIntermittentRenewable) && resourceProfile is null)
+            {
+                throw new ArgumentException(
+                    "Regions containing wind or solar fleets require a resource profile.",
+                    nameof(resourceProfile));
+            }
+
+            var demand = new DemandProfile(baseDemand, additiveDemandComponents);
+            resourceProfile?.RequireAligned(demand.TotalDemand);
+
             RegionId = regionId;
-            Demand = new DemandProfile(baseDemand, additiveDemandComponents);
+            Demand = demand;
             Fleets = Array.AsReadOnly(fleets.ToArray());
+            ResourceProfile = resourceProfile;
         }
     }
 }

@@ -1,17 +1,22 @@
+using NEM.Model.Generation.Solar;
+using NEM.Model.Generation.Wind;
 using NEM.Model.Series;
 using NEM.Model.Units;
+using NEM.Model.Weather;
 
 namespace NEM.Model.Grid
 {
     /// <summary>A region-wide aggregate of generation sharing one technology type.</summary>
     public sealed class GeneratingFleet
     {
-        private readonly FlowSeries? _availableGeneration;
+        private readonly IReadOnlyDictionary<DateOnly, double>? _monthlyCapacityFactors;
+        private readonly WindPowerCurveSettings _windPowerCurveSettings;
 
         public GeneratingFleet(
             TechnologyKey technologyKey,
             Power nameplateCapacity,
-            FlowSeries? availableGeneration = null)
+            IReadOnlyDictionary<DateOnly, double>? monthlyCapacityFactors = null,
+            WindPowerCurveSettings? windPowerCurveSettings = null)
         {
             if (nameplateCapacity < Power.Zero)
             {
@@ -21,24 +26,61 @@ namespace NEM.Model.Grid
                     "Nameplate capacity cannot be negative.");
             }
 
-            if (availableGeneration is not null)
+            if (windPowerCurveSettings is not null && technologyKey != TechnologyKey.Wind)
             {
-                for (int index = 0; index < availableGeneration.Length; index++)
+                throw new ArgumentException(
+                    "Wind power-curve settings can only be supplied for a wind fleet.",
+                    nameof(windPowerCurveSettings));
+            }
+
+            if (technologyKey == TechnologyKey.Hydro && monthlyCapacityFactors is null)
+            {
+                throw new ArgumentException(
+                    "Hydro requires monthly capacity factors.",
+                    nameof(monthlyCapacityFactors));
+            }
+
+            if (monthlyCapacityFactors is not null && technologyKey != TechnologyKey.Hydro)
+            {
+                throw new ArgumentException(
+                    "Monthly capacity factors can only be supplied for a hydro fleet.",
+                    nameof(monthlyCapacityFactors));
+            }
+
+            if (monthlyCapacityFactors is not null)
+            {
+                if (monthlyCapacityFactors.Count == 0)
                 {
-                    Power available = availableGeneration[index];
-                    if (available < Power.Zero || available > nameplateCapacity)
+                    throw new ArgumentException(
+                        "Monthly capacity factors must contain at least one month.",
+                        nameof(monthlyCapacityFactors));
+                }
+
+                foreach ((DateOnly month, double capacityFactor) in monthlyCapacityFactors)
+                {
+                    if (month.Day != 1)
+                    {
+                        throw new ArgumentException(
+                            $"Monthly capacity factor key {month:yyyy-MM-dd} must be the first day of a month.",
+                            nameof(monthlyCapacityFactors));
+                    }
+
+                    if (double.IsNaN(capacityFactor) || capacityFactor < 0 || capacityFactor > 1)
                     {
                         throw new ArgumentOutOfRangeException(
-                            nameof(availableGeneration),
-                            available.Megawatts,
-                            $"Available generation at index {index} must be between zero and nameplate capacity.");
+                            nameof(monthlyCapacityFactors),
+                            capacityFactor,
+                            $"Monthly capacity factor for {month:yyyy-MM} must be between zero and one.");
                     }
                 }
             }
 
             TechnologyKey = technologyKey;
             NameplateCapacity = nameplateCapacity;
-            _availableGeneration = availableGeneration;
+            _monthlyCapacityFactors = monthlyCapacityFactors is null
+                ? null
+                : new Dictionary<DateOnly, double>(monthlyCapacityFactors);
+            _windPowerCurveSettings = windPowerCurveSettings ?? WindPowerCurveSettings.Default;
         }
 
         public TechnologyKey TechnologyKey { get; }
@@ -46,17 +88,82 @@ namespace NEM.Model.Grid
         public ushort ShortRunMarginalCost => (ushort)TechnologyKey; // TODO: replace with SMRC cost basis B5
         public bool IsIntermittentRenewable => TechnologyKey is TechnologyKey.Solar or TechnologyKey.Wind; // TODO: move to TechnologyProfile as appropriate
 
-        internal FlowSeries AvailableGenerationFor(FlowSeries dispatchTimeline)
+        internal FlowSeries AvailableCapacityFor(
+            RegionalResourceProfile? resourceProfile,
+            FlowSeries dispatchTimeline)
         {
-            if (_availableGeneration is not null)
+            FlowSeries availableCapacity;
+            if (TechnologyKey == TechnologyKey.Solar)
             {
-                dispatchTimeline.RequireAligned(_availableGeneration);
-                return _availableGeneration;
+                RegionalResourceProfile resources = RequireResourceProfile(resourceProfile);
+                availableCapacity = DualAxisSolarPowerCurve.Calculate(
+                    resources.GlobalHorizontalRadiation,
+                    resources.DirectNormalRadiation,
+                    resources.DiffuseHorizontalRadiation,
+                    resources.DryBulbTemperature,
+                    resources.SolarZenith,
+                    NameplateCapacity);
+            }
+            else if (TechnologyKey == TechnologyKey.Wind)
+            {
+                availableCapacity = WindPowerCurve.Calculate(
+                    RequireResourceProfile(resourceProfile).WindSpeed,
+                    NameplateCapacity,
+                    _windPowerCurveSettings);
+            }
+            else
+            {
+                var values = new double[dispatchTimeline.Length];
+                Array.Fill(values, NameplateCapacity.Megawatts);
+                availableCapacity = new FlowSeries(
+                    dispatchTimeline.Start,
+                    dispatchTimeline.Resolution,
+                    values);
             }
 
-            var values = new double[dispatchTimeline.Length];
-            Array.Fill(values, NameplateCapacity.Megawatts);
-            return new FlowSeries(dispatchTimeline.Start, dispatchTimeline.Resolution, values);
+            dispatchTimeline.RequireAligned(availableCapacity);
+            return availableCapacity;
+        }
+
+        private RegionalResourceProfile RequireResourceProfile(
+            RegionalResourceProfile? resourceProfile) =>
+            resourceProfile ?? throw new InvalidOperationException(
+                $"{TechnologyKey} requires a regional resource profile.");
+
+        internal FlowSeries ApplyEnergyBudget(FlowSeries candidateGeneration)
+        {
+            if (_monthlyCapacityFactors is null)
+            {
+                return candidateGeneration;
+            }
+
+            var remainingByMonth = _monthlyCapacityFactors.ToDictionary(
+                entry => entry.Key,
+                entry => NameplateCapacity.Megawatts
+                    * DateTime.DaysInMonth(entry.Key.Year, entry.Key.Month)
+                    * 24
+                    * entry.Value);
+            var values = new double[candidateGeneration.Length];
+            double intervalHours = candidateGeneration.Resolution.TotalHours;
+
+            for (int index = 0; index < candidateGeneration.Length; index++)
+            {
+                DateTimeOffset instant = candidateGeneration.InstantAt(index);
+                var month = new DateOnly(instant.Year, instant.Month, 1);
+                if (!remainingByMonth.TryGetValue(month, out double remainingMwh))
+                {
+                    throw new InvalidOperationException(
+                        $"{TechnologyKey} has no energy budget for {month:yyyy-MM}.");
+                }
+
+                double generatedMw = Math.Min(
+                    candidateGeneration[index].Megawatts,
+                    remainingMwh / intervalHours);
+                values[index] = generatedMw;
+                remainingByMonth[month] = Math.Max(0, remainingMwh - (generatedMw * intervalHours));
+            }
+
+            return new FlowSeries(candidateGeneration.Start, candidateGeneration.Resolution, values);
         }
     }
 

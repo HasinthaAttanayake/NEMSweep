@@ -2,6 +2,7 @@ using FluentAssertions;
 using NEM.Model.Generation.Wind;
 using NEM.Model.Series;
 using NEM.Model.Units;
+using NEM.Model.Weather;
 
 namespace NEM.CLI.Tests;
 
@@ -32,7 +33,7 @@ public sealed class WindPowerCurveIntegrationTests
         string path = fixture.Write();
         try
         {
-            EpwWeatherSeries weather = EpwParser.ReadTimeSeries(path);
+            RegionalResourceProfile weather = EpwParser.ReadTimeSeries(path);
             Power installedCapacity = Power.FromMegawatts(100.0);
 
             FlowSeries generation = WindPowerCurve.Calculate(

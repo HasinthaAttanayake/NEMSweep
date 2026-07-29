@@ -2,6 +2,7 @@ using FluentAssertions;
 using NEM.Model.Grid;
 using NEM.Model.Series;
 using NEM.Model.Units;
+using NEM.Model.Weather;
 
 namespace NEM.Model.Tests.Grid
 {
@@ -60,10 +61,58 @@ namespace NEM.Model.Tests.Grid
             act.Should().Throw<NotSupportedException>();
         }
 
+        [Theory]
+        [InlineData(TechnologyKey.Solar)]
+        [InlineData(TechnologyKey.Wind)]
+        public void Construction_RejectsRenewableFleetWithoutResourceProfile(
+            TechnologyKey technology)
+        {
+            var act = () => new Region(
+                "NSW1",
+                [Fleet(technology)],
+                HourlyFlow(100));
+
+            act.Should().Throw<ArgumentException>()
+                .WithParameterName("resourceProfile")
+                .WithMessage("*wind or solar fleets require a resource profile*");
+        }
+
+        [Fact]
+        public void Construction_RejectsResourceProfileMisalignedWithDemand()
+        {
+            FlowSeries demand = HourlyFlow(100);
+            RegionalResourceProfile resources = ResourceProfile(NemStart.AddHours(1));
+
+            var act = () => new Region(
+                "NSW1",
+                [Fleet(TechnologyKey.Wind)],
+                demand,
+                resourceProfile: resources);
+
+            act.Should().Throw<ArgumentException>().WithMessage("*misaligned on start*");
+        }
+
         private static GeneratingFleet Fleet(TechnologyKey technology) =>
             new(technology, Power.FromMegawatts(100));
 
         private static FlowSeries HourlyFlow(params double[] megawatts) =>
             new(NemStart, TimeSpan.FromHours(1), megawatts);
+
+        private static RegionalResourceProfile ResourceProfile(DateTimeOffset start)
+        {
+            var values = new[] { 0.0 };
+            return new RegionalResourceProfile(
+                TraceSeries.GlobalHorizontalRadiation(start, TimeSpan.FromHours(1), values),
+                TraceSeries.DirectNormalRadiation(start, TimeSpan.FromHours(1), values),
+                TraceSeries.DiffuseHorizontalRadiation(start, TimeSpan.FromHours(1), values),
+                SolarZenithSeries.Calculate(
+                    start,
+                    TimeSpan.FromHours(1),
+                    1,
+                    latitude: -33.8688,
+                    longitude: 151.2093),
+                TraceSeries.DryBulbTemperature(start, TimeSpan.FromHours(1), values),
+                TraceSeries.WindSpeed(start, TimeSpan.FromHours(1), values, 10));
+        }
     }
 }

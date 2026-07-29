@@ -12,7 +12,7 @@ internal static class EpwWeatherExport
 {
     public static WeatherDataDTO Create(
         EpwHeader header,
-        EpwWeatherSeries weather,
+        RegionalResourceProfile weather,
         string sourceFile)
     {
         double windMeasurementHeightMetres = weather.WindSpeed.MeasurementHeightMetres

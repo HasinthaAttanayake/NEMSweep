@@ -371,7 +371,7 @@ public sealed class EpwParserTests
 
         try
         {
-            EpwWeatherSeries weather = EpwParser.ReadTimeSeries(path);
+            RegionalResourceProfile weather = EpwParser.ReadTimeSeries(path);
 
             weather.GlobalHorizontalRadiation.Length.Should().Be(8760);
             weather.GlobalHorizontalRadiation.Unit.Should().Be(
