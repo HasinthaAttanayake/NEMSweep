@@ -102,7 +102,7 @@ namespace NEM.Model.Tests.Simulation
                 });
 
             AssertSeries(outcome.PerFleetGeneration[TechnologyKey.Hydro], 0, 0);
-            AssertSeries(outcome.UnservedMw, 50, 50);
+            AssertSeries(outcome.Unserved, 50, 50);
         }
 
         [Fact]
