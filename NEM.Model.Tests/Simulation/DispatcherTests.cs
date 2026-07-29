@@ -36,13 +36,15 @@ namespace NEM.Model.Tests.Simulation
             DispatchOutcome outcome = Dispatcher.Dispatch(region);
 
             outcome.RegionId.Should().Be("NSW1");
-            AssertSeries(outcome.PerFleetGeneration[TechnologyKey.Solar], 10, 20, 20);
-            AssertSeries(outcome.PerFleetGeneration[TechnologyKey.Wind], 0, 10, 10);
+            AssertSeries(outcome.PerFleetGeneration[TechnologyKey.Solar], 20, 20, 20);
+            AssertSeries(outcome.PerFleetGeneration[TechnologyKey.Wind], 10, 10, 10);
             AssertSeries(outcome.PerFleetGeneration[TechnologyKey.Hydro], 0, 30, 30);
             AssertSeries(outcome.PerFleetGeneration[TechnologyKey.Coal], 0, 15, 40);
             AssertSeries(outcome.PerFleetGeneration[TechnologyKey.Gas], 0, 0, 50);
-            AssertSeries(outcome.CurtailmentMw, -20, 0, 0);
-            AssertSeries(outcome.UnservedMw, 0, 0, 30);
+            AssertSeries(outcome.PerFleetCurtailment[TechnologyKey.Solar], 10, 0, 0);
+            AssertSeries(outcome.PerFleetCurtailment[TechnologyKey.Wind], 10, 0, 0);
+            AssertSeries(outcome.Curtailment, 20, 0, 0);
+            AssertSeries(outcome.Unserved, 0, 0, 30);
         }
 
         [Theory]
@@ -79,37 +81,46 @@ namespace NEM.Model.Tests.Simulation
             for (int hour = 0; hour < HoursInJuly; hour++)
             {
                 double residual = demand[hour];
-                double dispatched = 0;
+                double generation = 0;
+                double expectedCurtailment = 0;
 
                 foreach (GeneratingFleet fleet in fleets.OrderBy(fleet => fleet.ShortRunMarginalCost))
                 {
                     double fleetOutput = outcome.PerFleetGeneration[fleet.TechnologyKey][hour].Megawatts;
                     double available = availableByFleet[fleet.TechnologyKey][hour].Megawatts;
-                    double expectedOutput = Math.Min(residual, available);
+                    double expectedDelivered = Math.Min(residual, available);
+                    double expectedOutput = fleet.IsIntermittentRenewable
+                        ? available
+                        : expectedDelivered;
+                    double fleetCurtailment = outcome.PerFleetCurtailment[fleet.TechnologyKey][hour].Megawatts;
+                    double expectedFleetCurtailment = fleet.IsIntermittentRenewable
+                        ? available - expectedDelivered
+                        : 0;
 
                     fleetOutput.Should().Be(expectedOutput, $"fleet {fleet.TechnologyKey} must follow merit order at hour {hour}");
                     fleetOutput.Should().BeInRange(0, fleet.NameplateCapacity.Megawatts);
-                    dispatched += fleetOutput;
-                    residual -= expectedOutput;
+                    fleetCurtailment.Should().Be(expectedFleetCurtailment);
+                    generation += fleetOutput;
+                    expectedCurtailment += expectedFleetCurtailment;
+                    residual -= expectedDelivered;
                 }
 
-                double unserved = outcome.UnservedMw[hour].Megawatts;
-                double curtailment = outcome.CurtailmentMw[hour].Megawatts;
-                double expectedCurtailment = fleets
-                    .Where(fleet => fleet.IsIntermittentRenewable)
-                    .Sum(fleet => outcome.PerFleetGeneration[fleet.TechnologyKey][hour].Megawatts
-                        - availableByFleet[fleet.TechnologyKey][hour].Megawatts);
+                double unserved = outcome.Unserved[hour].Megawatts;
+                double curtailment = outcome.Curtailment[hour].Megawatts;
 
-                (dispatched + unserved).Should().Be(demand[hour], $"energy must balance at hour {hour}");
+                (generation + unserved).Should().Be(
+                    demand[hour] + curtailment,
+                    $"energy must balance at hour {hour}");
                 unserved.Should().Be(Math.Max(residual, 0));
                 curtailment.Should().Be(expectedCurtailment);
-                (curtailment < 0 && unserved > 0).Should().BeFalse(
+                curtailment.Should().BeGreaterThanOrEqualTo(0);
+                (curtailment > 0 && unserved > 0).Should().BeFalse(
                     $"curtailment and unserved energy cannot co-occur at hour {hour}");
             }
         }
 
         [Fact]
-        public void Dispatch_ZeroDemand_ProducesOnlyNegativeRenewableCurtailment()
+        public void Dispatch_ZeroDemand_ReportsAvailableRenewablesAsPositiveCurtailment()
         {
             FlowSeries demand = HourlyFlowAt(NemStart.AddHours(12), 0);
             var region = new Region(
@@ -120,11 +131,14 @@ namespace NEM.Model.Tests.Simulation
 
             DispatchOutcome outcome = Dispatcher.Dispatch(region);
 
-            AssertSeries(outcome.PerFleetGeneration[TechnologyKey.Solar], 0);
-            AssertSeries(outcome.PerFleetGeneration[TechnologyKey.Wind], 0);
+            AssertSeries(outcome.PerFleetGeneration[TechnologyKey.Solar], 20);
+            AssertSeries(outcome.PerFleetGeneration[TechnologyKey.Wind], 10);
             AssertSeries(outcome.PerFleetGeneration[TechnologyKey.Coal], 0);
-            AssertSeries(outcome.CurtailmentMw, -30);
-            AssertSeries(outcome.UnservedMw, 0);
+            AssertSeries(outcome.PerFleetCurtailment[TechnologyKey.Solar], 20);
+            AssertSeries(outcome.PerFleetCurtailment[TechnologyKey.Wind], 10);
+            AssertSeries(outcome.PerFleetCurtailment[TechnologyKey.Coal], 0);
+            AssertSeries(outcome.Curtailment, 30);
+            AssertSeries(outcome.Unserved, 0);
         }
 
         [Fact]
@@ -142,8 +156,8 @@ namespace NEM.Model.Tests.Simulation
             AssertSeries(outcome.PerFleetGeneration[TechnologyKey.Solar], 20);
             AssertSeries(outcome.PerFleetGeneration[TechnologyKey.Wind], 10);
             AssertSeries(outcome.PerFleetGeneration[TechnologyKey.Hydro], 30);
-            AssertSeries(outcome.CurtailmentMw, 0);
-            AssertSeries(outcome.UnservedMw, 0);
+            AssertSeries(outcome.Curtailment, 0);
+            AssertSeries(outcome.Unserved, 0);
         }
 
         [Fact]
@@ -203,8 +217,8 @@ namespace NEM.Model.Tests.Simulation
             DispatchOutcome outcome = Dispatcher.Dispatch(region);
 
             AssertSeries(outcome.PerFleetGeneration[TechnologyKey.Solar], 0);
-            AssertSeries(outcome.CurtailmentMw, 0);
-            AssertSeries(outcome.UnservedMw, 10);
+            AssertSeries(outcome.Curtailment, 0);
+            AssertSeries(outcome.Unserved, 10);
         }
 
         [Fact]
@@ -228,7 +242,7 @@ namespace NEM.Model.Tests.Simulation
             DispatchOutcome outcome = Dispatcher.Dispatch(region);
 
             AssertSeries(outcome.PerFleetGeneration[TechnologyKey.Wind], 0, 10, 0);
-            AssertSeries(outcome.UnservedMw, 100, 90, 100);
+            AssertSeries(outcome.Unserved, 100, 90, 100);
         }
 
         [Fact]
@@ -249,7 +263,7 @@ namespace NEM.Model.Tests.Simulation
 
             region.Demand.BaseDemand.Resolution.Should().Be(DemandProfile.Resolution);
             AssertSeries(outcome.PerFleetGeneration[TechnologyKey.Wind], 10, 10);
-            AssertSeries(outcome.UnservedMw, 90, 90);
+            AssertSeries(outcome.Unserved, 90, 90);
         }
 
         [Fact]
@@ -268,7 +282,7 @@ namespace NEM.Model.Tests.Simulation
             DispatchOutcome outcome = Dispatcher.Dispatch(region);
 
             AssertSeries(outcome.PerFleetGeneration[TechnologyKey.Solar], 0, 95, 100);
-            AssertSeries(outcome.UnservedMw, 200, 105, 100);
+            AssertSeries(outcome.Unserved, 200, 105, 100);
         }
 
         [Fact]
@@ -286,14 +300,173 @@ namespace NEM.Model.Tests.Simulation
             {
                 [TechnologyKey.Coal] = HourlyFlow(10),
             };
-            var outcome = new DispatchOutcome("NSW1", generation, HourlyFlow(0), HourlyFlow(0));
+            var curtailment = new Dictionary<TechnologyKey, FlowSeries>
+            {
+                [TechnologyKey.Coal] = HourlyFlow(0),
+            };
+            var zero = HourlyFlow(0);
+            var outcome = new DispatchOutcome(
+                "NSW1",
+                generation,
+                curtailment,
+                HourlyFlow(10),
+                zero,
+                zero,
+                zero,
+                zero,
+                zero);
 
             generation.Clear();
+            curtailment.Clear();
             var mutableView = (IDictionary<TechnologyKey, FlowSeries>)outcome.PerFleetGeneration;
             var act = () => mutableView.Add(TechnologyKey.Gas, HourlyFlow(0));
 
             outcome.PerFleetGeneration.Should().ContainKey(TechnologyKey.Coal);
+            outcome.PerFleetCurtailment.Should().ContainKey(TechnologyKey.Coal);
             act.Should().Throw<NotSupportedException>();
+        }
+
+        [Fact]
+        public void DispatchOutcome_RejectsIntervalImbalanceEvenWhenIntegratedTotalsBalance()
+        {
+            var act = () => Outcome(
+                generation: [90, 110],
+                demand: [100, 100],
+                curtailment: [0, 0],
+                unserved: [0, 0]);
+
+            act.Should().Throw<InvalidOperationException>()
+                .WithMessage("Energy balance failed at index 0*");
+        }
+
+        [Fact]
+        public void DispatchOutcome_RejectsNegativeCurtailment()
+        {
+            var act = () => Outcome(
+                generation: [90],
+                demand: [100],
+                curtailment: [-10],
+                unserved: [0]);
+
+            act.Should().Throw<InvalidOperationException>()
+                .WithMessage("Curtailment cannot be negative at index 0*");
+        }
+
+        [Fact]
+        public void DispatchOutcome_RejectsCurtailmentAndUnservedInSameInterval()
+        {
+            var act = () => Outcome(
+                generation: [100],
+                demand: [100],
+                curtailment: [10],
+                unserved: [10]);
+
+            act.Should().Throw<InvalidOperationException>()
+                .WithMessage("Curtailment and unserved demand cannot coexist at index 0*");
+        }
+
+        [Fact]
+        public void DispatchOutcome_RejectsNonHourlyResolution()
+        {
+            var halfHourlyDemand = new FlowSeries(
+                NemStart,
+                TimeSpan.FromMinutes(30),
+                [100, 100]);
+            var halfHourlyZero = new FlowSeries(
+                NemStart,
+                TimeSpan.FromMinutes(30),
+                [0, 0]);
+            var act = () => new DispatchOutcome(
+                "NSW1",
+                new Dictionary<TechnologyKey, FlowSeries>
+                {
+                    [TechnologyKey.Coal] = halfHourlyDemand,
+                },
+                new Dictionary<TechnologyKey, FlowSeries>
+                {
+                    [TechnologyKey.Coal] = halfHourlyZero,
+                },
+                halfHourlyDemand,
+                halfHourlyZero,
+                halfHourlyZero,
+                halfHourlyZero,
+                halfHourlyZero,
+                halfHourlyZero);
+
+            act.Should().Throw<ArgumentException>()
+                .WithParameterName("Demand")
+                .WithMessage("Dispatch outcomes must use hourly resolution.*");
+        }
+
+        [Fact]
+        public void DispatchOutcome_RejectsBlankRegionId()
+        {
+            var act = () => Outcome(
+                generation: [100],
+                demand: [100],
+                curtailment: [0],
+                unserved: [0],
+                regionId: " ");
+
+            act.Should().Throw<ArgumentException>()
+                .WithParameterName("regionId");
+        }
+
+        [Fact]
+        public void DispatchOutcome_RejectsNullDemandWithClearParameterName()
+        {
+            FlowSeries zero = HourlyFlow(0);
+            var act = () => new DispatchOutcome(
+                "NSW1",
+                new Dictionary<TechnologyKey, FlowSeries>(),
+                new Dictionary<TechnologyKey, FlowSeries>(),
+                null!,
+                zero,
+                zero,
+                zero,
+                zero,
+                zero);
+
+            act.Should().Throw<ArgumentNullException>()
+                .WithParameterName("demand");
+        }
+
+        [Fact]
+        public void DispatchOutcome_AcceptsSubToleranceFloatingPointResidue()
+        {
+            var act = () => Outcome(
+                generation: [100 - 1e-10],
+                demand: [100],
+                curtailment: [-1e-10],
+                unserved: [1e-10]);
+
+            act.Should().NotThrow();
+        }
+
+        private static DispatchOutcome Outcome(
+            double[] generation,
+            double[] demand,
+            double[] curtailment,
+            double[] unserved,
+            string regionId = "NSW1")
+        {
+            FlowSeries zero = HourlyFlow(new double[demand.Length]);
+            return new DispatchOutcome(
+                regionId,
+                new Dictionary<TechnologyKey, FlowSeries>
+                {
+                    [TechnologyKey.Coal] = HourlyFlow(generation),
+                },
+                new Dictionary<TechnologyKey, FlowSeries>
+                {
+                    [TechnologyKey.Coal] = HourlyFlow(curtailment),
+                },
+                HourlyFlow(demand),
+                HourlyFlow(unserved),
+                zero,
+                zero,
+                zero,
+                zero);
         }
 
         private static GeneratingFleet Fleet(TechnologyKey technology, double capacityMw) =>
