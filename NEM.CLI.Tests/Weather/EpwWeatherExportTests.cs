@@ -1,4 +1,5 @@
 using FluentAssertions;
+using NEM.CLI.Weather;
 using NEM.Contracts;
 using NEM.Model.Generation.Wind;
 using NEM.Model.Series;
@@ -6,7 +7,7 @@ using NEM.Model.Units;
 using NEM.Model.Weather;
 using System.Text.Json;
 
-namespace NEM.CLI.Tests;
+namespace NEM.CLI.Tests.Weather;
 
 public sealed class EpwWeatherExportTests
 {

@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace NEM.CLI.Tests;
+namespace NEM.CLI.Tests.Weather;
 
 internal sealed class EpwFixture
 {

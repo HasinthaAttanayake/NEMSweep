@@ -1,6 +1,6 @@
-using System.Text.Json;
+using NEM.CLI.Infrastructure;
 
-namespace NEM.CLI;
+namespace NEM.CLI.Weather;
 
 internal sealed record EpwWindRun(int Length, DateTimeOffset? StartTimestamp);
 
@@ -106,20 +106,7 @@ internal static class EpwProvenance
     }
 
     public static void WriteJson(EpwProvenanceReport report, string path)
-    {
-        string? directory = Path.GetDirectoryName(path);
-        if (!string.IsNullOrEmpty(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
-
-        var options = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = true,
-        };
-        File.WriteAllText(path, JsonSerializer.Serialize(report, options));
-    }
+        => JsonFile.Write(report, path);
 
     private static DecodedFlag DecodeSolar(string flags, int offset, ref bool unavailable)
     {

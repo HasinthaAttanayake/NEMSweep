@@ -4,7 +4,7 @@ using NEM.Model.Series;
 using System.Globalization;
 using System.IO.Compression;
 
-namespace NEM.CLI;
+namespace NEM.CLI.Demand;
 
 internal sealed record OperationalDemandData(
     string Region,

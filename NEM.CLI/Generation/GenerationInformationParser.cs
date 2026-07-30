@@ -2,7 +2,7 @@ using ClosedXML.Excel;
 using NEM.Contracts;
 using System.Globalization;
 
-namespace NEM.CLI;
+namespace NEM.CLI.Generation;
 
 internal static class GenerationInformationParser
 {

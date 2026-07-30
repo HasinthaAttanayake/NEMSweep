@@ -1,8 +1,9 @@
 using FluentAssertions;
+using NEM.CLI.Demand;
 using System.Globalization;
 using System.IO.Compression;
 
-namespace NEM.CLI.Tests;
+namespace NEM.CLI.Tests.Demand;
 
 public sealed class OperationalDemandParserTests
 {

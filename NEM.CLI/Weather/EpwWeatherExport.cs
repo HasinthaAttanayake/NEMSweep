@@ -1,12 +1,12 @@
 using NEM.Contracts;
+using NEM.CLI.Infrastructure;
 using NEM.Model.Generation.Solar;
 using NEM.Model.Generation.Wind;
 using NEM.Model.Series;
 using NEM.Model.Units;
 using NEM.Model.Weather;
-using System.Text.Json;
 
-namespace NEM.CLI;
+namespace NEM.CLI.Weather;
 
 internal static class EpwWeatherExport
 {
@@ -52,20 +52,7 @@ internal static class EpwWeatherExport
     }
 
     public static void WriteJson(WeatherDataDTO weatherData, string path)
-    {
-        string? directory = Path.GetDirectoryName(path);
-        if (!string.IsNullOrEmpty(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
-
-        var options = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = true,
-        };
-        File.WriteAllText(path, JsonSerializer.Serialize(weatherData, options));
-    }
+        => JsonFile.Write(weatherData, path);
 
     private static double[] ValuesOf(TraceSeries series)
     {
