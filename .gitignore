@@ -287,6 +287,9 @@ healthchecksdb
 .env
 .env.*.local
 
+# Machine-local scenario configuration
+NEM.CLI/appsettings.local.json
+
 # data
 data/
 !NEM.Web/wwwroot/data/

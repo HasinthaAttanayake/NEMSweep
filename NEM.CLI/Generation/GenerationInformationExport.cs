@@ -1,7 +1,7 @@
 using NEM.Contracts;
-using System.Text.Json;
+using NEM.CLI.Infrastructure;
 
-namespace NEM.CLI;
+namespace NEM.CLI.Generation;
 
 internal static class GenerationInformationExport
 {
@@ -17,17 +17,5 @@ internal static class GenerationInformationExport
     }
 
     public static void WriteJson(GenerationInformationDTO data, string path)
-    {
-        string? directory = Path.GetDirectoryName(path);
-        if (!string.IsNullOrEmpty(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
-
-        File.WriteAllText(path, JsonSerializer.Serialize(data, new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = true,
-        }));
-    }
+        => JsonFile.Write(data, path);
 }

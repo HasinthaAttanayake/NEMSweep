@@ -40,6 +40,25 @@ model. Follow progress on the [NEM Sim Development Board](https://github.com/use
 - `NEM.Web` is the Blazor WebAssembly progress site.
 - `NEM.Model.Tests` and `NEM.CLI.Tests` cover model and ingestion behaviour.
 
+The implemented aggregate roots and domain-service boundaries are tracked in
+the [domain model](docs/domain-model.md).
+
+### CLI structure
+
+`NEM.CLI` is organised by workflow, with application mechanics kept separate:
+
+| Folder | Responsibility |
+| --- | --- |
+| `Application` | Argument routing, usage, exit codes, and shared command context |
+| `Configuration` | Strongly typed local/example settings and validation |
+| `Infrastructure` | Repository paths and the shared JSON policy |
+| `Demand` | Operational-demand import, validation, and export |
+| `Weather` | EPW parsing, provenance analysis, diagnostics, and weather export |
+| `Generation` | Generation-information workbook import and export |
+| `Scenarios` | Scenario input adaptation, dispatch orchestration, and result export |
+
+`NEM.CLI.Tests` mirrors the same feature folders.
+
 ## Local development
 
 NemSim currently targets .NET 10.
@@ -52,3 +71,16 @@ dotnet run --project .\NEM.Web\NEM.Web.csproj
 ```
 
 The web project is then available at the URL printed by `dotnet run`.
+
+Copy `NEM.CLI/appsettings.example.json` to
+`NEM.CLI/appsettings.local.json` for machine-local scenario settings. The local
+file is ignored by Git; the example is used as the fallback when it is absent.
+Scenario results record the schema version and SHA-256 digest of the exact
+demand and weather artifact bytes used by the run.
+
+Regenerate the committed dispatch artifact from the committed demand and weather
+inputs with:
+
+```powershell
+dotnet run --project .\NEM.CLI\NEM.CLI.csproj -- --run-scenario
+```

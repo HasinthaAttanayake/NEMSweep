@@ -1,8 +1,8 @@
 using NEM.Contracts;
+using NEM.CLI.Infrastructure;
 using NEM.Model.Series;
-using System.Text.Json;
 
-namespace NEM.CLI;
+namespace NEM.CLI.Demand;
 
 internal static class OperationalDemandExport
 {
@@ -30,18 +30,5 @@ internal static class OperationalDemandExport
     }
 
     public static void WriteJson(ModelInputOutputDTO demandData, string path)
-    {
-        string? directory = Path.GetDirectoryName(path);
-        if (!string.IsNullOrEmpty(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
-
-        var options = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = true,
-        };
-        File.WriteAllText(path, JsonSerializer.Serialize(demandData, options));
-    }
+        => JsonFile.Write(demandData, path);
 }

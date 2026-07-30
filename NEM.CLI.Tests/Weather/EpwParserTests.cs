@@ -1,7 +1,8 @@
 using FluentAssertions;
+using NEM.CLI.Weather;
 using NEM.Model.Weather;
 
-namespace NEM.CLI.Tests;
+namespace NEM.CLI.Tests.Weather;
 
 public sealed class EpwParserTests
 {

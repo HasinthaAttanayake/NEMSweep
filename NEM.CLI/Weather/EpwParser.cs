@@ -3,7 +3,7 @@ using CsvHelper.Configuration;
 using NEM.Model.Weather;
 using System.Globalization;
 
-namespace NEM.CLI;
+namespace NEM.CLI.Weather;
 
 internal sealed record EpwHeader(
     string City,

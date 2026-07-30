@@ -1,7 +1,8 @@
 using ClosedXML.Excel;
 using FluentAssertions;
+using NEM.CLI.Generation;
 
-namespace NEM.CLI.Tests;
+namespace NEM.CLI.Tests.Generation;
 
 public sealed class GenerationInformationParserTests
 {

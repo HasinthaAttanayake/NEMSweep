@@ -1,9 +1,10 @@
 using FluentAssertions;
+using NEM.CLI.Demand;
 using NEM.Contracts;
 using NEM.Model.Series;
 using System.Text.Json;
 
-namespace NEM.CLI.Tests;
+namespace NEM.CLI.Tests.Demand;
 
 public sealed class OperationalDemandExportTests
 {
