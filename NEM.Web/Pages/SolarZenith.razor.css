@@ -126,6 +126,10 @@
     font-weight: 700;
 }
 
+.chart-section ::deep circle.mud-chart-point:nth-of-type(n + 25) {
+    pointer-events: none;
+}
+
 @media (max-width: 700px) {
     .zenith-page {
         padding: 1rem 0.85rem 2rem;

@@ -1,6 +1,11 @@
 ﻿<div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
-        <a class="navbar-brand" href="">NemSim</a>
+        <a class="navbar-brand" href="" aria-label="NemSim home">
+            <span class="brand-mark" aria-hidden="true">
+                <MudIcon Icon="@Icons.Material.Filled.ElectricBolt" Size="Size.Small" />
+            </span>
+            <span class="brand-name">Nem<span>Sim</span></span>
+        </a>
         <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
             <span class="navbar-toggler-icon"></span>
         </button>
@@ -9,33 +14,44 @@
 
 <div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
     <nav class="nav flex-column">
+        <p class="nav-section-label">Overview</p>
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+                <MudIcon Icon="@Icons.Material.Filled.Home" Size="Size.Small" />
+                Home
             </NavLink>
         </div>
+        <p class="nav-section-label">Simulation</p>
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <MudIcon Icon="@Icons.Material.Filled.WbSunny" Size="Size.Small" Class="nav-mud-icon" />
-                Weather
+            <NavLink class="nav-link" href="dispatch">
+                <MudIcon Icon="@Icons.Material.Filled.AreaChart" Size="Size.Small" />
+                Dispatch
             </NavLink>
         </div>
+        <p class="nav-section-label">Model inputs</p>
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="demand">
-                <MudIcon Icon="@Icons.Material.Filled.ElectricBolt" Size="Size.Small" Class="nav-mud-icon" />
+                <MudIcon Icon="@Icons.Material.Filled.ElectricBolt" Size="Size.Small" />
                 Demand
             </NavLink>
         </div>
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="generation">
-                <MudIcon Icon="@Icons.Material.Filled.Factory" Size="Size.Small" Class="nav-mud-icon" />
-                Generation
+            <NavLink class="nav-link" href="weather">
+                <MudIcon Icon="@Icons.Material.Filled.WbSunny" Size="Size.Small" />
+                Weather
             </NavLink>
         </div>
         <div class="nav-item px-3">
+            <NavLink class="nav-link" href="generation">
+                <MudIcon Icon="@Icons.Material.Filled.Factory" Size="Size.Small" />
+                Generation
+            </NavLink>
+        </div>
+        <p class="nav-section-label">Model methods</p>
+        <div class="nav-item px-3">
             <NavLink class="nav-link" href="solar-zenith">
-                <MudIcon Icon="@Icons.Material.Filled.ShowChart" Size="Size.Small" Class="nav-mud-icon" />
-                Solar zenith
+                <MudIcon Icon="@Icons.Material.Filled.ShowChart" Size="Size.Small" />
+                Solar geometry
             </NavLink>
         </div>
     </nav>
