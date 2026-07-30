@@ -28,6 +28,8 @@ The currently validated and published layers are:
   year, month, or day.
 - **Weather resources:** solar radiation, wind, temperature, solar geometry, and
   modelled solar and wind generation.
+- **Baseline dispatch:** hourly merit-order generation by technology against New
+  South Wales operational demand, including curtailment and reliability metrics.
 
 New views will be published as the sequential build reaches each part of the
 model. Follow progress on the [NEM Sim Development Board](https://github.com/users/HasinthaAttanayake/projects/11).

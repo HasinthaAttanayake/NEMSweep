@@ -164,6 +164,11 @@
                 Name = "Solar zenith (degrees)",
                 Data = values,
             },
+            new ChartSeries<double>
+            {
+                Name = "Astronomical horizon (90°)",
+                Data = Enumerable.Repeat(90.0, series.Length).ToArray(),
+            },
         ];
     }
 }

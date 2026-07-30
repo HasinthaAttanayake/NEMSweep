@@ -142,7 +142,7 @@
         {
             var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
             ModelInputOutputDTO? result =
-                await Http.GetFromJsonAsync<ModelInputOutputDTO>("data/results.json", options);
+                await Http.GetFromJsonAsync<ModelInputOutputDTO>("data/demand-data.json", options);
 
             if (result is null)
             {
