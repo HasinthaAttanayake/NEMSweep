@@ -91,7 +91,7 @@ public sealed class CommandRouterTests
                     "name": "{{scenarioName}}",
                     "demandFile": "demand.json",
                     "weatherFile": "weather.json",
-                    "fleets": []
+                    "generatingFleets": []
                   }
                 }
                 """);

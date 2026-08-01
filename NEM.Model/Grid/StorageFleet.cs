@@ -48,41 +48,27 @@ namespace NEM.Model.Grid
         /// </summary>
         public StorageOutcome Operate(Energy initialStorageLevel, Power requestedFlow, TimeSpan resolution)
         {
-            if (initialStorageLevel < Energy.Zero || initialStorageLevel > StorageCapacity)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(initialStorageLevel),
-                    initialStorageLevel.MegawattHours,
-                    "Initial storage level must be within storage capacity.");
-            }
-
-            if (resolution <= TimeSpan.Zero)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(resolution), resolution, "Resolution must be positive.");
-            }
+            ValidateState(initialStorageLevel, resolution, nameof(initialStorageLevel));
 
             if (requestedFlow > Power.Zero)
             {
-                Energy dischargedEnergy = Energy.Min(
-                    initialStorageLevel,
-                    Energy.Min(requestedFlow * resolution, PowerCapacity * resolution));
+                Power deliveredFlow = Power.Min(
+                    requestedFlow,
+                    DischargeHeadroom(initialStorageLevel, resolution));
+                Energy dischargedEnergy = deliveredFlow * resolution;
 
                 return new StorageOutcome(
                     initialStorageLevel - dischargedEnergy,
-                    dischargedEnergy / resolution);
+                    deliveredFlow);
             }
 
             if (requestedFlow < Power.Zero)
             {
                 double roundTripEfficiency = _technologyProfile.RoundTripEfficiency;
-                Energy requestedInputEnergy = requestedFlow * resolution * -1;
-                Energy availableInputEnergy = roundTripEfficiency == 0
-                    ? requestedInputEnergy
-                    : (StorageCapacity - initialStorageLevel) * (1 / roundTripEfficiency);
-                Energy chargedInputEnergy = Energy.Min(
-                    requestedInputEnergy,
-                    Energy.Min(PowerCapacity * resolution, availableInputEnergy));
+                Power chargedInput = Power.Min(
+                    requestedFlow * -1,
+                    ChargeHeadroom(initialStorageLevel, resolution));
+                Energy chargedInputEnergy = chargedInput * resolution;
                 Energy storedEnergy = chargedInputEnergy * roundTripEfficiency;
 
                 return new StorageOutcome(
@@ -91,6 +77,46 @@ namespace NEM.Model.Grid
             }
 
             return new StorageOutcome(initialStorageLevel, Power.Zero);
+        }
+
+        internal Power ChargeHeadroom(Energy storageLevel, TimeSpan resolution)
+        {
+            ValidateState(storageLevel, resolution, nameof(storageLevel));
+            double roundTripEfficiency = _technologyProfile.RoundTripEfficiency;
+            if (roundTripEfficiency == 0)
+            {
+                return PowerCapacity;
+            }
+
+            Power energyHeadroom = ((StorageCapacity - storageLevel) * (1 / roundTripEfficiency))
+                / resolution;
+            return Power.Min(PowerCapacity, energyHeadroom);
+        }
+
+        internal Power DischargeHeadroom(Energy storageLevel, TimeSpan resolution)
+        {
+            ValidateState(storageLevel, resolution, nameof(storageLevel));
+            return Power.Min(PowerCapacity, storageLevel / resolution);
+        }
+
+        private void ValidateState(
+            Energy storageLevel,
+            TimeSpan resolution,
+            string storageLevelParameterName)
+        {
+            if (storageLevel < Energy.Zero || storageLevel > StorageCapacity)
+            {
+                throw new ArgumentOutOfRangeException(
+                    storageLevelParameterName,
+                    storageLevel.MegawattHours,
+                    "Storage level must be within storage capacity.");
+            }
+
+            if (resolution <= TimeSpan.Zero)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(resolution), resolution, "Resolution must be positive.");
+            }
         }
     }
 

@@ -31,7 +31,7 @@ internal sealed record CliSettings(
         ArgumentException.ThrowIfNullOrWhiteSpace(Scenario.Name);
         ArgumentException.ThrowIfNullOrWhiteSpace(Scenario.DemandFile);
         ArgumentException.ThrowIfNullOrWhiteSpace(Scenario.WeatherFile);
-        ArgumentNullException.ThrowIfNull(Scenario.Fleets);
+        ArgumentNullException.ThrowIfNull(Scenario.GeneratingFleets);
     }
 }
 
@@ -45,9 +45,9 @@ internal sealed record ScenarioSettings(
     string Name,
     string DemandFile,
     string WeatherFile,
-    FleetSettings[] Fleets);
+    GeneratingFleetSettings[] GeneratingFleets);
 
-internal sealed record FleetSettings(
+internal sealed record GeneratingFleetSettings(
     string Technology,
     double NameplateCapacityMw,
     MonthlyCapacityFactorSettings[]? MonthlyCapacityFactors = null);

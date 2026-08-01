@@ -49,7 +49,7 @@ internal static class DispatchResultsExport
                 demandData.SourceArchives.ToArray()),
             new DispatchPowerSystemDTO(
                 powerSystem.Id.Value,
-                region.Fleets.Select(fleet => new DispatchFleetDTO(
+                region.GeneratingFleets.Select(fleet => new DispatchFleetDTO(
                     fleet.GenerationTechnology.ToString(),
                     fleet.NameplateCapacity.Megawatts)).ToArray()),
             new DispatchSeriesDTO(

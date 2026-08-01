@@ -102,6 +102,37 @@ namespace NEM.Model.Tests.Grid
         }
 
         [Fact]
+        public void Operate_RejectsLevelAboveCapacityWithPublicParameterName()
+        {
+            var fleet = Battery(storageCapacityMwh: 100, powerCapacityMw: 20);
+
+            var act = () => fleet.Operate(
+                Energy.FromMegawattHours(101),
+                Power.Zero,
+                OneHour);
+
+            act.Should().Throw<ArgumentOutOfRangeException>()
+                .WithParameterName("initialStorageLevel");
+        }
+
+        [Fact]
+        public void Headroom_RejectsLevelAboveCapacityWithSharedInvariantMessage()
+        {
+            var fleet = Battery(storageCapacityMwh: 100, powerCapacityMw: 20);
+            Energy invalidLevel = Energy.FromMegawattHours(101);
+
+            var chargeAct = () => fleet.ChargeHeadroom(invalidLevel, OneHour);
+            var dischargeAct = () => fleet.DischargeHeadroom(invalidLevel, OneHour);
+
+            chargeAct.Should().Throw<ArgumentOutOfRangeException>()
+                .WithParameterName("storageLevel")
+                .WithMessage("Storage level must be within storage capacity.*");
+            dischargeAct.Should().Throw<ArgumentOutOfRangeException>()
+                .WithParameterName("storageLevel")
+                .WithMessage("Storage level must be within storage capacity.*");
+        }
+
+        [Fact]
         public void Archetypes_UseDifferentPinnedEfficiencyAndFleetDurations()
         {
             StorageTechnologyProfile battery = StorageTechnologyProfile.ProfileFor(StorageTechnology.Battery);

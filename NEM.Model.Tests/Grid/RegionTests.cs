@@ -12,53 +12,92 @@ namespace NEM.Model.Tests.Grid
             new(2026, 7, 1, 0, 0, 0, TimeSpan.FromHours(10));
 
         [Fact]
-        public void Construction_RejectsNullFleetCollection()
+        public void Construction_RejectsNullGeneratingFleetCollection()
         {
             var act = () => new Region("NSW1", null!, HourlyFlow(100));
 
-            act.Should().Throw<ArgumentNullException>().WithParameterName("fleets");
+            act.Should().Throw<ArgumentNullException>().WithParameterName("generatingFleets");
         }
 
         [Fact]
-        public void Construction_RejectsEmptyFleetCollection()
+        public void Construction_RejectsEmptyGeneratingFleetCollection()
         {
             var act = () => new Region("NSW1", [], HourlyFlow(100));
 
-            act.Should().Throw<ArgumentException>().WithParameterName("fleets");
+            act.Should().Throw<ArgumentException>().WithParameterName("generatingFleets");
         }
 
         [Fact]
-        public void Construction_RejectsNullFleetEntry()
+        public void Construction_RejectsNullGeneratingFleetEntry()
         {
             var act = () => new Region("NSW1", [null!], HourlyFlow(100));
 
-            act.Should().Throw<ArgumentException>().WithParameterName("fleets");
+            act.Should().Throw<ArgumentException>().WithParameterName("generatingFleets");
         }
 
         [Fact]
-        public void Construction_RejectsDuplicateTechnologyAggregates()
+        public void Construction_RejectsDuplicateGenerationTechnologyAggregates()
         {
             var act = () => new Region(
                 "NSW1",
                 [Fleet(GenerationTechnology.Coal), Fleet(GenerationTechnology.Coal)],
                 HourlyFlow(100));
 
-            act.Should().Throw<ArgumentException>().WithParameterName("fleets");
+            act.Should().Throw<ArgumentException>().WithParameterName("generatingFleets");
         }
 
         [Fact]
-        public void Construction_CopiesAndExposesReadOnlyFleetCollection()
+        public void Construction_CopiesAndExposesReadOnlyGeneratingFleetCollection()
         {
             GeneratingFleet coal = Fleet(GenerationTechnology.Coal);
-            GeneratingFleet[] fleets = [coal];
-            var region = new Region("NSW1", fleets, HourlyFlow(100));
+            GeneratingFleet[] generatingFleets = [coal];
+            var region = new Region("NSW1", generatingFleets, HourlyFlow(100));
 
-            fleets[0] = Fleet(GenerationTechnology.Gas);
-            var mutableView = (IList<GeneratingFleet>)region.Fleets;
+            generatingFleets[0] = Fleet(GenerationTechnology.Gas);
+            var mutableView = (IList<GeneratingFleet>)region.GeneratingFleets;
             var act = () => mutableView[0] = Fleet(GenerationTechnology.Gas);
 
-            region.Fleets.Should().ContainSingle().Which.Should().BeSameAs(coal);
+            region.GeneratingFleets.Should().ContainSingle().Which.Should().BeSameAs(coal);
             act.Should().Throw<NotSupportedException>();
+        }
+
+        [Fact]
+        public void Construction_AllowsNoStorageFleets()
+        {
+            var region = new Region(
+                "NSW1",
+                [Fleet(GenerationTechnology.Coal)],
+                HourlyFlow(100));
+
+            region.StorageFleets.Should().BeEmpty();
+        }
+
+        [Fact]
+        public void Construction_RejectsNullStorageFleetEntry()
+        {
+            var act = () => new Region(
+                "NSW1",
+                [Fleet(GenerationTechnology.Coal)],
+                HourlyFlow(100),
+                storageFleets: [null!]);
+
+            act.Should().Throw<ArgumentException>()
+                .WithParameterName("storageFleets");
+        }
+
+        [Fact]
+        public void Construction_RejectsDuplicateStorageTechnologyAggregates()
+        {
+            var act = () => new Region(
+                "NSW1",
+                [Fleet(GenerationTechnology.Coal)],
+                HourlyFlow(100),
+                storageFleets: [
+                    Storage(StorageTechnology.Battery),
+                    Storage(StorageTechnology.Battery),
+                ]);
+
+            act.Should().Throw<ArgumentException>().WithParameterName("storageFleets");
         }
 
         [Theory]
@@ -74,7 +113,7 @@ namespace NEM.Model.Tests.Grid
 
             act.Should().Throw<ArgumentException>()
                 .WithParameterName("resourceProfile")
-                .WithMessage("*wind or solar fleets require a resource profile*");
+                .WithMessage("*wind or solar generating fleets require a resource profile*");
         }
 
         [Fact]
@@ -94,6 +133,9 @@ namespace NEM.Model.Tests.Grid
 
         private static GeneratingFleet Fleet(GenerationTechnology technology) =>
             new(technology, Power.FromMegawatts(100));
+
+        private static StorageFleet Storage(StorageTechnology technology) =>
+            new(technology, Energy.FromMegawattHours(100), Power.FromMegawatts(50));
 
         private static FlowSeries HourlyFlow(params double[] megawatts) =>
             new(NemStart, TimeSpan.FromHours(1), megawatts);

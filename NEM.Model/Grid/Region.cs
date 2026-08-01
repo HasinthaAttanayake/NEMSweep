@@ -8,40 +8,64 @@ namespace NEM.Model.Grid
     {
         public string RegionId { get; }
         public DemandProfile Demand { get; }
-        public IReadOnlyList<GeneratingFleet> Fleets { get; }
+        public IReadOnlyList<GeneratingFleet> GeneratingFleets { get; }
+        public IReadOnlyList<StorageFleet> StorageFleets { get; }
         public RegionalResourceProfile? ResourceProfile { get; }
 
         public Region(
             string regionId,
-            IReadOnlyList<GeneratingFleet> fleets,
+            IReadOnlyList<GeneratingFleet> generatingFleets,
             FlowSeries baseDemand,
             IReadOnlyDictionary<string, FlowSeries>? additiveDemandComponents = null,
-            RegionalResourceProfile? resourceProfile = null)
+            RegionalResourceProfile? resourceProfile = null,
+            IReadOnlyList<StorageFleet>? storageFleets = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(regionId);
-            ArgumentNullException.ThrowIfNull(fleets);
-            if (fleets.Count == 0)
-            {
-                throw new ArgumentException("Region must have at least one generating fleet.", nameof(fleets));
-            }
-
-            if (fleets.Any(fleet => fleet is null))
-            {
-                throw new ArgumentException("Region fleets cannot contain null.", nameof(fleets));
-            }
-
-            if (fleets.DistinctBy(fleet => fleet.GenerationTechnology).Count() != fleets.Count)
+            ArgumentNullException.ThrowIfNull(generatingFleets);
+            if (generatingFleets.Count == 0)
             {
                 throw new ArgumentException(
-                    "Region cannot have more than one fleet with the same technology key.",
-                    nameof(fleets));
+                    "Region must have at least one generating fleet.",
+                    nameof(generatingFleets));
             }
 
-            if (fleets.Any(fleet => fleet.IsIntermittentRenewable) && resourceProfile is null)
+            if (generatingFleets.Any(fleet => fleet is null))
             {
                 throw new ArgumentException(
-                    "Regions containing wind or solar fleets require a resource profile.",
+                    "Region generating fleets cannot contain null.",
+                    nameof(generatingFleets));
+            }
+
+            if (generatingFleets.DistinctBy(fleet => fleet.GenerationTechnology).Count()
+                != generatingFleets.Count)
+            {
+                throw new ArgumentException(
+                    "Region cannot have more than one generating fleet with the same generation technology.",
+                    nameof(generatingFleets));
+            }
+
+            if (generatingFleets.Any(fleet => fleet.IsIntermittentRenewable) && resourceProfile is null)
+            {
+                throw new ArgumentException(
+                    "Regions containing wind or solar generating fleets require a resource profile.",
                     nameof(resourceProfile));
+            }
+
+            IReadOnlyList<StorageFleet> resolvedStorageFleets = storageFleets ?? [];
+            if (resolvedStorageFleets.Any(fleet => fleet is null))
+            {
+                throw new ArgumentException(
+                    "Region storage fleets cannot contain null.",
+                    nameof(storageFleets));
+            }
+
+            if (resolvedStorageFleets
+                .DistinctBy(fleet => fleet.StorageTechnology)
+                .Count() != resolvedStorageFleets.Count)
+            {
+                throw new ArgumentException(
+                    "Region cannot have more than one storage fleet with the same storage technology.",
+                    nameof(storageFleets));
             }
 
             var demand = new DemandProfile(baseDemand, additiveDemandComponents);
@@ -49,7 +73,8 @@ namespace NEM.Model.Grid
 
             RegionId = regionId;
             Demand = demand;
-            Fleets = Array.AsReadOnly(fleets.ToArray());
+            GeneratingFleets = Array.AsReadOnly(generatingFleets.ToArray());
+            StorageFleets = Array.AsReadOnly(resolvedStorageFleets.ToArray());
             ResourceProfile = resourceProfile;
         }
     }

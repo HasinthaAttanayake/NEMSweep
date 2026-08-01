@@ -25,12 +25,12 @@ public sealed class Scenario
         string regionId,
         DateTimeOffset periodStart,
         DateTimeOffset periodEnd,
-        IReadOnlyList<ScenarioFleet> fleets)
+        IReadOnlyList<ScenarioGeneratingFleet> generatingFleets)
     {
         ArgumentNullException.ThrowIfNull(id);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(regionId);
-        ArgumentNullException.ThrowIfNull(fleets);
+        ArgumentNullException.ThrowIfNull(generatingFleets);
         if (periodStart.Offset != TimeSpan.FromHours(10)
             || periodEnd.Offset != TimeSpan.FromHours(10))
         {
@@ -45,18 +45,19 @@ public sealed class Scenario
                 "Scenario period end must be after its start.");
         }
 
-        if (fleets.Count == 0 || fleets.Any(fleet => fleet is null))
+        if (generatingFleets.Count == 0 || generatingFleets.Any(fleet => fleet is null))
         {
             throw new ArgumentException(
-                "A scenario must contain at least one non-null fleet plan.",
-                nameof(fleets));
+                "A scenario must contain at least one non-null generating fleet plan.",
+                nameof(generatingFleets));
         }
 
-        if (fleets.DistinctBy(fleet => fleet.Technology).Count() != fleets.Count)
+        if (generatingFleets.DistinctBy(fleet => fleet.Technology).Count()
+            != generatingFleets.Count)
         {
             throw new ArgumentException(
-                "A scenario cannot contain duplicate fleet technologies.",
-                nameof(fleets));
+                "A scenario cannot contain duplicate generating fleet technologies.",
+                nameof(generatingFleets));
         }
 
         Id = id;
@@ -64,7 +65,7 @@ public sealed class Scenario
         RegionId = regionId;
         PeriodStart = periodStart;
         PeriodEnd = periodEnd;
-        Fleets = Array.AsReadOnly(fleets.ToArray());
+        GeneratingFleets = Array.AsReadOnly(generatingFleets.ToArray());
     }
 
     public ScenarioId Id { get; }
@@ -72,12 +73,12 @@ public sealed class Scenario
     public string RegionId { get; }
     public DateTimeOffset PeriodStart { get; }
     public DateTimeOffset PeriodEnd { get; }
-    public IReadOnlyList<ScenarioFleet> Fleets { get; }
+    public IReadOnlyList<ScenarioGeneratingFleet> GeneratingFleets { get; }
 }
 
-public sealed class ScenarioFleet
+public sealed class ScenarioGeneratingFleet
 {
-    public ScenarioFleet(
+    public ScenarioGeneratingFleet(
         GenerationTechnology technology,
         Power nameplateCapacity,
         IReadOnlyDictionary<DateOnly, double>? monthlyCapacityFactors = null)

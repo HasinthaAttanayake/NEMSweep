@@ -24,12 +24,12 @@ public static class ScenarioDerivation
                 nameof(baseDemand));
         }
 
-        GeneratingFleet[] fleets = scenario.Fleets
+        GeneratingFleet[] generatingFleets = scenario.GeneratingFleets
             .Select(fleet => fleet.ToGeneratingFleet())
             .ToArray();
         var region = new Region(
             scenario.RegionId,
-            fleets,
+            generatingFleets,
             hourlyDemand,
             resourceProfile: resourceProfile);
 

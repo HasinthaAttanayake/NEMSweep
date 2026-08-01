@@ -99,26 +99,32 @@ internal static class ScenarioRunner
         string regionId,
         FlowSeries timeline)
     {
-        if (settings.Fleets.Length == 0)
+        if (settings.GeneratingFleets.Length == 0)
         {
-            throw new FormatException("scenario.fleets must contain at least one fleet.");
+            throw new FormatException(
+                "scenario.generatingFleets must contain at least one generating fleet.");
         }
 
-        ScenarioFleet[] fleets = settings.Fleets.Select(fleetSettings =>
+        ScenarioGeneratingFleet[] generatingFleets = settings.GeneratingFleets.Select(
+            generatingFleetSettings =>
         {
-            if (!Enum.TryParse(fleetSettings.Technology, true, out GenerationTechnology technology))
+            if (!Enum.TryParse(
+                generatingFleetSettings.Technology,
+                true,
+                out GenerationTechnology technology))
             {
                 throw new FormatException(
-                    $"Unknown scenario fleet technology '{fleetSettings.Technology}'.");
+                    $"Unknown scenario generating fleet technology "
+                    + $"'{generatingFleetSettings.Technology}'.");
             }
 
             IReadOnlyDictionary<DateOnly, double>? monthlyCapacityFactors =
-                fleetSettings.MonthlyCapacityFactors?.ToDictionary(
+                generatingFleetSettings.MonthlyCapacityFactors?.ToDictionary(
                     entry => entry.Month,
                     entry => entry.CapacityFactor);
-            return new ScenarioFleet(
+            return new ScenarioGeneratingFleet(
                 technology,
-                Power.FromMegawatts(fleetSettings.NameplateCapacityMw),
+                Power.FromMegawatts(generatingFleetSettings.NameplateCapacityMw),
                 monthlyCapacityFactors);
         }).ToArray();
 
@@ -128,7 +134,7 @@ internal static class ScenarioRunner
             regionId,
             timeline.Start,
             timeline.Start.AddTicks(timeline.Resolution.Ticks * timeline.Length),
-            fleets);
+            generatingFleets);
     }
 
     private static RegionalResourceProfile ReadWeatherForTimeline(

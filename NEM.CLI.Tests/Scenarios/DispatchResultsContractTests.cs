@@ -115,8 +115,12 @@ public sealed class DispatchResultsContractTests
             start,
             start.AddHours(2),
             [
-                new ScenarioFleet(GenerationTechnology.Coal, Power.FromMegawatts(120)),
-                new ScenarioFleet(GenerationTechnology.Gas, Power.FromMegawatts(40)),
+                new ScenarioGeneratingFleet(
+                    GenerationTechnology.Coal,
+                    Power.FromMegawatts(120)),
+                new ScenarioGeneratingFleet(
+                    GenerationTechnology.Gas,
+                    Power.FromMegawatts(40)),
             ]);
         var powerSystem = new PowerSystem(
             new PowerSystemId("nsw1-baseline-dispatch-system"),
