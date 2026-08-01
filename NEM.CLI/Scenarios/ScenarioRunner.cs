@@ -106,7 +106,7 @@ internal static class ScenarioRunner
 
         ScenarioFleet[] fleets = settings.Fleets.Select(fleetSettings =>
         {
-            if (!Enum.TryParse(fleetSettings.Technology, true, out TechnologyKey technology))
+            if (!Enum.TryParse(fleetSettings.Technology, true, out GenerationTechnology technology))
             {
                 throw new FormatException(
                     $"Unknown scenario fleet technology '{fleetSettings.Technology}'.");

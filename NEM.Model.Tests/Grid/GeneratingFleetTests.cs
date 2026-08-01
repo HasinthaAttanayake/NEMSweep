@@ -14,7 +14,7 @@ namespace NEM.Model.Tests.Grid
         public void Construction_RejectsNegativeNameplateCapacity()
         {
             var act = () => new GeneratingFleet(
-                TechnologyKey.Coal,
+                GenerationTechnology.Coal,
                 Power.FromMegawatts(-1));
 
             act.Should().Throw<ArgumentOutOfRangeException>()
@@ -24,7 +24,7 @@ namespace NEM.Model.Tests.Grid
         [Fact]
         public void Construction_AllowsZeroNameplateCapacity()
         {
-            var fleet = new GeneratingFleet(TechnologyKey.Solar, Power.Zero);
+            var fleet = new GeneratingFleet(GenerationTechnology.Solar, Power.Zero);
 
             fleet.NameplateCapacity.Should().Be(Power.Zero);
         }
@@ -33,7 +33,7 @@ namespace NEM.Model.Tests.Grid
         public void Construction_RejectsHydroWithoutMonthlyCapacityFactors()
         {
             var act = () => new GeneratingFleet(
-                TechnologyKey.Hydro,
+                GenerationTechnology.Hydro,
                 Power.FromMegawatts(100));
 
             act.Should().Throw<ArgumentException>()
@@ -48,7 +48,7 @@ namespace NEM.Model.Tests.Grid
         public void Construction_RejectsInvalidMonthlyCapacityFactor(double capacityFactor)
         {
             var act = () => new GeneratingFleet(
-                TechnologyKey.Hydro,
+                GenerationTechnology.Hydro,
                 Power.FromMegawatts(100),
                 monthlyCapacityFactors: new Dictionary<DateOnly, double>
                 {
@@ -63,7 +63,7 @@ namespace NEM.Model.Tests.Grid
         public void Construction_RejectsMonthlyCapacityFactorsForNonHydroFleet()
         {
             var act = () => new GeneratingFleet(
-                TechnologyKey.Wind,
+                GenerationTechnology.Wind,
                 Power.FromMegawatts(100),
                 monthlyCapacityFactors: new Dictionary<DateOnly, double>
                 {

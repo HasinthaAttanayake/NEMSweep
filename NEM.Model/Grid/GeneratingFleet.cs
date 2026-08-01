@@ -13,7 +13,7 @@ namespace NEM.Model.Grid
         private readonly WindPowerCurveSettings _windPowerCurveSettings;
 
         public GeneratingFleet(
-            TechnologyKey technologyKey,
+            GenerationTechnology generationTechnology,
             Power nameplateCapacity,
             IReadOnlyDictionary<DateOnly, double>? monthlyCapacityFactors = null,
             WindPowerCurveSettings? windPowerCurveSettings = null)
@@ -26,21 +26,21 @@ namespace NEM.Model.Grid
                     "Nameplate capacity cannot be negative.");
             }
 
-            if (windPowerCurveSettings is not null && technologyKey != TechnologyKey.Wind)
+            if (windPowerCurveSettings is not null && generationTechnology != GenerationTechnology.Wind)
             {
                 throw new ArgumentException(
                     "Wind power-curve settings can only be supplied for a wind fleet.",
                     nameof(windPowerCurveSettings));
             }
 
-            if (technologyKey == TechnologyKey.Hydro && monthlyCapacityFactors is null)
+            if (generationTechnology == GenerationTechnology.Hydro && monthlyCapacityFactors is null)
             {
                 throw new ArgumentException(
                     "Hydro requires monthly capacity factors.",
                     nameof(monthlyCapacityFactors));
             }
 
-            if (monthlyCapacityFactors is not null && technologyKey != TechnologyKey.Hydro)
+            if (monthlyCapacityFactors is not null && generationTechnology != GenerationTechnology.Hydro)
             {
                 throw new ArgumentException(
                     "Monthly capacity factors can only be supplied for a hydro fleet.",
@@ -75,7 +75,7 @@ namespace NEM.Model.Grid
                 }
             }
 
-            TechnologyKey = technologyKey;
+            GenerationTechnology = generationTechnology;
             NameplateCapacity = nameplateCapacity;
             _monthlyCapacityFactors = monthlyCapacityFactors is null
                 ? null
@@ -83,17 +83,17 @@ namespace NEM.Model.Grid
             _windPowerCurveSettings = windPowerCurveSettings ?? WindPowerCurveSettings.Default;
         }
 
-        public TechnologyKey TechnologyKey { get; }
+        public GenerationTechnology GenerationTechnology { get; }
         public Power NameplateCapacity { get; }
-        public ushort ShortRunMarginalCost => (ushort)TechnologyKey; // TODO: replace with SMRC cost basis B5
-        public bool IsIntermittentRenewable => TechnologyKey is TechnologyKey.Solar or TechnologyKey.Wind; // TODO: move to TechnologyProfile as appropriate
+        public ushort ShortRunMarginalCost => (ushort)GenerationTechnology; // TODO: replace with SMRC cost basis B5
+        public bool IsIntermittentRenewable => GenerationTechnology is GenerationTechnology.Solar or GenerationTechnology.Wind; // TODO: move to TechnologyProfile as appropriate
 
         internal FlowSeries AvailableCapacityFor(
             RegionalResourceProfile? resourceProfile,
             FlowSeries dispatchTimeline)
         {
             FlowSeries availableCapacity;
-            if (TechnologyKey == TechnologyKey.Solar)
+            if (GenerationTechnology == GenerationTechnology.Solar)
             {
                 RegionalResourceProfile resources = RequireResourceProfile(resourceProfile);
                 availableCapacity = DualAxisSolarPowerCurve.Calculate(
@@ -104,7 +104,7 @@ namespace NEM.Model.Grid
                     resources.SolarZenith,
                     NameplateCapacity);
             }
-            else if (TechnologyKey == TechnologyKey.Wind)
+            else if (GenerationTechnology == GenerationTechnology.Wind)
             {
                 availableCapacity = WindPowerCurve.Calculate(
                     RequireResourceProfile(resourceProfile).WindSpeed,
@@ -128,7 +128,7 @@ namespace NEM.Model.Grid
         private RegionalResourceProfile RequireResourceProfile(
             RegionalResourceProfile? resourceProfile) =>
             resourceProfile ?? throw new InvalidOperationException(
-                $"{TechnologyKey} requires a regional resource profile.");
+                $"{GenerationTechnology} requires a regional resource profile.");
 
         internal FlowSeries ApplyEnergyBudget(FlowSeries candidateGeneration)
         {
@@ -153,7 +153,7 @@ namespace NEM.Model.Grid
                 if (!remainingByMonth.TryGetValue(month, out double remainingMwh))
                 {
                     throw new InvalidOperationException(
-                        $"{TechnologyKey} has no energy budget for {month:yyyy-MM}.");
+                        $"{GenerationTechnology} has no energy budget for {month:yyyy-MM}.");
                 }
 
                 double generatedMw = Math.Min(
@@ -165,15 +165,5 @@ namespace NEM.Model.Grid
 
             return new FlowSeries(candidateGeneration.Start, candidateGeneration.Resolution, values);
         }
-    }
-
-    public enum TechnologyKey
-    {
-        // Note: ENUM values here are akin to ranking of SMRC. This is temporary
-        Solar = 1,
-        Wind = 2,
-        Hydro = 3,
-        Coal = 4,
-        Gas = 5,
     }
 }

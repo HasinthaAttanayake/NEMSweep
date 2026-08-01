@@ -40,7 +40,7 @@ namespace NEM.Model.Tests.Grid
         {
             var act = () => new Region(
                 "NSW1",
-                [Fleet(TechnologyKey.Coal), Fleet(TechnologyKey.Coal)],
+                [Fleet(GenerationTechnology.Coal), Fleet(GenerationTechnology.Coal)],
                 HourlyFlow(100));
 
             act.Should().Throw<ArgumentException>().WithParameterName("fleets");
@@ -49,23 +49,23 @@ namespace NEM.Model.Tests.Grid
         [Fact]
         public void Construction_CopiesAndExposesReadOnlyFleetCollection()
         {
-            GeneratingFleet coal = Fleet(TechnologyKey.Coal);
+            GeneratingFleet coal = Fleet(GenerationTechnology.Coal);
             GeneratingFleet[] fleets = [coal];
             var region = new Region("NSW1", fleets, HourlyFlow(100));
 
-            fleets[0] = Fleet(TechnologyKey.Gas);
+            fleets[0] = Fleet(GenerationTechnology.Gas);
             var mutableView = (IList<GeneratingFleet>)region.Fleets;
-            var act = () => mutableView[0] = Fleet(TechnologyKey.Gas);
+            var act = () => mutableView[0] = Fleet(GenerationTechnology.Gas);
 
             region.Fleets.Should().ContainSingle().Which.Should().BeSameAs(coal);
             act.Should().Throw<NotSupportedException>();
         }
 
         [Theory]
-        [InlineData(TechnologyKey.Solar)]
-        [InlineData(TechnologyKey.Wind)]
+        [InlineData(GenerationTechnology.Solar)]
+        [InlineData(GenerationTechnology.Wind)]
         public void Construction_RejectsRenewableFleetWithoutResourceProfile(
-            TechnologyKey technology)
+            GenerationTechnology technology)
         {
             var act = () => new Region(
                 "NSW1",
@@ -85,14 +85,14 @@ namespace NEM.Model.Tests.Grid
 
             var act = () => new Region(
                 "NSW1",
-                [Fleet(TechnologyKey.Wind)],
+                [Fleet(GenerationTechnology.Wind)],
                 demand,
                 resourceProfile: resources);
 
             act.Should().Throw<ArgumentException>().WithMessage("*misaligned on start*");
         }
 
-        private static GeneratingFleet Fleet(TechnologyKey technology) =>
+        private static GeneratingFleet Fleet(GenerationTechnology technology) =>
             new(technology, Power.FromMegawatts(100));
 
         private static FlowSeries HourlyFlow(params double[] megawatts) =>

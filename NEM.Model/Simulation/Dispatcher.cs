@@ -9,8 +9,8 @@ namespace NEM.Model.Simulation
         private const double BalanceTolerance = 1e-9;
 
         public string RegionId { get; }
-        public IReadOnlyDictionary<TechnologyKey, FlowSeries> PerFleetGeneration { get; }
-        public IReadOnlyDictionary<TechnologyKey, FlowSeries> PerFleetCurtailment { get; }
+        public IReadOnlyDictionary<GenerationTechnology, FlowSeries> PerFleetGeneration { get; }
+        public IReadOnlyDictionary<GenerationTechnology, FlowSeries> PerFleetCurtailment { get; }
         public FlowSeries Demand { get; }
         public FlowSeries Charge { get; } // TODO: Set when battery
         public FlowSeries Discharge { get; } // TODO: Set when battery
@@ -22,8 +22,8 @@ namespace NEM.Model.Simulation
 
         public DispatchOutcome(
             string regionId,
-            IReadOnlyDictionary<TechnologyKey, FlowSeries> perFleetGeneration,
-            IReadOnlyDictionary<TechnologyKey, FlowSeries> perFleetCurtailment,
+            IReadOnlyDictionary<GenerationTechnology, FlowSeries> perFleetGeneration,
+            IReadOnlyDictionary<GenerationTechnology, FlowSeries> perFleetCurtailment,
             FlowSeries demand,
             FlowSeries unserved,
             FlowSeries charge,
@@ -56,10 +56,10 @@ namespace NEM.Model.Simulation
             }
 
             RegionId = regionId;
-            PerFleetGeneration = new ReadOnlyDictionary<TechnologyKey, FlowSeries>(
-                new Dictionary<TechnologyKey, FlowSeries>(perFleetGeneration));
-            PerFleetCurtailment = new ReadOnlyDictionary<TechnologyKey, FlowSeries>(
-                new Dictionary<TechnologyKey, FlowSeries>(perFleetCurtailment));
+            PerFleetGeneration = new ReadOnlyDictionary<GenerationTechnology, FlowSeries>(
+                new Dictionary<GenerationTechnology, FlowSeries>(perFleetGeneration));
+            PerFleetCurtailment = new ReadOnlyDictionary<GenerationTechnology, FlowSeries>(
+                new Dictionary<GenerationTechnology, FlowSeries>(perFleetCurtailment));
             Demand = demand;
             Unserved = unserved;
             Charge = charge;
@@ -193,8 +193,8 @@ namespace NEM.Model.Simulation
                 resolution,
                 new double[region.Demand.TotalDemand.Length]);
             var unservedMw = region.Demand.TotalDemand;
-            var perFleetGeneration = new Dictionary<TechnologyKey, FlowSeries>();
-            var perFleetCurtailment = new Dictionary<TechnologyKey, FlowSeries>();
+            var perFleetGeneration = new Dictionary<GenerationTechnology, FlowSeries>();
+            var perFleetCurtailment = new Dictionary<GenerationTechnology, FlowSeries>();
 
             // NEM-013: Implementation of Dispatch Order (Crude):
             foreach (var fleet in region.Fleets.OrderBy(f => f.ShortRunMarginalCost))
@@ -210,15 +210,15 @@ namespace NEM.Model.Simulation
                 unservedMw = unservedMw.Subtract(deliveredGeneration);
                 if (fleet.IsIntermittentRenewable)
                 {
-                    perFleetGeneration.Add(fleet.TechnologyKey, availableCapacity);
+                    perFleetGeneration.Add(fleet.GenerationTechnology, availableCapacity);
                     perFleetCurtailment.Add(
-                        fleet.TechnologyKey,
+                        fleet.GenerationTechnology,
                         availableCapacity.Subtract(deliveredGeneration));
                 }
                 else
                 {
-                    perFleetGeneration.Add(fleet.TechnologyKey, deliveredGeneration);
-                    perFleetCurtailment.Add(fleet.TechnologyKey, zeroFlow);
+                    perFleetGeneration.Add(fleet.GenerationTechnology, deliveredGeneration);
+                    perFleetCurtailment.Add(fleet.GenerationTechnology, zeroFlow);
                 }
             }
 

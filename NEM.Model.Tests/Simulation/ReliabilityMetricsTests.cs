@@ -80,13 +80,13 @@ namespace NEM.Model.Tests.Simulation
             FlowSeries demandFlow = HourlyFlow(demand);
             FlowSeries unservedFlow = HourlyFlow(unserved);
             FlowSeries zero = HourlyFlow(new double[demand.Length]);
-            var generation = new Dictionary<TechnologyKey, FlowSeries>
+            var generation = new Dictionary<GenerationTechnology, FlowSeries>
             {
-                [TechnologyKey.Coal] = demandFlow.Subtract(unservedFlow),
+                [GenerationTechnology.Coal] = demandFlow.Subtract(unservedFlow),
             };
-            var curtailment = new Dictionary<TechnologyKey, FlowSeries>
+            var curtailment = new Dictionary<GenerationTechnology, FlowSeries>
             {
-                [TechnologyKey.Coal] = zero,
+                [GenerationTechnology.Coal] = zero,
             };
 
             return new DispatchOutcome(

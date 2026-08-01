@@ -20,7 +20,7 @@ internal static class DispatchResultsExport
         DispatchOutcome outcome)
     {
         var deliveredGenerationByTechnology = new Dictionary<string, FlowSeries>();
-        foreach ((TechnologyKey technology, FlowSeries availableGeneration) in
+        foreach ((GenerationTechnology technology, FlowSeries availableGeneration) in
                  outcome.PerFleetGeneration.OrderBy(entry => entry.Key))
         {
             FlowSeries deliveredGeneration = availableGeneration.Subtract(
@@ -50,7 +50,7 @@ internal static class DispatchResultsExport
             new DispatchPowerSystemDTO(
                 powerSystem.Id.Value,
                 region.Fleets.Select(fleet => new DispatchFleetDTO(
-                    fleet.TechnologyKey.ToString(),
+                    fleet.GenerationTechnology.ToString(),
                     fleet.NameplateCapacity.Megawatts)).ToArray()),
             new DispatchSeriesDTO(
                 ValuesOf(outcome.Demand),

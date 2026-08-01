@@ -86,15 +86,15 @@ public sealed class DispatchResultsContractTests
         FlowSeries zero = Flow(start, 0, 0);
         var outcome = new DispatchOutcome(
             "NSW1",
-            new Dictionary<TechnologyKey, FlowSeries>
+            new Dictionary<GenerationTechnology, FlowSeries>
             {
-                [TechnologyKey.Coal] = Flow(start, 120, 50),
-                [TechnologyKey.Gas] = Flow(start, 0, 40),
+                [GenerationTechnology.Coal] = Flow(start, 120, 50),
+                [GenerationTechnology.Gas] = Flow(start, 0, 40),
             },
-            new Dictionary<TechnologyKey, FlowSeries>
+            new Dictionary<GenerationTechnology, FlowSeries>
             {
-                [TechnologyKey.Coal] = Flow(start, 20, 0),
-                [TechnologyKey.Gas] = zero,
+                [GenerationTechnology.Coal] = Flow(start, 20, 0),
+                [GenerationTechnology.Gas] = zero,
             },
             demand,
             Flow(start, 0, 10),
@@ -104,8 +104,8 @@ public sealed class DispatchResultsContractTests
             zero);
         GeneratingFleet[] fleets =
         [
-            new(TechnologyKey.Coal, Power.FromMegawatts(120)),
-            new(TechnologyKey.Gas, Power.FromMegawatts(40)),
+            new(GenerationTechnology.Coal, Power.FromMegawatts(120)),
+            new(GenerationTechnology.Gas, Power.FromMegawatts(40)),
         ];
         var demandData = new OperationalDemandData("NSW1", demand, ["demand.zip"]);
         var scenario = new DomainScenario(
@@ -115,8 +115,8 @@ public sealed class DispatchResultsContractTests
             start,
             start.AddHours(2),
             [
-                new ScenarioFleet(TechnologyKey.Coal, Power.FromMegawatts(120)),
-                new ScenarioFleet(TechnologyKey.Gas, Power.FromMegawatts(40)),
+                new ScenarioFleet(GenerationTechnology.Coal, Power.FromMegawatts(120)),
+                new ScenarioFleet(GenerationTechnology.Gas, Power.FromMegawatts(40)),
             ]);
         var powerSystem = new PowerSystem(
             new PowerSystemId("nsw1-baseline-dispatch-system"),
