@@ -78,7 +78,7 @@ public sealed class Scenario
 public sealed class ScenarioFleet
 {
     public ScenarioFleet(
-        TechnologyKey technology,
+        GenerationTechnology technology,
         Power nameplateCapacity,
         IReadOnlyDictionary<DateOnly, double>? monthlyCapacityFactors = null)
     {
@@ -97,7 +97,7 @@ public sealed class ScenarioFleet
         _ = ToGeneratingFleet();
     }
 
-    public TechnologyKey Technology { get; }
+    public GenerationTechnology Technology { get; }
     public Power NameplateCapacity { get; }
     public IReadOnlyDictionary<DateOnly, double>? MonthlyCapacityFactors { get; }
 

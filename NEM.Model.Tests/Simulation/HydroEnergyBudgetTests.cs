@@ -32,7 +32,7 @@ namespace NEM.Model.Tests.Simulation
                 capacityMw,
                 factors);
 
-            FlowSeries generation = outcome.PerFleetGeneration[TechnologyKey.Hydro];
+            FlowSeries generation = outcome.PerFleetGeneration[GenerationTechnology.Hydro];
             int firstHour = 0;
             for (int month = 1; month <= 12; month++)
             {
@@ -61,7 +61,7 @@ namespace NEM.Model.Tests.Simulation
                 capacityMw,
                 factors);
 
-            AssertSeries(outcome.PerFleetGeneration[TechnologyKey.Hydro], 50, 0, 50, 0);
+            AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Hydro], 50, 0, 50, 0);
         }
 
         [Fact]
@@ -82,7 +82,7 @@ namespace NEM.Model.Tests.Simulation
                     [new DateOnly(2028, 2, 1)] = capacityFactor,
                 });
 
-            outcome.PerFleetGeneration[TechnologyKey.Hydro].Integrate().MegawattHours
+            outcome.PerFleetGeneration[GenerationTechnology.Hydro].Integrate().MegawattHours
                 .Should().BeApproximately(capacityMw * hours * capacityFactor, 1e-9);
         }
 
@@ -101,7 +101,7 @@ namespace NEM.Model.Tests.Simulation
                     [new DateOnly(2026, 7, 1)] = 0,
                 });
 
-            AssertSeries(outcome.PerFleetGeneration[TechnologyKey.Hydro], 0, 0);
+            AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Hydro], 0, 0);
             AssertSeries(outcome.Unserved, 50, 50);
         }
 
@@ -122,7 +122,7 @@ namespace NEM.Model.Tests.Simulation
                 capacityMw,
                 factors);
 
-            AssertSeries(outcome.PerFleetGeneration[TechnologyKey.Hydro], 50, 50, 0);
+            AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Hydro], 50, 50, 0);
         }
 
         [Fact]
@@ -147,9 +147,9 @@ namespace NEM.Model.Tests.Simulation
                 capacityMw,
                 factors);
 
-            first.PerFleetGeneration[TechnologyKey.Hydro].Integrate().MegawattHours
+            first.PerFleetGeneration[GenerationTechnology.Hydro].Integrate().MegawattHours
                 .Should().BeApproximately(100, 1e-9);
-            second.PerFleetGeneration[TechnologyKey.Hydro].Integrate().MegawattHours
+            second.PerFleetGeneration[GenerationTechnology.Hydro].Integrate().MegawattHours
                 .Should().BeApproximately(100, 1e-9);
         }
 
@@ -159,7 +159,7 @@ namespace NEM.Model.Tests.Simulation
             var start = new DateTimeOffset(2026, 7, 1, 0, 0, 0, NemOffset);
             const double capacityMw = 100;
             var fleet = new GeneratingFleet(
-                TechnologyKey.Hydro,
+                GenerationTechnology.Hydro,
                 Power.FromMegawatts(capacityMw),
                 new Dictionary<DateOnly, double>
                 {
@@ -184,7 +184,7 @@ namespace NEM.Model.Tests.Simulation
             IReadOnlyDictionary<DateOnly, double> factors)
         {
             var hydro = new GeneratingFleet(
-                TechnologyKey.Hydro,
+                GenerationTechnology.Hydro,
                 Power.FromMegawatts(capacityMw),
                 factors);
             var region = new Region(

@@ -139,6 +139,6 @@ namespace NEM.Model.Tests.Grid
             new(NemStart, TimeSpan.FromMinutes(30), megawatts);
 
         private static GeneratingFleet TestFleet() =>
-            new(TechnologyKey.Coal, Power.FromMegawatts(1_000));
+            new(GenerationTechnology.Coal, Power.FromMegawatts(1_000));
     }
 }

@@ -30,7 +30,7 @@ namespace NEM.Model.Grid
                 throw new ArgumentException("Region fleets cannot contain null.", nameof(fleets));
             }
 
-            if (fleets.DistinctBy(fleet => fleet.TechnologyKey).Count() != fleets.Count)
+            if (fleets.DistinctBy(fleet => fleet.GenerationTechnology).Count() != fleets.Count)
             {
                 throw new ArgumentException(
                     "Region cannot have more than one fleet with the same technology key.",

@@ -15,7 +15,7 @@ classDiagram
         ScenarioFleet[] fleets
     }
     class ScenarioFleet {
-        TechnologyKey technology
+        GenerationTechnology generationTechnology
         Power nameplateCapacity
         monthlyCapacityFactors
     }
@@ -90,3 +90,20 @@ delivered generation + unserved = demand
 Reliability reports both unserved energy (USE) as a percentage of demand and
 hours served. USE percentage is the binding reliability measure; hours served
 is diagnostic and must not be compared with an energy-based reliability target.
+
+## Storage
+
+`StorageFleet` is an immutable storage-archetype configuration and an interval
+state-transition operation. A positive requested flow discharges to the grid;
+a negative requested flow charges from the grid. Its state of charge is always
+validated within zero and its configured energy capacity.
+
+Each fleet owns its energy and power capacities; its duration is derived as MWh
+divided by MW. The same storage abstraction supports battery and pumped-hydro
+fleets with different fleet capacities. Both limits bind each interval.
+
+The technology profile supplies one round-trip efficiency. It is applied once
+while charging: input MWh multiplied by efficiency becomes stored MWh.
+Discharge removes and delivers stored MWh one-for-one, so a charge-discharge
+cycle loses `(1 - efficiency)` of the grid energy used to charge it. Round-trip
+efficiency is constrained to the inclusive range from zero to one.

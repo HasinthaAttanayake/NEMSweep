@@ -13,12 +13,8 @@ namespace NEM.Model.Series
     /// hour loop indexes into the series with scalars.
     /// </para>
     /// </summary>
-    public sealed class FlowSeries : TimeSeries
+    public sealed class FlowSeries(DateTimeOffset start, TimeSpan resolution, double[] megawatts) : TimeSeries(start, resolution, megawatts)
     {
-        public FlowSeries(DateTimeOffset start, TimeSpan resolution, double[] megawatts)
-            : base(start, resolution, megawatts)
-        {
-        }
 
         /// <summary>Power at <paramref name="index"/> (MW).</summary>
         public Power this[int index] => Power.FromMegawatts(RawValue(index));

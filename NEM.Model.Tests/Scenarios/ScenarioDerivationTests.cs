@@ -20,7 +20,7 @@ public sealed class ScenarioDerivationTests
             "NSW1",
             Start,
             Start.AddHours(2),
-            [new ScenarioFleet(TechnologyKey.Coal, Power.FromMegawatts(100))]);
+            [new ScenarioFleet(GenerationTechnology.Coal, Power.FromMegawatts(100))]);
 
         PowerSystem system = ScenarioDerivation.Derive(
             scenario,
@@ -44,7 +44,7 @@ public sealed class ScenarioDerivationTests
             "NSW1",
             Start,
             Start.AddHours(1),
-            [new ScenarioFleet(TechnologyKey.Coal, Power.FromMegawatts(100))]);
+            [new ScenarioFleet(GenerationTechnology.Coal, Power.FromMegawatts(100))]);
         var demand = new FlowSeries(Start.AddHours(1), TimeSpan.FromHours(1), [100]);
 
         var act = () => ScenarioDerivation.Derive(scenario, demand);

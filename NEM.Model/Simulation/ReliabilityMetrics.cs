@@ -34,5 +34,5 @@ namespace NEM.Model.Simulation
                 HoursServedFraction = 1 - ((double)unservedHours / dispatchOutcome.Unserved.Length),
             };
         }
-    } 
+    }
 }
