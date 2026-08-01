@@ -425,9 +425,10 @@ internal static class EpwParser
 
     private static double ParseDouble(string raw, string fieldName, int lineNumber)
     {
-        if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double value))
+        if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double value)
+            || !double.IsFinite(value))
         {
-            throw new FormatException($"Line {lineNumber}: {fieldName} is not a number: '{raw}'.");
+            throw new FormatException($"Line {lineNumber}: {fieldName} is not a finite number: '{raw}'.");
         }
 
         return value;

@@ -136,6 +136,26 @@ public sealed class EpwParserTests
     }
 
     [Fact]
+    public void ReadRows_RejectsNonFiniteNumericValues()
+    {
+        string path = new EpwFixture()
+            .AddRow(DefaultSourceYear, 1, 1, 1, directNormalRadiation: double.NaN)
+            .Write();
+
+        try
+        {
+            var act = () => EpwParser.ReadRows(path);
+
+            act.Should().Throw<FormatException>()
+                .WithMessage("*Line 9: Direct Normal Radiation is not a finite number: 'NaN'*");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void ReadRows_DoesNotReportGap_WhenNighttimeDniIsZero()
     {
         string path = new EpwFixture().AddRow(
