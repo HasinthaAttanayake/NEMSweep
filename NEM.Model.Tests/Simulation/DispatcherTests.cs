@@ -286,6 +286,162 @@ namespace NEM.Model.Tests.Simulation
         }
 
         [Fact]
+        public void Dispatch_GreedyPolicy_ChargesFromSurplusThenDischargesIntoDeficit()
+        {
+            FlowSeries demand = HourlyFlowAt(NemStart.AddHours(12), 0, 30);
+            var region = new Region(
+                "NSW1",
+                [Fleet(GenerationTechnology.Solar, 20)],
+                demand,
+                resourceProfile: RegionalResources(demand),
+                storageFleets: [Battery(storageCapacityMwh: 20, powerCapacityMw: 20)]);
+
+            DispatchOutcome outcome = Dispatcher.Dispatch(region);
+
+            AssertSeries(outcome.SurplusCharge, 20, 0);
+            AssertSeries(outcome.IncrementalGenerationCharge, 0, 0);
+            AssertSeries(outcome.Charge, 20, 0);
+            AssertSeries(outcome.Discharge, 0, 10);
+            AssertSeries(outcome.Curtailment, 0, 0);
+            AssertSeries(outcome.Unserved, 0, 0);
+        }
+
+        [Fact]
+        public void Dispatch_GreedyPolicy_ClampsAtEnergyLimitAndBooksRemainingDemandShortfall()
+        {
+            FlowSeries demand = HourlyFlowAt(NemStart.AddHours(12), 0, 40);
+            var region = new Region(
+                "NSW1",
+                [Fleet(GenerationTechnology.Solar, 20)],
+                demand,
+                resourceProfile: RegionalResources(demand),
+                storageFleets: [Battery(storageCapacityMwh: 8.7, powerCapacityMw: 20)]);
+
+            DispatchOutcome outcome = Dispatcher.Dispatch(region);
+
+            outcome.Charge[0].Megawatts.Should().BeApproximately(10, 1e-10);
+            outcome.Discharge[1].Megawatts.Should().BeApproximately(8.7, 1e-10);
+            outcome.Unserved[1].Megawatts.Should().BeApproximately(11.3, 1e-10);
+            outcome.Unserved[0].Should().Be(Power.Zero);
+        }
+
+        [Fact]
+        public void Dispatch_TotalUnservedEnergy_IsNonIncreasingAsStorageEnergyCapacityIncreases()
+        {
+            var random = new Random(34025);
+            double[] storageCapacitiesMwh = Enumerable.Range(0, 100)
+                .Select(_ => 0.1 + (random.NextDouble() * 79.9))
+                .Append(0.1)
+                .Append(80)
+                .Order()
+                .ToArray();
+            FlowSeries demand = HourlyFlow(0, 40, 0, 40, 40);
+            GeneratingFleet wind = Fleet(GenerationTechnology.Wind, 20);
+            RegionalResourceProfile resources = RegionalResources(demand);
+
+            (double CapacityMwh, Energy TotalUse)[] results = storageCapacitiesMwh
+                .Select(storageCapacityMwh =>
+                {
+                    var region = new Region(
+                        "NSW1",
+                        [wind],
+                        demand,
+                        resourceProfile: resources,
+                        storageFleets: [Battery(storageCapacityMwh, powerCapacityMw: 20)]);
+                    Energy totalUse = ReliabilityMetrics.FromOutcome(
+                        Dispatcher.Dispatch(region)).UnservedEnergy;
+
+                    return (storageCapacityMwh, totalUse);
+                })
+                .ToArray();
+
+            for (int index = 1; index < results.Length; index++)
+            {
+                results[index].TotalUse.Should().BeLessThanOrEqualTo(
+                    results[index - 1].TotalUse,
+                    "increasing storage energy capacity from {0} MWh to {1} MWh "
+                    + "must not increase total USE",
+                    results[index - 1].CapacityMwh,
+                    results[index].CapacityMwh);
+            }
+        }
+
+        [Fact]
+        public void Dispatch_FailedIncrementalGenerationChargingIsSilentWhileDemandShortfallIsUnserved()
+        {
+            FlowSeries demand = HourlyFlow(0, 10);
+            var region = new Region(
+                "NSW1",
+                [Fleet(GenerationTechnology.Gas, 0)],
+                demand,
+                storageFleets: [Battery(storageCapacityMwh: 20, powerCapacityMw: 10)]);
+            var policy = new IncrementalGenerationChargingPolicy(
+                GenerationTechnology.Gas,
+                chargeMw: 10);
+
+            DispatchOutcome outcome = Dispatcher.Dispatch(region, policy);
+
+            AssertSeries(outcome.IncrementalGenerationCharge, 0, 0);
+            AssertSeries(outcome.Charge, 0, 0);
+            AssertSeries(outcome.Unserved, 0, 10);
+        }
+
+        [Fact]
+        public void Dispatch_IncrementalGenerationChargingUsesNamedFleetAndAppliesRoundTripLoss()
+        {
+            FlowSeries demand = HourlyFlow(0, 50);
+            var region = new Region(
+                "NSW1",
+                [
+                    Fleet(GenerationTechnology.Coal, 20),
+                    Fleet(GenerationTechnology.Gas, 20),
+                ],
+                demand,
+                storageFleets: [Battery(storageCapacityMwh: 20, powerCapacityMw: 10)]);
+            var policy = new IncrementalGenerationChargingPolicy(
+                GenerationTechnology.Gas,
+                chargeMw: 10);
+
+            DispatchOutcome outcome = Dispatcher.Dispatch(region, policy);
+
+            AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Coal], 0, 20);
+            AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Gas], 10, 20);
+            AssertSeries(outcome.SurplusCharge, 0, 0);
+            AssertSeries(outcome.IncrementalGenerationCharge, 10, 0);
+            outcome.Discharge[1].Megawatts.Should().BeApproximately(8.7, 1e-10);
+            outcome.Unserved[1].Megawatts.Should().BeApproximately(1.3, 1e-10);
+        }
+
+        [Fact]
+        public void Dispatch_IncrementalHydroChargingConsumesMonthlyEnergyBudget()
+        {
+            FlowSeries demand = HourlyFlow(0, 10);
+            const double hydroCapacityMw = 10;
+            var hydro = new GeneratingFleet(
+                GenerationTechnology.Hydro,
+                Power.FromMegawatts(hydroCapacityMw),
+                new Dictionary<DateOnly, double>
+                {
+                    [new DateOnly(2026, 7, 1)] = 10.0 / (hydroCapacityMw * 31 * 24),
+                });
+            var region = new Region(
+                "NSW1",
+                [hydro],
+                demand,
+                storageFleets: [Battery(storageCapacityMwh: 20, powerCapacityMw: 10)]);
+            var policy = new IncrementalGenerationChargingPolicy(
+                GenerationTechnology.Hydro,
+                chargeMw: 10);
+
+            DispatchOutcome outcome = Dispatcher.Dispatch(region, policy);
+
+            AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Hydro], 10, 0);
+            AssertSeries(outcome.IncrementalGenerationCharge, 10, 0);
+            outcome.Discharge[1].Megawatts.Should().BeApproximately(8.7, 1e-10);
+            outcome.Unserved[1].Megawatts.Should().BeApproximately(1.3, 1e-10);
+        }
+
+        [Fact]
         public void Dispatch_RejectsNullRegion()
         {
             var act = () => Dispatcher.Dispatch(null!);
@@ -443,6 +599,33 @@ namespace NEM.Model.Tests.Simulation
             act.Should().NotThrow();
         }
 
+        [Fact]
+        public void DispatchOutcome_ChargeIsSumOfSurplusAndIncrementalGenerationSources()
+        {
+            FlowSeries zero = HourlyFlow(0);
+            var outcome = new DispatchOutcome(
+                "NSW1",
+                new Dictionary<GenerationTechnology, FlowSeries>
+                {
+                    [GenerationTechnology.Coal] = HourlyFlow(10),
+                },
+                new Dictionary<GenerationTechnology, FlowSeries>
+                {
+                    [GenerationTechnology.Coal] = zero,
+                },
+                HourlyFlow(7),
+                zero,
+                HourlyFlow(2),
+                zero,
+                zero,
+                zero,
+                HourlyFlow(1));
+
+            AssertSeries(outcome.SurplusCharge, 2);
+            AssertSeries(outcome.IncrementalGenerationCharge, 1);
+            AssertSeries(outcome.Charge, 3);
+        }
+
         private static DispatchOutcome Outcome(
             double[] generation,
             double[] demand,
@@ -479,6 +662,12 @@ namespace NEM.Model.Tests.Simulation
                         [new DateOnly(2026, 7, 1)] = 1,
                     }
                     : null);
+
+        private static StorageFleet Battery(double storageCapacityMwh, double powerCapacityMw) =>
+            new(
+                StorageTechnology.Battery,
+                Energy.FromMegawattHours(storageCapacityMwh),
+                Power.FromMegawatts(powerCapacityMw));
 
         private static FlowSeries HourlyFlow(params double[] megawatts) =>
             new(NemStart, TimeSpan.FromHours(1), megawatts);
@@ -544,6 +733,41 @@ namespace NEM.Model.Tests.Simulation
                 timeline.Start,
                 timeline.Resolution,
                 Enumerable.Repeat(fleet.NameplateCapacity.Megawatts, timeline.Length).ToArray());
+        }
+
+        private sealed class IncrementalGenerationChargingPolicy(
+            GenerationTechnology sourceTechnology,
+            double chargeMw) : IStoragePolicy
+        {
+            public StorageDecision Decide(DispatchContext context)
+            {
+                StorageFleetSnapshot? fleet = context.StorageFleets
+                    .OrderBy(candidate => candidate.StorageTechnology)
+                    .Cast<StorageFleetSnapshot?>()
+                    .FirstOrDefault();
+                if (fleet is null)
+                {
+                    return StorageDecision.None;
+                }
+
+                if (context.Residual > Power.Zero)
+                {
+                    return fleet.Value.DischargeHeadroom == Power.Zero
+                        ? StorageDecision.None
+                        : new StorageDecision([
+                            new StorageIntent(
+                                fleet.Value.StorageTechnology,
+                                context.Residual),
+                        ]);
+                }
+
+                return new StorageDecision([
+                    new StorageIntent(
+                        fleet.Value.StorageTechnology,
+                        Power.FromMegawatts(-chargeMw),
+                        ChargeSource.IncrementalGeneration(sourceTechnology)),
+                ]);
+            }
         }
 
         private static void AssertSeries(FlowSeries actual, params double[] expected)

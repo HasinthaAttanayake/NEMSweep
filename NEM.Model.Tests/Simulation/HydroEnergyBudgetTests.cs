@@ -1,4 +1,3 @@
-using System.Reflection;
 using FluentAssertions;
 using NEM.Model.Grid;
 using NEM.Model.Series;
@@ -154,7 +153,7 @@ namespace NEM.Model.Tests.Simulation
         }
 
         [Fact]
-        public void ApplyEnergyBudget_SubHourlyCandidate_AccountsForIntervalDuration()
+        public void GenerationEnergyBudget_SubHourlyRequests_AccountForIntervalDuration()
         {
             var start = new DateTimeOffset(2026, 7, 1, 0, 0, 0, NemOffset);
             const double capacityMw = 100;
@@ -165,15 +164,18 @@ namespace NEM.Model.Tests.Simulation
                 {
                     [new DateOnly(2026, 7, 1)] = FactorForBudget(75, capacityMw, 2026, 7),
                 });
-            var candidate = new FlowSeries(
-                start,
-                TimeSpan.FromMinutes(30),
-                [100, 100, 100]);
+            GenerationEnergyBudget budget = fleet.CreateEnergyBudget();
+            TimeSpan resolution = TimeSpan.FromMinutes(30);
 
-            FlowSeries generation = ApplyEnergyBudget(fleet, candidate);
+            Power[] generation =
+            [
+                budget.Take(Power.FromMegawatts(100), start, resolution),
+                budget.Take(Power.FromMegawatts(100), start.Add(resolution), resolution),
+                budget.Take(Power.FromMegawatts(100), start.Add(resolution * 2), resolution),
+            ];
 
-            AssertSeries(generation, 100, 50, 0);
-            generation.Integrate().MegawattHours.Should().Be(75);
+            generation.Select(power => power.Megawatts).Should().Equal(100, 50, 0);
+            generation.Sum(power => (power * resolution).MegawattHours).Should().Be(75);
         }
 
         private static DispatchOutcome Dispatch(
@@ -192,17 +194,6 @@ namespace NEM.Model.Tests.Simulation
                 [hydro],
                 new FlowSeries(start, resolution, demandMw));
             return Dispatcher.Dispatch(region);
-        }
-
-        private static FlowSeries ApplyEnergyBudget(
-            GeneratingFleet fleet,
-            FlowSeries candidate)
-        {
-            MethodInfo method = typeof(GeneratingFleet).GetMethod(
-                "ApplyEnergyBudget",
-                BindingFlags.Instance | BindingFlags.NonPublic)
-                ?? throw new InvalidOperationException("ApplyEnergyBudget method was not found.");
-            return (FlowSeries)method.Invoke(fleet, [candidate])!;
         }
 
         private static double FactorForBudget(
