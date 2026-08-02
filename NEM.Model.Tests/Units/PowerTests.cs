@@ -60,5 +60,21 @@ namespace NEM.Model.Tests.Units
 
             energy.MegawattHours.Should().BeApproximately(3700, Tolerance);
         }
+
+        [Fact]
+        public void DivisionByPower_ProducesDimensionlessRatio()
+        {
+            double ratio = Power.FromMegawatts(30) / Power.FromMegawatts(120);
+
+            ratio.Should().BeApproximately(0.25, Tolerance);
+        }
+
+        [Fact]
+        public void DivisionByZeroPower_Throws()
+        {
+            var act = () => Power.FromMegawatts(30) / Power.Zero;
+
+            act.Should().Throw<DivideByZeroException>();
+        }
     }
 }

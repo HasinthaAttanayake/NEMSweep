@@ -1,4 +1,5 @@
 using NEM.Model.Series;
+using NEM.Model.Units;
 using NEM.Model.Weather;
 
 namespace NEM.Model.Grid
@@ -76,6 +77,25 @@ namespace NEM.Model.Grid
             GeneratingFleets = Array.AsReadOnly(generatingFleets.ToArray());
             StorageFleets = Array.AsReadOnly(resolvedStorageFleets.ToArray());
             ResourceProfile = resourceProfile;
+        }
+
+        public Region WithBatteryStorage(Energy storageCapacity, Power powerCapacity)
+        {
+            StorageFleet[] storageFleets = StorageFleets
+                .Where(fleet => fleet.StorageTechnology != StorageTechnology.Battery)
+                .Append(new StorageFleet(
+                    StorageTechnology.Battery,
+                    storageCapacity,
+                    powerCapacity))
+                .ToArray();
+
+            return new Region(
+                RegionId,
+                GeneratingFleets,
+                Demand.BaseDemand,
+                Demand.AdditiveComponents,
+                ResourceProfile,
+                storageFleets);
         }
     }
 }

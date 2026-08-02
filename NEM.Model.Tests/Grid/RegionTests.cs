@@ -131,6 +131,52 @@ namespace NEM.Model.Tests.Grid
             act.Should().Throw<ArgumentException>().WithMessage("*misaligned on start*");
         }
 
+        [Fact]
+        public void WithBatteryStorage_IntroducesBatteryAndPreservesDemandAndFixedStorage()
+        {
+            FlowSeries additiveDemand = HourlyFlow(20);
+            var pumpedHydro = Storage(StorageTechnology.PumpedHydro);
+            var region = new Region(
+                "NSW1",
+                [Fleet(GenerationTechnology.Coal)],
+                HourlyFlow(100),
+                new Dictionary<string, FlowSeries> { ["DataCentre"] = additiveDemand },
+                storageFleets: [pumpedHydro]);
+
+            Region sized = region.WithBatteryStorage(
+                Energy.FromMegawattHours(120),
+                Power.FromMegawatts(30));
+
+            region.StorageFleets.Should().ContainSingle().Which.Should().BeSameAs(pumpedHydro);
+            sized.StorageFleets.Should().HaveCount(2).And.Contain(pumpedHydro);
+            StorageFleet battery = sized.StorageFleets.Single(
+                fleet => fleet.StorageTechnology == StorageTechnology.Battery);
+            battery.StorageCapacity.Should().Be(Energy.FromMegawattHours(120));
+            battery.PowerCapacity.Should().Be(Power.FromMegawatts(30));
+            sized.Demand.BaseDemand.Should().BeSameAs(region.Demand.BaseDemand);
+            sized.Demand.AdditiveComponents["DataCentre"].Should().BeSameAs(additiveDemand);
+        }
+
+        [Fact]
+        public void WithBatteryStorage_ReplacesExistingBatteryAsTotalSizing()
+        {
+            var existingBattery = Storage(StorageTechnology.Battery);
+            var region = new Region(
+                "NSW1",
+                [Fleet(GenerationTechnology.Coal)],
+                HourlyFlow(100),
+                storageFleets: [existingBattery]);
+
+            Region sized = region.WithBatteryStorage(
+                Energy.FromMegawattHours(240),
+                Power.FromMegawatts(60));
+
+            sized.StorageFleets.Should().ContainSingle();
+            sized.StorageFleets[0].Should().NotBeSameAs(existingBattery);
+            sized.StorageFleets[0].StorageCapacity.Should().Be(Energy.FromMegawattHours(240));
+            sized.StorageFleets[0].PowerCapacity.Should().Be(Power.FromMegawatts(60));
+        }
+
         private static GeneratingFleet Fleet(GenerationTechnology technology) =>
             new(technology, Power.FromMegawatts(100));
 

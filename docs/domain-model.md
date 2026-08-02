@@ -38,6 +38,10 @@ classDiagram
     class StorageDecision
     class StorageIntent
     class StorageOutcome
+    class StorageSizingService
+    class StorageSizingRunResult
+    class RegionalSizingResult
+    class StorageSizing
 
     Scenario "1" *-- "1..*" ScenarioGeneratingFleet
     Scenario --> PowerSystem : ScenarioDerivation.Derive
@@ -45,7 +49,7 @@ classDiagram
     Region "1" *-- "1..*" GeneratingFleet
     Region "1" *-- "0..*" StorageFleet
     Region "1" *-- "1" DemandProfile
-    Dispatcher --> Region : consumes
+    Dispatcher --> PowerSystem : consumes
     Dispatcher --> IStoragePolicy : invokes per interval
     Dispatcher --> DispatchContext : constructs
     IStoragePolicy --> StorageDecision : produces
@@ -54,7 +58,14 @@ classDiagram
     Dispatcher --> StorageIntent : executes
     StorageFleet --> StorageOutcome : operates
     Dispatcher --> StorageOutcome : reconciles
-    Dispatcher --> DispatchOutcome : produces
+    Dispatcher "1" --> "1..*" DispatchOutcome : produces per region
+    DispatchOutcome "1" *-- "1" ReliabilityMetrics
+    StorageSizingService --> PowerSystem : sizes immutable candidates
+    StorageSizingService --> Dispatcher : reruns whole system
+    StorageSizingService --> StorageSizingRunResult : produces
+    StorageSizingRunResult "1" *-- "1..*" RegionalSizingResult
+    RegionalSizingResult "1" *-- "1" StorageSizing
+    RegionalSizingResult --> DispatchOutcome : final evidence
 ```
 
 ## Ownership boundaries
@@ -69,12 +80,19 @@ classDiagram
   `ScenarioId`. It owns one or more `Region` aggregates.
 - `Region` requires one or more generating fleets with distinct generation
   technologies and may own storage fleets with distinct storage technologies.
-- `Dispatcher` remains scenario-blind. It consumes a realised `Region`, builds
-  an immutable storage-policy context for each interval, executes policy intent
-  through fleet physics, and produces a `DispatchOutcome`.
+- `Dispatcher` remains scenario-blind. It consumes a realised `PowerSystem` and
+  dispatches each owned region, producing one `DispatchOutcome` per region. Each
+  outcome includes its `ReliabilityMetrics`. Regional dispatch builds an
+  immutable storage-policy context for each interval and executes policy intent
+  through fleet physics.
 - `IStoragePolicy` owns storage intent and fleet ordering. It receives scalar
   snapshots rather than mutable fleet objects and does not own state of charge,
   execute storage physics, or book unserved demand and curtailment.
+- `StorageSizingService` is a pure whole-system orchestration service. It creates
+  immutable `PowerSystem` candidates, reruns dispatch, and changes Battery
+  storage only in regions that fail the configured USE target. Pumped hydro is
+  fixed. Existing Battery capacity is the starting lower bound and results report
+  total Battery capacity rather than incremental capacity.
 - Exported run results cite scenario and power-system identities rather than
   serialising the domain object graph.
 
@@ -118,8 +136,29 @@ run requires charge and discharge series alongside generation and curtailment
 to preserve the full dispatch identity.
 
 Reliability reports both unserved energy (USE) as a percentage of demand and
-hours served. USE percentage is the binding reliability measure; hours served
-is diagnostic and must not be compared with an energy-based reliability target.
+hours served, plus peak single-hour unserved power. USE percentage is the binding
+reliability measure; hours served and peak unserved are diagnostics and must not
+be compared directly with an energy-based reliability target.
+
+## Storage sizing
+
+Storage sizing defaults to the NER target of 0.002% USE. A caller supplies a
+commercial maximum Battery power, maximum Battery energy, and pass bound. New
+or undersized Battery storage is first raised to 30 MW and 120 MWh. Every sized
+candidate preserves a minimum four-hour duration.
+
+After the floor, total USE divided by current Battery energy and peak unserved
+power divided by current Battery power steer monotone geometric growth. Storage
+dispatch is stepwise, so increasing a dimension can plateau but must not increase
+USE. Explicit MW, MWh, and pass bounds provide termination; reaching a capacity
+bound returns `SingleFleetInsufficient`, while exhausting dispatch passes returns
+`PassLimitReached`.
+
+Once every region complies, full-system probes refine power and energy to 1 MW
+and 1 MWh precision while retaining only compliant candidates. The result is a
+deterministic coordinate-wise near-frontier point, not a globally minimum or
+cost-optimal point. Multi-region orchestration is implemented, but regions remain
+independent until interconnectors are introduced.
 
 ## Storage
 

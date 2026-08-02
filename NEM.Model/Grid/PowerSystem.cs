@@ -49,4 +49,7 @@ public sealed class PowerSystem
     public PowerSystemId Id { get; }
     public ScenarioId DerivedFromScenario { get; }
     public IReadOnlyList<Region> Regions { get; }
+
+    public PowerSystem WithRegions(IReadOnlyList<Region> regions) =>
+        new(Id, DerivedFromScenario, regions);
 }

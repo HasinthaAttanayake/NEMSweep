@@ -20,6 +20,7 @@ namespace NEM.Model.Tests.Simulation
                     unserved: [0, 20]));
 
             metrics.UnservedEnergy.Should().Be(Energy.FromMegawattHours(20));
+            metrics.PeakUnservedPower.Should().Be(Power.FromMegawatts(20));
             metrics.UnservedEnergyPercentageOfDemand.Should().Be(10);
         }
 
@@ -62,6 +63,7 @@ namespace NEM.Model.Tests.Simulation
                 Outcome(demand: [0, 0], unserved: [0, 0]));
 
             metrics.UnservedEnergyPercentageOfDemand.Should().Be(0);
+            metrics.PeakUnservedPower.Should().Be(Power.Zero);
             metrics.UnservedHours.Should().Be(0);
             metrics.HoursServedFraction.Should().Be(1);
         }

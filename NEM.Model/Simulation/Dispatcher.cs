@@ -22,6 +22,7 @@ namespace NEM.Model.Simulation
         /// <summary>Total non-negative magnitude of available generation constrained off.</summary>
         public FlowSeries Curtailment { get; }
         public FlowSeries Unserved { get; }
+        public ReliabilityMetrics Reliability { get; }
 
         public DispatchOutcome(
             string regionId,
@@ -75,6 +76,7 @@ namespace NEM.Model.Simulation
             Curtailment = SumFlows(perFleetCurtailment.Values, demand);
 
             Validate();
+            Reliability = ReliabilityMetrics.FromOutcome(this);
         }
 
         private static FlowSeries ZeroFlow(FlowSeries timeline) =>
@@ -206,14 +208,23 @@ namespace NEM.Model.Simulation
 
     public static class Dispatcher
     {
-        public static DispatchOutcome Dispatch(Region region) =>
-            Dispatch(region, new GreedyPolicy());
+        public static IReadOnlyList<DispatchOutcome> Dispatch(PowerSystem powerSystem) =>
+            Dispatch(powerSystem, new GreedyPolicy());
 
-        public static DispatchOutcome Dispatch(Region region, IStoragePolicy storagePolicy)
+        public static IReadOnlyList<DispatchOutcome> Dispatch(
+            PowerSystem powerSystem,
+            IStoragePolicy storagePolicy)
         {
-            ArgumentNullException.ThrowIfNull(region);
+            ArgumentNullException.ThrowIfNull(powerSystem);
             ArgumentNullException.ThrowIfNull(storagePolicy);
 
+            return Array.AsReadOnly(powerSystem.Regions
+                .Select(region => DispatchRegion(region, storagePolicy))
+                .ToArray());
+        }
+
+        private static DispatchOutcome DispatchRegion(Region region, IStoragePolicy storagePolicy)
+        {
             FlowSeries demand = region.Demand.TotalDemand;
             TimeSpan resolution = demand.Resolution;
             GeneratingFleet[] generatingFleets = region.GeneratingFleets
