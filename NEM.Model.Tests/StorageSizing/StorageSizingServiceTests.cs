@@ -28,15 +28,15 @@ public sealed class StorageSizingServiceTests
         result.DispatchPassCount.Should().BeLessThan(30);
         RegionalSizingResult region = result.Regions.Should().ContainSingle().Subject;
         region.Reliability.UnservedEnergy.Should().Be(Energy.Zero);
-        region.StorageSizing.PowerCapacity.Should().Be(Power.FromMegawatts(35));
-        region.StorageSizing.EnergyCapacity.Should().Be(Energy.FromMegawattHours(140));
-        region.StorageSizing.WasSolvedFor.Should().BeTrue();
-        InstalledStorageAssessment installed = result.InstalledStorageAssessments
+        region.BatterySizing.PowerCapacity.Should().Be(Power.FromMegawatts(35));
+        region.BatterySizing.EnergyCapacity.Should().Be(Energy.FromMegawattHours(140));
+        region.BatterySizing.WasChanged.Should().BeTrue();
+        InstalledBatteryAssessment installed = result.InstalledBatteryAssessments
             .Should().ContainSingle().Subject;
         installed.MeetsTarget.Should().BeFalse();
-        installed.StorageSizing.EnergyCapacity.Should().Be(Energy.Zero);
-        installed.StorageSizing.PowerCapacity.Should().Be(Power.Zero);
-        installed.StorageSizing.WasSolvedFor.Should().BeFalse();
+        installed.BatteryCapacity.EnergyCapacity.Should().Be(Energy.Zero);
+        installed.BatteryCapacity.PowerCapacity.Should().Be(Power.Zero);
+        installed.BatteryCapacity.WasChanged.Should().BeFalse();
         system.Regions[0].StorageFleets.Should().BeEmpty();
         var mutableRegions = (IList<RegionalSizingResult>)result.Regions;
         var act = () => mutableRegions.Clear();
@@ -61,15 +61,15 @@ public sealed class StorageSizingServiceTests
 
         result.Status.Should().Be(StorageSizingStatus.TargetMet);
         result.DispatchPassCount.Should().Be(1);
-        InstalledStorageAssessment installed = result.InstalledStorageAssessments
+        InstalledBatteryAssessment installed = result.InstalledBatteryAssessments
             .Should().ContainSingle().Subject;
         installed.MeetsTarget.Should().BeTrue();
         installed.Reliability.UnservedEnergy.Should().Be(Energy.Zero);
-        installed.StorageSizing.EnergyCapacity.Should().Be(Energy.FromMegawattHours(120));
-        installed.StorageSizing.PowerCapacity.Should().Be(Power.FromMegawatts(30));
-        installed.StorageSizing.WasSolvedFor.Should().BeFalse();
+        installed.BatteryCapacity.EnergyCapacity.Should().Be(Energy.FromMegawattHours(120));
+        installed.BatteryCapacity.PowerCapacity.Should().Be(Power.FromMegawatts(30));
+        installed.BatteryCapacity.WasChanged.Should().BeFalse();
         result.Regions.Should().ContainSingle()
-            .Which.StorageSizing.WasSolvedFor.Should().BeFalse();
+            .Which.BatterySizing.WasChanged.Should().BeFalse();
         result.PowerSystem.Should().BeSameAs(system);
     }
 
@@ -90,12 +90,12 @@ public sealed class StorageSizingServiceTests
             Options(maximumPowerMw: 100, maximumEnergyMwh: 400));
 
         result.Status.Should().Be(StorageSizingStatus.TargetMet);
-        InstalledStorageAssessment installed = result.InstalledStorageAssessments.Single();
+        InstalledBatteryAssessment installed = result.InstalledBatteryAssessments.Single();
         installed.MeetsTarget.Should().BeFalse();
-        installed.StorageSizing.PowerCapacity.Should().Be(Power.FromMegawatts(32));
-        installed.StorageSizing.EnergyCapacity.Should().Be(Energy.FromMegawattHours(128));
-        installed.StorageSizing.WasSolvedFor.Should().BeFalse();
-        var sizing = result.Regions.Single().StorageSizing;
+        installed.BatteryCapacity.PowerCapacity.Should().Be(Power.FromMegawatts(32));
+        installed.BatteryCapacity.EnergyCapacity.Should().Be(Energy.FromMegawattHours(128));
+        installed.BatteryCapacity.WasChanged.Should().BeFalse();
+        var sizing = result.Regions.Single().BatterySizing;
         sizing.PowerCapacity.Should().Be(Power.FromMegawatts(35));
         sizing.EnergyCapacity.Should().Be(Energy.FromMegawattHours(140));
         system.Regions[0].StorageFleets.Single().PowerCapacity
@@ -118,7 +118,7 @@ public sealed class StorageSizingServiceTests
             Options(maximumPowerMw: 100, maximumEnergyMwh: 400));
 
         result.Status.Should().Be(StorageSizingStatus.TargetMet);
-        var sizing = result.Regions.Single().StorageSizing;
+        var sizing = result.Regions.Single().BatterySizing;
         sizing.PowerCapacity.Should().Be(Power.FromMegawatts(30));
         sizing.EnergyCapacity.Should().Be(Energy.FromMegawattHours(130));
         result.Regions.Single().Reliability.UnservedEnergy.Should().Be(Energy.Zero);
@@ -149,7 +149,7 @@ public sealed class StorageSizingServiceTests
     }
 
     [Fact]
-    public void Size_TargetCannotBeMetWithinBounds_ReturnsSingleFleetInsufficient()
+    public void Size_TargetCannotBeMetWithinBounds_ReturnsBatteryCapacityLimitReached()
     {
         Region region = CoalRegion("NSW1", generationMw: 0, demandMw: [10, 10]);
         var system = new PowerSystem(
@@ -161,10 +161,10 @@ public sealed class StorageSizingServiceTests
             system,
             Options(maximumPowerMw: 60, maximumEnergyMwh: 240));
 
-        result.Status.Should().Be(StorageSizingStatus.SingleFleetInsufficient);
-        result.Regions.Single().Status.Should().Be(StorageSizingStatus.SingleFleetInsufficient);
+        result.Status.Should().Be(StorageSizingStatus.BatteryCapacityLimitReached);
+        result.Regions.Single().Status.Should().Be(StorageSizingStatus.BatteryCapacityLimitReached);
         result.Regions.Single().Reliability.UnservedEnergy.Should().BeGreaterThan(Energy.Zero);
-        var sizing = result.Regions.Single().StorageSizing;
+        var sizing = result.Regions.Single().BatterySizing;
         sizing.PowerCapacity.Should().BeLessThanOrEqualTo(Power.FromMegawatts(60));
         sizing.EnergyCapacity.Should().BeLessThanOrEqualTo(Energy.FromMegawattHours(240));
     }
@@ -193,6 +193,31 @@ public sealed class StorageSizingServiceTests
         var act = () => Options(maximumPowerMw: 100, maximumEnergyMwh: 399);
 
         act.Should().Throw<ArgumentException>().WithParameterName("maximumEnergy");
+    }
+
+    [Fact]
+    public void RegionalBatterySizing_RejectsNegativeCapacity()
+    {
+        var act = () => new RegionalBatterySizing(
+            "NSW1",
+            Energy.FromMegawattHours(-1),
+            Power.Zero,
+            wasChanged: false);
+
+        act.Should().Throw<ArgumentOutOfRangeException>()
+            .WithParameterName("energyCapacity");
+    }
+
+    [Fact]
+    public void RegionalBatterySizing_RejectsUnpairedPowerAndEnergyCapacity()
+    {
+        var act = () => new RegionalBatterySizing(
+            "NSW1",
+            Energy.FromMegawattHours(120),
+            Power.Zero,
+            wasChanged: false);
+
+        act.Should().Throw<ArgumentException>();
     }
 
     private static StorageSizingOptions Options(

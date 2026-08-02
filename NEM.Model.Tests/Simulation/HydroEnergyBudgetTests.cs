@@ -154,7 +154,7 @@ namespace NEM.Model.Tests.Simulation
         }
 
         [Fact]
-        public void GenerationEnergyBudget_SubHourlyRequests_AccountForIntervalDuration()
+        public void GenerationBudgetState_SubHourlyRequests_AccountForIntervalDuration()
         {
             var start = new DateTimeOffset(2026, 7, 1, 0, 0, 0, NemOffset);
             const double capacityMw = 100;
@@ -165,7 +165,7 @@ namespace NEM.Model.Tests.Simulation
                 {
                     [new DateOnly(2026, 7, 1)] = FactorForBudget(75, capacityMw, 2026, 7),
                 });
-            GenerationEnergyBudget budget = fleet.CreateEnergyBudget();
+            var budget = new GenerationBudgetState(fleet);
             TimeSpan resolution = TimeSpan.FromMinutes(30);
 
             Power[] generation =

@@ -85,6 +85,8 @@ namespace NEM.Model.Grid
 
         public GenerationTechnology GenerationTechnology { get; }
         public Power NameplateCapacity { get; }
+        internal IReadOnlyDictionary<DateOnly, double>? MonthlyCapacityFactors =>
+            _monthlyCapacityFactors;
         public ushort ShortRunMarginalCost => (ushort)GenerationTechnology; // TODO: replace with SMRC cost basis B5
         public bool IsIntermittentRenewable => GenerationTechnology is GenerationTechnology.Solar or GenerationTechnology.Wind; // TODO: move to TechnologyProfile as appropriate
 
@@ -130,86 +132,5 @@ namespace NEM.Model.Grid
             resourceProfile ?? throw new InvalidOperationException(
                 $"{GenerationTechnology} requires a regional resource profile.");
 
-        internal GenerationEnergyBudget CreateEnergyBudget() =>
-            new(GenerationTechnology, NameplateCapacity, _monthlyCapacityFactors);
-    }
-
-    internal sealed class GenerationEnergyBudget
-    {
-        private readonly GenerationTechnology _generationTechnology;
-        private readonly Dictionary<DateOnly, double>? _remainingMwhByMonth;
-
-        public GenerationEnergyBudget(
-            GenerationTechnology generationTechnology,
-            Power nameplateCapacity,
-            IReadOnlyDictionary<DateOnly, double>? monthlyCapacityFactors)
-        {
-            _generationTechnology = generationTechnology;
-            _remainingMwhByMonth = monthlyCapacityFactors?.ToDictionary(
-                entry => entry.Key,
-                entry => nameplateCapacity.Megawatts
-                    * DateTime.DaysInMonth(entry.Key.Year, entry.Key.Month)
-                    * 24
-                    * entry.Value);
-        }
-
-        public Power Headroom(
-            Power availableCapacity,
-            Power generated,
-            DateTimeOffset instant,
-            TimeSpan resolution)
-        {
-            Power capacityHeadroom = Power.Max(Power.Zero, availableCapacity - generated);
-            if (_remainingMwhByMonth is null)
-            {
-                return capacityHeadroom;
-            }
-
-            double remainingMwh = RemainingFor(instant);
-            return Power.Min(
-                capacityHeadroom,
-                Energy.FromMegawattHours(remainingMwh) / resolution);
-        }
-
-        public Power Take(Power requested, DateTimeOffset instant, TimeSpan resolution)
-        {
-            if (requested < Power.Zero)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(requested), requested.Megawatts, "Generation cannot be negative.");
-            }
-
-            if (_remainingMwhByMonth is null)
-            {
-                return requested;
-            }
-
-            var month = new DateOnly(instant.Year, instant.Month, 1);
-            double remainingMwh = RemainingFor(instant);
-            Power accepted = Power.Min(
-                requested,
-                Energy.FromMegawattHours(remainingMwh) / resolution);
-            _remainingMwhByMonth[month] = Math.Max(
-                0,
-                remainingMwh - (accepted * resolution).MegawattHours);
-            return accepted;
-        }
-
-        private double RemainingFor(DateTimeOffset instant)
-        {
-            var month = new DateOnly(instant.Year, instant.Month, 1);
-            if (_remainingMwhByMonth is null)
-            {
-                return double.PositiveInfinity;
-            }
-
-            if (!_remainingMwhByMonth.TryGetValue(month, out double remainingMwh))
-            {
-                throw new InvalidOperationException(
-                    $"{_generationTechnology} has no energy budget for {month:yyyy-MM}.");
-            }
-
-            return remainingMwh;
-        }
     }
 }

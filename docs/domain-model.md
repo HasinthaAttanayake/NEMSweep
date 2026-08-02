@@ -38,10 +38,12 @@ classDiagram
     class StorageDecision
     class StorageIntent
     class StorageOutcome
+    class RegionalDispatchRun
+    class GenerationBudgetState
     class StorageSizingService
     class StorageSizingRunResult
     class RegionalSizingResult
-    class StorageSizing
+    class RegionalBatterySizing
 
     Scenario "1" *-- "1..*" ScenarioGeneratingFleet
     Scenario --> PowerSystem : ScenarioDerivation.Derive
@@ -50,6 +52,8 @@ classDiagram
     Region "1" *-- "0..*" StorageFleet
     Region "1" *-- "1" DemandProfile
     Dispatcher --> PowerSystem : consumes
+    Dispatcher --> RegionalDispatchRun : creates per region
+    RegionalDispatchRun --> GenerationBudgetState : owns per fleet
     Dispatcher --> IStoragePolicy : invokes per interval
     Dispatcher --> DispatchContext : constructs
     IStoragePolicy --> StorageDecision : produces
@@ -64,7 +68,7 @@ classDiagram
     StorageSizingService --> Dispatcher : reruns whole system
     StorageSizingService --> StorageSizingRunResult : produces
     StorageSizingRunResult "1" *-- "1..*" RegionalSizingResult
-    RegionalSizingResult "1" *-- "1" StorageSizing
+    RegionalSizingResult "1" *-- "1" RegionalBatterySizing
     RegionalSizingResult --> DispatchOutcome : final evidence
 ```
 
@@ -82,9 +86,10 @@ classDiagram
   technologies and may own storage fleets with distinct storage technologies.
 - `Dispatcher` remains scenario-blind. It consumes a realised `PowerSystem` and
   dispatches each owned region, producing one `DispatchOutcome` per region. Each
-  outcome includes its `ReliabilityMetrics`. Regional dispatch builds an
-  immutable storage-policy context for each interval and executes policy intent
-  through fleet physics.
+  outcome includes its `ReliabilityMetrics`. A per-region `RegionalDispatchRun`
+  owns mutable execution state, including generation budgets and storage levels.
+  It builds an immutable storage-policy context for each interval and executes
+  policy intent through fleet physics.
 - `IStoragePolicy` owns storage intent and fleet ordering. It receives scalar
   snapshots rather than mutable fleet objects and does not own state of charge,
   execute storage physics, or book unserved demand and curtailment.
@@ -151,8 +156,8 @@ After the floor, total USE divided by current Battery energy and peak unserved
 power divided by current Battery power steer monotone geometric growth. Storage
 dispatch is stepwise, so increasing a dimension can plateau but must not increase
 USE. Explicit MW, MWh, and pass bounds provide termination; reaching a capacity
-bound returns `SingleFleetInsufficient`, while exhausting dispatch passes returns
-`PassLimitReached`.
+bound returns `BatteryCapacityLimitReached`, while exhausting dispatch passes
+returns `PassLimitReached`.
 
 Once every region complies, full-system probes refine power and energy to 1 MW
 and 1 MWh precision while retaining only compliant candidates. The result is a

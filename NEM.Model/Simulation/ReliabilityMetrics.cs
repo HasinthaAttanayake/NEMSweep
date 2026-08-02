@@ -4,11 +4,25 @@ namespace NEM.Model.Simulation
 {
     public sealed record ReliabilityMetrics
     {
-        public Energy UnservedEnergy { get; init; }
-        public Power PeakUnservedPower { get; init; }
-        public double UnservedEnergyPercentageOfDemand { get; init; }
-        public int UnservedHours { get; init; }
-        public double HoursServedFraction { get; init; }
+        private ReliabilityMetrics(
+            Energy unservedEnergy,
+            Power peakUnservedPower,
+            double unservedEnergyPercentageOfDemand,
+            int unservedHours,
+            double hoursServedFraction)
+        {
+            UnservedEnergy = unservedEnergy;
+            PeakUnservedPower = peakUnservedPower;
+            UnservedEnergyPercentageOfDemand = unservedEnergyPercentageOfDemand;
+            UnservedHours = unservedHours;
+            HoursServedFraction = hoursServedFraction;
+        }
+
+        public Energy UnservedEnergy { get; }
+        public Power PeakUnservedPower { get; }
+        public double UnservedEnergyPercentageOfDemand { get; }
+        public int UnservedHours { get; }
+        public double HoursServedFraction { get; }
 
         public static ReliabilityMetrics FromOutcome(DispatchOutcome dispatchOutcome)
         {
@@ -28,16 +42,14 @@ namespace NEM.Model.Simulation
                 }
             }
 
-            return new ReliabilityMetrics
-            {
-                UnservedEnergy = unservedEnergy,
-                PeakUnservedPower = peakUnservedPower,
-                UnservedEnergyPercentageOfDemand = totalDemand == Energy.Zero
+            return new ReliabilityMetrics(
+                unservedEnergy,
+                peakUnservedPower,
+                totalDemand == Energy.Zero
                     ? 0
                     : 100 * (unservedEnergy / totalDemand),
-                UnservedHours = unservedHours,
-                HoursServedFraction = 1 - ((double)unservedHours / dispatchOutcome.Unserved.Length),
-            };
+                unservedHours,
+                1 - ((double)unservedHours / dispatchOutcome.Unserved.Length));
         }
     }
 }
