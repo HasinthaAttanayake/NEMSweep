@@ -17,6 +17,7 @@ internal sealed class RegionalDispatchRun
     private readonly Dictionary<GenerationTechnology, double[]> _curtailmentMwByTechnology;
     private readonly Dictionary<StorageTechnology, StorageFleet> _storageByTechnology;
     private readonly Dictionary<StorageTechnology, Energy> _storageLevelByTechnology;
+    private readonly Dictionary<StorageTechnology, double[]> _stateOfChargeMwhByTechnology;
     private readonly double[] _unservedMw;
     private readonly double[] _surplusChargeMw;
     private readonly double[] _incrementalGenerationChargeMw;
@@ -44,6 +45,9 @@ internal sealed class RegionalDispatchRun
         _storageLevelByTechnology = region.StorageFleets.ToDictionary(
             fleet => fleet.StorageTechnology,
             _ => Energy.Zero);
+        _stateOfChargeMwhByTechnology = region.StorageFleets.ToDictionary(
+            fleet => fleet.StorageTechnology,
+            _ => new double[_demand.Length]);
         _unservedMw = new double[_demand.Length];
         _surplusChargeMw = new double[_demand.Length];
         _incrementalGenerationChargeMw = new double[_demand.Length];
@@ -54,6 +58,7 @@ internal sealed class RegionalDispatchRun
     {
         for (int index = 0; index < _demand.Length; index++)
         {
+            RecordStateOfCharge(index);
             DateTimeOffset instant = _demand.InstantAt(index);
             Power remainingDemand = DispatchGeneration(index, instant);
             Power surplus = Power.FromMegawatts(
@@ -71,6 +76,14 @@ internal sealed class RegionalDispatchRun
         }
 
         return BuildOutcome();
+    }
+
+    private void RecordStateOfCharge(int index)
+    {
+        foreach ((StorageTechnology technology, Energy level) in _storageLevelByTechnology)
+        {
+            _stateOfChargeMwhByTechnology[technology][index] = level.MegawattHours;
+        }
     }
 
     private Dictionary<GenerationTechnology, double[]> CreateGenerationSeries() =>
@@ -301,6 +314,9 @@ internal sealed class RegionalDispatchRun
         var perFleetCurtailment = _curtailmentMwByTechnology.ToDictionary(
             entry => entry.Key,
             entry => Flow(entry.Value));
+        var stateOfChargeByTechnology = _stateOfChargeMwhByTechnology.ToDictionary(
+            entry => entry.Key,
+            entry => new StockSeries(_demand.Start, _resolution, entry.Value));
         FlowSeries zeroFlow = Flow(new double[_demand.Length]);
         return new DispatchOutcome(
             regionId: _region.RegionId,
@@ -312,7 +328,8 @@ internal sealed class RegionalDispatchRun
             discharge: Flow(_dischargeMw),
             imports: zeroFlow,
             exports: zeroFlow,
-            incrementalGenerationCharge: Flow(_incrementalGenerationChargeMw));
+            incrementalGenerationCharge: Flow(_incrementalGenerationChargeMw),
+            stateOfChargeByTechnology);
     }
 
     private FlowSeries Flow(double[] values) =>

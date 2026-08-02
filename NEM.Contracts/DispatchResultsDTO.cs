@@ -30,17 +30,26 @@ public sealed record DispatchInputArtifactDTO(
 
 public sealed record DispatchPowerSystemDTO(
     string Id,
-    DispatchFleetDTO[] Fleets);
+    DispatchFleetDTO[] Fleets,
+    DispatchStorageFleetDTO[] StorageFleets);
 
 public sealed record DispatchFleetDTO(
     string Technology,
     double NameplateCapacityMw);
 
+public sealed record DispatchStorageFleetDTO(
+    string Technology,
+    double EnergyCapacityMwh,
+    double PowerCapacityMw);
+
 public sealed record DispatchSeriesDTO(
     double[] DemandMw,
     Dictionary<string, double[]> DeliveredGenerationByTechnologyMw,
     double[] CurtailmentMw,
-    double[] UnservedDemandMw);
+    double[] UnservedDemandMw,
+    double[] ChargeMw,
+    double[] DischargeMw,
+    Dictionary<string, double[]> StateOfChargeByTechnologyMwh);
 
 public sealed record DispatchMetricsDTO(
     double DemandMwh,
@@ -49,7 +58,8 @@ public sealed record DispatchMetricsDTO(
     double UnservedEnergyMwh,
     double UnservedEnergyPercentageOfDemand,
     int UnservedHours,
-    double HoursServedFraction);
+    double HoursServedFraction,
+    double PeakUnservedPowerMw);
 
 public sealed record DispatchCostDTO(
     string Status,

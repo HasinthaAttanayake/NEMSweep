@@ -6,6 +6,7 @@ using NEM.Model.Grid;
 using NEM.Model.Scenarios;
 using NEM.Model.Series;
 using NEM.Model.Simulation;
+using NEM.Model.StorageSizing;
 using NEM.Model.Units;
 using NEM.Model.Weather;
 using System.Security.Cryptography;
@@ -30,7 +31,23 @@ internal static class ScenarioRunner
         RegionalResourceProfile resources = ReadWeatherForTimeline(weatherData, hourlyDemand);
         DomainScenario scenario = BuildScenario(settings, demandData.Region, hourlyDemand);
         PowerSystem powerSystem = ScenarioDerivation.Derive(scenario, hourlyDemand, resources);
-        DispatchOutcome outcome = Dispatcher.Dispatch(powerSystem).Single();
+        StorageSizingSettings sizing = settings.StorageSizing;
+        StorageSizingRunResult sizingResult = StorageSizingService.Size(
+            powerSystem,
+            new StorageSizingOptions(
+                Power.FromMegawatts(sizing.MaximumPowerMw),
+                Energy.FromMegawattHours(sizing.MaximumEnergyMwh),
+                sizing.TargetUsePercentage,
+                sizing.MaximumPasses));
+        if (sizingResult.Status != StorageSizingStatus.TargetMet)
+        {
+            throw new InvalidOperationException(
+                $"Storage sizing ended with {sizingResult.Status}: "
+                + sizingResult.TerminationEvidence);
+        }
+
+        powerSystem = sizingResult.PowerSystem;
+        DispatchOutcome outcome = sizingResult.Regions.Single().DispatchOutcome;
 
         return DispatchResultsExport.Create(
             demandData,

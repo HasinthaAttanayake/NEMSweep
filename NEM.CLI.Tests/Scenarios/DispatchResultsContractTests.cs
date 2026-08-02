@@ -16,11 +16,11 @@ namespace NEM.CLI.Tests.Scenarios;
 public sealed class DispatchResultsContractTests
 {
     [Fact]
-    public void V1_RoundTripsWithVersionAndExplicitUnits()
+    public void V2_RoundTripsWithVersionAndExplicitUnits()
     {
         var start = new DateTimeOffset(2025, 7, 1, 0, 0, 0, TimeSpan.FromHours(10));
         var result = new DispatchResultsDTO(
-            1,
+            2,
             new DispatchScenarioDTO(
                 "nsw1-baseline-dispatch",
                 "NSW1 baseline dispatch",
@@ -35,13 +35,17 @@ public sealed class DispatchResultsContractTests
                 ["demand.zip"]),
             new DispatchPowerSystemDTO(
                 "nsw1-baseline-dispatch-system",
-                [new DispatchFleetDTO("Solar", 100)]),
+                [new DispatchFleetDTO("Solar", 100)],
+                [new DispatchStorageFleetDTO("Battery", 120, 30)]),
             new DispatchSeriesDTO(
                 [80, 90],
                 new Dictionary<string, double[]> { ["Solar"] = [80, 85] },
                 [20, 15],
-                [0, 5]),
-            new DispatchMetricsDTO(170, 165, 35, 5, 5.0 / 170 * 100, 1, 0.5),
+                [0, 5],
+                [10, 0],
+                [0, 5],
+                new Dictionary<string, double[]> { ["Battery"] = [0, 8.7] }),
+            new DispatchMetricsDTO(170, 165, 35, 5, 5.0 / 170 * 100, 1, 0.5, 5),
             new DispatchCostDTO("pending NEM-018", null, null));
 
         string json = JsonSerializer.Serialize(result, new JsonSerializerOptions
@@ -53,9 +57,13 @@ public sealed class DispatchResultsContractTests
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
         roundTripped.Should().BeEquivalentTo(result);
-        roundTripped!.SchemaVersion.Should().Be(1);
+        roundTripped!.SchemaVersion.Should().Be(2);
         json.Should().Contain("\"nameplateCapacityMw\"");
+        json.Should().Contain("\"energyCapacityMwh\"");
+        json.Should().Contain("\"powerCapacityMw\"");
         json.Should().Contain("\"deliveredGenerationByTechnologyMw\"");
+        json.Should().Contain("\"stateOfChargeByTechnologyMwh\"");
+        json.Should().Contain("\"peakUnservedPowerMw\"");
         json.Should().Contain("\"generationCostAud\"");
         json.Should().Contain("\"generationSlcoeAudPerMwh\"");
         json.Should().Contain("\"sha256\"");
@@ -101,7 +109,14 @@ public sealed class DispatchResultsContractTests
             zero,
             zero,
             zero,
-            zero);
+            zero,
+            stateOfChargeByTechnology: new Dictionary<StorageTechnology, StockSeries>
+            {
+                [StorageTechnology.Battery] = new StockSeries(
+                    start,
+                    TimeSpan.FromHours(1),
+                    [0, 8.7]),
+            });
         GeneratingFleet[] fleets =
         [
             new(GenerationTechnology.Coal, Power.FromMegawatts(120)),
@@ -125,7 +140,17 @@ public sealed class DispatchResultsContractTests
         var powerSystem = new PowerSystem(
             new PowerSystemId("nsw1-baseline-dispatch-system"),
             scenario.Id,
-            [new Region("NSW1", fleets, demand)]);
+            [new Region(
+                "NSW1",
+                fleets,
+                demand,
+                storageFleets:
+                [
+                    new StorageFleet(
+                        StorageTechnology.Battery,
+                        Energy.FromMegawattHours(120),
+                        Power.FromMegawatts(30)),
+                ])]);
 
         DispatchResultsDTO result = DispatchResultsExport.Create(
             demandData,
@@ -137,7 +162,10 @@ public sealed class DispatchResultsContractTests
 
         result.DataSeries.DeliveredGenerationByTechnologyMw["Coal"].Should().Equal(100, 50);
         result.DataSeries.DeliveredGenerationByTechnologyMw["Gas"].Should().Equal(0, 40);
-        result.Metrics.Should().Be(new DispatchMetricsDTO(200, 190, 20, 10, 5, 1, 0.5));
+        result.PowerSystem.StorageFleets.Should().ContainSingle().Which
+            .Should().Be(new DispatchStorageFleetDTO("Battery", 120, 30));
+        result.DataSeries.StateOfChargeByTechnologyMwh["Battery"].Should().Equal(0, 8.7);
+        result.Metrics.Should().Be(new DispatchMetricsDTO(200, 190, 20, 10, 5, 1, 0.5, 10));
         result.Cost.GenerationCostAud.Should().BeNull();
         result.Cost.GenerationSlcoeAudPerMwh.Should().BeNull();
     }

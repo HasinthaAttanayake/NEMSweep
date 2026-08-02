@@ -15,17 +15,22 @@
 .metric-strip strong { display: block; margin: .2rem 0 0; color: var(--accent); font-family: Georgia, "Times New Roman", serif; font-size: 1.25rem; font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
 .trace-context { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; padding: 1rem 0 .5rem; color: var(--muted); font-size: .85rem; }
 .chart-section { padding-top: 1rem; }
+.storage-section { margin-top: 1.25rem; border-top: 1px solid #dce1e5; }
 .chart-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: .75rem; }
 .chart-heading h2 { margin: 0; font-size: 1.2rem; }
 .unit-badge { padding: .25rem .5rem; border: 1px solid #9ac8be; border-radius: 4px; background: var(--accent-soft); color: var(--accent); font-size: .75rem; font-weight: 700; }
 .dispatch-chart { width: 100%; overflow-x: auto; border-block: 1px solid #dce1e5; background: #fbfcfc; }
 .dispatch-chart svg { display: block; width: 100%; min-width: 680px; aspect-ratio: 1000 / 440; }
+.storage-chart svg { aspect-ratio: 1000 / 300; }
 .chart-axis-labels { display: flex; justify-content: space-between; padding: .25rem 1rem .6rem 4rem; color: var(--muted); font-size: .75rem; }
 .chart-legend { display: flex; flex-wrap: wrap; gap: .65rem 1.25rem; padding: .9rem 0; color: var(--muted); font-size: .82rem; }
 .chart-legend span { display: inline-flex; align-items: center; gap: .4rem; }
 .chart-legend i { width: 14px; height: 8px; display: inline-block; }
 .chart-legend .demand-key { height: 2px; background: #101820; }
-.assumption-band { display: grid; grid-template-columns: 3fr 1fr; gap: 1.5rem; margin-top: 1rem; padding: 1rem 0; border-top: 1px solid #dce1e5; }
+.empty-storage { display: flex; align-items: center; gap: 1rem; min-height: 110px; padding: 1.25rem; border-block: 1px solid #dce1e5; background: #f5f8f7; color: var(--accent); }
+.empty-storage strong, .empty-storage span { display: block; }
+.empty-storage span { margin-top: .2rem; color: var(--muted); font-size: .88rem; }
+.assumption-band { display: grid; grid-template-columns: 2fr 2fr 1fr; gap: 1.5rem; margin-top: 1rem; padding: 1rem 0; border-top: 1px solid #dce1e5; }
 .assumption-band span, .assumption-band strong { display: block; }
 .assumption-band span { margin-bottom: .25rem; color: var(--muted); font-size: .78rem; text-transform: uppercase; }
 .assumption-band strong { font-size: .9rem; font-weight: 600; }

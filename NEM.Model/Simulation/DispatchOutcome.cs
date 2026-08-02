@@ -21,6 +21,7 @@ public sealed record DispatchOutcome
     /// <summary>Total non-negative magnitude of available generation constrained off.</summary>
     public FlowSeries Curtailment { get; }
     public FlowSeries Unserved { get; }
+    public IReadOnlyDictionary<StorageTechnology, StockSeries> StateOfChargeByTechnology { get; }
     public ReliabilityMetrics Reliability { get; }
 
     public DispatchOutcome(
@@ -33,7 +34,8 @@ public sealed record DispatchOutcome
         FlowSeries discharge,
         FlowSeries imports,
         FlowSeries exports,
-        FlowSeries? incrementalGenerationCharge = null)
+        FlowSeries? incrementalGenerationCharge = null,
+        IReadOnlyDictionary<StorageTechnology, StockSeries>? stateOfChargeByTechnology = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(regionId);
         ArgumentNullException.ThrowIfNull(perFleetGeneration);
@@ -73,6 +75,9 @@ public sealed record DispatchOutcome
         Imports = imports;
         Exports = exports;
         Curtailment = SumFlows(perFleetCurtailment.Values, demand);
+        StateOfChargeByTechnology = new ReadOnlyDictionary<StorageTechnology, StockSeries>(
+            new Dictionary<StorageTechnology, StockSeries>(stateOfChargeByTechnology
+                ?? new Dictionary<StorageTechnology, StockSeries>()));
 
         Validate();
         Reliability = ReliabilityMetrics.FromOutcome(this);
@@ -127,6 +132,11 @@ public sealed record DispatchOutcome
         foreach (FlowSeries curtailment in PerFleetCurtailment.Values)
         {
             Demand.RequireAligned(curtailment);
+        }
+
+        foreach (StockSeries stateOfCharge in StateOfChargeByTechnology.Values)
+        {
+            Demand.RequireAligned(stateOfCharge);
         }
 
         FlowSeries[] generationFlows = PerFleetGeneration.Values.ToArray();

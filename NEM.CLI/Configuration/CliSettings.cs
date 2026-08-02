@@ -32,6 +32,7 @@ internal sealed record CliSettings(
         ArgumentException.ThrowIfNullOrWhiteSpace(Scenario.DemandFile);
         ArgumentException.ThrowIfNullOrWhiteSpace(Scenario.WeatherFile);
         ArgumentNullException.ThrowIfNull(Scenario.GeneratingFleets);
+        ArgumentNullException.ThrowIfNull(Scenario.StorageSizing);
     }
 }
 
@@ -45,7 +46,14 @@ internal sealed record ScenarioSettings(
     string Name,
     string DemandFile,
     string WeatherFile,
-    GeneratingFleetSettings[] GeneratingFleets);
+    GeneratingFleetSettings[] GeneratingFleets,
+    StorageSizingSettings StorageSizing);
+
+internal sealed record StorageSizingSettings(
+    double MaximumPowerMw,
+    double MaximumEnergyMwh,
+    double TargetUsePercentage = 0.002,
+    int MaximumPasses = 256);
 
 internal sealed record GeneratingFleetSettings(
     string Technology,

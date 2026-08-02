@@ -34,7 +34,7 @@ internal static class DispatchResultsExport
         Region region = powerSystem.Regions.Single(region => region.RegionId == outcome.RegionId);
 
         return new DispatchResultsDTO(
-            1,
+            2,
             new DispatchScenarioDTO(
                 scenario.Id.Value,
                 scenario.Name,
@@ -51,14 +51,23 @@ internal static class DispatchResultsExport
                 powerSystem.Id.Value,
                 region.GeneratingFleets.Select(fleet => new DispatchFleetDTO(
                     fleet.GenerationTechnology.ToString(),
-                    fleet.NameplateCapacity.Megawatts)).ToArray()),
+                    fleet.NameplateCapacity.Megawatts)).ToArray(),
+                region.StorageFleets.Select(fleet => new DispatchStorageFleetDTO(
+                    fleet.StorageTechnology.ToString(),
+                    fleet.StorageCapacity.MegawattHours,
+                    fleet.PowerCapacity.Megawatts)).ToArray()),
             new DispatchSeriesDTO(
                 ValuesOf(outcome.Demand),
                 deliveredGenerationByTechnology.ToDictionary(
                     entry => entry.Key,
                     entry => ValuesOf(entry.Value)),
                 ValuesOf(outcome.Curtailment),
-                ValuesOf(outcome.Unserved)),
+                ValuesOf(outcome.Unserved),
+                ValuesOf(outcome.Charge),
+                ValuesOf(outcome.Discharge),
+                outcome.StateOfChargeByTechnology.ToDictionary(
+                    entry => entry.Key.ToString(),
+                    entry => ValuesOf(entry.Value))),
             new DispatchMetricsDTO(
                 outcome.Demand.Integrate().MegawattHours,
                 deliveredGenerationMwh,
@@ -66,7 +75,8 @@ internal static class DispatchResultsExport
                 reliability.UnservedEnergy.MegawattHours,
                 reliability.UnservedEnergyPercentageOfDemand,
                 reliability.UnservedHours,
-                reliability.HoursServedFraction),
+                reliability.HoursServedFraction,
+                reliability.PeakUnservedPower.Megawatts),
             new DispatchCostDTO(
                 "pending NEM-018",
                 null,
@@ -82,6 +92,17 @@ internal static class DispatchResultsExport
         for (int index = 0; index < series.Length; index++)
         {
             values[index] = series[index].Megawatts;
+        }
+
+        return values;
+    }
+
+    private static double[] ValuesOf(StockSeries series)
+    {
+        var values = new double[series.Length];
+        for (int index = 0; index < series.Length; index++)
+        {
+            values[index] = series[index].MegawattHours;
         }
 
         return values;

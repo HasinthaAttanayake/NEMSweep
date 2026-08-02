@@ -183,12 +183,13 @@ cycle loses `(1 - efficiency)` of the grid energy used to charge it. Round-trip
 efficiency is constrained to the inclusive range from zero to one.
 
 `Dispatcher` initializes each storage fleet at zero MWh for a dispatch run and
-threads the returned state of charge into the next interval. It constructs a
-fresh `DispatchContext` after generation has been dispatched to demand and
-before storage operates. The context contains signed residual power, resolution,
-storage levels and operating headroom, and current incremental-generation
-headroom. Positive residual means unmet demand; negative residual means
-would-be-curtailed surplus.
+threads the returned state of charge into the next interval. `DispatchOutcome`
+records one interval-beginning `StockSeries` per storage technology. The
+dispatcher constructs a fresh `DispatchContext` after generation has been
+dispatched to demand and before storage operates. The context contains signed
+residual power, resolution, storage levels and operating headroom, and current
+incremental-generation headroom. Positive residual means unmet demand; negative
+residual means would-be-curtailed surplus.
 
 `GreedyPolicy` is stateless. For a deficit it requests discharge; for a surplus
 it requests charging sourced only from that surplus. It allocates Battery before

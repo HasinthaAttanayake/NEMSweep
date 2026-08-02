@@ -305,6 +305,10 @@ namespace NEM.Model.Tests.Simulation
             AssertSeries(outcome.Discharge, 0, 10);
             AssertSeries(outcome.Curtailment, 0, 0);
             AssertSeries(outcome.Unserved, 0, 0);
+            outcome.StateOfChargeByTechnology[StorageTechnology.Battery][0]
+                .Should().Be(Energy.Zero);
+            outcome.StateOfChargeByTechnology[StorageTechnology.Battery][1]
+                .Should().Be(Energy.FromMegawattHours(17.4));
         }
 
         [Fact]
