@@ -1,8 +1,27 @@
 .navbar-toggler {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem 0.75rem;
+    border: 1px solid transparent;
+    border-radius: 0.375rem;
     background-color: rgba(255, 255, 255, 0.1);
+    line-height: 1;
+}
+
+.navbar-toggler-icon {
+    display: inline-block;
+    width: 1.5em;
+    height: 1.5em;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255,255,255,0.75%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 100%;
 }
 
 .top-row {
+    display: flex;
+    align-items: center;
     border-bottom: 1px solid rgba(255, 255, 255, 0.12);
     min-height: 3.5rem;
     background-color: #102723;
@@ -48,6 +67,15 @@
 .brand-name span {
     color: #8fd3c4;
     font-weight: 500;
+}
+
+.collapse {
+    display: none;
+}
+
+.nav {
+    display: flex;
+    flex-direction: column;
 }
 
 .nav-section-label {
