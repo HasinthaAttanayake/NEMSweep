@@ -2,6 +2,7 @@ using FluentAssertions;
 using NEM.Model.Generation.Solar;
 using NEM.Model.Generation.Wind;
 using NEM.Model.Grid;
+using NEM.Model.Scenarios;
 using NEM.Model.Series;
 using NEM.Model.Simulation;
 using NEM.Model.Units;
@@ -33,7 +34,7 @@ namespace NEM.Model.Tests.Simulation
                 demand,
                 resourceProfile: RegionalResources(demand));
 
-            DispatchOutcome outcome = Dispatcher.Dispatch(region);
+            DispatchOutcome outcome = Dispatch(region);
 
             outcome.RegionId.Should().Be("NSW1");
             AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Solar], 20, 20, 20);
@@ -76,7 +77,7 @@ namespace NEM.Model.Tests.Simulation
                 fleet => fleet.GenerationTechnology,
                 fleet => ExpectedAvailableCapacity(fleet, resources, demandSeries));
 
-            DispatchOutcome outcome = Dispatcher.Dispatch(region);
+            DispatchOutcome outcome = Dispatch(region);
 
             for (int hour = 0; hour < HoursInJuly; hour++)
             {
@@ -129,7 +130,7 @@ namespace NEM.Model.Tests.Simulation
                 demand,
                 resourceProfile: RegionalResources(demand));
 
-            DispatchOutcome outcome = Dispatcher.Dispatch(region);
+            DispatchOutcome outcome = Dispatch(region);
 
             AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Solar], 20);
             AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Wind], 10);
@@ -151,7 +152,7 @@ namespace NEM.Model.Tests.Simulation
                 demand,
                 resourceProfile: RegionalResources(demand));
 
-            DispatchOutcome outcome = Dispatcher.Dispatch(region);
+            DispatchOutcome outcome = Dispatch(region);
 
             AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Solar], 20);
             AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Wind], 10);
@@ -180,7 +181,7 @@ namespace NEM.Model.Tests.Simulation
                 [hydro],
                 new FlowSeries(start, TimeSpan.FromHours(1), Enumerable.Repeat(50.0, hours).ToArray()));
 
-            DispatchOutcome outcome = Dispatcher.Dispatch(region);
+            DispatchOutcome outcome = Dispatch(region);
 
             outcome.PerFleetGeneration[GenerationTechnology.Hydro].Integrate()
                 .Should().Be(Energy.FromMegawattHours(1_200));
@@ -198,7 +199,7 @@ namespace NEM.Model.Tests.Simulation
                 });
             var region = new Region("NSW1", [hydro], HourlyFlow(50));
 
-            var act = () => Dispatcher.Dispatch(region);
+            var act = () => Dispatch(region);
 
             act.Should().Throw<InvalidOperationException>()
                 .WithMessage("*Hydro has no energy budget for 2026-07*");
@@ -214,7 +215,7 @@ namespace NEM.Model.Tests.Simulation
                 demand,
                 resourceProfile: RegionalResources(demand));
 
-            DispatchOutcome outcome = Dispatcher.Dispatch(region);
+            DispatchOutcome outcome = Dispatch(region);
 
             AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Solar], 0);
             AssertSeries(outcome.Curtailment, 0);
@@ -239,7 +240,7 @@ namespace NEM.Model.Tests.Simulation
                 demand,
                 resourceProfile: resources);
 
-            DispatchOutcome outcome = Dispatcher.Dispatch(region);
+            DispatchOutcome outcome = Dispatch(region);
 
             AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Wind], 0, 10, 0);
             AssertSeries(outcome.Unserved, 100, 90, 100);
@@ -259,7 +260,7 @@ namespace NEM.Model.Tests.Simulation
                 subHourlyDemand,
                 resourceProfile: RegionalResources(dispatchTimeline));
 
-            DispatchOutcome outcome = Dispatcher.Dispatch(region);
+            DispatchOutcome outcome = Dispatch(region);
 
             region.Demand.BaseDemand.Resolution.Should().Be(DemandProfile.Resolution);
             AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Wind], 10, 10);
@@ -279,7 +280,7 @@ namespace NEM.Model.Tests.Simulation
                 demand,
                 resourceProfile: resources);
 
-            DispatchOutcome outcome = Dispatcher.Dispatch(region);
+            DispatchOutcome outcome = Dispatch(region);
 
             AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Solar], 0, 95, 100);
             AssertSeries(outcome.Unserved, 200, 105, 100);
@@ -296,7 +297,7 @@ namespace NEM.Model.Tests.Simulation
                 resourceProfile: RegionalResources(demand),
                 storageFleets: [Battery(storageCapacityMwh: 20, powerCapacityMw: 20)]);
 
-            DispatchOutcome outcome = Dispatcher.Dispatch(region);
+            DispatchOutcome outcome = Dispatch(region);
 
             AssertSeries(outcome.SurplusCharge, 20, 0);
             AssertSeries(outcome.IncrementalGenerationCharge, 0, 0);
@@ -317,7 +318,7 @@ namespace NEM.Model.Tests.Simulation
                 resourceProfile: RegionalResources(demand),
                 storageFleets: [Battery(storageCapacityMwh: 8.7, powerCapacityMw: 20)]);
 
-            DispatchOutcome outcome = Dispatcher.Dispatch(region);
+            DispatchOutcome outcome = Dispatch(region);
 
             outcome.Charge[0].Megawatts.Should().BeApproximately(10, 1e-10);
             outcome.Discharge[1].Megawatts.Should().BeApproximately(8.7, 1e-10);
@@ -348,8 +349,7 @@ namespace NEM.Model.Tests.Simulation
                         demand,
                         resourceProfile: resources,
                         storageFleets: [Battery(storageCapacityMwh, powerCapacityMw: 20)]);
-                    Energy totalUse = ReliabilityMetrics.FromOutcome(
-                        Dispatcher.Dispatch(region)).UnservedEnergy;
+                    Energy totalUse = Dispatch(region).Reliability.UnservedEnergy;
 
                     return (storageCapacityMwh, totalUse);
                 })
@@ -379,7 +379,7 @@ namespace NEM.Model.Tests.Simulation
                 GenerationTechnology.Gas,
                 chargeMw: 10);
 
-            DispatchOutcome outcome = Dispatcher.Dispatch(region, policy);
+            DispatchOutcome outcome = Dispatch(region, policy);
 
             AssertSeries(outcome.IncrementalGenerationCharge, 0, 0);
             AssertSeries(outcome.Charge, 0, 0);
@@ -402,7 +402,7 @@ namespace NEM.Model.Tests.Simulation
                 GenerationTechnology.Gas,
                 chargeMw: 10);
 
-            DispatchOutcome outcome = Dispatcher.Dispatch(region, policy);
+            DispatchOutcome outcome = Dispatch(region, policy);
 
             AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Coal], 0, 20);
             AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Gas], 10, 20);
@@ -433,7 +433,7 @@ namespace NEM.Model.Tests.Simulation
                 GenerationTechnology.Hydro,
                 chargeMw: 10);
 
-            DispatchOutcome outcome = Dispatcher.Dispatch(region, policy);
+            DispatchOutcome outcome = Dispatch(region, policy);
 
             AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Hydro], 10, 0);
             AssertSeries(outcome.IncrementalGenerationCharge, 10, 0);
@@ -442,11 +442,27 @@ namespace NEM.Model.Tests.Simulation
         }
 
         [Fact]
-        public void Dispatch_RejectsNullRegion()
+        public void Dispatch_RejectsNullPowerSystem()
         {
             var act = () => Dispatcher.Dispatch(null!);
 
-            act.Should().Throw<ArgumentNullException>().WithParameterName("region");
+            act.Should().Throw<ArgumentNullException>().WithParameterName("powerSystem");
+        }
+
+        [Fact]
+        public void Dispatch_PowerSystem_ProducesOutcomeAndReliabilityForEachRegion()
+        {
+            var nsw = new Region("NSW1", [Fleet(GenerationTechnology.Coal, 80)], HourlyFlow(100));
+            var qld = new Region("QLD1", [Fleet(GenerationTechnology.Gas, 100)], HourlyFlow(100));
+
+            IReadOnlyList<DispatchOutcome> outcomes = Dispatcher.Dispatch(PowerSystem(nsw, qld));
+
+            outcomes.Select(outcome => outcome.RegionId).Should().Equal("NSW1", "QLD1");
+            outcomes[0].Reliability.UnservedEnergy.Should().Be(Energy.FromMegawattHours(20));
+            outcomes[1].Reliability.UnservedEnergy.Should().Be(Energy.Zero);
+            var mutableOutcomes = (IList<DispatchOutcome>)outcomes;
+            var act = () => mutableOutcomes.Clear();
+            act.Should().Throw<NotSupportedException>();
         }
 
         [Fact]
@@ -651,6 +667,19 @@ namespace NEM.Model.Tests.Simulation
                 zero,
                 zero);
         }
+
+        private static DispatchOutcome Dispatch(
+            Region region,
+            IStoragePolicy? storagePolicy = null) =>
+            (storagePolicy is null
+                ? Dispatcher.Dispatch(PowerSystem(region))
+                : Dispatcher.Dispatch(PowerSystem(region), storagePolicy)).Single();
+
+        private static PowerSystem PowerSystem(params Region[] regions) =>
+            new(
+                new PowerSystemId("test-power-system"),
+                new ScenarioId("test-scenario"),
+                regions);
 
         private static GeneratingFleet Fleet(GenerationTechnology technology, double capacityMw) =>
             new(

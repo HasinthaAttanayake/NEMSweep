@@ -7,6 +7,12 @@ applyTo: ["NEM.Model/**", "NEM.Model.Tests/**"]
 - Read `docs/domain-model.md` before changing domain ownership or relationships.
 - Keep `Scenario` as intent, `ScenarioDerivation` as the pure transformation,
   `PowerSystem` as realised configuration, and `Dispatcher` scenario-blind.
+- Keep `StorageSizingService` pure and whole-system scoped. It may create
+    immutable `PowerSystem` candidates and rerun `Dispatcher`, but only Battery
+    storage is sizeable; pumped hydro remains fixed.
+- Describe sizing results as coordinate-wise near-frontier unless a cost or
+    explicit ordering objective is implemented. Do not call the 2-D result a
+    global minimum.
 - Update `docs/domain-model.md` in the same change whenever a domain type,
   aggregate relationship, derivation boundary, invariant, time rule, or unit
   rule changes.

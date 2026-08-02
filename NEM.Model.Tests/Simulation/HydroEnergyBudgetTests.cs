@@ -1,5 +1,6 @@
 using FluentAssertions;
 using NEM.Model.Grid;
+using NEM.Model.Scenarios;
 using NEM.Model.Series;
 using NEM.Model.Simulation;
 using NEM.Model.Units;
@@ -193,7 +194,11 @@ namespace NEM.Model.Tests.Simulation
                 "NSW1",
                 [hydro],
                 new FlowSeries(start, resolution, demandMw));
-            return Dispatcher.Dispatch(region);
+            var powerSystem = new PowerSystem(
+                new PowerSystemId("test-power-system"),
+                new ScenarioId("test-scenario"),
+                [region]);
+            return Dispatcher.Dispatch(powerSystem).Single();
         }
 
         private static double FactorForBudget(

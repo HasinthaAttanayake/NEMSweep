@@ -62,6 +62,17 @@ namespace NEM.Model.Units
         public static Energy operator *(Power power, TimeSpan interval)
             => Energy.From(power, interval);
 
+        /// <summary>Dimensionless ratio between two power values.</summary>
+        public static double operator /(Power numerator, Power denominator)
+        {
+            if (denominator.Megawatts == 0)
+            {
+                throw new DivideByZeroException("Cannot divide power by zero power.");
+            }
+
+            return numerator.Megawatts / denominator.Megawatts;
+        }
+
         public static bool operator <(Power a, Power b) => a.Megawatts < b.Megawatts;
         public static bool operator >(Power a, Power b) => a.Megawatts > b.Megawatts;
         public static bool operator <=(Power a, Power b) => a.Megawatts <= b.Megawatts;

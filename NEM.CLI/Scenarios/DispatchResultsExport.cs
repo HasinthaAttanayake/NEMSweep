@@ -28,7 +28,7 @@ internal static class DispatchResultsExport
             deliveredGenerationByTechnology.Add(technology.ToString(), deliveredGeneration);
         }
 
-        ReliabilityMetrics reliability = ReliabilityMetrics.FromOutcome(outcome);
+        ReliabilityMetrics reliability = outcome.Reliability;
         double deliveredGenerationMwh = deliveredGenerationByTechnology.Values
             .Sum(series => series.Integrate().MegawattHours);
         Region region = powerSystem.Regions.Single(region => region.RegionId == outcome.RegionId);

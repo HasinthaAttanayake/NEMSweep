@@ -30,8 +30,7 @@ internal static class ScenarioRunner
         RegionalResourceProfile resources = ReadWeatherForTimeline(weatherData, hourlyDemand);
         DomainScenario scenario = BuildScenario(settings, demandData.Region, hourlyDemand);
         PowerSystem powerSystem = ScenarioDerivation.Derive(scenario, hourlyDemand, resources);
-        Region region = powerSystem.Regions.Single();
-        DispatchOutcome outcome = Dispatcher.Dispatch(region);
+        DispatchOutcome outcome = Dispatcher.Dispatch(powerSystem).Single();
 
         return DispatchResultsExport.Create(
             demandData,

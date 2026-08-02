@@ -5,6 +5,7 @@ namespace NEM.Model.Simulation
     public sealed record ReliabilityMetrics
     {
         public Energy UnservedEnergy { get; init; }
+        public Power PeakUnservedPower { get; init; }
         public double UnservedEnergyPercentageOfDemand { get; init; }
         public int UnservedHours { get; init; }
         public double HoursServedFraction { get; init; }
@@ -16,9 +17,12 @@ namespace NEM.Model.Simulation
             Energy unservedEnergy = dispatchOutcome.Unserved.Integrate();
             Energy totalDemand = dispatchOutcome.Demand.Integrate();
             int unservedHours = 0;
+            Power peakUnservedPower = Power.Zero;
             for (int index = 0; index < dispatchOutcome.Unserved.Length; index++)
             {
-                if (dispatchOutcome.Unserved[index].Megawatts > 0)
+                Power unservedPower = dispatchOutcome.Unserved[index];
+                peakUnservedPower = Power.Max(peakUnservedPower, unservedPower);
+                if (unservedPower > Power.Zero)
                 {
                     unservedHours++;
                 }
@@ -27,6 +31,7 @@ namespace NEM.Model.Simulation
             return new ReliabilityMetrics
             {
                 UnservedEnergy = unservedEnergy,
+                PeakUnservedPower = peakUnservedPower,
                 UnservedEnergyPercentageOfDemand = totalDemand == Energy.Zero
                     ? 0
                     : 100 * (unservedEnergy / totalDemand),
