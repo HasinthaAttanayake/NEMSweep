@@ -2,6 +2,7 @@ using FluentAssertions;
 using NEM.CLI.Application;
 using NEM.CLI.Configuration;
 using NEM.CLI.Infrastructure;
+using System.Text.Json;
 
 namespace NEM.CLI.Tests.Application;
 
@@ -79,22 +80,31 @@ public sealed class CommandRouterTests
 
         public void WriteSettings(string fileName, string scenarioName)
         {
-            File.WriteAllText(Path.Combine(RootPath, fileName), $$"""
+            var settings = new
+            {
+                operationalDemand = new
                 {
-                  "operationalDemand": {
-                    "archiveDirectory": "NEM.CLI/data/demand-zips",
-                    "region": "NSW1",
-                    "periodStart": "2025-07-01T00:00:00+10:00"
-                  },
-                  "scenario": {
-                    "id": "test-scenario",
-                    "name": "{{scenarioName}}",
-                    "demandFile": "demand.json",
-                    "weatherFile": "weather.json",
-                    "generatingFleets": []
-                  }
-                }
-                """);
+                    archiveDirectory = "NEM.CLI/data/demand-zips",
+                    region = "NSW1",
+                    periodStart = "2025-07-01T00:00:00+10:00",
+                },
+                scenario = new
+                {
+                    id = "test-scenario",
+                    name = scenarioName,
+                    demandFile = "demand.json",
+                    weatherFile = "weather.json",
+                    storageSizing = new
+                    {
+                        maximumPowerMw = 100,
+                        maximumEnergyMwh = 400,
+                    },
+                    generatingFleets = Array.Empty<object>(),
+                },
+            };
+            File.WriteAllText(
+                Path.Combine(RootPath, fileName),
+                JsonSerializer.Serialize(settings));
         }
 
         public void Dispose() => Directory.Delete(RootPath, recursive: true);

@@ -55,7 +55,7 @@
             <div><span>Peak demand</span><strong>@_peakDemandMw.ToString("N0")</strong><small>MW</small></div>
             <div><span>Energy delivered</span><strong>@_deliveredEnergyMwh.ToString("N0")</strong><small>MWh</small></div>
             <div><span>Renewable share</span><strong>@_renewableSharePercent.ToString("N1")</strong><small>% of delivered generation</small></div>
-            <div><span>Unserved energy</span><strong>@_unservedEnergyMwh.ToString("N0")</strong><small>MWh · @_unservedEnergyPercent.ToString("N3")% USE · @_hoursServedPercent.ToString("N1")% hours served</small></div>
+            <div><span>Unserved energy</span><strong>@_unservedEnergyMwh.ToString("N0")</strong><small>MWh · @_unservedEnergyPercent.ToString("N3")% USE · @_peakUnservedPowerMw.ToString("N0") MW peak</small></div>
         </section>
 
         <div class="trace-context">
@@ -100,8 +100,49 @@
             </div>
         </section>
 
+        <section class="chart-section storage-section">
+            <div class="chart-heading">
+                <div><h2>Storage state of charge</h2><p>Stored energy at the beginning of each interval for the selected period.</p></div>
+                <span class="unit-badge">MWh</span>
+            </div>
+            @if (_storageTraces.Count == 0)
+            {
+                <div class="empty-storage" role="status">
+                    <MudIcon Icon="@Icons.Material.Filled.BatteryStd" Size="Size.Large" />
+                    <div><strong>No storage installed</strong><span>This scenario meets its reliability target without a storage fleet.</span></div>
+                </div>
+            }
+            else
+            {
+                <div class="dispatch-chart storage-chart">
+                    <svg viewBox="0 0 1000 300" role="img" aria-label="Storage state of charge by technology">
+                        @for (int tick = 0; tick <= 4; tick++)
+                        {
+                            double y = StorageChartY(_storageChartMaximumMwh * tick / 4);
+                            <line class="grid-line" x1="64" y1="@y" x2="984" y2="@y" stroke="#dce1e5" stroke-width="1" />
+                        }
+                        @foreach (StorageTrace trace in _storageTraces)
+                        {
+                            <polyline points="@trace.Points" fill="none" stroke="@trace.Color"
+                                      stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke">
+                                <title>@trace.Technology state of charge</title>
+                            </polyline>
+                        }
+                    </svg>
+                    <div class="chart-axis-labels"><span>@_firstLabel</span><span>@_middleLabel</span><span>@_lastLabel</span></div>
+                </div>
+                <div class="chart-legend" aria-label="Storage chart series">
+                    @foreach (StorageTrace trace in _storageTraces)
+                    {
+                        <span><i style="background-color: @trace.Color"></i>@trace.Technology · @trace.EnergyCapacityMwh.ToString("N0") MWh / @trace.PowerCapacityMw.ToString("N0") MW</span>
+                    }
+                </div>
+            }
+        </section>
+
         <section class="assumption-band">
             <div><span>Scenario fleet</span><strong>@string.Join(" · ", _result!.PowerSystem.Fleets.Select(fleet => $"{fleet.Technology} {fleet.NameplateCapacityMw:N0} MW"))</strong></div>
+            <div><span>Storage fleet</span><strong>@StorageFleetSummary()</strong></div>
             <div>
                 <span>Generation cost</span>
                 <a class="cost-progress"
@@ -121,6 +162,8 @@
     private const double ChartRight = 984;
     private const double ChartTop = 12;
     private const double ChartBottom = 408;
+    private const double StorageChartTop = 12;
+    private const double StorageChartBottom = 276;
     private static readonly string[] PreferredTechnologyOrder = ["Solar", "Wind", "Hydro", "Coal", "Gas"];
     private static readonly Dictionary<string, string> TechnologyColors = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -130,11 +173,17 @@
         ["Coal"] = "#59636e",
         ["Gas"] = "#c76d4d",
     };
+    private static readonly Dictionary<string, string> StorageColors = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Battery"] = "#176b5b",
+        ["PumpedHydro"] = "#4f7db8",
+    };
 
     private bool _isLoading = true;
     private string? _errorMessage;
     private DispatchResultsDTO? _result;
     private List<AreaLayer> _areas = [];
+    private List<StorageTrace> _storageTraces = [];
     private string _demandPoints = string.Empty;
     private string _firstLabel = string.Empty;
     private string _middleLabel = string.Empty;
@@ -143,12 +192,13 @@
     private string _minimumDate = string.Empty;
     private string _maximumDate = string.Empty;
     private double _chartMaximumMw = 1;
+    private double _storageChartMaximumMwh = 1;
     private double _peakDemandMw;
     private double _deliveredEnergyMwh;
     private double _renewableSharePercent;
     private double _unservedEnergyMwh;
     private double _unservedEnergyPercent;
-    private double _hoursServedPercent;
+    private double _peakUnservedPowerMw;
     private int _rawPointCount;
     private int _displayPointCount;
     private int _selectedView;
@@ -162,17 +212,42 @@
             _result = await Http.GetFromJsonAsync<DispatchResultsDTO>(
                 "data/results.json",
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            if (_result is null || _result.SchemaVersion != 1)
+            if (_result is null || _result.SchemaVersion != 2)
             {
-                _errorMessage = "Dispatch results are missing or use an unsupported schema; expected schema 1.";
+                _errorMessage = "Dispatch results are missing or use an unsupported schema; expected schema 2.";
                 return;
             }
 
-            int length = _result.DataSeries.DemandMw.Length;
+            DispatchSeriesDTO? series = _result.DataSeries;
+            DispatchPowerSystemDTO? powerSystem = _result.PowerSystem;
+            if (series is null
+                || powerSystem is null
+                || series.DemandMw is null
+                || series.UnservedDemandMw is null
+                || series.ChargeMw is null
+                || series.DischargeMw is null
+                || series.StateOfChargeByTechnologyMwh is null
+                || series.DeliveredGenerationByTechnologyMw is null
+                || powerSystem.StorageFleets is null)
+            {
+                _errorMessage = "Dispatch result series are empty or misaligned.";
+                return;
+            }
+
+            int length = series.DemandMw.Length;
             if (length == 0
                 || _result.Scenario.Resolution <= TimeSpan.Zero
-                || _result.DataSeries.UnservedDemandMw.Length != length
-                || _result.DataSeries.DeliveredGenerationByTechnologyMw.Values.Any(values => values.Length != length))
+                || series.UnservedDemandMw.Length != length
+                || series.ChargeMw.Length != length
+                || series.DischargeMw.Length != length
+                || series.StateOfChargeByTechnologyMwh.Values.Any(values =>
+                    values is null || values.Length != length)
+                || powerSystem.StorageFleets.Any(fleet =>
+                    fleet.EnergyCapacityMwh <= 0
+                    || fleet.PowerCapacityMw <= 0
+                    || !series.StateOfChargeByTechnologyMwh.ContainsKey(fleet.Technology))
+                || series.DeliveredGenerationByTechnologyMw.Values.Any(values =>
+                    values is null || values.Length != length))
             {
                 _errorMessage = "Dispatch result series are empty or misaligned.";
                 return;
@@ -224,8 +299,7 @@
         _unservedEnergyPercent = demandEnergyMwh == 0
             ? 0
             : 100.0 * _unservedEnergyMwh / demandEnergyMwh;
-        _hoursServedPercent = 100.0 * selectedIndexes.Count(index => result.DataSeries.UnservedDemandMw[index] == 0)
-            / selectedIndexes.Length;
+        _peakUnservedPowerMw = selectedIndexes.Max(index => result.DataSeries.UnservedDemandMw[index]);
 
         string[] technologies = PreferredTechnologyOrder
             .Where(result.DataSeries.DeliveredGenerationByTechnologyMw.ContainsKey)
@@ -277,6 +351,7 @@
                 AreaPoints(baseline, cumulative)));
         }
         _demandPoints = LinePoints(demand);
+        BuildStorageChart(result, selectedIndexes, bucketSize);
 
         DateTimeOffset selectedStart = InstantAt(selectedIndexes[0]);
         DateTimeOffset selectedEnd = InstantAt(selectedIndexes[^1]) + result.Scenario.Resolution;
@@ -289,6 +364,42 @@
         _lastLabel = timestamps[^1].ToString(labelFormat);
     }
 
+    private void BuildStorageChart(
+        DispatchResultsDTO result,
+        int[] selectedIndexes,
+        int bucketSize)
+    {
+        _storageTraces = [];
+        foreach (DispatchStorageFleetDTO fleet in result.PowerSystem.StorageFleets)
+        {
+            double[] stateOfCharge = result.DataSeries.StateOfChargeByTechnologyMwh[fleet.Technology];
+            var displayedValues = new List<double>();
+            for (int offset = 0; offset < selectedIndexes.Length; offset += bucketSize)
+            {
+                int[] bucket = selectedIndexes[offset..Math.Min(offset + bucketSize, selectedIndexes.Length)];
+                displayedValues.Add(stateOfCharge[bucket[0]]);
+            }
+
+            _storageTraces.Add(new StorageTrace(
+                fleet.Technology,
+                StorageColors.GetValueOrDefault(fleet.Technology, "#8a7d72"),
+                fleet.EnergyCapacityMwh,
+                fleet.PowerCapacityMw,
+                displayedValues));
+        }
+
+        _storageChartMaximumMwh = Math.Max(
+            1,
+            result.PowerSystem.StorageFleets
+                .Select(fleet => fleet.EnergyCapacityMwh)
+                .DefaultIfEmpty(1)
+                .Max());
+        _storageTraces = _storageTraces.Select(trace => trace with
+        {
+            Points = StorageLinePoints(trace.Values),
+        }).ToList();
+    }
+
     private string AreaPoints(double[] baseline, double[] top) => string.Join(" ",
         top.Select((value, index) => Point(index, value, top.Length))
             .Concat(baseline.Select((value, index) => Point(index, value, baseline.Length)).Reverse()));
@@ -296,10 +407,23 @@
     private string LinePoints(IReadOnlyList<double> values) => string.Join(" ",
         values.Select((value, index) => Point(index, value, values.Count)));
 
+    private string StorageLinePoints(IReadOnlyList<double> values) => string.Join(" ",
+        values.Select((value, index) => FormattableString.Invariant(
+            $"{ChartLeft + ((ChartRight - ChartLeft) * index / Math.Max(1, values.Count - 1)):F2},{StorageChartY(value):F2}")));
+
     private string Point(int index, double value, int count) => FormattableString.Invariant(
         $"{ChartLeft + ((ChartRight - ChartLeft) * index / Math.Max(1, count - 1)):F2},{ChartY(value):F2}");
 
     private double ChartY(double value) => ChartBottom - ((ChartBottom - ChartTop) * value / _chartMaximumMw);
+
+    private double StorageChartY(double value) =>
+        StorageChartBottom
+        - ((StorageChartBottom - StorageChartTop) * value / _storageChartMaximumMwh);
+
+    private string StorageFleetSummary() => _result!.PowerSystem.StorageFleets.Length == 0
+        ? "None installed"
+        : string.Join(" · ", _result.PowerSystem.StorageFleets.Select(fleet =>
+            $"{fleet.Technology} {fleet.EnergyCapacityMwh:N0} MWh / {fleet.PowerCapacityMw:N0} MW"));
 
     private bool IsSelected(int index)
     {
@@ -330,5 +454,12 @@
     };
 
     private sealed record AreaLayer(string Name, string Color, string Points);
+    private sealed record StorageTrace(
+        string Technology,
+        string Color,
+        double EnergyCapacityMwh,
+        double PowerCapacityMw,
+        IReadOnlyList<double> Values,
+        string Points = "");
     private sealed record MonthOption(int Month, string Label);
 }

@@ -8,6 +8,15 @@
     background-color: #102723;
 }
 
+.top-row .container-fluid {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0 0.75rem;
+    box-sizing: border-box;
+}
+
 .navbar-brand {
     display: inline-flex;
     align-items: center;
@@ -80,6 +89,11 @@
 }
 
 @media (min-width: 641px) {
+    .top-row .container-fluid {
+        justify-content: flex-start;
+        padding-left: 1.75rem;
+    }
+
     .navbar-toggler {
         display: none;
     }
