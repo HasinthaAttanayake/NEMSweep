@@ -31,7 +31,13 @@ internal sealed record CliSettings(
         ArgumentException.ThrowIfNullOrWhiteSpace(Scenario.Name);
         ArgumentException.ThrowIfNullOrWhiteSpace(Scenario.DemandFile);
         ArgumentException.ThrowIfNullOrWhiteSpace(Scenario.WeatherFile);
+        ArgumentNullException.ThrowIfNull(Scenario.CostBasis);
         ArgumentNullException.ThrowIfNull(Scenario.GeneratingFleets);
+        if (Scenario.GeneratingFleets.Any(fleet => fleet is null || fleet.CostParameters is null))
+        {
+            throw new FormatException("scenario.generatingFleets must each define costParameters.");
+        }
+
         ArgumentNullException.ThrowIfNull(Scenario.StorageSizing);
     }
 }
@@ -46,8 +52,13 @@ internal sealed record ScenarioSettings(
     string Name,
     string DemandFile,
     string WeatherFile,
+    CostBasisSettings CostBasis,
     GeneratingFleetSettings[] GeneratingFleets,
     StorageSizingSettings StorageSizing);
+
+internal sealed record CostBasisSettings(
+    int Year,
+    double RealDiscountRate);
 
 internal sealed record StorageSizingSettings(
     double MaximumPowerMw,
@@ -58,7 +69,15 @@ internal sealed record StorageSizingSettings(
 internal sealed record GeneratingFleetSettings(
     string Technology,
     double NameplateCapacityMw,
+    CostParametersSettings CostParameters,
     MonthlyCapacityFactorSettings[]? MonthlyCapacityFactors = null);
+
+internal sealed record CostParametersSettings(
+    decimal CapitalCostAudPerMw,
+    decimal EnergyCapitalCostAudPerMwh,
+    decimal FixedOperatingCostAudPerMwYear,
+    decimal VariableOperatingCostAudPerMwh,
+    decimal FuelPriceAudPerGj);
 
 internal sealed record MonthlyCapacityFactorSettings(
     DateOnly Month,

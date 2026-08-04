@@ -94,6 +94,11 @@ public sealed class CommandRouterTests
                     name = scenarioName,
                     demandFile = "demand.json",
                     weatherFile = "weather.json",
+                    costBasis = new
+                    {
+                        year = 2026,
+                        realDiscountRate = 0.07,
+                    },
                     storageSizing = new
                     {
                         maximumPowerMw = 100,

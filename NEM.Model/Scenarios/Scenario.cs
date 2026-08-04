@@ -25,12 +25,14 @@ public sealed class Scenario
         string regionId,
         DateTimeOffset periodStart,
         DateTimeOffset periodEnd,
-        IReadOnlyList<ScenarioGeneratingFleet> generatingFleets)
+        IReadOnlyList<ScenarioGeneratingFleet> generatingFleets,
+        CostBasis costBasis)
     {
         ArgumentNullException.ThrowIfNull(id);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(regionId);
         ArgumentNullException.ThrowIfNull(generatingFleets);
+        ArgumentNullException.ThrowIfNull(costBasis);
         if (periodStart.Offset != TimeSpan.FromHours(10)
             || periodEnd.Offset != TimeSpan.FromHours(10))
         {
@@ -66,6 +68,7 @@ public sealed class Scenario
         PeriodStart = periodStart;
         PeriodEnd = periodEnd;
         GeneratingFleets = Array.AsReadOnly(generatingFleets.ToArray());
+        CostBasis = costBasis;
     }
 
     public ScenarioId Id { get; }
@@ -74,6 +77,7 @@ public sealed class Scenario
     public DateTimeOffset PeriodStart { get; }
     public DateTimeOffset PeriodEnd { get; }
     public IReadOnlyList<ScenarioGeneratingFleet> GeneratingFleets { get; }
+    public CostBasis CostBasis { get; }
 }
 
 public sealed class ScenarioGeneratingFleet
@@ -81,8 +85,11 @@ public sealed class ScenarioGeneratingFleet
     public ScenarioGeneratingFleet(
         GenerationTechnology technology,
         Power nameplateCapacity,
+        CostParameters costParameters,
         IReadOnlyDictionary<DateOnly, double>? monthlyCapacityFactors = null)
     {
+        ArgumentNullException.ThrowIfNull(costParameters);
+
         if (nameplateCapacity < Power.Zero)
         {
             throw new ArgumentOutOfRangeException(nameof(nameplateCapacity));
@@ -90,6 +97,7 @@ public sealed class ScenarioGeneratingFleet
 
         Technology = technology;
         NameplateCapacity = nameplateCapacity;
+        CostParameters = costParameters;
         MonthlyCapacityFactors = monthlyCapacityFactors is null
             ? null
             : new ReadOnlyDictionary<DateOnly, double>(
@@ -100,6 +108,7 @@ public sealed class ScenarioGeneratingFleet
 
     public GenerationTechnology Technology { get; }
     public Power NameplateCapacity { get; }
+    public CostParameters CostParameters { get; }
     public IReadOnlyDictionary<DateOnly, double>? MonthlyCapacityFactors { get; }
 
     internal GeneratingFleet ToGeneratingFleet() =>

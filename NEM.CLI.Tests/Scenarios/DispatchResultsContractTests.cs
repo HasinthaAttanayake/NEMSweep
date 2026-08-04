@@ -132,11 +132,14 @@ public sealed class DispatchResultsContractTests
             [
                 new ScenarioGeneratingFleet(
                     GenerationTechnology.Coal,
-                    Power.FromMegawatts(120)),
+                    Power.FromMegawatts(120),
+                    CreateCostParameters()),
                 new ScenarioGeneratingFleet(
                     GenerationTechnology.Gas,
-                    Power.FromMegawatts(40)),
-            ]);
+                    Power.FromMegawatts(40),
+                    CreateCostParameters()),
+            ],
+            new CostBasis(2026, 0.07));
         var powerSystem = new PowerSystem(
             new PowerSystemId("nsw1-baseline-dispatch-system"),
             scenario.Id,
@@ -172,4 +175,11 @@ public sealed class DispatchResultsContractTests
 
     private static FlowSeries Flow(DateTimeOffset start, params double[] megawatts) =>
         new(start, TimeSpan.FromHours(1), megawatts);
+
+    private static CostParameters CreateCostParameters() => new(
+        PowerCapacityCost.FromAudPerMwCapacity(0),
+        EnergyCapacityCost.FromAudPerMwhStorage(0),
+        AnnualPowerCapacityCost.FromAudPerMwYear(0),
+        EnergyPrice.FromAudPerMwhDelivered(0),
+        FuelPrice.FromAudPerGjThermal(0));
 }
