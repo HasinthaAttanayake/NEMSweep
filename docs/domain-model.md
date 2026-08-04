@@ -13,11 +13,24 @@ classDiagram
         DateTimeOffset periodStart
         DateTimeOffset periodEnd
         ScenarioGeneratingFleet[] generatingFleets
+      CostBasis costBasis
     }
       class ScenarioGeneratingFleet {
         GenerationTechnology generationTechnology
         Power nameplateCapacity
+      CostParameters costParameters
         monthlyCapacityFactors
+    }
+    class CostBasis {
+      int year
+      double realDiscountRate
+    }
+    class CostParameters {
+      PowerCapacityCost capitalCost
+      EnergyCapacityCost energyCapitalCost
+      AnnualPowerCapacityCost fixedOperatingCost
+      EnergyPrice variableOperatingCost
+      FuelPrice fuelPrice
     }
     class PowerSystem {
         PowerSystemId id
@@ -46,6 +59,8 @@ classDiagram
     class RegionalBatterySizing
 
     Scenario "1" *-- "1..*" ScenarioGeneratingFleet
+    Scenario "1" *-- "1" CostBasis
+    ScenarioGeneratingFleet "1" *-- "1" CostParameters
     Scenario --> PowerSystem : ScenarioDerivation.Derive
     PowerSystem "1" *-- "1..*" Region
     Region "1" *-- "1..*" GeneratingFleet
@@ -75,7 +90,10 @@ classDiagram
 ## Ownership boundaries
 
 - `Scenario` is the aggregate root for scenario intent. It validates identity,
-  NEM-time period bounds, target region, and generating-fleet plans.
+  NEM-time period bounds, target region, cost basis, and generating-fleet plans.
+- `CostBasis` fixes the year and real discount rate applied to scenario costs.
+  Each `ScenarioGeneratingFleet` owns its `CostParameters`; parameter derivation
+  and cost calculations are not implemented yet.
 - `ScenarioDerivation` is a pure domain service that realises a `PowerSystem`
   from scenario intent and aligned demand/resources. Scenario intent currently
   defines generating fleets only; storage fleets can be attached directly to a
@@ -117,6 +135,19 @@ Scenario periods and model series use fixed NEM market time (UTC+10). Result
 generation timestamps use UTC because they describe when an artifact was
 created; seeing `+10:00` period bounds and a `+00:00` generated timestamp in the
 same result is intentional.
+
+Money and cost-rate quantities use `decimal`; measured physical quantities use
+`double`. They meet only inside typed conversion methods, where finite,
+non-negative physical values are explicitly converted to `decimal`. `Money`
+divided by delivered `Energy` produces `EnergyPrice`. `FuelPrice` multiplied by
+a heat rate produces the delivered-energy fuel price.
+
+`EnergyPrice` is AUD/MWh delivered to load, while `EnergyCapacityCost` is
+AUD/MWh of storage built. They deliberately have no shared abstraction despite
+sharing a unit string. Their raw value names preserve this distinction:
+`AudPerMwhDelivered` and `AudPerMwhStorage`. These costs are modelled estimates,
+not audited figures; `decimal` prevents base-10 accumulation artefacts from
+appearing as model defects.
 
 Flow series are interval-average MW and integrate to MWh through
 `FlowSeries.Integrate()`. The dispatch invariant is:

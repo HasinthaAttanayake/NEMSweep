@@ -141,6 +141,17 @@ internal static class ScenarioRunner
             return new ScenarioGeneratingFleet(
                 technology,
                 Power.FromMegawatts(generatingFleetSettings.NameplateCapacityMw),
+                new CostParameters(
+                    PowerCapacityCost.FromAudPerMwCapacity(
+                        generatingFleetSettings.CostParameters.CapitalCostAudPerMw),
+                    EnergyCapacityCost.FromAudPerMwhStorage(
+                        generatingFleetSettings.CostParameters.EnergyCapitalCostAudPerMwh),
+                    AnnualPowerCapacityCost.FromAudPerMwYear(
+                        generatingFleetSettings.CostParameters.FixedOperatingCostAudPerMwYear),
+                    EnergyPrice.FromAudPerMwhDelivered(
+                        generatingFleetSettings.CostParameters.VariableOperatingCostAudPerMwh),
+                    FuelPrice.FromAudPerGjThermal(
+                        generatingFleetSettings.CostParameters.FuelPriceAudPerGj)),
                 monthlyCapacityFactors);
         }).ToArray();
 
@@ -150,7 +161,8 @@ internal static class ScenarioRunner
             regionId,
             timeline.Start,
             timeline.Start.AddTicks(timeline.Resolution.Ticks * timeline.Length),
-            generatingFleets);
+            generatingFleets,
+            new CostBasis(settings.CostBasis.Year, settings.CostBasis.RealDiscountRate));
     }
 
     private static RegionalResourceProfile ReadWeatherForTimeline(
