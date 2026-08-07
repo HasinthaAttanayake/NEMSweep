@@ -4,10 +4,8 @@ namespace NEM.Model.Units
     /// Money per unit of energy delivered to load, in AUD/MWh delivered.
     /// <para>
     /// This is the output unit of system levelised cost of energy (SLCoE). It is
-    /// deliberately distinct from <see cref="EnergyCapacityCost"/>, which has the
-    /// same unit string but prices storage capacity built rather than energy
-    /// delivered. The two types have no shared cost abstraction and cannot be
-    /// substituted for one another.
+    /// deliberately distinct from <see cref="GenerationEnergyCost"/>, which prices
+    /// gross generator output rather than energy delivered to load.
     /// </para>
     /// </summary>
     public readonly record struct EnergyPrice
@@ -30,5 +28,17 @@ namespace NEM.Model.Units
             AudPerMwhDelivered * DecimalPhysicalBoundary.RequireNonNegativeFinite(
                 deliveredEnergy.MegawattHours,
                 nameof(deliveredEnergy)));
+
+        /// <summary>
+        /// Cost of delivered energy: AUD = AUD/MWh delivered × MWh delivered.
+        /// </summary>
+        public static Money operator *(EnergyPrice price, Energy deliveredEnergy) =>
+            price.For(deliveredEnergy);
+
+        /// <summary>
+        /// Cost of delivered energy: AUD = MWh delivered × AUD/MWh delivered.
+        /// </summary>
+        public static Money operator *(Energy deliveredEnergy, EnergyPrice price) =>
+            price * deliveredEnergy;
     }
 }

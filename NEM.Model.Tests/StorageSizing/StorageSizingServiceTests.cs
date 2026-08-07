@@ -31,6 +31,8 @@ public sealed class StorageSizingServiceTests
         region.BatterySizing.PowerCapacity.Should().Be(Power.FromMegawatts(35));
         region.BatterySizing.EnergyCapacity.Should().Be(Energy.FromMegawattHours(140));
         region.BatterySizing.WasChanged.Should().BeTrue();
+        result.PowerSystem.Regions.Single().StorageFleets.Single().TechnologyProfile
+            .Should().Be(BatteryProfile());
         InstalledBatteryAssessment installed = result.InstalledBatteryAssessments
             .Should().ContainSingle().Subject;
         installed.MeetsTarget.Should().BeFalse();
@@ -228,7 +230,9 @@ public sealed class StorageSizingServiceTests
             Power.FromMegawatts(maximumPowerMw),
             Energy.FromMegawattHours(maximumEnergyMwh),
             targetUsePercentage: 0,
-            maximumPasses);
+                maximumPasses: maximumPasses);
+
+    private static StorageTechnologyProfile BatteryProfile() => new(15u, 0.87);
 
     private static PowerSystem SolarSystem(
         string regionId,
@@ -249,7 +253,8 @@ public sealed class StorageSizingServiceTests
             regionId,
             [new GeneratingFleet(GenerationTechnology.Solar, Power.FromMegawatts(100))],
             demand,
-            resourceProfile: StorageMonotonicityTests.Resources(demand, directNormalRadiation));
+            resourceProfile: StorageMonotonicityTests.Resources(demand, directNormalRadiation),
+            storageTechnologyProfiles: BatteryProfiles());
     }
 
     private static Region CoalRegion(
@@ -259,7 +264,14 @@ public sealed class StorageSizingServiceTests
         new(
             regionId,
             [new GeneratingFleet(GenerationTechnology.Coal, Power.FromMegawatts(generationMw))],
-            Flow(demandMw));
+            Flow(demandMw),
+            storageTechnologyProfiles: BatteryProfiles());
+
+    private static IReadOnlyDictionary<StorageTechnology, StorageTechnologyProfile>
+        BatteryProfiles() => new Dictionary<StorageTechnology, StorageTechnologyProfile>
+        {
+            [StorageTechnology.Battery] = BatteryProfile(),
+        };
 
     private static FlowSeries Flow(double[] values) =>
         new(Start, TimeSpan.FromHours(1), values);

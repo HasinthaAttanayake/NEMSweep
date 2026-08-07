@@ -141,7 +141,8 @@ namespace NEM.Model.Tests.Grid
                 [Fleet(GenerationTechnology.Coal)],
                 HourlyFlow(100),
                 new Dictionary<string, FlowSeries> { ["DataCentre"] = additiveDemand },
-                storageFleets: [pumpedHydro]);
+                storageFleets: [pumpedHydro],
+                storageTechnologyProfiles: BatteryProfiles());
 
             Region sized = region.WithBatteryStorage(
                 Energy.FromMegawattHours(120),
@@ -177,11 +178,43 @@ namespace NEM.Model.Tests.Grid
             sized.StorageFleets[0].PowerCapacity.Should().Be(Power.FromMegawatts(60));
         }
 
+        [Fact]
+        public void Constructor_RejectsFleetThatDisagreesWithConfiguredStorageProfile()
+        {
+            StorageFleet battery = Storage(StorageTechnology.Battery);
+            var profiles = new Dictionary<StorageTechnology, StorageTechnologyProfile>
+            {
+                [StorageTechnology.Battery] = new(20u, 0.5),
+            };
+
+            var act = () => new Region(
+                "NSW1",
+                [Fleet(GenerationTechnology.Coal)],
+                HourlyFlow(100),
+                storageFleets: [battery],
+                storageTechnologyProfiles: profiles);
+
+            act.Should().Throw<ArgumentException>()
+                .WithParameterName("storageFleets");
+        }
+
         private static GeneratingFleet Fleet(GenerationTechnology technology) =>
             new(technology, Power.FromMegawatts(100));
 
         private static StorageFleet Storage(StorageTechnology technology) =>
-            new(technology, Energy.FromMegawattHours(100), Power.FromMegawatts(50));
+            new(
+                technology,
+                Energy.FromMegawattHours(100),
+                Power.FromMegawatts(50),
+                BatteryProfile());
+
+        private static StorageTechnologyProfile BatteryProfile() => new(15u, 0.87);
+
+        private static IReadOnlyDictionary<StorageTechnology, StorageTechnologyProfile>
+            BatteryProfiles() => new Dictionary<StorageTechnology, StorageTechnologyProfile>
+            {
+                [StorageTechnology.Battery] = BatteryProfile(),
+            };
 
         private static FlowSeries HourlyFlow(params double[] megawatts) =>
             new(NemStart, TimeSpan.FromHours(1), megawatts);

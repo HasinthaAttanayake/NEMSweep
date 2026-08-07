@@ -28,5 +28,17 @@ namespace NEM.Model.Units
             AudPerMwCapacity * DecimalPhysicalBoundary.RequireNonNegativeFinite(
                 capacity.Megawatts,
                 nameof(capacity)));
+
+        /// <summary>
+        /// Cost of power capacity: AUD = AUD/MW capacity × MW built.
+        /// </summary>
+        public static Money operator *(PowerCapacityCost cost, Power capacity) =>
+            cost.For(capacity);
+
+        /// <summary>
+        /// Cost of power capacity: AUD = MW built × AUD/MW capacity.
+        /// </summary>
+        public static Money operator *(Power capacity, PowerCapacityCost cost) =>
+            cost * capacity;
     }
 }

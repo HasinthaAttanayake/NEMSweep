@@ -15,12 +15,11 @@ internal sealed class RegionalDispatchRun
     private readonly Dictionary<GenerationTechnology, GenerationBudgetState> _budgetByTechnology;
     private readonly Dictionary<GenerationTechnology, double[]> _generationMwByTechnology;
     private readonly Dictionary<GenerationTechnology, double[]> _curtailmentMwByTechnology;
+    private readonly Dictionary<GenerationTechnology, double[]> _chargeMwByTechnology;
     private readonly Dictionary<StorageTechnology, StorageFleet> _storageByTechnology;
     private readonly Dictionary<StorageTechnology, Energy> _storageLevelByTechnology;
     private readonly Dictionary<StorageTechnology, double[]> _stateOfChargeMwhByTechnology;
     private readonly double[] _unservedMw;
-    private readonly double[] _surplusChargeMw;
-    private readonly double[] _incrementalGenerationChargeMw;
     private readonly double[] _dischargeMw;
 
     public RegionalDispatchRun(Region region, IStoragePolicy storagePolicy)
@@ -31,6 +30,7 @@ internal sealed class RegionalDispatchRun
         _resolution = _demand.Resolution;
         _generatingFleets = region.GeneratingFleets
             .OrderBy(fleet => fleet.ShortRunMarginalCost)
+            .ThenBy(fleet => fleet.GenerationTechnology)
             .ToArray();
         _availableByTechnology = _generatingFleets.ToDictionary(
             fleet => fleet.GenerationTechnology,
@@ -40,6 +40,7 @@ internal sealed class RegionalDispatchRun
             fleet => new GenerationBudgetState(fleet));
         _generationMwByTechnology = CreateGenerationSeries();
         _curtailmentMwByTechnology = CreateGenerationSeries();
+        _chargeMwByTechnology = CreateGenerationSeries();
         _storageByTechnology = region.StorageFleets.ToDictionary(
             fleet => fleet.StorageTechnology);
         _storageLevelByTechnology = region.StorageFleets.ToDictionary(
@@ -49,8 +50,6 @@ internal sealed class RegionalDispatchRun
             fleet => fleet.StorageTechnology,
             _ => new double[_demand.Length]);
         _unservedMw = new double[_demand.Length];
-        _surplusChargeMw = new double[_demand.Length];
-        _incrementalGenerationChargeMw = new double[_demand.Length];
         _dischargeMw = new double[_demand.Length];
     }
 
@@ -237,7 +236,6 @@ internal sealed class RegionalDispatchRun
             _resolution);
         Power actualCharge = outcome.DeliveredFlow * -1;
         _storageLevelByTechnology[fleet.StorageTechnology] = outcome.FinalStorageLevel;
-        _surplusChargeMw[index] += actualCharge.Megawatts;
         ReduceCurtailment(index, actualCharge);
         return remainingSurplus - actualCharge;
     }
@@ -287,7 +285,7 @@ internal sealed class RegionalDispatchRun
             _resolution);
         _storageLevelByTechnology[fleet.StorageTechnology] = outcome.FinalStorageLevel;
         _generationMwByTechnology[sourceTechnology][index] += additionalGeneration.Megawatts;
-        _incrementalGenerationChargeMw[index] += additionalGeneration.Megawatts;
+        _chargeMwByTechnology[sourceTechnology][index] += additionalGeneration.Megawatts;
     }
 
     private void ReduceCurtailment(int index, Power charge)
@@ -295,9 +293,11 @@ internal sealed class RegionalDispatchRun
         double remainingMw = charge.Megawatts;
         foreach (GeneratingFleet fleet in _generatingFleets)
         {
-            double[] curtailmentMw = _curtailmentMwByTechnology[fleet.GenerationTechnology];
+            GenerationTechnology technology = fleet.GenerationTechnology;
+            double[] curtailmentMw = _curtailmentMwByTechnology[technology];
             double reductionMw = Math.Min(remainingMw, curtailmentMw[index]);
             curtailmentMw[index] -= reductionMw;
+            _chargeMwByTechnology[technology][index] += reductionMw;
             remainingMw -= reductionMw;
             if (remainingMw <= 0)
             {
@@ -314,6 +314,22 @@ internal sealed class RegionalDispatchRun
         var perFleetCurtailment = _curtailmentMwByTechnology.ToDictionary(
             entry => entry.Key,
             entry => Flow(entry.Value));
+        var perFleetCharge = _chargeMwByTechnology.ToDictionary(
+            entry => entry.Key,
+            entry => Flow(entry.Value));
+        var perFleetDelivered = _generationMwByTechnology.ToDictionary(
+            entry => entry.Key,
+            entry => Flow(entry.Value.Select((generationMw, index) =>
+                generationMw
+                - _curtailmentMwByTechnology[entry.Key][index]
+                - _chargeMwByTechnology[entry.Key][index]).ToArray()));
+        var chargeMw = new double[_demand.Length];
+        for (int index = 0; index < chargeMw.Length; index++)
+        {
+            chargeMw[index] = _chargeMwByTechnology.Values.Sum(values => values[index]);
+        }
+
+        FlowSeries charge = Flow(chargeMw);
         var stateOfChargeByTechnology = _stateOfChargeMwhByTechnology.ToDictionary(
             entry => entry.Key,
             entry => new StockSeries(_demand.Start, _resolution, entry.Value));
@@ -322,13 +338,14 @@ internal sealed class RegionalDispatchRun
             regionId: _region.RegionId,
             perFleetGeneration,
             perFleetCurtailment,
+            perFleetDelivered,
+            perFleetCharge,
             demand: _demand,
             unserved: Flow(_unservedMw),
-            surplusCharge: Flow(_surplusChargeMw),
+            charge,
             discharge: Flow(_dischargeMw),
             imports: zeroFlow,
             exports: zeroFlow,
-            incrementalGenerationCharge: Flow(_incrementalGenerationChargeMw),
             stateOfChargeByTechnology);
     }
 

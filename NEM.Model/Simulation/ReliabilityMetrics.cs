@@ -2,6 +2,10 @@ using NEM.Model.Units;
 
 namespace NEM.Model.Simulation
 {
+    /// <summary>
+    /// Reliability measures calculated from the demand and unserved-demand series of a
+    /// <see cref="DispatchOutcome"/>.
+    /// </summary>
     public sealed record ReliabilityMetrics
     {
         private ReliabilityMetrics(
@@ -18,12 +22,18 @@ namespace NEM.Model.Simulation
             HoursServedFraction = hoursServedFraction;
         }
 
+        /// <summary>Total demand energy that was not served.</summary>
         public Energy UnservedEnergy { get; }
+        /// <summary>Largest hourly unserved-demand power.</summary>
         public Power PeakUnservedPower { get; }
+        /// <summary>Unserved energy as a percentage of total demand energy.</summary>
         public double UnservedEnergyPercentageOfDemand { get; }
+        /// <summary>Number of intervals in which any demand was unserved.</summary>
         public int UnservedHours { get; }
+        /// <summary>Fraction of intervals in which all demand was served.</summary>
         public double HoursServedFraction { get; }
 
+        /// <summary>Calculates reliability measures for a regional dispatch outcome.</summary>
         public static ReliabilityMetrics FromOutcome(DispatchOutcome dispatchOutcome)
         {
             ArgumentNullException.ThrowIfNull(dispatchOutcome);

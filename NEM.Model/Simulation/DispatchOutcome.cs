@@ -4,45 +4,76 @@ using NEM.Model.Series;
 
 namespace NEM.Model.Simulation;
 
+/// <summary>
+/// Immutable hourly dispatch evidence for one region, including energy-balance series and
+/// reliability measures derived from unserved demand. Per-fleet delivered and charge flows
+/// are bookkeeping allocations recorded as generation is diverted from curtailment or produced
+/// incrementally for charging; they are not physical attributions of co-mingled electricity.
+/// </summary>
 public sealed record DispatchOutcome
 {
     private const double BalanceTolerance = 1e-9;
 
+    /// <summary>Identifies the region that was dispatched.</summary>
     public string RegionId { get; }
+    /// <summary>Available generation by technology before curtailment.</summary>
     public IReadOnlyDictionary<GenerationTechnology, FlowSeries> PerFleetGeneration { get; }
+    /// <summary>Available generation constrained off by technology.</summary>
     public IReadOnlyDictionary<GenerationTechnology, FlowSeries> PerFleetCurtailment { get; }
+    /// <summary>
+    /// Generator output delivered to the grid by technology after curtailment and charging,
+    /// including load and exports. This is a consistent bookkeeping allocation, not a
+    /// physical attribution.
+    /// </summary>
+    public IReadOnlyDictionary<GenerationTechnology, FlowSeries> PerFleetDelivered { get; }
+    /// <summary>
+    /// Storage charging booked to the technology whose curtailment was reduced or whose
+    /// generation was increased. This is a consistent allocation, not a physical attribution.
+    /// </summary>
+    public IReadOnlyDictionary<GenerationTechnology, FlowSeries> PerFleetCharge { get; }
+    /// <summary>Total regional demand.</summary>
     public FlowSeries Demand { get; }
+    /// <summary>Demand served by generation, storage discharge, and imports.</summary>
+    public FlowSeries DeliveredToLoad { get; }
+    /// <summary>Total storage charging.</summary>
     public FlowSeries Charge { get; }
-    public FlowSeries SurplusCharge { get; }
-    public FlowSeries IncrementalGenerationCharge { get; }
+    /// <summary>Energy discharged from storage to serve demand.</summary>
     public FlowSeries Discharge { get; }
+    /// <summary>Energy imported into the region.</summary>
     public FlowSeries Imports { get; }
+    /// <summary>Energy exported from the region.</summary>
     public FlowSeries Exports { get; }
     /// <summary>Total non-negative magnitude of available generation constrained off.</summary>
     public FlowSeries Curtailment { get; }
+    /// <summary>Demand that remains unserved after generation, storage, and imports.</summary>
     public FlowSeries Unserved { get; }
+    /// <summary>Storage energy level by technology at the start of each dispatch interval.</summary>
     public IReadOnlyDictionary<StorageTechnology, StockSeries> StateOfChargeByTechnology { get; }
+    /// <summary>Reliability measures calculated from <see cref="Unserved"/> and <see cref="Demand"/>.</summary>
     public ReliabilityMetrics Reliability { get; }
 
     public DispatchOutcome(
         string regionId,
         IReadOnlyDictionary<GenerationTechnology, FlowSeries> perFleetGeneration,
         IReadOnlyDictionary<GenerationTechnology, FlowSeries> perFleetCurtailment,
+        IReadOnlyDictionary<GenerationTechnology, FlowSeries> perFleetDelivered,
+        IReadOnlyDictionary<GenerationTechnology, FlowSeries> perFleetCharge,
         FlowSeries demand,
         FlowSeries unserved,
-        FlowSeries surplusCharge,
+        FlowSeries charge,
         FlowSeries discharge,
         FlowSeries imports,
         FlowSeries exports,
-        FlowSeries? incrementalGenerationCharge = null,
         IReadOnlyDictionary<StorageTechnology, StockSeries>? stateOfChargeByTechnology = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(regionId);
         ArgumentNullException.ThrowIfNull(perFleetGeneration);
         ArgumentNullException.ThrowIfNull(perFleetCurtailment);
+        ArgumentNullException.ThrowIfNull(perFleetDelivered);
+        ArgumentNullException.ThrowIfNull(perFleetCharge);
         ArgumentNullException.ThrowIfNull(demand);
         ArgumentNullException.ThrowIfNull(unserved);
-        ArgumentNullException.ThrowIfNull(surplusCharge);
+        ArgumentNullException.ThrowIfNull(charge);
         ArgumentNullException.ThrowIfNull(discharge);
         ArgumentNullException.ThrowIfNull(imports);
         ArgumentNullException.ThrowIfNull(exports);
@@ -61,16 +92,41 @@ public sealed record DispatchOutcome
                 nameof(perFleetCurtailment));
         }
 
+        if (perFleetDelivered.Values.Any(flow => flow is null))
+        {
+            throw new ArgumentException(
+                "Delivered flows cannot contain a null flow.",
+                nameof(perFleetDelivered));
+        }
+
+        if (perFleetCharge.Values.Any(flow => flow is null))
+        {
+            throw new ArgumentException(
+                "Charge flows cannot contain a null flow.",
+                nameof(perFleetCharge));
+        }
+
+        if (!perFleetGeneration.Keys.ToHashSet().SetEquals(perFleetCurtailment.Keys)
+            || !perFleetGeneration.Keys.ToHashSet().SetEquals(perFleetDelivered.Keys)
+            || !perFleetGeneration.Keys.ToHashSet().SetEquals(perFleetCharge.Keys))
+        {
+            throw new ArgumentException(
+                "Per-fleet dispatch flows must contain the same generation technology keys.");
+        }
+
         RegionId = regionId;
         PerFleetGeneration = new ReadOnlyDictionary<GenerationTechnology, FlowSeries>(
             new Dictionary<GenerationTechnology, FlowSeries>(perFleetGeneration));
         PerFleetCurtailment = new ReadOnlyDictionary<GenerationTechnology, FlowSeries>(
             new Dictionary<GenerationTechnology, FlowSeries>(perFleetCurtailment));
+        PerFleetDelivered = new ReadOnlyDictionary<GenerationTechnology, FlowSeries>(
+            new Dictionary<GenerationTechnology, FlowSeries>(perFleetDelivered));
+        PerFleetCharge = new ReadOnlyDictionary<GenerationTechnology, FlowSeries>(
+            new Dictionary<GenerationTechnology, FlowSeries>(perFleetCharge));
         Demand = demand;
         Unserved = unserved;
-        SurplusCharge = surplusCharge;
-        IncrementalGenerationCharge = incrementalGenerationCharge ?? ZeroFlow(demand);
-        Charge = SumFlows([SurplusCharge, IncrementalGenerationCharge], demand);
+        DeliveredToLoad = Demand.Subtract(Unserved);
+        Charge = charge;
         Discharge = discharge;
         Imports = imports;
         Exports = exports;
@@ -82,9 +138,6 @@ public sealed record DispatchOutcome
         Validate();
         Reliability = ReliabilityMetrics.FromOutcome(this);
     }
-
-    private static FlowSeries ZeroFlow(FlowSeries timeline) =>
-        new(timeline.Start, timeline.Resolution, new double[timeline.Length]);
 
     private static FlowSeries SumFlows(IEnumerable<FlowSeries> flows, FlowSeries timeline)
     {
@@ -112,16 +165,16 @@ public sealed record DispatchOutcome
 
         Demand.RequireAligned(Unserved);
         Demand.RequireAligned(Charge);
-        Demand.RequireAligned(SurplusCharge);
-        Demand.RequireAligned(IncrementalGenerationCharge);
         Demand.RequireAligned(Discharge);
         Demand.RequireAligned(Imports);
         Demand.RequireAligned(Exports);
 
-        if (!PerFleetGeneration.Keys.ToHashSet().SetEquals(PerFleetCurtailment.Keys))
+        if (!PerFleetGeneration.Keys.ToHashSet().SetEquals(PerFleetCurtailment.Keys)
+            || !PerFleetGeneration.Keys.ToHashSet().SetEquals(PerFleetDelivered.Keys)
+            || !PerFleetGeneration.Keys.ToHashSet().SetEquals(PerFleetCharge.Keys))
         {
             throw new ArgumentException(
-                "Generation and curtailment must contain the same generation technology keys.");
+                "Per-fleet dispatch flows must contain the same generation technology keys.");
         }
 
         foreach (FlowSeries generation in PerFleetGeneration.Values)
@@ -134,26 +187,37 @@ public sealed record DispatchOutcome
             Demand.RequireAligned(curtailment);
         }
 
+        foreach (FlowSeries delivered in PerFleetDelivered.Values)
+        {
+            Demand.RequireAligned(delivered);
+        }
+
+        foreach (FlowSeries fleetCharge in PerFleetCharge.Values)
+        {
+            Demand.RequireAligned(fleetCharge);
+        }
+
         foreach (StockSeries stateOfCharge in StateOfChargeByTechnology.Values)
         {
             Demand.RequireAligned(stateOfCharge);
         }
 
-        FlowSeries[] generationFlows = PerFleetGeneration.Values.ToArray();
-        FlowSeries[] curtailmentFlows = PerFleetCurtailment.Values.ToArray();
+        GenerationTechnology[] technologies = PerFleetGeneration.Keys.ToArray();
         for (int index = 0; index < Demand.Length; index++)
         {
             double generation = 0;
-            for (int fleetIndex = 0; fleetIndex < generationFlows.Length; fleetIndex++)
+            double allocatedDelivered = 0;
+            double allocatedCharge = 0;
+            foreach (GenerationTechnology technology in technologies)
             {
-                generation += generationFlows[fleetIndex][index].Megawatts;
+                generation += PerFleetGeneration[technology][index].Megawatts;
+                allocatedDelivered += PerFleetDelivered[technology][index].Megawatts;
+                allocatedCharge += PerFleetCharge[technology][index].Megawatts;
             }
 
             double curtailment = Curtailment[index].Megawatts;
             double unserved = Unserved[index].Megawatts;
             double charge = Charge[index].Megawatts;
-            double surplusCharge = SurplusCharge[index].Megawatts;
-            double incrementalGenerationCharge = IncrementalGenerationCharge[index].Megawatts;
             double discharge = Discharge[index].Megawatts;
             double magnitude = Math.Max(
                 1,
@@ -162,9 +226,9 @@ public sealed record DispatchOutcome
                     Math.Max(Math.Abs(Demand[index].Megawatts), Math.Abs(curtailment))));
             double tolerance = BalanceTolerance * magnitude;
 
-            for (int fleetIndex = 0; fleetIndex < curtailmentFlows.Length; fleetIndex++)
+            foreach (GenerationTechnology technology in technologies)
             {
-                if (curtailmentFlows[fleetIndex][index].Megawatts < -tolerance)
+                if (PerFleetCurtailment[technology][index].Megawatts < -tolerance)
                 {
                     throw new InvalidOperationException(
                         $"Curtailment cannot be negative at index {index} ({Demand.InstantAt(index):o}).");
@@ -177,10 +241,7 @@ public sealed record DispatchOutcome
                     $"Unserved demand cannot be negative at index {index} ({Demand.InstantAt(index):o}).");
             }
 
-            if (surplusCharge < -tolerance
-                || incrementalGenerationCharge < -tolerance
-                || charge < -tolerance
-                || discharge < -tolerance)
+            if (charge < -tolerance || discharge < -tolerance)
             {
                 throw new InvalidOperationException(
                     $"Storage charge and discharge cannot be negative at index {index} "
@@ -191,6 +252,27 @@ public sealed record DispatchOutcome
             {
                 throw new InvalidOperationException(
                     $"Curtailment and unserved demand cannot coexist at index {index} ({Demand.InstantAt(index):o}).");
+            }
+
+            foreach (GenerationTechnology technology in technologies)
+            {
+                double fleetGeneration = PerFleetGeneration[technology][index].Megawatts;
+                double fleetOutputs = PerFleetCurtailment[technology][index].Megawatts
+                    + PerFleetCharge[technology][index].Megawatts
+                    + PerFleetDelivered[technology][index].Megawatts;
+                if (Math.Abs(fleetGeneration - fleetOutputs) > tolerance)
+                {
+                    throw new InvalidOperationException(
+                        $"Per-fleet energy balance failed at index {index} ({Demand.InstantAt(index):o}).");
+                }
+            }
+
+            double generatorDelivered = generation - curtailment - charge;
+            if (Math.Abs(allocatedDelivered - generatorDelivered) > tolerance
+                || Math.Abs(allocatedCharge - charge) > tolerance)
+            {
+                throw new InvalidOperationException(
+                    $"Per-fleet allocation closure failed at index {index} ({Demand.InstantAt(index):o}).");
             }
 
             double inputs = generation

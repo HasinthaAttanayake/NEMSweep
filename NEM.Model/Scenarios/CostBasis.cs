@@ -5,22 +5,20 @@ namespace NEM.Model.Scenarios;
 /// <para>
 /// <see cref="Year"/> identifies the real-dollar basis year. The dimensionless
 /// <see cref="RealDiscountRate"/> is expressed as a fraction, so 0.07 means 7%.
-/// It must be finite and greater than -1; annuity or escalation calculations are
+/// It must be greater than -1; annuity or escalation calculations are
 /// intentionally outside this value object.
 /// </para>
 /// </summary>
 public sealed record CostBasis
 {
-    public CostBasis(int year, double realDiscountRate)
+    public CostBasis(int year, decimal realDiscountRate)
     {
         if (year is < 1 or > 9999)
         {
             throw new ArgumentOutOfRangeException(nameof(year));
         }
 
-        if (double.IsNaN(realDiscountRate)
-            || double.IsInfinity(realDiscountRate)
-            || realDiscountRate <= -1)
+        if (realDiscountRate <= -1m)
         {
             throw new ArgumentOutOfRangeException(nameof(realDiscountRate));
         }
@@ -33,5 +31,5 @@ public sealed record CostBasis
     public int Year { get; }
 
     /// <summary>The dimensionless real discount rate expressed as a fraction.</summary>
-    public double RealDiscountRate { get; }
+    public decimal RealDiscountRate { get; }
 }

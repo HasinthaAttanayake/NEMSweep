@@ -22,16 +22,14 @@ public sealed class Scenario
     public Scenario(
         ScenarioId id,
         string name,
-        string regionId,
         DateTimeOffset periodStart,
         DateTimeOffset periodEnd,
-        IReadOnlyList<ScenarioGeneratingFleet> generatingFleets,
+        IReadOnlyList<ScenarioRegion> regions,
         CostBasis costBasis)
     {
         ArgumentNullException.ThrowIfNull(id);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentException.ThrowIfNullOrWhiteSpace(regionId);
-        ArgumentNullException.ThrowIfNull(generatingFleets);
+        ArgumentNullException.ThrowIfNull(regions);
         ArgumentNullException.ThrowIfNull(costBasis);
         if (periodStart.Offset != TimeSpan.FromHours(10)
             || periodEnd.Offset != TimeSpan.FromHours(10))
@@ -47,10 +45,51 @@ public sealed class Scenario
                 "Scenario period end must be after its start.");
         }
 
+        if (regions.Count == 0 || regions.Any(region => region is null))
+        {
+            throw new ArgumentException(
+                "A scenario must contain at least one non-null regional plan.",
+                nameof(regions));
+        }
+
+        if (regions.DistinctBy(region => region.RegionId, StringComparer.OrdinalIgnoreCase).Count()
+            != regions.Count)
+        {
+            throw new ArgumentException(
+                "A scenario cannot contain duplicate region IDs.",
+                nameof(regions));
+        }
+
+        Id = id;
+        Name = name;
+        PeriodStart = periodStart;
+        PeriodEnd = periodEnd;
+        Regions = Array.AsReadOnly(regions.ToArray());
+        CostBasis = costBasis;
+    }
+
+    public ScenarioId Id { get; }
+    public string Name { get; }
+    public DateTimeOffset PeriodStart { get; }
+    public DateTimeOffset PeriodEnd { get; }
+    public IReadOnlyList<ScenarioRegion> Regions { get; }
+    public CostBasis CostBasis { get; }
+}
+
+/// <summary>Scenario intent for the fleet plan in one NEM region.</summary>
+public sealed class ScenarioRegion
+{
+    public ScenarioRegion(
+        string regionId,
+        IReadOnlyList<ScenarioGeneratingFleet> generatingFleets,
+        IReadOnlyList<ScenarioStorageFleet>? storageFleets = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(regionId);
+        ArgumentNullException.ThrowIfNull(generatingFleets);
         if (generatingFleets.Count == 0 || generatingFleets.Any(fleet => fleet is null))
         {
             throw new ArgumentException(
-                "A scenario must contain at least one non-null generating fleet plan.",
+                "A scenario region must contain at least one non-null generating fleet plan.",
                 nameof(generatingFleets));
         }
 
@@ -58,26 +97,92 @@ public sealed class Scenario
             != generatingFleets.Count)
         {
             throw new ArgumentException(
-                "A scenario cannot contain duplicate generating fleet technologies.",
+                "A scenario region cannot contain duplicate generating fleet technologies.",
                 nameof(generatingFleets));
         }
 
-        Id = id;
-        Name = name;
+        IReadOnlyList<ScenarioStorageFleet> resolvedStorageFleets = storageFleets ?? [];
+        if (resolvedStorageFleets.Any(fleet => fleet is null))
+        {
+            throw new ArgumentException(
+                "Scenario storage fleet plans cannot contain null.",
+                nameof(storageFleets));
+        }
+
+        if (resolvedStorageFleets.DistinctBy(fleet => fleet.Technology).Count()
+            != resolvedStorageFleets.Count)
+        {
+            throw new ArgumentException(
+                "A scenario region cannot contain duplicate storage fleet technologies.",
+                nameof(storageFleets));
+        }
+
         RegionId = regionId;
-        PeriodStart = periodStart;
-        PeriodEnd = periodEnd;
         GeneratingFleets = Array.AsReadOnly(generatingFleets.ToArray());
-        CostBasis = costBasis;
+        StorageFleets = Array.AsReadOnly(resolvedStorageFleets.ToArray());
     }
 
-    public ScenarioId Id { get; }
-    public string Name { get; }
+    /// <summary>Identifies the NEM region to be realised from this plan.</summary>
     public string RegionId { get; }
-    public DateTimeOffset PeriodStart { get; }
-    public DateTimeOffset PeriodEnd { get; }
+
+    /// <summary>One capacity and technology plan for each generation technology in the region.</summary>
     public IReadOnlyList<ScenarioGeneratingFleet> GeneratingFleets { get; }
-    public CostBasis CostBasis { get; }
+
+    /// <summary>Storage capacity and economic assumptions available to the scenario.</summary>
+    public IReadOnlyList<ScenarioStorageFleet> StorageFleets { get; }
+}
+
+/// <summary>
+/// Scenario storage intent, economics, and technical behavior. Zero initial
+/// capacities retain assumptions for storage that may be introduced by sizing.
+/// </summary>
+public sealed class ScenarioStorageFleet
+{
+    public ScenarioStorageFleet(
+        StorageTechnology technology,
+        Energy initialEnergyCapacity,
+        Power initialPowerCapacity,
+        StorageCostParameters costParameters,
+        StorageTechnologyProfile technologyProfile)
+    {
+        ArgumentNullException.ThrowIfNull(costParameters);
+        ArgumentNullException.ThrowIfNull(technologyProfile);
+        if (initialEnergyCapacity < Energy.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(initialEnergyCapacity));
+        }
+
+        if (initialPowerCapacity < Power.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(initialPowerCapacity));
+        }
+
+        if ((initialEnergyCapacity == Energy.Zero) != (initialPowerCapacity == Power.Zero))
+        {
+            throw new ArgumentException(
+                "Initial storage energy and power capacity must either both be zero or both be positive.");
+        }
+
+        Technology = technology;
+        InitialEnergyCapacity = initialEnergyCapacity;
+        InitialPowerCapacity = initialPowerCapacity;
+        CostParameters = costParameters;
+        TechnologyProfile = technologyProfile;
+    }
+
+    public StorageTechnology Technology { get; }
+    public Energy InitialEnergyCapacity { get; }
+    public Power InitialPowerCapacity { get; }
+    public StorageCostParameters CostParameters { get; }
+    public StorageTechnologyProfile TechnologyProfile { get; }
+
+    internal StorageFleet? ToStorageFleet() => InitialEnergyCapacity == Energy.Zero
+        ? null
+        : new StorageFleet(
+            Technology,
+            InitialEnergyCapacity,
+            InitialPowerCapacity,
+            TechnologyProfile);
 }
 
 public sealed class ScenarioGeneratingFleet
@@ -85,10 +190,12 @@ public sealed class ScenarioGeneratingFleet
     public ScenarioGeneratingFleet(
         GenerationTechnology technology,
         Power nameplateCapacity,
-        CostParameters costParameters,
+        GenerationCostParameters costParameters,
+        GenerationTechnologyProfile technologyProfile,
         IReadOnlyDictionary<DateOnly, double>? monthlyCapacityFactors = null)
     {
         ArgumentNullException.ThrowIfNull(costParameters);
+        ArgumentNullException.ThrowIfNull(technologyProfile);
 
         if (nameplateCapacity < Power.Zero)
         {
@@ -98,6 +205,7 @@ public sealed class ScenarioGeneratingFleet
         Technology = technology;
         NameplateCapacity = nameplateCapacity;
         CostParameters = costParameters;
+        TechnologyProfile = technologyProfile;
         MonthlyCapacityFactors = monthlyCapacityFactors is null
             ? null
             : new ReadOnlyDictionary<DateOnly, double>(
@@ -108,9 +216,14 @@ public sealed class ScenarioGeneratingFleet
 
     public GenerationTechnology Technology { get; }
     public Power NameplateCapacity { get; }
-    public CostParameters CostParameters { get; }
+    public GenerationCostParameters CostParameters { get; }
+    public GenerationTechnologyProfile TechnologyProfile { get; }
     public IReadOnlyDictionary<DateOnly, double>? MonthlyCapacityFactors { get; }
 
     internal GeneratingFleet ToGeneratingFleet() =>
-        new(Technology, NameplateCapacity, MonthlyCapacityFactors);
+        new(
+            Technology,
+            NameplateCapacity,
+            MonthlyCapacityFactors,
+            shortRunMarginalCost: CostParameters.ShortRunMarginalCostFor(TechnologyProfile));
 }

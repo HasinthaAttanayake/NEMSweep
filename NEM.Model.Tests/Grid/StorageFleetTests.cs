@@ -23,6 +23,23 @@ namespace NEM.Model.Tests.Grid
         }
 
         [Fact]
+        public void Operate_UsesConfiguredRoundTripEfficiency()
+        {
+            var fleet = new StorageFleet(
+                StorageTechnology.Battery,
+                Energy.FromMegawattHours(200),
+                Power.FromMegawatts(50),
+                new StorageTechnologyProfile(15u, 0.5));
+
+            StorageOutcome outcome = fleet.Operate(
+                Energy.Zero,
+                Power.FromMegawatts(-20),
+                OneHour);
+
+            outcome.FinalStorageLevel.Should().Be(Energy.FromMegawattHours(10));
+        }
+
+        [Fact]
         public void Operate_DischargingDeliversStoredEnergyWithoutApplyingEfficiencyAgain()
         {
             var fleet = Battery(storageCapacityMwh: 200, powerCapacityMw: 50);
@@ -133,15 +150,16 @@ namespace NEM.Model.Tests.Grid
         }
 
         [Fact]
-        public void Archetypes_UseDifferentPinnedEfficiencyAndFleetDurations()
+        public void ConfiguredProfilesAndFleetCapacitiesRemainIndependent()
         {
-            StorageTechnologyProfile battery = StorageTechnologyProfile.ProfileFor(StorageTechnology.Battery);
-            StorageTechnologyProfile pumpedHydro = StorageTechnologyProfile.ProfileFor(StorageTechnology.PumpedHydro);
+            var battery = new StorageTechnologyProfile(15u, 0.87);
+            var pumpedHydro = new StorageTechnologyProfile(50u, 0.78);
             var batteryFleet = Battery(storageCapacityMwh: 40, powerCapacityMw: 10);
             var pumpedHydroFleet = new StorageFleet(
                 StorageTechnology.PumpedHydro,
                 Energy.FromMegawattHours(120),
-                Power.FromMegawatts(10));
+                Power.FromMegawatts(10),
+                pumpedHydro);
 
             battery.RoundTripEfficiency.Should().Be(0.87);
             pumpedHydro.RoundTripEfficiency.Should().Be(0.78);
@@ -155,7 +173,7 @@ namespace NEM.Model.Tests.Grid
         public void StorageTechnologyProfile_AllowsInclusiveEfficiencyBounds(double efficiency)
         {
             var profile = new StorageTechnologyProfile(
-                technicalLifeYears: 10,
+                technicalLifeYears: 10u,
                 roundTripEfficiency: efficiency);
 
             profile.RoundTripEfficiency.Should().Be(efficiency);
@@ -164,20 +182,35 @@ namespace NEM.Model.Tests.Grid
         [Theory]
         [InlineData(-0.01)]
         [InlineData(1.01)]
-        public void StorageTechnologyProfile_RejectsEfficiencyOutsideInclusiveBounds(double efficiency)
+        [InlineData(double.NaN)]
+        [InlineData(double.PositiveInfinity)]
+        [InlineData(double.NegativeInfinity)]
+        public void StorageTechnologyProfile_RejectsNonFiniteOrOutOfRangeEfficiency(double efficiency)
         {
             var act = () => new StorageTechnologyProfile(
-                technicalLifeYears: 10,
+                technicalLifeYears: 10u,
                 roundTripEfficiency: efficiency);
 
             act.Should().Throw<ArgumentOutOfRangeException>()
                 .WithParameterName("roundTripEfficiency");
         }
 
+        [Fact]
+        public void StorageTechnologyProfile_RejectsZeroTechnicalLife()
+        {
+            var act = () => new StorageTechnologyProfile(
+                technicalLifeYears: 0u,
+                roundTripEfficiency: 0.87);
+
+            act.Should().Throw<ArgumentOutOfRangeException>()
+                .WithParameterName("technicalLifeYears");
+        }
+
         private static StorageFleet Battery(double storageCapacityMwh, double powerCapacityMw) =>
             new(
                 StorageTechnology.Battery,
-            Energy.FromMegawattHours(storageCapacityMwh),
-                Power.FromMegawatts(powerCapacityMw));
+                Energy.FromMegawattHours(storageCapacityMwh),
+                Power.FromMegawatts(powerCapacityMw),
+                new StorageTechnologyProfile(15u, 0.87));
     }
 }
