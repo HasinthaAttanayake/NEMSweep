@@ -1,0 +1,23 @@
+{
+  "id": "wind-curtailment",
+  "title": "Surplus wind is curtailed without storage",
+  "arithmetic": [
+    "Hour 1: 30 MW wind - 20 MW demand = 10 MW curtailment.",
+    "Hour 2: 0 MW wind leaves 20 MW demand unserved."
+  ],
+  "demandMw": [20, 20],
+  "fleet": {
+    "technology": "Wind",
+    "capacityMw": 30,
+    "availableMw": [30, 0]
+  },
+  "battery": null,
+  "expected": {
+    "generationMw": [30, 0],
+    "chargeMw": [0, 0],
+    "dischargeMw": [0, 0],
+    "curtailmentMw": [10, 0],
+    "unservedMw": [0, 20],
+    "stateOfChargeMwh": []
+  }
+}

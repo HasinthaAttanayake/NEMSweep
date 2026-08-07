@@ -1,0 +1,26 @@
+{
+  "id": "battery-energy-limit",
+  "title": "Battery energy capacity limits charging and later discharge",
+  "arithmetic": [
+    "Hour 1: filling 8.7 MWh at 87% efficiency requires 8.7 / 0.87 = 10 MWh input, so 20 - 10 = 10 MWh is curtailed.",
+    "Hour 2: the battery discharges 8.7 MWh; USE = 20 - 8.7 = 11.3 MWh."
+  ],
+  "demandMw": [0, 20],
+  "fleet": {
+    "technology": "Wind",
+    "capacityMw": 20,
+    "availableMw": [20, 0]
+  },
+  "battery": {
+    "energyCapacityMwh": 8.7,
+    "powerCapacityMw": 20
+  },
+  "expected": {
+    "generationMw": [20, 0],
+    "chargeMw": [10, 0],
+    "dischargeMw": [0, 8.7],
+    "curtailmentMw": [10, 0],
+    "unservedMw": [0, 11.3],
+    "stateOfChargeMwh": [0, 8.7]
+  }
+}
