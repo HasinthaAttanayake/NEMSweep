@@ -74,6 +74,27 @@ dotnet run --project .\NEM.Web\NEM.Web.csproj
 
 The web project is then available at the URL printed by `dotnet run`.
 
+### Validation runs
+
+Run the committed hand-calculated dispatch fixtures with:
+
+```powershell
+dotnet test .\NEM.Model.Tests\NEM.Model.Tests.csproj `
+  --filter FullyQualifiedName~ManualScenarioFixtureTests
+```
+
+Run the synthetic 8,760-hour storage-sizing acceptance in Release mode with:
+
+```powershell
+dotnet test .\NEM.Model.Tests\NEM.Model.Tests.csproj -c Release `
+  --filter FullyQualifiedName~FullYearSizingAcceptanceTests `
+  --logger "console;verbosity=detailed"
+```
+
+The full-year test prints solver wall-clock time, dispatch-pass count, and the
+selected Battery capacity. Treat a runtime above a few minutes as a scope issue
+to record rather than an automatic optimisation task.
+
 Copy `NEM.CLI/appsettings.example.json` to
 `NEM.CLI/appsettings.local.json` for machine-local scenario settings. The local
 file is ignored by Git; the example is used as the fallback when it is absent.
