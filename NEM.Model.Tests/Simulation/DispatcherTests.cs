@@ -48,6 +48,24 @@ namespace NEM.Model.Tests.Simulation
             AssertSeries(outcome.Unserved, 0, 0, 30);
         }
 
+        [Fact]
+        public void Dispatch_UsesShortRunMarginalCostBeforeTechnologyOrder()
+        {
+            FlowSeries demand = HourlyFlow(40);
+            var region = new Region(
+                "NSW1",
+                [
+                    Fleet(GenerationTechnology.Coal, 30, shortRunMarginalCostAudPerMwh: 10),
+                    Fleet(GenerationTechnology.Gas, 30, shortRunMarginalCostAudPerMwh: 1),
+                ],
+                demand);
+
+            DispatchOutcome outcome = Dispatch(region);
+
+            AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Gas], 30);
+            AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Coal], 10);
+        }
+
         [Theory]
         [InlineData(7)]
         [InlineData(41)]
@@ -85,7 +103,9 @@ namespace NEM.Model.Tests.Simulation
                 double generation = 0;
                 double expectedCurtailment = 0;
 
-                foreach (GeneratingFleet fleet in fleets.OrderBy(fleet => fleet.ShortRunMarginalCost))
+                foreach (GeneratingFleet fleet in fleets
+                    .OrderBy(fleet => fleet.ShortRunMarginalCost)
+                    .ThenBy(fleet => fleet.GenerationTechnology))
                 {
                     double fleetOutput = outcome.PerFleetGeneration[fleet.GenerationTechnology][hour].Megawatts;
                     double available = availableByFleet[fleet.GenerationTechnology][hour].Megawatts;
@@ -117,6 +137,95 @@ namespace NEM.Model.Tests.Simulation
                 curtailment.Should().BeGreaterThanOrEqualTo(0);
                 (curtailment > 0 && unserved > 0).Should().BeFalse(
                     $"curtailment and unserved energy cannot co-occur at hour {hour}");
+            }
+        }
+
+        [Theory]
+        [InlineData(7)]
+        [InlineData(41)]
+        [InlineData(2026)]
+        public void Dispatch_RandomizedStorageRun_PreservesPerFleetEnergyBalance(int seed)
+        {
+            DispatchOutcome outcome = RandomizedStorageOutcome(seed);
+
+            for (int hour = 0; hour < outcome.Demand.Length; hour++)
+            {
+                foreach (GenerationTechnology technology in outcome.PerFleetGeneration.Keys)
+                {
+                    double generation = outcome.PerFleetGeneration[technology][hour].Megawatts;
+                    double outputs = outcome.PerFleetCurtailment[technology][hour].Megawatts
+                        + outcome.PerFleetCharge[technology][hour].Megawatts
+                        + outcome.PerFleetDelivered[technology][hour].Megawatts;
+
+                    outputs.Should().BeApproximately(generation, 1e-9);
+                }
+            }
+        }
+
+        [Theory]
+        [InlineData(7)]
+        [InlineData(41)]
+        [InlineData(2026)]
+        public void Dispatch_RandomizedStorageRun_PerFleetAllocationsClose(int seed)
+        {
+            DispatchOutcome outcome = RandomizedStorageOutcome(seed);
+
+            for (int hour = 0; hour < outcome.Demand.Length; hour++)
+            {
+                double allocatedDelivered = outcome.PerFleetDelivered.Values
+                    .Sum(flow => flow[hour].Megawatts);
+                double allocatedCharge = outcome.PerFleetCharge.Values
+                    .Sum(flow => flow[hour].Megawatts);
+                double generatorDelivered = outcome.DeliveredToLoad[hour].Megawatts
+                    - outcome.Discharge[hour].Megawatts
+                    - outcome.Imports[hour].Megawatts
+                    + outcome.Exports[hour].Megawatts;
+
+                allocatedDelivered.Should().BeApproximately(generatorDelivered, 1e-9);
+                allocatedCharge.Should().BeApproximately(outcome.Charge[hour].Megawatts, 1e-9);
+                outcome.DeliveredToLoad[hour].Megawatts.Should().BeApproximately(
+                    outcome.Demand[hour].Megawatts - outcome.Unserved[hour].Megawatts,
+                    1e-9);
+            }
+        }
+
+        [Theory]
+        [InlineData(7)]
+        [InlineData(41)]
+        [InlineData(2026)]
+        public void Dispatch_RandomizedStorageRun_PreservesSystemEnergyBalance(int seed)
+        {
+            DispatchOutcome outcome = RandomizedStorageOutcome(seed);
+
+            for (int hour = 0; hour < outcome.Demand.Length; hour++)
+            {
+                double generation = outcome.PerFleetGeneration.Values
+                    .Sum(flow => flow[hour].Megawatts);
+                double inputs = generation
+                    + outcome.Discharge[hour].Megawatts
+                    + outcome.Imports[hour].Megawatts
+                    + outcome.Unserved[hour].Megawatts;
+                double outputs = outcome.Demand[hour].Megawatts
+                    + outcome.Charge[hour].Megawatts
+                    + outcome.Exports[hour].Megawatts
+                    + outcome.Curtailment[hour].Megawatts;
+
+                inputs.Should().BeApproximately(outputs, 1e-9);
+            }
+        }
+
+        [Theory]
+        [InlineData(7)]
+        [InlineData(41)]
+        [InlineData(2026)]
+        public void Dispatch_RandomizedStorageRun_NeverCoexistsCurtailmentAndUnserved(int seed)
+        {
+            DispatchOutcome outcome = RandomizedStorageOutcome(seed);
+
+            for (int hour = 0; hour < outcome.Demand.Length; hour++)
+            {
+                (outcome.Curtailment[hour].Megawatts > 1e-9
+                    && outcome.Unserved[hour].Megawatts > 1e-9).Should().BeFalse();
             }
         }
 
@@ -299,9 +408,10 @@ namespace NEM.Model.Tests.Simulation
 
             DispatchOutcome outcome = Dispatch(region);
 
-            AssertSeries(outcome.SurplusCharge, 20, 0);
-            AssertSeries(outcome.IncrementalGenerationCharge, 0, 0);
             AssertSeries(outcome.Charge, 20, 0);
+            AssertSeries(outcome.PerFleetCharge[GenerationTechnology.Solar], 20, 0);
+            AssertSeries(outcome.PerFleetDelivered[GenerationTechnology.Solar], 0, 20);
+            AssertSeries(outcome.DeliveredToLoad, 0, 30);
             AssertSeries(outcome.Discharge, 0, 10);
             AssertSeries(outcome.Curtailment, 0, 0);
             AssertSeries(outcome.Unserved, 0, 0);
@@ -309,6 +419,33 @@ namespace NEM.Model.Tests.Simulation
                 .Should().Be(Energy.Zero);
             outcome.StateOfChargeByTechnology[StorageTechnology.Battery][1]
                 .Should().Be(Energy.FromMegawattHours(17.4));
+        }
+
+        [Fact]
+        public void Dispatch_GreedyPolicy_TracksMultiFleetChargeAsCurtailmentIsReduced()
+        {
+            FlowSeries demand = HourlyFlowAt(NemStart.AddHours(12), 10);
+            var region = new Region(
+                "NSW1",
+                [
+                    Fleet(GenerationTechnology.Solar, 20),
+                    Fleet(GenerationTechnology.Wind, 10),
+                ],
+                demand,
+                resourceProfile: RegionalResources(demand),
+                storageFleets: [Battery(storageCapacityMwh: 20, powerCapacityMw: 15)]);
+
+            DispatchOutcome outcome = Dispatch(region);
+
+            AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Solar], 20);
+            AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Wind], 10);
+            AssertSeries(outcome.PerFleetCurtailment[GenerationTechnology.Solar], 0);
+            AssertSeries(outcome.PerFleetCurtailment[GenerationTechnology.Wind], 5);
+            AssertSeries(outcome.PerFleetCharge[GenerationTechnology.Solar], 10);
+            AssertSeries(outcome.PerFleetCharge[GenerationTechnology.Wind], 5);
+            AssertSeries(outcome.PerFleetDelivered[GenerationTechnology.Solar], 10);
+            AssertSeries(outcome.PerFleetDelivered[GenerationTechnology.Wind], 0);
+            AssertSeries(outcome.Charge, 15);
         }
 
         [Fact]
@@ -385,7 +522,6 @@ namespace NEM.Model.Tests.Simulation
 
             DispatchOutcome outcome = Dispatch(region, policy);
 
-            AssertSeries(outcome.IncrementalGenerationCharge, 0, 0);
             AssertSeries(outcome.Charge, 0, 0);
             AssertSeries(outcome.Unserved, 0, 10);
         }
@@ -410,8 +546,11 @@ namespace NEM.Model.Tests.Simulation
 
             AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Coal], 0, 20);
             AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Gas], 10, 20);
-            AssertSeries(outcome.SurplusCharge, 0, 0);
-            AssertSeries(outcome.IncrementalGenerationCharge, 10, 0);
+            AssertSeries(outcome.PerFleetCharge[GenerationTechnology.Coal], 0, 0);
+            AssertSeries(outcome.PerFleetCharge[GenerationTechnology.Gas], 10, 0);
+            AssertSeries(outcome.PerFleetDelivered[GenerationTechnology.Coal], 0, 20);
+            AssertSeries(outcome.PerFleetDelivered[GenerationTechnology.Gas], 0, 20);
+            AssertSeries(outcome.Charge, 10, 0);
             outcome.Discharge[1].Megawatts.Should().BeApproximately(8.7, 1e-10);
             outcome.Unserved[1].Megawatts.Should().BeApproximately(1.3, 1e-10);
         }
@@ -440,7 +579,7 @@ namespace NEM.Model.Tests.Simulation
             DispatchOutcome outcome = Dispatch(region, policy);
 
             AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Hydro], 10, 0);
-            AssertSeries(outcome.IncrementalGenerationCharge, 10, 0);
+            AssertSeries(outcome.Charge, 10, 0);
             outcome.Discharge[1].Megawatts.Should().BeApproximately(8.7, 1e-10);
             outcome.Unserved[1].Megawatts.Should().BeApproximately(1.3, 1e-10);
         }
@@ -470,7 +609,7 @@ namespace NEM.Model.Tests.Simulation
         }
 
         [Fact]
-        public void DispatchOutcome_CopiesAndExposesReadOnlyFleetGeneration()
+        public void DispatchOutcome_CopiesAndExposesReadOnlyPerFleetFlows()
         {
             var generation = new Dictionary<GenerationTechnology, FlowSeries>
             {
@@ -481,10 +620,20 @@ namespace NEM.Model.Tests.Simulation
                 [GenerationTechnology.Coal] = HourlyFlow(0),
             };
             var zero = HourlyFlow(0);
+            var delivered = new Dictionary<GenerationTechnology, FlowSeries>
+            {
+                [GenerationTechnology.Coal] = HourlyFlow(10),
+            };
+            var charge = new Dictionary<GenerationTechnology, FlowSeries>
+            {
+                [GenerationTechnology.Coal] = zero,
+            };
             var outcome = new DispatchOutcome(
                 "NSW1",
                 generation,
                 curtailment,
+                delivered,
+                charge,
                 HourlyFlow(10),
                 zero,
                 zero,
@@ -494,12 +643,20 @@ namespace NEM.Model.Tests.Simulation
 
             generation.Clear();
             curtailment.Clear();
+            delivered.Clear();
+            charge.Clear();
             var mutableView = (IDictionary<GenerationTechnology, FlowSeries>)outcome.PerFleetGeneration;
-            var act = () => mutableView.Add(GenerationTechnology.Gas, HourlyFlow(0));
+            var mutableDelivered = (IDictionary<GenerationTechnology, FlowSeries>)outcome.PerFleetDelivered;
+            var mutableCharge = (IDictionary<GenerationTechnology, FlowSeries>)outcome.PerFleetCharge;
+            var addGeneration = () => mutableView.Add(GenerationTechnology.Gas, HourlyFlow(0));
+            var addDelivered = () => mutableDelivered.Add(GenerationTechnology.Gas, HourlyFlow(0));
+            var addCharge = () => mutableCharge.Add(GenerationTechnology.Gas, HourlyFlow(0));
 
             outcome.PerFleetGeneration.Should().ContainKey(GenerationTechnology.Coal);
             outcome.PerFleetCurtailment.Should().ContainKey(GenerationTechnology.Coal);
-            act.Should().Throw<NotSupportedException>();
+            addGeneration.Should().Throw<NotSupportedException>();
+            addDelivered.Should().Throw<NotSupportedException>();
+            addCharge.Should().Throw<NotSupportedException>();
         }
 
         [Fact]
@@ -562,6 +719,14 @@ namespace NEM.Model.Tests.Simulation
                 {
                     [GenerationTechnology.Coal] = halfHourlyZero,
                 },
+                new Dictionary<GenerationTechnology, FlowSeries>
+                {
+                    [GenerationTechnology.Coal] = halfHourlyDemand,
+                },
+                new Dictionary<GenerationTechnology, FlowSeries>
+                {
+                    [GenerationTechnology.Coal] = halfHourlyZero,
+                },
                 halfHourlyDemand,
                 halfHourlyZero,
                 halfHourlyZero,
@@ -596,6 +761,8 @@ namespace NEM.Model.Tests.Simulation
                 "NSW1",
                 new Dictionary<GenerationTechnology, FlowSeries>(),
                 new Dictionary<GenerationTechnology, FlowSeries>(),
+                new Dictionary<GenerationTechnology, FlowSeries>(),
+                new Dictionary<GenerationTechnology, FlowSeries>(),
                 null!,
                 zero,
                 zero,
@@ -620,7 +787,7 @@ namespace NEM.Model.Tests.Simulation
         }
 
         [Fact]
-        public void DispatchOutcome_ChargeIsSumOfSurplusAndIncrementalGenerationSources()
+        public void DispatchOutcome_DerivesDeliveredToLoadAndAcceptsConsistentPerFleetFlows()
         {
             FlowSeries zero = HourlyFlow(0);
             var outcome = new DispatchOutcome(
@@ -633,17 +800,58 @@ namespace NEM.Model.Tests.Simulation
                 {
                     [GenerationTechnology.Coal] = zero,
                 },
+                new Dictionary<GenerationTechnology, FlowSeries>
+                {
+                    [GenerationTechnology.Coal] = HourlyFlow(7),
+                },
+                new Dictionary<GenerationTechnology, FlowSeries>
+                {
+                    [GenerationTechnology.Coal] = HourlyFlow(3),
+                },
                 HourlyFlow(7),
                 zero,
-                HourlyFlow(2),
+                HourlyFlow(3),
                 zero,
                 zero,
-                zero,
-                HourlyFlow(1));
+                zero);
 
-            AssertSeries(outcome.SurplusCharge, 2);
-            AssertSeries(outcome.IncrementalGenerationCharge, 1);
             AssertSeries(outcome.Charge, 3);
+            AssertSeries(outcome.DeliveredToLoad, 7);
+            AssertSeries(outcome.PerFleetCharge[GenerationTechnology.Coal], 3);
+            AssertSeries(outcome.PerFleetDelivered[GenerationTechnology.Coal], 7);
+        }
+
+        [Fact]
+        public void DispatchOutcome_RejectsInconsistentSuppliedPerFleetFlows()
+        {
+            FlowSeries zero = HourlyFlow(0);
+            var act = () => new DispatchOutcome(
+                "NSW1",
+                new Dictionary<GenerationTechnology, FlowSeries>
+                {
+                    [GenerationTechnology.Coal] = HourlyFlow(10),
+                },
+                new Dictionary<GenerationTechnology, FlowSeries>
+                {
+                    [GenerationTechnology.Coal] = zero,
+                },
+                new Dictionary<GenerationTechnology, FlowSeries>
+                {
+                    [GenerationTechnology.Coal] = HourlyFlow(8),
+                },
+                new Dictionary<GenerationTechnology, FlowSeries>
+                {
+                    [GenerationTechnology.Coal] = HourlyFlow(1),
+                },
+                HourlyFlow(9),
+                zero,
+                HourlyFlow(1),
+                zero,
+                zero,
+                zero);
+
+            act.Should().Throw<InvalidOperationException>()
+                .WithMessage("Per-fleet energy balance failed at index 0*");
         }
 
         private static DispatchOutcome Outcome(
@@ -654,15 +862,25 @@ namespace NEM.Model.Tests.Simulation
             string regionId = "NSW1")
         {
             FlowSeries zero = HourlyFlow(new double[demand.Length]);
+            FlowSeries generationFlow = HourlyFlow(generation);
+            FlowSeries curtailmentFlow = HourlyFlow(curtailment);
             return new DispatchOutcome(
                 regionId,
                 new Dictionary<GenerationTechnology, FlowSeries>
                 {
-                    [GenerationTechnology.Coal] = HourlyFlow(generation),
+                    [GenerationTechnology.Coal] = generationFlow,
                 },
                 new Dictionary<GenerationTechnology, FlowSeries>
                 {
-                    [GenerationTechnology.Coal] = HourlyFlow(curtailment),
+                    [GenerationTechnology.Coal] = curtailmentFlow,
+                },
+                new Dictionary<GenerationTechnology, FlowSeries>
+                {
+                    [GenerationTechnology.Coal] = generationFlow.Subtract(curtailmentFlow),
+                },
+                new Dictionary<GenerationTechnology, FlowSeries>
+                {
+                    [GenerationTechnology.Coal] = zero,
                 },
                 HourlyFlow(demand),
                 HourlyFlow(unserved),
@@ -679,13 +897,39 @@ namespace NEM.Model.Tests.Simulation
                 ? Dispatcher.Dispatch(PowerSystem(region))
                 : Dispatcher.Dispatch(PowerSystem(region), storagePolicy)).Single();
 
+        private static DispatchOutcome RandomizedStorageOutcome(int seed)
+        {
+            var random = new Random(seed);
+            double[] demandValues = Enumerable.Range(0, 96)
+                .Select(hour => hour % 4 == 0
+                    ? 0
+                    : (double)random.Next(10, 101))
+                .ToArray();
+            FlowSeries demand = HourlyFlowAt(NemStart.AddHours(12), demandValues);
+            var region = new Region(
+                "NSW1",
+                [
+                    Fleet(GenerationTechnology.Solar, 30),
+                    Fleet(GenerationTechnology.Coal, 40),
+                    Fleet(GenerationTechnology.Gas, 20),
+                ],
+                demand,
+                resourceProfile: RegionalResources(demand),
+                storageFleets: [Battery(storageCapacityMwh: 60, powerCapacityMw: 20)]);
+
+            return Dispatch(region);
+        }
+
         private static PowerSystem PowerSystem(params Region[] regions) =>
             new(
                 new PowerSystemId("test-power-system"),
                 new ScenarioId("test-scenario"),
                 regions);
 
-        private static GeneratingFleet Fleet(GenerationTechnology technology, double capacityMw) =>
+        private static GeneratingFleet Fleet(
+            GenerationTechnology technology,
+            double capacityMw,
+            decimal shortRunMarginalCostAudPerMwh = 0m) =>
             new(
                 technology,
                 Power.FromMegawatts(capacityMw),
@@ -694,13 +938,16 @@ namespace NEM.Model.Tests.Simulation
                     {
                         [new DateOnly(2026, 7, 1)] = 1,
                     }
-                    : null);
+                    : null,
+                shortRunMarginalCost: GenerationEnergyCost.FromAudPerMwhGenerated(
+                    shortRunMarginalCostAudPerMwh));
 
         private static StorageFleet Battery(double storageCapacityMwh, double powerCapacityMw) =>
             new(
                 StorageTechnology.Battery,
                 Energy.FromMegawattHours(storageCapacityMwh),
-                Power.FromMegawatts(powerCapacityMw));
+                Power.FromMegawatts(powerCapacityMw),
+                new StorageTechnologyProfile(15u, 0.87));
 
         private static FlowSeries HourlyFlow(params double[] megawatts) =>
             new(NemStart, TimeSpan.FromHours(1), megawatts);

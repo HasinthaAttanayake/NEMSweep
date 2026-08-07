@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using NEM.Model.Series;
 using NEM.Model.Units;
 using NEM.Model.Weather;
@@ -11,6 +12,12 @@ namespace NEM.Model.Grid
         public DemandProfile Demand { get; }
         public IReadOnlyList<GeneratingFleet> GeneratingFleets { get; }
         public IReadOnlyList<StorageFleet> StorageFleets { get; }
+        /// <summary>
+        /// Technical assumptions available for installed or scenario-planned storage.
+        /// </summary>
+        public IReadOnlyDictionary<StorageTechnology, StorageTechnologyProfile>
+            StorageTechnologyProfiles
+        { get; }
         public RegionalResourceProfile? ResourceProfile { get; }
 
         public Region(
@@ -19,7 +26,9 @@ namespace NEM.Model.Grid
             FlowSeries baseDemand,
             IReadOnlyDictionary<string, FlowSeries>? additiveDemandComponents = null,
             RegionalResourceProfile? resourceProfile = null,
-            IReadOnlyList<StorageFleet>? storageFleets = null)
+            IReadOnlyList<StorageFleet>? storageFleets = null,
+            IReadOnlyDictionary<StorageTechnology, StorageTechnologyProfile>?
+                storageTechnologyProfiles = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(regionId);
             ArgumentNullException.ThrowIfNull(generatingFleets);
@@ -69,6 +78,33 @@ namespace NEM.Model.Grid
                     nameof(storageFleets));
             }
 
+            if (storageTechnologyProfiles?.Any(entry => entry.Value is null) == true)
+            {
+                throw new ArgumentException(
+                    "Region storage technology profiles cannot contain null.",
+                    nameof(storageTechnologyProfiles));
+            }
+
+            var resolvedStorageTechnologyProfiles = storageTechnologyProfiles is null
+                ? []
+                : new Dictionary<StorageTechnology, StorageTechnologyProfile>(
+                    storageTechnologyProfiles);
+            foreach (StorageFleet fleet in resolvedStorageFleets)
+            {
+                if (resolvedStorageTechnologyProfiles.TryGetValue(
+                        fleet.StorageTechnology,
+                        out StorageTechnologyProfile? configuredProfile)
+                    && configuredProfile != fleet.TechnologyProfile)
+                {
+                    throw new ArgumentException(
+                        "A storage fleet must use its region's configured technology profile.",
+                        nameof(storageFleets));
+                }
+
+                resolvedStorageTechnologyProfiles[fleet.StorageTechnology] =
+                    fleet.TechnologyProfile;
+            }
+
             var demand = new DemandProfile(baseDemand, additiveDemandComponents);
             resourceProfile?.RequireAligned(demand.TotalDemand);
 
@@ -76,17 +112,31 @@ namespace NEM.Model.Grid
             Demand = demand;
             GeneratingFleets = Array.AsReadOnly(generatingFleets.ToArray());
             StorageFleets = Array.AsReadOnly(resolvedStorageFleets.ToArray());
+            StorageTechnologyProfiles = new ReadOnlyDictionary<
+                StorageTechnology,
+                StorageTechnologyProfile>(resolvedStorageTechnologyProfiles);
             ResourceProfile = resourceProfile;
         }
 
-        public Region WithBatteryStorage(Energy storageCapacity, Power powerCapacity)
+        public Region WithBatteryStorage(
+            Energy storageCapacity,
+            Power powerCapacity)
         {
+            if (!StorageTechnologyProfiles.TryGetValue(
+                    StorageTechnology.Battery,
+                    out StorageTechnologyProfile? technologyProfile))
+            {
+                throw new InvalidOperationException(
+                    $"Region {RegionId} has no configured Battery technology profile.");
+            }
+
             StorageFleet[] storageFleets = StorageFleets
                 .Where(fleet => fleet.StorageTechnology != StorageTechnology.Battery)
                 .Append(new StorageFleet(
                     StorageTechnology.Battery,
                     storageCapacity,
-                    powerCapacity))
+                    powerCapacity,
+                    technologyProfile))
                 .ToArray();
 
             return new Region(
@@ -95,7 +145,8 @@ namespace NEM.Model.Grid
                 Demand.BaseDemand,
                 Demand.AdditiveComponents,
                 ResourceProfile,
-                storageFleets);
+                storageFleets,
+                StorageTechnologyProfiles);
         }
     }
 }

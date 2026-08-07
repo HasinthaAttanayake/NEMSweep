@@ -2,6 +2,7 @@ using NEM.Model.Units;
 
 namespace NEM.Model.StorageSizing;
 
+/// <summary>Total installed Battery capacity selected or assessed for one region.</summary>
 public sealed record RegionalBatterySizing
 {
     public RegionalBatterySizing(
@@ -33,8 +34,12 @@ public sealed record RegionalBatterySizing
         WasChanged = wasChanged;
     }
 
+    /// <summary>Identifies the region whose Battery capacity is described.</summary>
     public string RegionId { get; }
+    /// <summary>Total installed Battery energy capacity.</summary>
     public Energy EnergyCapacity { get; }
+    /// <summary>Total installed Battery power capacity.</summary>
     public Power PowerCapacity { get; }
+    /// <summary>Whether the sizing search changed capacity from the installed baseline.</summary>
     public bool WasChanged { get; }
 }

@@ -5,7 +5,7 @@ namespace NEM.Model.Units
     /// <para>
     /// Fuel price does not directly price electrical energy delivered. Combining
     /// it with a generator heat rate in GJ/MWh produces the fuel component of an
-    /// <see cref="EnergyPrice"/> in AUD/MWh delivered.
+    /// <see cref="GenerationEnergyCost"/> in AUD/MWh generated.
     /// </para>
     /// </summary>
     public readonly record struct FuelPrice
@@ -19,14 +19,11 @@ namespace NEM.Model.Units
         public static FuelPrice FromAudPerGjThermal(decimal audPerGjThermal) =>
             new(audPerGjThermal);
 
-        /// <summary>
-        /// Fuel cost per delivered MWh: AUD/MWh = AUD/GJ × GJ/MWh. Heat rate must
-        /// be non-negative and finite.
-        /// </summary>
-        public EnergyPrice ForHeatRate(double gigajoulesPerMegawattHour) =>
-            EnergyPrice.FromAudPerMwhDelivered(
+        /// <summary>Fuel cost per generated MWh: AUD/MWh = AUD/GJ × GJ/MWh.</summary>
+        public GenerationEnergyCost ForHeatRate(HeatRate heatRate) =>
+            GenerationEnergyCost.FromAudPerMwhGenerated(
                 AudPerGjThermal * DecimalPhysicalBoundary.RequireNonNegativeFinite(
-                    gigajoulesPerMegawattHour,
-                    nameof(gigajoulesPerMegawattHour)));
+                    heatRate.GigajoulesPerMegawattHour,
+                    nameof(heatRate)));
     }
 }

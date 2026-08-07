@@ -58,7 +58,8 @@ public sealed class StorageMonotonicityTests
                 new StorageFleet(
                     StorageTechnology.Battery,
                     Energy.FromMegawattHours(energyMwh),
-                    Power.FromMegawatts(powerMw)),
+                    Power.FromMegawatts(powerMw),
+                    new StorageTechnologyProfile(15u, 0.87)),
             ]);
         var system = new PowerSystem(
             new PowerSystemId("test-system"),

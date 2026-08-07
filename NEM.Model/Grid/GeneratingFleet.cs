@@ -16,7 +16,8 @@ namespace NEM.Model.Grid
             GenerationTechnology generationTechnology,
             Power nameplateCapacity,
             IReadOnlyDictionary<DateOnly, double>? monthlyCapacityFactors = null,
-            WindPowerCurveSettings? windPowerCurveSettings = null)
+            WindPowerCurveSettings? windPowerCurveSettings = null,
+            GenerationEnergyCost shortRunMarginalCost = default)
         {
             if (nameplateCapacity < Power.Zero)
             {
@@ -77,6 +78,7 @@ namespace NEM.Model.Grid
 
             GenerationTechnology = generationTechnology;
             NameplateCapacity = nameplateCapacity;
+            ShortRunMarginalCost = shortRunMarginalCost;
             _monthlyCapacityFactors = monthlyCapacityFactors is null
                 ? null
                 : new Dictionary<DateOnly, double>(monthlyCapacityFactors);
@@ -85,9 +87,9 @@ namespace NEM.Model.Grid
 
         public GenerationTechnology GenerationTechnology { get; }
         public Power NameplateCapacity { get; }
+        public GenerationEnergyCost ShortRunMarginalCost { get; }
         internal IReadOnlyDictionary<DateOnly, double>? MonthlyCapacityFactors =>
             _monthlyCapacityFactors;
-        public ushort ShortRunMarginalCost => (ushort)GenerationTechnology; // TODO: replace with SMRC cost basis B5
         public bool IsIntermittentRenewable => GenerationTechnology is GenerationTechnology.Solar or GenerationTechnology.Wind; // TODO: move to TechnologyProfile as appropriate
 
         internal FlowSeries AvailableCapacityFor(

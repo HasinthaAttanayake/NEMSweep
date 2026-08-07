@@ -1,31 +1,57 @@
+using NEM.Model.Units;
+
 namespace NEM.Model.Grid
 {
     public enum GenerationTechnology
     {
-        // Note: ENUM values here are akin to ranking of SMRC. This is temporary
-        Solar = 1,
-        Wind = 2,
-        Hydro = 3,
-        Coal = 4,
-        Gas = 5,
+        Solar,
+        Wind,
+        Hydro,
+        Coal,
+        Gas,
     }
 
     public enum StorageTechnology { Battery, PumpedHydro }
 
-    public sealed class StorageTechnologyProfile
+    /// <summary>
+    /// Technical assumptions for one scenario generation fleet.
+    /// </summary>
+    public sealed record GenerationTechnologyProfile
+    {
+        public GenerationTechnologyProfile(HeatRate heatRate, uint technicalLifeYears)
+        {
+            if (technicalLifeYears == 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(technicalLifeYears));
+            }
+
+            HeatRate = heatRate;
+            TechnicalLifeYears = technicalLifeYears;
+        }
+
+        /// <summary>Thermal energy required to deliver one MWh of electricity.</summary>
+        public HeatRate HeatRate { get; }
+
+        /// <summary>Expected operating life of the generating asset in years.</summary>
+        public uint TechnicalLifeYears { get; }
+    }
+
+    public sealed record StorageTechnologyProfile
     {
         public StorageTechnologyProfile(
-            double technicalLifeYears,
+            uint technicalLifeYears,
             double roundTripEfficiency)
         {
-            if (technicalLifeYears <= 0)
+            if (technicalLifeYears == 0)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(technicalLifeYears),
                     "Technical life must be positive.");
             }
 
-            if (roundTripEfficiency is < 0 or > 1)
+            if (double.IsNaN(roundTripEfficiency)
+                || double.IsInfinity(roundTripEfficiency)
+                || roundTripEfficiency is < 0 or > 1)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(roundTripEfficiency),
@@ -36,21 +62,8 @@ namespace NEM.Model.Grid
             RoundTripEfficiency = roundTripEfficiency;
         }
 
-        public double TechnicalLifeYears { get; }
+        public uint TechnicalLifeYears { get; }
         public double RoundTripEfficiency { get; }
-
-        public static StorageTechnologyProfile ProfileFor(StorageTechnology storageTechnology) =>
-            storageTechnology switch
-            {
-                StorageTechnology.Battery => new(
-                    technicalLifeYears: 15,
-                    roundTripEfficiency: 0.87),
-                StorageTechnology.PumpedHydro => new(
-                    technicalLifeYears: 50,
-                    roundTripEfficiency: 0.78),
-                _ => throw new ArgumentOutOfRangeException(nameof(storageTechnology)),
-            };
     }
 
-    // TODO: implement Generation Technology Profile when required
 }

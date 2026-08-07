@@ -3,6 +3,7 @@ using NEM.Model.Units;
 
 namespace NEM.Model.StorageSizing;
 
+/// <summary>Final Battery sizing and dispatch evidence for one region.</summary>
 public sealed record RegionalSizingResult
 {
     public RegionalSizingResult(
@@ -30,11 +31,18 @@ public sealed record RegionalSizingResult
         TerminationEvidence = terminationEvidence;
     }
 
+    /// <summary>Final dispatch outcome for the sized regional system.</summary>
     public DispatchOutcome DispatchOutcome { get; }
+    /// <summary>Total Battery capacity selected for the region.</summary>
     public RegionalBatterySizing BatterySizing { get; }
+    /// <summary>Terminal status as it applies to this region.</summary>
     public StorageSizingStatus Status { get; }
+    /// <summary>Human-readable evidence explaining the regional status.</summary>
     public string TerminationEvidence { get; }
+    /// <summary>Reliability calculated from <see cref="DispatchOutcome"/>.</summary>
     public ReliabilityMetrics Reliability => DispatchOutcome.Reliability;
+    /// <summary>Total demand energy unserved by the final dispatch.</summary>
     public Energy TotalUnservedEnergy => Reliability.UnservedEnergy;
+    /// <summary>Largest hourly unserved-demand power in the final dispatch.</summary>
     public Power PeakUnservedPower => Reliability.PeakUnservedPower;
 }

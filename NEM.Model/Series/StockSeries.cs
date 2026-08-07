@@ -12,9 +12,9 @@ namespace NEM.Model.Series
     /// of charge across intervals yields a number with no physical meaning.
     /// </para>
     /// <para>
-    /// Resolution-change rule, for the record: a flow resamples by <b>mean</b>, a stock
-    /// by <b>sum</b>. Neither is built here for stock — state of charge is never
-    /// resampled in the model.
+    /// A stock resolution change would select or sample a value appropriate to an instant,
+    /// rather than aggregate values over an interval. This is intentionally unsupported:
+    /// state of charge is never resampled in the model.
     /// </para>
     /// </summary>
     public sealed class StockSeries : TimeSeries

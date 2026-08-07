@@ -1,6 +1,8 @@
 ---
 description: "Use when adding or changing NEM.Model domain types, aggregate roots, domain services, relationships, invariants, time semantics, or unit semantics. Keeps the tracked domain model accurate."
-applyTo: ["NEM.Model/**", "NEM.Model.Tests/**"]
+applyTo:
+    - "NEM.Model/**"
+    - "NEM.Model.Tests/**"
 ---
 # Domain Model Maintenance
 
@@ -13,6 +15,8 @@ applyTo: ["NEM.Model/**", "NEM.Model.Tests/**"]
 - Describe sizing results as coordinate-wise near-frontier unless a cost or
     explicit ordering objective is implemented. Do not call the 2-D result a
     global minimum.
+- When a public domain process-output type changes, update its XML documentation
+    to describe the resulting public semantics, relationships, and units.
 - Update `docs/domain-model.md` in the same change whenever a domain type,
   aggregate relationship, derivation boundary, invariant, time rule, or unit
   rule changes.

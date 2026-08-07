@@ -4,13 +4,13 @@ namespace NEM.Model.Grid
 {
     public sealed class StorageFleet
     {
-        private readonly StorageTechnologyProfile _technologyProfile;
-
         public StorageFleet(
             StorageTechnology storageTechnology,
             Energy storageCapacity,
-            Power powerCapacity)
+            Power powerCapacity,
+            StorageTechnologyProfile technologyProfile)
         {
+            ArgumentNullException.ThrowIfNull(technologyProfile);
             if (storageCapacity <= Energy.Zero)
             {
                 throw new ArgumentOutOfRangeException(
@@ -27,10 +27,10 @@ namespace NEM.Model.Grid
                     "Power capacity must be positive.");
             }
 
-            _technologyProfile = StorageTechnologyProfile.ProfileFor(storageTechnology);
             StorageTechnology = storageTechnology;
             StorageCapacity = storageCapacity;
             PowerCapacity = powerCapacity;
+            TechnologyProfile = technologyProfile;
         }
 
         /// <summary>Storage duration determined by this fleet's energy and power capacities.</summary>
@@ -39,6 +39,7 @@ namespace NEM.Model.Grid
         public StorageTechnology StorageTechnology { get; }
         public Energy StorageCapacity { get; }
         public Power PowerCapacity { get; }
+        public StorageTechnologyProfile TechnologyProfile { get; }
 
         /// <summary>
         /// Advances storage over an interval. Positive requested flow discharges to the
@@ -64,7 +65,7 @@ namespace NEM.Model.Grid
 
             if (requestedFlow < Power.Zero)
             {
-                double roundTripEfficiency = _technologyProfile.RoundTripEfficiency;
+                double roundTripEfficiency = TechnologyProfile.RoundTripEfficiency;
                 Power chargedInput = Power.Min(
                     requestedFlow * -1,
                     ChargeHeadroom(initialStorageLevel, resolution));
@@ -82,7 +83,7 @@ namespace NEM.Model.Grid
         internal Power ChargeHeadroom(Energy storageLevel, TimeSpan resolution)
         {
             ValidateState(storageLevel, resolution, nameof(storageLevel));
-            double roundTripEfficiency = _technologyProfile.RoundTripEfficiency;
+            double roundTripEfficiency = TechnologyProfile.RoundTripEfficiency;
             if (roundTripEfficiency == 0)
             {
                 return PowerCapacity;
@@ -120,5 +121,10 @@ namespace NEM.Model.Grid
         }
     }
 
+    /// <summary>Result of operating a storage fleet for one dispatch interval.</summary>
+    /// <param name="FinalStorageLevel">Energy remaining in storage after the interval.</param>
+    /// <param name="DeliveredFlow">
+    /// Grid-facing flow: positive when discharging to the grid and negative when charging from it.
+    /// </param>
     public sealed record StorageOutcome(Energy FinalStorageLevel, Power DeliveredFlow) { }
 }

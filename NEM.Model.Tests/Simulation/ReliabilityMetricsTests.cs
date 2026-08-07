@@ -95,6 +95,8 @@ namespace NEM.Model.Tests.Simulation
                 "NSW1",
                 generation,
                 curtailment,
+                generation,
+                curtailment,
                 demandFlow,
                 unservedFlow,
                 zero,
