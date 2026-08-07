@@ -1,0 +1,26 @@
+{
+  "id": "battery-shift",
+  "title": "Battery shifts wind after charging loss",
+  "arithmetic": [
+    "Hour 1: 20 MW surplus charges for one hour; stored energy = 20 MWh x 0.87 = 17.4 MWh.",
+    "Hour 2: 10 MW is discharged for one hour, serving all demand and leaving 17.4 - 10 = 7.4 MWh after the fixture window."
+  ],
+  "demandMw": [0, 10],
+  "fleet": {
+    "technology": "Wind",
+    "capacityMw": 20,
+    "availableMw": [20, 0]
+  },
+  "battery": {
+    "energyCapacityMwh": 20,
+    "powerCapacityMw": 20
+  },
+  "expected": {
+    "generationMw": [20, 0],
+    "chargeMw": [20, 0],
+    "dischargeMw": [0, 10],
+    "curtailmentMw": [0, 0],
+    "unservedMw": [0, 0],
+    "stateOfChargeMwh": [0, 17.4]
+  }
+}

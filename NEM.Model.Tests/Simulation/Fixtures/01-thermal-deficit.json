@@ -1,0 +1,22 @@
+{
+  "id": "thermal-deficit",
+  "title": "Thermal fleet serves up to its capacity",
+  "arithmetic": [
+    "Hour 1: min(40 MW demand, 50 MW capacity) = 40 MW generation; USE = 0 MW.",
+    "Hour 2: min(60 MW demand, 50 MW capacity) = 50 MW generation; USE = 60 - 50 = 10 MW."
+  ],
+  "demandMw": [40, 60],
+  "fleet": {
+    "technology": "Coal",
+    "capacityMw": 50
+  },
+  "battery": null,
+  "expected": {
+    "generationMw": [40, 50],
+    "chargeMw": [0, 0],
+    "dischargeMw": [0, 0],
+    "curtailmentMw": [0, 0],
+    "unservedMw": [0, 10],
+    "stateOfChargeMwh": []
+  }
+}
