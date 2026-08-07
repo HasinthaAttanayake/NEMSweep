@@ -65,6 +65,58 @@
             <span>Schema v@_result!.SchemaVersion</span>
         </div>
 
+        <section class="cost-section" aria-labelledby="system-cost-heading">
+            <div class="cost-heading">
+                <div>
+                    <p class="section-label">Full financial year</p>
+                    <h2 id="system-cost-heading">System cost</h2>
+                    <p>Annualised generation and storage asset costs per MWh served in @_result.Scenario.Region.</p>
+                </div>
+                <span class="cost-status">@_result.Cost.Status</span>
+            </div>
+
+            <div class="cost-layout">
+                <div class="cost-primary">
+                    <span>System levelised cost</span>
+                    <strong>@_result.Cost.SlcoeAudPerMwh.ToString("N2")</strong>
+                    <small>AUD/MWh served</small>
+                    <p>Generation and storage assets are included. Transmission is not yet modelled.</p>
+                </div>
+
+                <div class="cost-components" aria-label="SLCoE component contributions">
+                    <div class="cost-component">
+                        <div>
+                            <span>Generation</span>
+                            <strong>@_result.Cost.GenerationSlcoeAudPerMwh.ToString("N2") AUD/MWh</strong>
+                        </div>
+                        <div class="cost-track" aria-hidden="true">
+                            <i style="@CostShareStyle(_result.Cost.GenerationSlcoeAudPerMwh)"></i>
+                        </div>
+                    </div>
+                    <div class="cost-component storage-cost-component">
+                        <div>
+                            <span>Storage assets</span>
+                            <strong>@_result.Cost.StorageSlcoeAudPerMwh.ToString("N2") AUD/MWh</strong>
+                        </div>
+                        <div class="cost-track" aria-hidden="true">
+                            <i style="@CostShareStyle(_result.Cost.StorageSlcoeAudPerMwh)"></i>
+                        </div>
+                    </div>
+                    @if (_result.Cost.TotalAnnualisedCostAud == 0)
+                    {
+                        <p class="zero-cost-note">The current scenario uses zero-valued economic inputs; the calculation path is active.</p>
+                    }
+                </div>
+
+                <dl class="cost-ledger">
+                    <div><dt>Generation annual cost</dt><dd>@FormatAud(_result.Cost.AnnualisedGenerationCostAud)</dd></div>
+                    <div><dt>Storage annual cost</dt><dd>@FormatAud(_result.Cost.AnnualisedStorageCostAud)</dd></div>
+                    <div class="cost-total"><dt>Total annual cost</dt><dd>@FormatAud(_result.Cost.TotalAnnualisedCostAud)</dd></div>
+                    <div><dt>Electricity served</dt><dd>@AnnualServedEnergyMwh().ToString("N0") MWh</dd></div>
+                </dl>
+            </div>
+        </section>
+
         <section class="chart-section">
             <div class="chart-heading">
                 <div><h2>Generation against demand</h2><p>Delivered generation is stacked by technology; the demand trace reveals any supply gap.</p></div>
@@ -140,18 +192,18 @@
             }
         </section>
 
-        <section class="assumption-band">
+        <section class="assumption-band" aria-label="Scenario assumptions and provenance">
             <div><span>Scenario fleet</span><strong>@string.Join(" · ", _result!.PowerSystem.Fleets.Select(fleet => $"{fleet.Technology} {fleet.NameplateCapacityMw:N0} MW"))</strong></div>
             <div><span>Storage fleet</span><strong>@StorageFleetSummary()</strong></div>
             <div>
-                <span>Generation cost</span>
-                <a class="cost-progress"
-                   href="https://github.com/users/HasinthaAttanayake/projects/11"
-                   target="_blank"
-                   rel="noopener noreferrer">
-                    Modelling in progress
-                    <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" />
-                </a>
+                <span>Reliability outcome</span>
+                <strong>@_result.Metrics.HoursServedFraction.ToString("P3") hours served</strong>
+                <small>@_result.Metrics.UnservedHours unserved hours · @_result.Metrics.UnservedEnergyMwh.ToString("N0") MWh USE</small>
+            </div>
+            <div>
+                <span>Run provenance</span>
+                <strong>Generated @_result.GeneratedAt.ToString("dd MMM yyyy, HH:mm 'UTC'")</strong>
+                <small>@_result.DataSources.DemandInput.FileName · @_result.DataSources.WeatherInput.FileName</small>
             </div>
         </section>
     }
@@ -212,9 +264,9 @@
             _result = await Http.GetFromJsonAsync<DispatchResultsDTO>(
                 "data/results.json",
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            if (_result is null || _result.SchemaVersion != 2)
+            if (_result is null || _result.SchemaVersion != 3)
             {
-                _errorMessage = "Dispatch results are missing or use an unsupported schema; expected schema 2.";
+                _errorMessage = "Dispatch results are missing or use an unsupported schema; expected schema 3.";
                 return;
             }
 
@@ -424,6 +476,28 @@
         ? "None installed"
         : string.Join(" · ", _result.PowerSystem.StorageFleets.Select(fleet =>
             $"{fleet.Technology} {fleet.EnergyCapacityMwh:N0} MWh / {fleet.PowerCapacityMw:N0} MW"));
+
+    private string CostShareStyle(decimal componentAudPerMwh)
+    {
+        decimal total = _result!.Cost.SlcoeAudPerMwh;
+        decimal percentage = total <= 0 ? 0 : Math.Clamp(100 * componentAudPerMwh / total, 0, 100);
+        return FormattableString.Invariant($"width: {percentage:F2}%");
+    }
+
+    private static string FormatAud(decimal value)
+    {
+        decimal magnitude = Math.Abs(value);
+        return magnitude switch
+        {
+            >= 1_000_000_000m => $"AUD {value / 1_000_000_000m:N2}b",
+            >= 1_000_000m => $"AUD {value / 1_000_000m:N2}m",
+            >= 1_000m => $"AUD {value / 1_000m:N2}k",
+            _ => $"AUD {value:N2}",
+        };
+    }
+
+    private double AnnualServedEnergyMwh() =>
+        _result!.Metrics.DemandMwh - _result.Metrics.UnservedEnergyMwh;
 
     private bool IsSelected(int index)
     {

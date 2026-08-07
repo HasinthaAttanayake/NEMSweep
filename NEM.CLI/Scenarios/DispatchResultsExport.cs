@@ -1,6 +1,7 @@
 using NEM.Contracts;
 using NEM.CLI.Demand;
 using NEM.CLI.Infrastructure;
+using NEM.Model.Economics;
 using NEM.Model.Grid;
 using NEM.Model.Scenarios;
 using NEM.Model.Series;
@@ -17,8 +18,10 @@ internal static class DispatchResultsExport
         DispatchInputArtifactDTO weatherInput,
         DomainScenario scenario,
         PowerSystem powerSystem,
-        DispatchOutcome outcome)
+        DispatchOutcome outcome,
+        PowerSystemCostBreakdown costBreakdown)
     {
+        ArgumentNullException.ThrowIfNull(costBreakdown);
         var deliveredGenerationByTechnology = new Dictionary<string, FlowSeries>();
         foreach ((GenerationTechnology technology, FlowSeries availableGeneration) in
                  outcome.PerFleetGeneration.OrderBy(entry => entry.Key))
@@ -34,7 +37,7 @@ internal static class DispatchResultsExport
         Region region = powerSystem.Regions.Single(region => region.RegionId == outcome.RegionId);
 
         return new DispatchResultsDTO(
-            2,
+            3,
             new DispatchScenarioDTO(
                 scenario.Id.Value,
                 scenario.Name,
@@ -78,9 +81,13 @@ internal static class DispatchResultsExport
                 reliability.HoursServedFraction,
                 reliability.PeakUnservedPower.Megawatts),
             new DispatchCostDTO(
-                "pending NEM-018",
-                null,
-                null));
+                "calculated",
+                costBreakdown.TotalAnnualisedGenerationCost.Aud,
+                costBreakdown.TotalAnnualisedStorageCost.Aud,
+                costBreakdown.TotalAnnualisedCost.Aud,
+                costBreakdown.SystemLevelisedCostOfGeneration.AudPerMwhDelivered,
+                costBreakdown.SystemLevelisedCostOfStorage.AudPerMwhDelivered,
+                costBreakdown.SystemLevelisedCostOfElectricity.AudPerMwhDelivered));
     }
 
     public static void WriteJson(DispatchResultsDTO result, string path)

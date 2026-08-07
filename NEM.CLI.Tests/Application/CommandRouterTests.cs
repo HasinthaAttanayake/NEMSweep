@@ -62,6 +62,8 @@ public sealed class CommandRouterTests
         CliSettings settings = CliSettings.Load(fixture.RootPath);
 
         settings.Scenario.Name.Should().Be("Local scenario");
+        settings.Scenario.Regions.Single().StorageFleets.Single().TechnologyProfile
+            .Should().Be(new StorageTechnologyProfileSettings(15u, 0.87));
     }
 
     private sealed class CliFixture : IDisposable
@@ -104,7 +106,53 @@ public sealed class CommandRouterTests
                         maximumPowerMw = 100,
                         maximumEnergyMwh = 400,
                     },
-                    generatingFleets = Array.Empty<object>(),
+                    regions = new[]
+                    {
+                        new
+                        {
+                            regionId = "NSW1",
+                            storageFleets = new[]
+                            {
+                                new
+                                {
+                                    technology = "Battery",
+                                    initialEnergyCapacityMwh = 0,
+                                    initialPowerCapacityMw = 0,
+                                    costParameters = new
+                                    {
+                                        powerCapitalCostAudPerMw = 0m,
+                                        energyCapitalCostAudPerMwh = 0m,
+                                        fixedOperatingCostAudPerMwYear = 0m,
+                                    },
+                                    technologyProfile = new
+                                    {
+                                        technicalLifeYears = 15u,
+                                        roundTripEfficiency = 0.87,
+                                    },
+                                },
+                            },
+                            generatingFleets = new[]
+                            {
+                                new
+                                {
+                                    technology = "Gas",
+                                    nameplateCapacityMw = 100,
+                                    costParameters = new
+                                    {
+                                        capitalCostAudPerMw = 0m,
+                                        fixedOperatingCostAudPerMwYear = 0m,
+                                        variableOperatingCostAudPerMwh = 0m,
+                                        fuelPriceAudPerGj = 0m,
+                                    },
+                                    technologyProfile = new
+                                    {
+                                        heatRateGjPerMwh = 7,
+                                        technicalLifeYears = 30,
+                                    },
+                                },
+                            },
+                        },
+                    },
                 },
             };
             File.WriteAllText(

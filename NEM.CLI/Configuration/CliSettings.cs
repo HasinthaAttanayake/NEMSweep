@@ -32,10 +32,27 @@ internal sealed record CliSettings(
         ArgumentException.ThrowIfNullOrWhiteSpace(Scenario.DemandFile);
         ArgumentException.ThrowIfNullOrWhiteSpace(Scenario.WeatherFile);
         ArgumentNullException.ThrowIfNull(Scenario.CostBasis);
-        ArgumentNullException.ThrowIfNull(Scenario.GeneratingFleets);
-        if (Scenario.GeneratingFleets.Any(fleet => fleet is null || fleet.CostParameters is null))
+        ArgumentNullException.ThrowIfNull(Scenario.Regions);
+        if (Scenario.Regions.Length == 0
+            || Scenario.Regions.Any(region =>
+                region is null
+                || string.IsNullOrWhiteSpace(region.RegionId)
+                || region.GeneratingFleets is null
+                || region.GeneratingFleets.Length == 0
+                || region.StorageFleets is null
+                || region.StorageFleets.Length == 0
+                || region.StorageFleets.Any(fleet =>
+                    fleet is null
+                    || string.IsNullOrWhiteSpace(fleet.Technology)
+                    || fleet.CostParameters is null
+                    || fleet.TechnologyProfile is null)
+                || region.GeneratingFleets.Any(fleet =>
+                    fleet is null
+                    || fleet.CostParameters is null
+                    || fleet.TechnologyProfile is null)))
         {
-            throw new FormatException("scenario.generatingFleets must each define costParameters.");
+            throw new FormatException(
+                "scenario.regions must each define a region ID, generating fleets, and storage fleets with cost parameters and technology profiles.");
         }
 
         ArgumentNullException.ThrowIfNull(Scenario.StorageSizing);
@@ -53,12 +70,17 @@ internal sealed record ScenarioSettings(
     string DemandFile,
     string WeatherFile,
     CostBasisSettings CostBasis,
-    GeneratingFleetSettings[] GeneratingFleets,
+    ScenarioRegionSettings[] Regions,
     StorageSizingSettings StorageSizing);
+
+internal sealed record ScenarioRegionSettings(
+    string RegionId,
+    GeneratingFleetSettings[] GeneratingFleets,
+    StorageFleetSettings[] StorageFleets);
 
 internal sealed record CostBasisSettings(
     int Year,
-    double RealDiscountRate);
+    decimal RealDiscountRate);
 
 internal sealed record StorageSizingSettings(
     double MaximumPowerMw,
@@ -70,14 +92,34 @@ internal sealed record GeneratingFleetSettings(
     string Technology,
     double NameplateCapacityMw,
     CostParametersSettings CostParameters,
+    GenerationTechnologyProfileSettings TechnologyProfile,
     MonthlyCapacityFactorSettings[]? MonthlyCapacityFactors = null);
+
+internal sealed record GenerationTechnologyProfileSettings(
+    double HeatRateGjPerMwh,
+    uint TechnicalLifeYears);
 
 internal sealed record CostParametersSettings(
     decimal CapitalCostAudPerMw,
-    decimal EnergyCapitalCostAudPerMwh,
     decimal FixedOperatingCostAudPerMwYear,
     decimal VariableOperatingCostAudPerMwh,
     decimal FuelPriceAudPerGj);
+
+internal sealed record StorageFleetSettings(
+    string Technology,
+    double InitialEnergyCapacityMwh,
+    double InitialPowerCapacityMw,
+    StorageCostParametersSettings CostParameters,
+    StorageTechnologyProfileSettings TechnologyProfile);
+
+internal sealed record StorageCostParametersSettings(
+    decimal PowerCapitalCostAudPerMw,
+    decimal EnergyCapitalCostAudPerMwh,
+    decimal FixedOperatingCostAudPerMwYear);
+
+internal sealed record StorageTechnologyProfileSettings(
+    uint TechnicalLifeYears,
+    double RoundTripEfficiency);
 
 internal sealed record MonthlyCapacityFactorSettings(
     DateOnly Month,

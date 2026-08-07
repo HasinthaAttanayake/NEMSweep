@@ -8,7 +8,7 @@
     "resolution": "00:30:00",
     "aggregation": "single region; no cross-region aggregation; identical overlaps deduplicated"
   },
-  "generatedAt": "2026-07-30T06:33:51.5401749+00:00",
+  "generatedAt": "2026-08-07T12:10:21.4290824+00:00",
   "dataSources": {
     "demandSourceFiles": [
       "PUBLIC_ACTUAL_OPERATIONAL_DEMAND_HH_20250706.zip",

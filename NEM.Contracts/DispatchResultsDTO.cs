@@ -63,5 +63,9 @@ public sealed record DispatchMetricsDTO(
 
 public sealed record DispatchCostDTO(
     string Status,
-    double? GenerationCostAud,
-    double? GenerationSlcoeAudPerMwh);
+    decimal AnnualisedGenerationCostAud,
+    decimal AnnualisedStorageCostAud,
+    decimal TotalAnnualisedCostAud,
+    decimal GenerationSlcoeAudPerMwh,
+    decimal StorageSlcoeAudPerMwh,
+    decimal SlcoeAudPerMwh);

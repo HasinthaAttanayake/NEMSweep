@@ -2,6 +2,7 @@ using NEM.Contracts;
 using NEM.CLI.Configuration;
 using NEM.CLI.Demand;
 using NEM.CLI.Infrastructure;
+using NEM.Model.Economics;
 using NEM.Model.Grid;
 using NEM.Model.Scenarios;
 using NEM.Model.Series;
@@ -29,8 +30,27 @@ internal static class ScenarioRunner
         LoadedInput<WeatherDataDTO> weatherInput = ReadWeather(weatherPath);
         WeatherDataDTO weatherData = weatherInput.Value;
         RegionalResourceProfile resources = ReadWeatherForTimeline(weatherData, hourlyDemand);
-        DomainScenario scenario = BuildScenario(settings, demandData.Region, hourlyDemand);
-        PowerSystem powerSystem = ScenarioDerivation.Derive(scenario, hourlyDemand, resources);
+        DomainScenario scenario = BuildScenario(settings, hourlyDemand);
+        if (scenario.Regions.Count != 1
+            || !string.Equals(
+                scenario.Regions[0].RegionId,
+                demandData.Region,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new NotSupportedException(
+                "The current scenario runner requires exactly one scenario region matching its demand input.");
+        }
+
+        PowerSystem powerSystem = ScenarioDerivation.Derive(
+            scenario,
+            new Dictionary<string, FlowSeries>(StringComparer.OrdinalIgnoreCase)
+            {
+                [demandData.Region] = hourlyDemand,
+            },
+            new Dictionary<string, RegionalResourceProfile?>(StringComparer.OrdinalIgnoreCase)
+            {
+                [demandData.Region] = resources,
+            });
         StorageSizingSettings sizing = settings.StorageSizing;
         StorageSizingRunResult sizingResult = StorageSizingService.Size(
             powerSystem,
@@ -48,6 +68,9 @@ internal static class ScenarioRunner
 
         powerSystem = sizingResult.PowerSystem;
         DispatchOutcome outcome = sizingResult.Regions.Single().DispatchOutcome;
+        PowerSystemCostBreakdown costBreakdown = PowerSystemCostCalculator.Calculate(
+            scenario,
+            sizingResult);
 
         return DispatchResultsExport.Create(
             demandData,
@@ -55,7 +78,8 @@ internal static class ScenarioRunner
             weatherInput.Artifact,
             scenario,
             powerSystem,
-            outcome);
+            outcome,
+            costBreakdown);
     }
 
     private static LoadedInput<OperationalDemandData> ReadDemand(string path)
@@ -112,57 +136,87 @@ internal static class ScenarioRunner
 
     private static DomainScenario BuildScenario(
         ScenarioSettings settings,
-        string regionId,
         FlowSeries timeline)
     {
-        if (settings.GeneratingFleets.Length == 0)
+        ScenarioRegion[] regions = settings.Regions.Select(regionSettings =>
         {
-            throw new FormatException(
-                "scenario.generatingFleets must contain at least one generating fleet.");
-        }
-
-        ScenarioGeneratingFleet[] generatingFleets = settings.GeneratingFleets.Select(
-            generatingFleetSettings =>
-        {
-            if (!Enum.TryParse(
-                generatingFleetSettings.Technology,
-                true,
-                out GenerationTechnology technology))
-            {
-                throw new FormatException(
-                    $"Unknown scenario generating fleet technology "
-                    + $"'{generatingFleetSettings.Technology}'.");
-            }
-
-            IReadOnlyDictionary<DateOnly, double>? monthlyCapacityFactors =
-                generatingFleetSettings.MonthlyCapacityFactors?.ToDictionary(
-                    entry => entry.Month,
-                    entry => entry.CapacityFactor);
-            return new ScenarioGeneratingFleet(
-                technology,
-                Power.FromMegawatts(generatingFleetSettings.NameplateCapacityMw),
-                new CostParameters(
-                    PowerCapacityCost.FromAudPerMwCapacity(
-                        generatingFleetSettings.CostParameters.CapitalCostAudPerMw),
-                    EnergyCapacityCost.FromAudPerMwhStorage(
-                        generatingFleetSettings.CostParameters.EnergyCapitalCostAudPerMwh),
-                    AnnualPowerCapacityCost.FromAudPerMwYear(
-                        generatingFleetSettings.CostParameters.FixedOperatingCostAudPerMwYear),
-                    EnergyPrice.FromAudPerMwhDelivered(
-                        generatingFleetSettings.CostParameters.VariableOperatingCostAudPerMwh),
-                    FuelPrice.FromAudPerGjThermal(
-                        generatingFleetSettings.CostParameters.FuelPriceAudPerGj)),
-                monthlyCapacityFactors);
+            ScenarioGeneratingFleet[] generatingFleets = regionSettings.GeneratingFleets.Select(
+                generatingFleetSettings => CreateGeneratingFleet(generatingFleetSettings)).ToArray();
+            ScenarioStorageFleet[] storageFleets = regionSettings.StorageFleets.Select(
+                storageFleetSettings => CreateStorageFleet(storageFleetSettings)).ToArray();
+            return new ScenarioRegion(regionSettings.RegionId, generatingFleets, storageFleets);
         }).ToArray();
 
         return new DomainScenario(
             new ScenarioId(settings.Id),
             settings.Name,
-            regionId,
             timeline.Start,
             timeline.Start.AddTicks(timeline.Resolution.Ticks * timeline.Length),
-            generatingFleets,
+            regions,
             new CostBasis(settings.CostBasis.Year, settings.CostBasis.RealDiscountRate));
+    }
+
+    private static ScenarioGeneratingFleet CreateGeneratingFleet(
+        GeneratingFleetSettings generatingFleetSettings)
+    {
+        if (!Enum.TryParse(
+            generatingFleetSettings.Technology,
+            true,
+            out GenerationTechnology technology))
+        {
+            throw new FormatException(
+                $"Unknown scenario generating fleet technology "
+                + $"'{generatingFleetSettings.Technology}'.");
+        }
+
+        IReadOnlyDictionary<DateOnly, double>? monthlyCapacityFactors =
+            generatingFleetSettings.MonthlyCapacityFactors?.ToDictionary(
+                entry => entry.Month,
+                entry => entry.CapacityFactor);
+        return new ScenarioGeneratingFleet(
+            technology,
+            Power.FromMegawatts(generatingFleetSettings.NameplateCapacityMw),
+            new GenerationCostParameters(
+                PowerCapacityCost.FromAudPerMwCapacity(
+                    generatingFleetSettings.CostParameters.CapitalCostAudPerMw),
+                AnnualPowerCapacityCost.FromAudPerMwYear(
+                    generatingFleetSettings.CostParameters.FixedOperatingCostAudPerMwYear),
+                GenerationEnergyCost.FromAudPerMwhGenerated(
+                    generatingFleetSettings.CostParameters.VariableOperatingCostAudPerMwh),
+                FuelPrice.FromAudPerGjThermal(
+                    generatingFleetSettings.CostParameters.FuelPriceAudPerGj)),
+            new GenerationTechnologyProfile(
+                HeatRate.FromGigajoulesPerMegawattHour(
+                    generatingFleetSettings.TechnologyProfile.HeatRateGjPerMwh),
+                generatingFleetSettings.TechnologyProfile.TechnicalLifeYears),
+            monthlyCapacityFactors);
+    }
+
+    private static ScenarioStorageFleet CreateStorageFleet(
+        StorageFleetSettings storageFleetSettings)
+    {
+        if (!Enum.TryParse(
+            storageFleetSettings.Technology,
+            true,
+            out StorageTechnology technology))
+        {
+            throw new FormatException(
+                $"Unknown scenario storage fleet technology '{storageFleetSettings.Technology}'.");
+        }
+
+        StorageCostParametersSettings costs = storageFleetSettings.CostParameters;
+        return new ScenarioStorageFleet(
+            technology,
+            Energy.FromMegawattHours(storageFleetSettings.InitialEnergyCapacityMwh),
+            Power.FromMegawatts(storageFleetSettings.InitialPowerCapacityMw),
+            new StorageCostParameters(
+                PowerCapacityCost.FromAudPerMwCapacity(costs.PowerCapitalCostAudPerMw),
+                EnergyCapacityCost.FromAudPerMwhCapacity(costs.EnergyCapitalCostAudPerMwh),
+                AnnualPowerCapacityCost.FromAudPerMwYear(
+                    costs.FixedOperatingCostAudPerMwYear)),
+            new StorageTechnologyProfile(
+                storageFleetSettings.TechnologyProfile.TechnicalLifeYears,
+                storageFleetSettings.TechnologyProfile.RoundTripEfficiency));
     }
 
     private static RegionalResourceProfile ReadWeatherForTimeline(
