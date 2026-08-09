@@ -346,7 +346,8 @@ internal sealed class RegionalDispatchRun
             discharge: Flow(_dischargeMw),
             imports: zeroFlow,
             exports: zeroFlow,
-            stateOfChargeByTechnology);
+            stateOfChargeByTechnology,
+            demandProfile: _region.Demand);
     }
 
     private FlowSeries Flow(double[] values) =>

@@ -31,30 +31,43 @@ namespace NEM.Model.Tests.Grid
 
             var profile = new DemandProfile(
                 baseDemand,
-                new Dictionary<string, FlowSeries>
-                {
-                    ["Data centres"] = dataCentreDemand,
-                    ["Electrification"] = electrificationDemand,
-                });
+                [
+                    new DemandComponent("Data centres", dataCentreDemand),
+                    new DemandComponent("Electrification", electrificationDemand),
+                ]);
 
             profile.TotalDemand[0].Megawatts.Should().Be(1_110);
             profile.TotalDemand[1].Megawatts.Should().Be(1_320);
-            profile.AdditiveComponents["Data centres"].Should().BeSameAs(dataCentreDemand);
-            profile.AdditiveComponents["Electrification"].Should().BeSameAs(electrificationDemand);
+            profile.AdditiveComponents.Should().ContainEquivalentOf(
+                new DemandComponent("Data centres", dataCentreDemand));
+            profile.AdditiveComponents.Should().ContainEquivalentOf(
+                new DemandComponent("Electrification", electrificationDemand));
         }
 
         [Fact]
-        public void Construction_ResamplesAllGridDemandToHourlyResolution()
+        public void TotalDemand_IncludesConstantComponentInEveryInterval()
+        {
+            var baseDemand = HourlyFlow(1_000, 1_100);
+            var profile = new DemandProfile(
+                baseDemand,
+                [new DemandComponent("Firm load", HourlyFlow(500, 500))]);
+
+            profile.TotalDemand[0].Megawatts.Should().Be(baseDemand[0].Megawatts + 500);
+            profile.TotalDemand[1].Megawatts.Should().Be(baseDemand[1].Megawatts + 500);
+        }
+
+        [Fact]
+        public void Construction_ResamplesBaseAndComponentsToHourlyResolution()
         {
             var baseDemand = HalfHourlyFlow(900, 1_100, 1_200, 1_400);
             var additiveDemand = HalfHourlyFlow(100, 300, 200, 400);
 
             var profile = new DemandProfile(
                 baseDemand,
-                new Dictionary<string, FlowSeries> { ["Data centres"] = additiveDemand });
+                [new DemandComponent("Data centres", additiveDemand)]);
 
             profile.BaseDemand.Resolution.Should().Be(DemandProfile.Resolution);
-            profile.AdditiveComponents["Data centres"].Resolution.Should().Be(DemandProfile.Resolution);
+            profile.AdditiveComponents.Single().Demand.Resolution.Should().Be(DemandProfile.Resolution);
             profile.TotalDemand.Resolution.Should().Be(DemandProfile.Resolution);
             profile.TotalDemand[0].Megawatts.Should().Be(1_200);
             profile.TotalDemand[1].Megawatts.Should().Be(1_600);
@@ -63,15 +76,13 @@ namespace NEM.Model.Tests.Grid
         [Fact]
         public void Construction_CopiesAdditiveComponentCollection()
         {
-            var components = new Dictionary<string, FlowSeries>
-            {
-                ["Data centres"] = HourlyFlow(100, 200),
-            };
+            var component = new DemandComponent("Data centres", HourlyFlow(100, 200));
+            var components = new List<DemandComponent> { component };
             var profile = new DemandProfile(HourlyFlow(1_000, 1_100), components);
 
             components.Clear();
 
-            profile.AdditiveComponents.Should().ContainKey("Data centres");
+            profile.AdditiveComponents.Should().Contain(component);
         }
 
         [Fact]
@@ -85,28 +96,19 @@ namespace NEM.Model.Tests.Grid
 
             var act = () => new DemandProfile(
                 baseDemand,
-                new Dictionary<string, FlowSeries> { ["Data centres"] = shiftedComponent });
+                [new DemandComponent("Data centres", shiftedComponent)]);
 
-            act.Should().Throw<ArgumentException>().WithMessage("*misaligned on start*");
-        }
-
-        [Fact]
-        public void Construction_RejectsBlankComponentName()
-        {
-            var act = () => new DemandProfile(
-                HourlyFlow(1_000, 1_100),
-                new Dictionary<string, FlowSeries> { [" "] = HourlyFlow(100, 200) });
-
-            act.Should().Throw<ArgumentException>();
+            act.Should().Throw<ArgumentException>()
+                .WithMessage("*Data centres*misaligned on start*");
         }
 
         [Fact]
         public void Construction_RejectsDuplicateComponentNamesIgnoringCase()
         {
-            var components = new Dictionary<string, FlowSeries>
+            var components = new List<DemandComponent>
             {
-                ["Data centres"] = HourlyFlow(100, 200),
-                ["DATA CENTRES"] = HourlyFlow(300, 400),
+                new("Data centres", HourlyFlow(100, 200)),
+                new("DATA CENTRES", HourlyFlow(300, 400)),
             };
 
             var act = () => new DemandProfile(HourlyFlow(1_000, 1_100), components);
@@ -115,13 +117,27 @@ namespace NEM.Model.Tests.Grid
         }
 
         [Fact]
-        public void Construction_RejectsNegativeTotalDemand()
+        public void Construction_RejectsNegativeAdditiveComponent()
         {
-            var act = () => new DemandProfile(HourlyFlow(100, -1));
+            var act = () => new DemandProfile(
+                HourlyFlow(100, 100),
+                [new DemandComponent("Data centres", HourlyFlow(100, -1))]);
 
             act.Should().Throw<ArgumentOutOfRangeException>()
-                .WithParameterName("baseDemand")
-                .WithMessage("*Total demand (base plus additive components) at index 1 cannot be negative.*");
+                .WithParameterName("demand")
+                .WithMessage("*Data centres*cannot be negative at index 1*");
+        }
+
+        [Fact]
+        public void DemandComponent_RejectsNegativeHalfHourlyValueBeforeResampling()
+        {
+            var act = () => new DemandComponent(
+                "Data centres",
+                HalfHourlyFlow(-100, 100));
+
+            act.Should().Throw<ArgumentOutOfRangeException>()
+                .WithParameterName("demand")
+                .WithMessage("*Data centres*cannot be negative at index 0*");
         }
 
         [Fact]

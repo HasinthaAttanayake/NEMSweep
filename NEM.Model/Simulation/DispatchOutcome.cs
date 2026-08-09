@@ -51,6 +51,7 @@ public sealed record DispatchOutcome
     public IReadOnlyDictionary<StorageTechnology, StockSeries> StateOfChargeByTechnology { get; }
     /// <summary>Reliability measures calculated from <see cref="Unserved"/> and <see cref="Demand"/>.</summary>
     public ReliabilityMetrics Reliability { get; }
+    private DemandProfile? DemandProfile { get; }
 
     public DispatchOutcome(
         string regionId,
@@ -64,7 +65,8 @@ public sealed record DispatchOutcome
         FlowSeries discharge,
         FlowSeries imports,
         FlowSeries exports,
-        IReadOnlyDictionary<StorageTechnology, StockSeries>? stateOfChargeByTechnology = null)
+        IReadOnlyDictionary<StorageTechnology, StockSeries>? stateOfChargeByTechnology = null,
+        DemandProfile? demandProfile = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(regionId);
         ArgumentNullException.ThrowIfNull(perFleetGeneration);
@@ -123,6 +125,7 @@ public sealed record DispatchOutcome
             new Dictionary<GenerationTechnology, FlowSeries>(perFleetDelivered));
         PerFleetCharge = new ReadOnlyDictionary<GenerationTechnology, FlowSeries>(
             new Dictionary<GenerationTechnology, FlowSeries>(perFleetCharge));
+        DemandProfile = demandProfile;
         Demand = demand;
         Unserved = unserved;
         DeliveredToLoad = Demand.Subtract(Unserved);
@@ -168,6 +171,10 @@ public sealed record DispatchOutcome
         Demand.RequireAligned(Discharge);
         Demand.RequireAligned(Imports);
         Demand.RequireAligned(Exports);
+        if (DemandProfile is not null)
+        {
+            DemandProfile.TotalDemand.RequireAligned(Demand);
+        }
 
         if (!PerFleetGeneration.Keys.ToHashSet().SetEquals(PerFleetCurtailment.Keys)
             || !PerFleetGeneration.Keys.ToHashSet().SetEquals(PerFleetDelivered.Keys)
@@ -219,12 +226,31 @@ public sealed record DispatchOutcome
             double unserved = Unserved[index].Megawatts;
             double charge = Charge[index].Megawatts;
             double discharge = Discharge[index].Megawatts;
+            double composedDemand = DemandProfile is null
+                ? Demand[index].Megawatts
+                : DemandProfile.BaseDemand[index].Megawatts
+                    + DemandProfile.AdditiveComponents.Sum(
+                        component => component.Demand[index].Megawatts);
             double magnitude = Math.Max(
                 1,
                 Math.Max(
                     Math.Abs(generation),
-                    Math.Max(Math.Abs(Demand[index].Megawatts), Math.Abs(curtailment))));
+                    Math.Max(Math.Abs(composedDemand), Math.Abs(curtailment))));
             double tolerance = BalanceTolerance * magnitude;
+
+            if (Math.Abs(Demand[index].Megawatts - composedDemand) > tolerance)
+            {
+                throw new InvalidOperationException(
+                    $"Dispatch demand does not match composed demand at index {index} "
+                    + $"({Demand.InstantAt(index):o}).");
+            }
+
+            if (Math.Abs(composedDemand - (DeliveredToLoad[index].Megawatts + unserved)) > tolerance)
+            {
+                throw new InvalidOperationException(
+                    $"Demand composition balance failed at index {index} "
+                    + $"({Demand.InstantAt(index):o}).");
+            }
 
             foreach (GenerationTechnology technology in technologies)
             {
@@ -279,7 +305,7 @@ public sealed record DispatchOutcome
                 + Discharge[index].Megawatts
                 + Imports[index].Megawatts
                 + unserved;
-            double outputs = Demand[index].Megawatts
+            double outputs = composedDemand
                 + Charge[index].Megawatts
                 + Exports[index].Megawatts
                 + curtailment;

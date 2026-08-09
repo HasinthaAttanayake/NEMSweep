@@ -140,7 +140,7 @@ namespace NEM.Model.Tests.Grid
                 "NSW1",
                 [Fleet(GenerationTechnology.Coal)],
                 HourlyFlow(100),
-                new Dictionary<string, FlowSeries> { ["DataCentre"] = additiveDemand },
+                [new DemandComponent("DataCentre", additiveDemand)],
                 storageFleets: [pumpedHydro],
                 storageTechnologyProfiles: BatteryProfiles());
 
@@ -155,7 +155,8 @@ namespace NEM.Model.Tests.Grid
             battery.StorageCapacity.Should().Be(Energy.FromMegawattHours(120));
             battery.PowerCapacity.Should().Be(Power.FromMegawatts(30));
             sized.Demand.BaseDemand.Should().BeSameAs(region.Demand.BaseDemand);
-            sized.Demand.AdditiveComponents["DataCentre"].Should().BeSameAs(additiveDemand);
+            sized.Demand.AdditiveComponents.Should().ContainEquivalentOf(
+                new DemandComponent("DataCentre", additiveDemand));
         }
 
         [Fact]
