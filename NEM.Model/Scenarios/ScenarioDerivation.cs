@@ -9,7 +9,8 @@ public static class ScenarioDerivation
     public static PowerSystem Derive(
         Scenario scenario,
         IReadOnlyDictionary<string, FlowSeries> baseDemandByRegion,
-        IReadOnlyDictionary<string, RegionalResourceProfile?>? resourceProfilesByRegion = null)
+        IReadOnlyDictionary<string, RegionalResourceProfile?>? resourceProfilesByRegion = null,
+        IReadOnlyDictionary<string, IReadOnlyList<DemandComponent>>? additiveDemandComponentsByRegion = null)
     {
         ArgumentNullException.ThrowIfNull(scenario);
         ArgumentNullException.ThrowIfNull(baseDemandByRegion);
@@ -47,6 +48,23 @@ public static class ScenarioDerivation
                 nameof(resourceProfilesByRegion));
         }
 
+        var componentsByRegion = additiveDemandComponentsByRegion is null
+            ? new Dictionary<string, IReadOnlyList<DemandComponent>>(StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, IReadOnlyList<DemandComponent>>(
+                additiveDemandComponentsByRegion,
+                StringComparer.OrdinalIgnoreCase);
+        if (additiveDemandComponentsByRegion is not null
+            && (componentsByRegion.Count != additiveDemandComponentsByRegion.Count
+                || !scenario.Regions.Select(region => region.RegionId)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase)
+                    .SetEquals(componentsByRegion.Keys)
+                || componentsByRegion.Any(entry => entry.Value is null)))
+        {
+            throw new ArgumentException(
+                "Additive demand components must contain a non-null collection for every scenario region.",
+                nameof(additiveDemandComponentsByRegion));
+        }
+
         Region[] regions = scenario.Regions.Select(plan =>
         {
             FlowSeries hourlyDemand = demandByRegion[plan.RegionId].ResampleToHourly();
@@ -60,10 +78,14 @@ public static class ScenarioDerivation
             }
 
             resourcesByRegion.TryGetValue(plan.RegionId, out RegionalResourceProfile? resourceProfile);
+            componentsByRegion.TryGetValue(
+                plan.RegionId,
+                out IReadOnlyList<DemandComponent>? additiveDemandComponents);
             return new Region(
                 plan.RegionId,
                 plan.GeneratingFleets.Select(fleet => fleet.ToGeneratingFleet()).ToArray(),
                 hourlyDemand,
+                additiveDemandComponents,
                 resourceProfile: resourceProfile,
                 storageFleets: plan.StorageFleets
                     .Select(fleet => fleet.ToStorageFleet())

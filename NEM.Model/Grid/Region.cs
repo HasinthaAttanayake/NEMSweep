@@ -24,7 +24,7 @@ namespace NEM.Model.Grid
             string regionId,
             IReadOnlyList<GeneratingFleet> generatingFleets,
             FlowSeries baseDemand,
-            IReadOnlyDictionary<string, FlowSeries>? additiveDemandComponents = null,
+            IReadOnlyList<DemandComponent>? additiveDemandComponents = null,
             RegionalResourceProfile? resourceProfile = null,
             IReadOnlyList<StorageFleet>? storageFleets = null,
             IReadOnlyDictionary<StorageTechnology, StorageTechnologyProfile>?

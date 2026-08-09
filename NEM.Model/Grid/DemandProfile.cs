@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using NEM.Model.Series;
 using NEM.Model.Units;
 
@@ -14,28 +13,65 @@ namespace NEM.Model.Grid
 
         public FlowSeries TotalDemand { get; }
         public FlowSeries BaseDemand { get; }
-        public IReadOnlyDictionary<string, FlowSeries> AdditiveComponents { get; }
+        public IReadOnlyList<DemandComponent> AdditiveComponents { get; }
 
         public DemandProfile(
             FlowSeries baseDemand,
-            IReadOnlyDictionary<string, FlowSeries>? additiveComponents = null)
+            IReadOnlyList<DemandComponent>? additiveComponents = null)
         {
             ArgumentNullException.ThrowIfNull(baseDemand);
 
             BaseDemand = baseDemand.ResampleToHourly();
-            var hourlyComponents = new Dictionary<string, FlowSeries>(StringComparer.OrdinalIgnoreCase);
+            var components = new List<DemandComponent>();
+            var componentNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             FlowSeries totalDemand = BaseDemand;
 
             if (additiveComponents is not null)
             {
-                foreach ((string name, FlowSeries component) in additiveComponents)
+                foreach (DemandComponent component in additiveComponents)
                 {
-                    ArgumentException.ThrowIfNullOrWhiteSpace(name);
-                    ArgumentNullException.ThrowIfNull(component);
+                    if (component.Demand is null)
+                    {
+                        throw new ArgumentException(
+                            "Additive demand components cannot contain an uninitialized component.",
+                            nameof(additiveComponents));
+                    }
 
-                    FlowSeries hourlyComponent = component.ResampleToHourly();
-                    hourlyComponents.Add(name, hourlyComponent);
-                    totalDemand = totalDemand.Add(hourlyComponent);
+                    if (!componentNames.Add(component.Name))
+                    {
+                        throw new ArgumentException(
+                            $"Additive demand component '{component.Name}' is duplicated.",
+                            nameof(additiveComponents));
+                    }
+
+                    FlowSeries hourlyDemand = component.Demand.ResampleToHourly();
+                    try
+                    {
+                        BaseDemand.RequireAligned(hourlyDemand);
+                    }
+                    catch (ArgumentException exception)
+                    {
+                        throw new ArgumentException(
+                            $"Additive demand component '{component.Name}' must align with base demand: "
+                            + exception.Message,
+                            nameof(additiveComponents),
+                            exception);
+                    }
+
+                    for (int index = 0; index < hourlyDemand.Length; index++)
+                    {
+                        if (hourlyDemand[index] < Power.Zero)
+                        {
+                            throw new ArgumentOutOfRangeException(
+                                nameof(additiveComponents),
+                                hourlyDemand[index].Megawatts,
+                                $"Additive demand component '{component.Name}' cannot be negative at index {index}.");
+                        }
+                    }
+
+                    var hourlyComponent = new DemandComponent(component.Name, hourlyDemand);
+                    components.Add(hourlyComponent);
+                    totalDemand = totalDemand.Add(hourlyComponent.Demand);
                 }
             }
 
@@ -50,7 +86,7 @@ namespace NEM.Model.Grid
                 }
             }
 
-            AdditiveComponents = new ReadOnlyDictionary<string, FlowSeries>(hourlyComponents);
+            AdditiveComponents = Array.AsReadOnly(components.ToArray());
             TotalDemand = totalDemand;
         }
     }

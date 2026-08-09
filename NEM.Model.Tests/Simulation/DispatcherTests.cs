@@ -673,6 +673,40 @@ namespace NEM.Model.Tests.Simulation
         }
 
         [Fact]
+        public void DispatchOutcome_UsesComposedDemandForEnergyBalance()
+        {
+            var demandProfile = new DemandProfile(
+                HourlyFlow(100),
+                [new DemandComponent("Firm load", HourlyFlow(500))]);
+
+            var act = () => Outcome(
+                generation: [500],
+                demand: [0],
+                curtailment: [0],
+                unserved: [0],
+                demandProfile: demandProfile);
+
+            act.Should().Throw<InvalidOperationException>()
+                .WithMessage("Energy balance failed at index 0*");
+        }
+
+        [Fact]
+        public void Dispatch_UsesAdditiveDemandComponentsInServedDemand()
+        {
+            var region = new Region(
+                "NSW1",
+                [Fleet(GenerationTechnology.Coal, 1_000)],
+                HourlyFlow(100),
+                [new DemandComponent("Firm load", HourlyFlow(500))]);
+
+            DispatchOutcome outcome = Dispatch(region);
+
+            AssertSeries(outcome.Demand, 600);
+            AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Coal], 600);
+            AssertSeries(outcome.Unserved, 0);
+        }
+
+        [Fact]
         public void DispatchOutcome_RejectsNegativeCurtailment()
         {
             var act = () => Outcome(
@@ -859,7 +893,8 @@ namespace NEM.Model.Tests.Simulation
             double[] demand,
             double[] curtailment,
             double[] unserved,
-            string regionId = "NSW1")
+            string regionId = "NSW1",
+            DemandProfile? demandProfile = null)
         {
             FlowSeries zero = HourlyFlow(new double[demand.Length]);
             FlowSeries generationFlow = HourlyFlow(generation);
@@ -882,12 +917,13 @@ namespace NEM.Model.Tests.Simulation
                 {
                     [GenerationTechnology.Coal] = zero,
                 },
-                HourlyFlow(demand),
+                demandProfile?.TotalDemand ?? HourlyFlow(demand),
                 HourlyFlow(unserved),
                 zero,
                 zero,
                 zero,
-                zero);
+                zero,
+                demandProfile: demandProfile);
         }
 
         private static DispatchOutcome Dispatch(
