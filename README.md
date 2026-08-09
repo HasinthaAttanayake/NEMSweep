@@ -40,7 +40,8 @@ model. Follow progress on the [NEM Sim Development Board](https://github.com/use
 - `NEM.CLI` validates source data and generates datasets consumed by the site.
 - `NEM.Contracts` defines the exported data contracts.
 - `NEM.Web` is the Blazor WebAssembly progress site.
-- `NEM.Model.Tests` and `NEM.CLI.Tests` cover model and ingestion behaviour.
+- `NEM.Model.Tests`, `NEM.CLI.Tests`, and `NEM.Web.Tests` cover model,
+  ingestion, and web behaviour.
 
 The implemented aggregate roots and domain-service boundaries are tracked in
 the [domain model](docs/domain-model.md).
@@ -106,4 +107,25 @@ inputs with:
 
 ```powershell
 dotnet run --project .\NEM.CLI\NEM.CLI.csproj -- --run-scenario
+```
+
+Run a scenario using a specific scenario configuration with:
+
+```powershell
+dotnet run --project .\NEM.CLI\NEM.CLI.csproj -- `
+  --run-scenario .\scenarios\nsw1-baseline-dispatch.json
+```
+
+Fan out a sweep definition into its point configurations with:
+
+```powershell
+dotnet run --project .\NEM.CLI\NEM.CLI.csproj -- `
+  --fan-out-sweep .\sweeps\datacentre-nameplate-nsw1-fy2026.json
+```
+
+Run all points in a sweep definition with:
+
+```powershell
+dotnet run --project .\NEM.CLI\NEM.CLI.csproj -- `
+  --run-sweep .\sweeps\datacentre-nameplate-nsw1-fy2026.json
 ```

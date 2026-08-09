@@ -143,19 +143,26 @@ classDiagram
   plan carries both economic and technical assumptions for Battery capacity later
   introduced by `StorageSizingService`.
 - `ScenarioDerivation` is a pure domain service that realises a `PowerSystem`
-  from scenario intent plus one aligned demand series per scenario region and
-  optional aligned regional resource profiles. It realises positive-capacity
-  storage plans and omits zero-capacity sizing plans. Realised `StorageFleet`
+  from scenario intent plus one aligned demand series per scenario region,
+  optional aligned additive demand components, and optional aligned regional
+  resource profiles. It realises positive-capacity storage plans and omits
+  zero-capacity sizing plans. Realised `StorageFleet`
   values retain their scenario technology profiles. `Region` also retains the
   profile map for zero-capacity plans, so immutable sizing candidates use each
   region's assumptions without making sizing scenario-aware. Its
   `ScenarioGeneratingFleet.ToGeneratingFleet` transformation derives typed
   short-run marginal cost as variable operating cost plus fuel price multiplied
   by heat rate. The realised `GeneratingFleet` owns that dispatch-relevant value.
+- `DataCentreDemand` expands a validated nameplate into a flat,
+  full-load-factor component for the scenario period.
 - `PowerSystem` is the realised grid aggregate and cites its source scenario by
   `ScenarioId`. It owns one or more `Region` aggregates.
 - `Region` requires one or more generating fleets with distinct generation
   technologies and may own storage fleets with distinct storage technologies.
+  Its `DemandProfile` owns the base demand and zero or more labelled
+  `DemandComponent` flows. Components must be non-negative, uniquely named
+  case-insensitively, and exactly aligned with base demand; total demand is their
+  element-wise sum and is the only demand consumed by dispatch.
 - `Dispatcher` remains scenario-blind. It consumes a realised `PowerSystem` and
   dispatches each owned region, producing one `DispatchOutcome` per region. Each
   outcome includes its `ReliabilityMetrics`. A per-region `RegionalDispatchRun`

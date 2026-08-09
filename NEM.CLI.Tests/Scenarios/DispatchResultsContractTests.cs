@@ -17,11 +17,11 @@ namespace NEM.CLI.Tests.Scenarios;
 public sealed class DispatchResultsContractTests
 {
     [Fact]
-    public void V3_RoundTripsWithVersionAndExplicitUnits()
+    public void V4_RoundTripsWithVersionAndExplicitUnits()
     {
         var start = new DateTimeOffset(2025, 7, 1, 0, 0, 0, TimeSpan.FromHours(10));
         var result = new DispatchResultsDTO(
-            3,
+            4,
             new DispatchScenarioDTO(
                 "nsw1-baseline-dispatch",
                 "NSW1 baseline dispatch",
@@ -39,7 +39,10 @@ public sealed class DispatchResultsContractTests
                 [new DispatchFleetDTO("Solar", 100)],
                 [new DispatchStorageFleetDTO("Battery", 120, 30)]),
             new DispatchSeriesDTO(
-                [80, 90],
+                new DispatchDemandDTO(
+                    [70, 80],
+                    new Dictionary<string, double[]> { ["Data centres"] = [10, 10] },
+                    [80, 90]),
                 new Dictionary<string, double[]> { ["Solar"] = [80, 85] },
                 [20, 15],
                 [0, 5],
@@ -58,7 +61,10 @@ public sealed class DispatchResultsContractTests
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
         roundTripped.Should().BeEquivalentTo(result);
-        roundTripped!.SchemaVersion.Should().Be(3);
+    roundTripped!.SchemaVersion.Should().Be(4);
+    json.Should().Contain("\"baseDemandMw\"");
+    json.Should().Contain("\"additiveComponentsByNameMw\"");
+    json.Should().Contain("\"totalDemandMw\"");
         json.Should().Contain("\"nameplateCapacityMw\"");
         json.Should().Contain("\"energyCapacityMwh\"");
         json.Should().Contain("\"powerCapacityMw\"");
@@ -95,14 +101,16 @@ public sealed class DispatchResultsContractTests
     public void Export_ReportsDeliveredGenerationSeparatelyFromCurtailment()
     {
         var start = new DateTimeOffset(2025, 7, 1, 0, 0, 0, TimeSpan.FromHours(10));
-        FlowSeries demand = Flow(start, 100, 100);
+        FlowSeries baseDemand = Flow(start, 100, 100);
+        FlowSeries additiveDemand = Flow(start, 20, 10);
+        FlowSeries totalDemand = Flow(start, 120, 110);
         FlowSeries zero = Flow(start, 0, 0);
         var outcome = new DispatchOutcome(
             "NSW1",
             new Dictionary<GenerationTechnology, FlowSeries>
             {
-                [GenerationTechnology.Coal] = Flow(start, 120, 50),
-                [GenerationTechnology.Gas] = Flow(start, 0, 40),
+                [GenerationTechnology.Coal] = Flow(start, 140, 50),
+                [GenerationTechnology.Gas] = Flow(start, 0, 60),
             },
             new Dictionary<GenerationTechnology, FlowSeries>
             {
@@ -111,16 +119,16 @@ public sealed class DispatchResultsContractTests
             },
             new Dictionary<GenerationTechnology, FlowSeries>
             {
-                [GenerationTechnology.Coal] = Flow(start, 100, 50),
-                [GenerationTechnology.Gas] = Flow(start, 0, 40),
+                [GenerationTechnology.Coal] = Flow(start, 120, 50),
+                [GenerationTechnology.Gas] = Flow(start, 0, 60),
             },
             new Dictionary<GenerationTechnology, FlowSeries>
             {
                 [GenerationTechnology.Coal] = zero,
                 [GenerationTechnology.Gas] = zero,
             },
-            demand,
-            Flow(start, 0, 10),
+            totalDemand,
+            zero,
             zero,
             zero,
             zero,
@@ -134,10 +142,10 @@ public sealed class DispatchResultsContractTests
             });
         GeneratingFleet[] fleets =
         [
-            new(GenerationTechnology.Coal, Power.FromMegawatts(120)),
-            new(GenerationTechnology.Gas, Power.FromMegawatts(40)),
+            new(GenerationTechnology.Coal, Power.FromMegawatts(140)),
+            new(GenerationTechnology.Gas, Power.FromMegawatts(60)),
         ];
-        var demandData = new OperationalDemandData("NSW1", demand, ["demand.zip"]);
+        var demandData = new OperationalDemandData("NSW1", baseDemand, ["demand.zip"]);
         var scenario = new DomainScenario(
             new ScenarioId("nsw1-baseline-dispatch"),
             "NSW1 baseline dispatch",
@@ -148,12 +156,12 @@ public sealed class DispatchResultsContractTests
                 [
                     new ScenarioGeneratingFleet(
                         GenerationTechnology.Coal,
-                        Power.FromMegawatts(120),
+                        Power.FromMegawatts(140),
                         CreateCostParameters(),
                         CreateTechnologyProfile()),
                     new ScenarioGeneratingFleet(
                         GenerationTechnology.Gas,
-                        Power.FromMegawatts(40),
+                        Power.FromMegawatts(60),
                         CreateCostParameters(),
                         CreateTechnologyProfile()),
                 ],
@@ -173,7 +181,8 @@ public sealed class DispatchResultsContractTests
             [new Region(
                 "NSW1",
                 fleets,
-                demand,
+                baseDemand,
+                [new DemandComponent("Data centres", additiveDemand)],
                 storageFleets:
                 [
                     new StorageFleet(
@@ -192,23 +201,28 @@ public sealed class DispatchResultsContractTests
             outcome,
             PowerSystemCostCalculator.Calculate(scenario, powerSystem, [outcome]));
 
+        result.SchemaVersion.Should().Be(4);
         result.DataSeries.DeliveredGenerationByTechnologyMw["Coal"].Take(2)
-            .Should().Equal(100, 50);
+            .Should().Equal(120, 50);
         result.DataSeries.DeliveredGenerationByTechnologyMw["Gas"].Take(2)
-            .Should().Equal(0, 40);
+            .Should().Equal(0, 60);
+        result.DataSeries.Demand.BaseDemandMw!.Take(2).Should().Equal(100, 100);
+        result.DataSeries.Demand.AdditiveComponentsByNameMw["Data centres"].Take(2)
+            .Should().Equal(20, 10);
+        result.DataSeries.Demand.TotalDemandMw.Take(2).Should().Equal(120, 110);
         result.PowerSystem.StorageFleets.Should().ContainSingle().Which
             .Should().Be(new DispatchStorageFleetDTO("Battery", 120, 30));
         result.DataSeries.StateOfChargeByTechnologyMwh["Battery"].Take(2)
             .Should().Equal(0, 8.7);
         result.Metrics.Should().Be(new DispatchMetricsDTO(
-            200,
-            190,
+            230,
+            230,
             20,
-            10,
-            5,
-            1,
-            8759.0 / 8760,
-            10));
+            0,
+            0,
+            0,
+            8760.0 / 8760,
+            0));
         result.Cost.AnnualisedGenerationCostAud.Should().Be(0);
         result.Cost.AnnualisedStorageCostAud.Should().Be(0);
         result.Cost.SlcoeAudPerMwh.Should().Be(0);

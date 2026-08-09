@@ -37,7 +37,7 @@ internal static class DispatchResultsExport
         Region region = powerSystem.Regions.Single(region => region.RegionId == outcome.RegionId);
 
         return new DispatchResultsDTO(
-            3,
+            4,
             new DispatchScenarioDTO(
                 scenario.Id.Value,
                 scenario.Name,
@@ -60,7 +60,13 @@ internal static class DispatchResultsExport
                     fleet.StorageCapacity.MegawattHours,
                     fleet.PowerCapacity.Megawatts)).ToArray()),
             new DispatchSeriesDTO(
-                ValuesOf(outcome.Demand),
+                new DispatchDemandDTO(
+                    ValuesOf(region.Demand.BaseDemand),
+                    region.Demand.AdditiveComponents.ToDictionary(
+                        component => component.Name,
+                        component => ValuesOf(component.Demand),
+                        StringComparer.OrdinalIgnoreCase),
+                    ValuesOf(region.Demand.TotalDemand)),
                 deliveredGenerationByTechnology.ToDictionary(
                     entry => entry.Key,
                     entry => ValuesOf(entry.Value)),

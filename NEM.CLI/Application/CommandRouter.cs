@@ -17,7 +17,7 @@ internal sealed class CommandRouter
         TextWriter output,
         TextWriter error)
     {
-        _context = new CliContext(paths, settingsDirectory, output);
+        _context = new CliContext(paths, settingsDirectory, output, error);
         _error = error;
     }
 
@@ -28,6 +28,9 @@ internal sealed class CommandRouter
             return args switch
             {
                 ["--run-scenario"] => ScenarioCommand.Run(_context),
+                ["--run-scenario", var scenarioConfigPath] => ScenarioCommand.Run(_context, scenarioConfigPath),
+                ["--fan-out-sweep", var definitionPath] => SweepFanOutCommand.Run(_context, definitionPath),
+                ["--run-sweep", var definitionPath] => SweepRunCommand.Run(_context, definitionPath),
                 ["--generation-information", var path] =>
                     GenerationInformationCommand.Run(_context, path),
                 ["--epw-report", var path] => EpwCommands.WriteReport(_context, path),
@@ -52,7 +55,9 @@ internal sealed class CommandRouter
     private int PrintUsage()
     {
         _error.WriteLine("Usage:");
-        _error.WriteLine("  NEM.CLI --run-scenario");
+        _error.WriteLine("  NEM.CLI --run-scenario [scenario-config.json]");
+        _error.WriteLine("  NEM.CLI --fan-out-sweep <sweep-definition.json>");
+        _error.WriteLine("  NEM.CLI --run-sweep <sweep-definition.json>");
         _error.WriteLine("  NEM.CLI --generation-information <workbook.xlsx>");
         _error.WriteLine("  NEM.CLI --epw-report|--epw-series|--epw-validate|--epw-gaps|--epw-rows|--epw-header <file.epw>");
         _error.WriteLine("  NEM.CLI [demand-output.json]");
@@ -62,6 +67,8 @@ internal sealed class CommandRouter
     private static string OperationName(string[] args) => args.FirstOrDefault() switch
     {
         "--run-scenario" => "Scenario run",
+        "--fan-out-sweep" => "Sweep fan-out",
+        "--run-sweep" => "Sweep run",
         "--generation-information" => "Generation-information import",
         "--epw-report" => "EPW report",
         "--epw-series" => "EPW series",

@@ -205,6 +205,9 @@ Backup*/
 UpgradeLog*.XML
 UpgradeLog*.htm
 
+# Generated sweep point configurations
+sweeps/*/configs/
+
 # SQL Server files
 *.mdf
 *.ldf
