@@ -5,4 +5,5 @@
   <Project Path="NEM.Model.Tests/NEM.Model.Tests.csproj" Id="d4c06f12-2c71-467b-ba1d-17f825d4cfc7" />
   <Project Path="NEM.Model/NEM.Model.csproj" Id="0003c1e1-66a2-4216-b184-468f4f7e8733" />
   <Project Path="NEM.Web/NEM.Web.csproj" />
+  <Project Path="NEM.Web.Tests/NEM.Web.Tests.csproj" />
 </Solution>

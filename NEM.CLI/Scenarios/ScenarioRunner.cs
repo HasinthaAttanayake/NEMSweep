@@ -41,6 +41,9 @@ internal static class ScenarioRunner
                 "The current scenario runner requires exactly one scenario region matching its demand input.");
         }
 
+        IReadOnlyDictionary<string, IReadOnlyList<DemandComponent>>? additiveDemandComponents =
+            CreateDataCentreDemandComponents(settings, scenario);
+
         PowerSystem powerSystem = ScenarioDerivation.Derive(
             scenario,
             new Dictionary<string, FlowSeries>(StringComparer.OrdinalIgnoreCase)
@@ -50,7 +53,8 @@ internal static class ScenarioRunner
             new Dictionary<string, RegionalResourceProfile?>(StringComparer.OrdinalIgnoreCase)
             {
                 [demandData.Region] = resources,
-            });
+            },
+            additiveDemandComponents);
         StorageSizingSettings sizing = settings.StorageSizing;
         StorageSizingRunResult sizingResult = StorageSizingService.Size(
             powerSystem,
@@ -154,6 +158,27 @@ internal static class ScenarioRunner
             timeline.Start.AddTicks(timeline.Resolution.Ticks * timeline.Length),
             regions,
             new CostBasis(settings.CostBasis.Year, settings.CostBasis.RealDiscountRate));
+    }
+
+    private static IReadOnlyDictionary<string, IReadOnlyList<DemandComponent>>?
+        CreateDataCentreDemandComponents(ScenarioSettings settings, DomainScenario scenario)
+    {
+        if (settings.DataCentreNameplateMw == 0)
+        {
+            return null;
+        }
+
+        int intervalCount = checked((int)((scenario.PeriodEnd - scenario.PeriodStart).Ticks
+            / HourlyResolution.Ticks));
+        FlowSeries demand = DataCentreDemand.Expand(
+            Power.FromMegawatts(settings.DataCentreNameplateMw),
+            scenario.PeriodStart,
+            HourlyResolution,
+            intervalCount);
+        return new Dictionary<string, IReadOnlyList<DemandComponent>>(StringComparer.OrdinalIgnoreCase)
+        {
+            [scenario.Regions.Single().RegionId] = [new DemandComponent("Data centre", demand)],
+        };
     }
 
     private static ScenarioGeneratingFleet CreateGeneratingFleet(

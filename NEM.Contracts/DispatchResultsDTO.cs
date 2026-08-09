@@ -42,8 +42,14 @@ public sealed record DispatchStorageFleetDTO(
     double EnergyCapacityMwh,
     double PowerCapacityMw);
 
+public sealed record DispatchDemandDTO(
+    double[]? BaseDemandMw,
+    Dictionary<string, double[]> AdditiveComponentsByNameMw,
+    double[] TotalDemandMw,
+    string? BaseDemandSeriesPath = null);
+
 public sealed record DispatchSeriesDTO(
-    double[] DemandMw,
+    DispatchDemandDTO Demand,
     Dictionary<string, double[]> DeliveredGenerationByTechnologyMw,
     double[] CurtailmentMw,
     double[] UnservedDemandMw,

@@ -1,5 +1,6 @@
 @page "/dispatch"
 @using NEM.Contracts
+@using NEM.Web.Services
 @using System.Globalization
 @using System.Text.Json
 @inject HttpClient Http
@@ -264,9 +265,9 @@
             _result = await Http.GetFromJsonAsync<DispatchResultsDTO>(
                 "data/results.json",
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            if (_result is null || _result.SchemaVersion != 3)
+            if (_result is null || _result.SchemaVersion != 4)
             {
-                _errorMessage = "Dispatch results are missing or use an unsupported schema; expected schema 3.";
+                _errorMessage = "Dispatch results are missing or use an unsupported schema; expected schema 4.";
                 return;
             }
 
@@ -274,7 +275,10 @@
             DispatchPowerSystemDTO? powerSystem = _result.PowerSystem;
             if (series is null
                 || powerSystem is null
-                || series.DemandMw is null
+                || series.Demand is null
+                || series.Demand.BaseDemandMw is null
+                || series.Demand.AdditiveComponentsByNameMw is null
+                || series.Demand.TotalDemandMw is null
                 || series.UnservedDemandMw is null
                 || series.ChargeMw is null
                 || series.DischargeMw is null
@@ -286,9 +290,14 @@
                 return;
             }
 
-            int length = series.DemandMw.Length;
+            int length = series.Demand.TotalDemandMw.Length;
             if (length == 0
                 || _result.Scenario.Resolution <= TimeSpan.Zero
+                || series.Demand.BaseDemandMw.Length != length
+                || series.Demand.AdditiveComponentsByNameMw.Any(component =>
+                    string.IsNullOrWhiteSpace(component.Key)
+                    || component.Value is null
+                    || component.Value.Length != length)
                 || series.UnservedDemandMw.Length != length
                 || series.ChargeMw.Length != length
                 || series.DischargeMw.Length != length
@@ -303,6 +312,18 @@
             {
                 _errorMessage = "Dispatch result series are empty or misaligned.";
                 return;
+            }
+
+            for (int index = 0; index < length; index++)
+            {
+                if (!DispatchDemandDecompositionValidator.IsWithinRoundingEnvelope(
+                    series.Demand.BaseDemandMw[index],
+                    series.Demand.AdditiveComponentsByNameMw.Values.Select(component => component[index]),
+                    series.Demand.TotalDemandMw[index]))
+                {
+                    _errorMessage = "Dispatch demand decomposition does not add up.";
+                    return;
+                }
             }
 
             _selectedDate = _result.Scenario.PeriodStart.Date;
@@ -340,13 +361,14 @@
     private void BuildChart()
     {
         DispatchResultsDTO result = _result!;
-        int[] selectedIndexes = Enumerable.Range(0, result.DataSeries.DemandMw.Length)
+        double[] totalDemandMw = result.DataSeries.Demand.TotalDemandMw;
+        int[] selectedIndexes = Enumerable.Range(0, totalDemandMw.Length)
             .Where(IsSelected).ToArray();
         _rawPointCount = selectedIndexes.Length;
-        _peakDemandMw = selectedIndexes.Max(index => result.DataSeries.DemandMw[index]);
+        _peakDemandMw = selectedIndexes.Max(index => totalDemandMw[index]);
         _unservedEnergyMwh = selectedIndexes.Sum(index => result.DataSeries.UnservedDemandMw[index])
             * result.Scenario.Resolution.TotalHours;
-        double demandEnergyMwh = selectedIndexes.Sum(index => result.DataSeries.DemandMw[index])
+        double demandEnergyMwh = selectedIndexes.Sum(index => totalDemandMw[index])
             * result.Scenario.Resolution.TotalHours;
         _unservedEnergyPercent = demandEnergyMwh == 0
             ? 0
@@ -376,7 +398,7 @@
         {
             int[] bucket = selectedIndexes[offset..Math.Min(offset + bucketSize, selectedIndexes.Length)];
             timestamps.Add(InstantAt(bucket[0]));
-            demand.Add(bucket.Average(index => result.DataSeries.DemandMw[index]));
+            demand.Add(bucket.Average(index => totalDemandMw[index]));
             foreach (string technology in technologies)
             {
                 generation[technology].Add(bucket.Average(

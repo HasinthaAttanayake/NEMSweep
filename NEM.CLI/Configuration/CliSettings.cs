@@ -21,6 +21,23 @@ internal sealed record CliSettings(
         return settings;
     }
 
+    internal static ScenarioSettings LoadScenario(string path)
+    {
+        if (!File.Exists(path))
+        {
+            throw new FileNotFoundException("Scenario config was not found.", path);
+        }
+
+        ScenarioSettings scenario = JsonSerializer.Deserialize<ScenarioSettings>(
+            File.ReadAllBytes(path),
+            JsonFile.ReadOptions)
+            ?? throw new FormatException("Scenario config is empty.");
+        new CliSettings(
+            new OperationalDemandSettings("standalone", "standalone", default),
+            scenario).Validate();
+        return scenario;
+    }
+
     private void Validate()
     {
         ArgumentNullException.ThrowIfNull(OperationalDemand);
@@ -31,6 +48,13 @@ internal sealed record CliSettings(
         ArgumentException.ThrowIfNullOrWhiteSpace(Scenario.Name);
         ArgumentException.ThrowIfNullOrWhiteSpace(Scenario.DemandFile);
         ArgumentException.ThrowIfNullOrWhiteSpace(Scenario.WeatherFile);
+        if (double.IsNaN(Scenario.DataCentreNameplateMw)
+            || double.IsInfinity(Scenario.DataCentreNameplateMw)
+            || Scenario.DataCentreNameplateMw < 0)
+        {
+            throw new FormatException("scenario.dataCentreNameplateMw must be a finite, non-negative number.");
+        }
+
         ArgumentNullException.ThrowIfNull(Scenario.CostBasis);
         ArgumentNullException.ThrowIfNull(Scenario.Regions);
         if (Scenario.Regions.Length == 0
@@ -71,7 +95,8 @@ internal sealed record ScenarioSettings(
     string WeatherFile,
     CostBasisSettings CostBasis,
     ScenarioRegionSettings[] Regions,
-    StorageSizingSettings StorageSizing);
+    StorageSizingSettings StorageSizing,
+    double DataCentreNameplateMw = 0);
 
 internal sealed record ScenarioRegionSettings(
     string RegionId,
