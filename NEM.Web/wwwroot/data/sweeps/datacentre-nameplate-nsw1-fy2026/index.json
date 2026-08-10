@@ -10,114 +10,312 @@
       "configPath": "configs/p0.json",
       "detailPath": "points/p0.json",
       "failure": null,
+      "intervalPointers": {
+        "minimumStateOfChargeIntervalIndex": 0,
+        "peakCurtailmentIntervalIndex": 1957,
+        "peakUnservedIntervalIndex": null
+      },
       "label": "Baseline",
       "pointId": "p0",
+      "reliability": {
+        "achievedUsePercentageOfDemand": 0,
+        "standardName": "NEM reliability standard",
+        "targetUsePercentageOfDemand": 0.002,
+        "withinTarget": true
+      },
       "scalars": {
         "achievedRenewableShareGridScale": null,
         "achievedRenewableShareNative": null,
         "curtailedEnergyMwh": 598490.7,
+        "deliveredGenerationMwh": 66282328.1,
+        "demandMwh": 66275989,
         "energyServedMwh": 66275989,
         "generationSlcoeAudPerMwh": 167.36,
+        "hoursServedFraction": 1,
+        "peakUnservedPowerMw": 0,
         "slcoeAudPerMwh": 170.55,
         "storageEnergyMwh": 5515,
         "storagePowerMw": 940,
         "storageSlcoeAudPerMwh": 3.19,
         "unservedEnergyMwh": 0,
-        "unservedEnergyPercentageOfDemand": 0
+        "unservedEnergyPercentageOfDemand": 0,
+        "unservedHours": 0
       },
-      "status": "succeeded"
+      "status": "succeeded",
+      "storageSizing": {
+        "finalEnergyMwh": 5515,
+        "finalPowerMw": 940,
+        "initialEnergyMwh": 5515,
+        "initialPowerMw": 940,
+        "maximumEnergyMwh": 100000,
+        "maximumPowerMw": 10000,
+        "outcome": "notRequired",
+        "passesUsed": 1
+      }
     },
     {
       "axisValue": 500,
       "configPath": "configs/p1.json",
       "detailPath": "points/p1.json",
       "failure": null,
+      "intervalPointers": {
+        "minimumStateOfChargeIntervalIndex": 0,
+        "peakCurtailmentIntervalIndex": 1957,
+        "peakUnservedIntervalIndex": null
+      },
       "label": "\u002B500 MW",
       "pointId": "p1",
+      "reliability": {
+        "achievedUsePercentageOfDemand": 0,
+        "standardName": "NEM reliability standard",
+        "targetUsePercentageOfDemand": 0.002,
+        "withinTarget": true
+      },
       "scalars": {
         "achievedRenewableShareGridScale": null,
         "achievedRenewableShareNative": null,
         "curtailedEnergyMwh": 369323.5,
+        "deliveredGenerationMwh": 70662328.1,
+        "demandMwh": 70655989,
         "energyServedMwh": 70655989,
         "generationSlcoeAudPerMwh": 160.2,
+        "hoursServedFraction": 1,
+        "peakUnservedPowerMw": 0,
         "slcoeAudPerMwh": 163.2,
         "storageEnergyMwh": 5515,
         "storagePowerMw": 940,
         "storageSlcoeAudPerMwh": 3,
         "unservedEnergyMwh": 0,
-        "unservedEnergyPercentageOfDemand": 0
+        "unservedEnergyPercentageOfDemand": 0,
+        "unservedHours": 0
       },
-      "status": "succeeded"
+      "status": "succeeded",
+      "storageSizing": {
+        "finalEnergyMwh": 5515,
+        "finalPowerMw": 940,
+        "initialEnergyMwh": 5515,
+        "initialPowerMw": 940,
+        "maximumEnergyMwh": 100000,
+        "maximumPowerMw": 10000,
+        "outcome": "notRequired",
+        "passesUsed": 1
+      }
     },
     {
       "axisValue": 1000,
       "configPath": "configs/p2.json",
       "detailPath": "points/p2.json",
       "failure": null,
+      "intervalPointers": {
+        "minimumStateOfChargeIntervalIndex": 0,
+        "peakCurtailmentIntervalIndex": 1957,
+        "peakUnservedIntervalIndex": null
+      },
       "label": "\u002B1,000 MW",
       "pointId": "p2",
+      "reliability": {
+        "achievedUsePercentageOfDemand": 0,
+        "standardName": "NEM reliability standard",
+        "targetUsePercentageOfDemand": 0.002,
+        "withinTarget": true
+      },
       "scalars": {
         "achievedRenewableShareGridScale": null,
         "achievedRenewableShareNative": null,
         "curtailedEnergyMwh": 208139,
+        "deliveredGenerationMwh": 75042328.1,
+        "demandMwh": 75035989,
         "energyServedMwh": 75035989,
         "generationSlcoeAudPerMwh": 154.25,
+        "hoursServedFraction": 1,
+        "peakUnservedPowerMw": 0,
         "slcoeAudPerMwh": 157.07,
         "storageEnergyMwh": 5515,
         "storagePowerMw": 940,
         "storageSlcoeAudPerMwh": 2.82,
         "unservedEnergyMwh": 0,
-        "unservedEnergyPercentageOfDemand": 0
+        "unservedEnergyPercentageOfDemand": 0,
+        "unservedHours": 0
       },
-      "status": "succeeded"
+      "status": "succeeded",
+      "storageSizing": {
+        "finalEnergyMwh": 5515,
+        "finalPowerMw": 940,
+        "initialEnergyMwh": 5515,
+        "initialPowerMw": 940,
+        "maximumEnergyMwh": 100000,
+        "maximumPowerMw": 10000,
+        "outcome": "notRequired",
+        "passesUsed": 1
+      }
     },
     {
       "axisValue": 1500,
       "configPath": "configs/p3.json",
       "detailPath": "points/p3.json",
       "failure": null,
+      "intervalPointers": {
+        "minimumStateOfChargeIntervalIndex": 0,
+        "peakCurtailmentIntervalIndex": 1957,
+        "peakUnservedIntervalIndex": 1170
+      },
       "label": "\u002B1,500 MW",
       "pointId": "p3",
+      "reliability": {
+        "achievedUsePercentageOfDemand": 4.4071729687E-05,
+        "standardName": "NEM reliability standard",
+        "targetUsePercentageOfDemand": 0.002,
+        "withinTarget": true
+      },
       "scalars": {
         "achievedRenewableShareGridScale": null,
         "achievedRenewableShareNative": null,
         "curtailedEnergyMwh": 105105.3,
+        "deliveredGenerationMwh": 79422293.1,
+        "demandMwh": 79415989,
         "energyServedMwh": 79415954,
         "generationSlcoeAudPerMwh": 149.33,
+        "hoursServedFraction": 0.999885844748859,
+        "peakUnservedPowerMw": 35,
         "slcoeAudPerMwh": 152,
         "storageEnergyMwh": 5515,
         "storagePowerMw": 940,
         "storageSlcoeAudPerMwh": 2.67,
         "unservedEnergyMwh": 35,
-        "unservedEnergyPercentageOfDemand": 4.4071729687E-05
+        "unservedEnergyPercentageOfDemand": 4.4071729687E-05,
+        "unservedHours": 1
       },
-      "status": "succeeded"
+      "status": "succeeded",
+      "storageSizing": {
+        "finalEnergyMwh": 5515,
+        "finalPowerMw": 940,
+        "initialEnergyMwh": 5515,
+        "initialPowerMw": 940,
+        "maximumEnergyMwh": 100000,
+        "maximumPowerMw": 10000,
+        "outcome": "notRequired",
+        "passesUsed": 1
+      }
     },
     {
       "axisValue": 2000,
       "configPath": "configs/p4.json",
       "detailPath": "points/p4.json",
       "failure": null,
+      "intervalPointers": {
+        "minimumStateOfChargeIntervalIndex": 0,
+        "peakCurtailmentIntervalIndex": 1957,
+        "peakUnservedIntervalIndex": 1170
+      },
       "label": "\u002B2,000 MW",
       "pointId": "p4",
+      "reliability": {
+        "achievedUsePercentageOfDemand": 0.000839538990345,
+        "standardName": "NEM reliability standard",
+        "targetUsePercentageOfDemand": 0.002,
+        "withinTarget": true
+      },
       "scalars": {
         "achievedRenewableShareGridScale": null,
         "achievedRenewableShareNative": null,
         "curtailedEnergyMwh": 42985.6,
+        "deliveredGenerationMwh": 83801624.6,
+        "demandMwh": 83795989,
         "energyServedMwh": 83795285.5,
         "generationSlcoeAudPerMwh": 145.32,
+        "hoursServedFraction": 0.999657534246575,
+        "peakUnservedPowerMw": 535,
         "slcoeAudPerMwh": 147.85,
         "storageEnergyMwh": 5515,
         "storagePowerMw": 940,
         "storageSlcoeAudPerMwh": 2.53,
         "unservedEnergyMwh": 703.5,
-        "unservedEnergyPercentageOfDemand": 0.000839538990345
+        "unservedEnergyPercentageOfDemand": 0.000839538990345,
+        "unservedHours": 3
       },
-      "status": "succeeded"
+      "status": "succeeded",
+      "storageSizing": {
+        "finalEnergyMwh": 5515,
+        "finalPowerMw": 940,
+        "initialEnergyMwh": 5515,
+        "initialPowerMw": 940,
+        "maximumEnergyMwh": 100000,
+        "maximumPowerMw": 10000,
+        "outcome": "notRequired",
+        "passesUsed": 1
+      }
+    },
+    {
+      "axisValue": 2500,
+      "configPath": "configs/p5.json",
+      "detailPath": null,
+      "failure": {
+        "code": "batteryCapacityLimitReached",
+        "message": "Storage sizing ended with BatteryCapacityLimitReached: The Battery capacity bounds are insufficient for region NSW1.",
+        "stage": "sizing"
+      },
+      "intervalPointers": null,
+      "label": "\u002B2,500 MW",
+      "pointId": "p5",
+      "reliability": null,
+      "scalars": null,
+      "status": "failed",
+      "storageSizing": null
+    },
+    {
+      "axisValue": 3000,
+      "configPath": "configs/p6.json",
+      "detailPath": null,
+      "failure": {
+        "code": "batteryCapacityLimitReached",
+        "message": "Storage sizing ended with BatteryCapacityLimitReached: The Battery capacity bounds are insufficient for region NSW1.",
+        "stage": "sizing"
+      },
+      "intervalPointers": null,
+      "label": "\u002B3,000 MW",
+      "pointId": "p6",
+      "reliability": null,
+      "scalars": null,
+      "status": "failed",
+      "storageSizing": null
+    },
+    {
+      "axisValue": 3500,
+      "configPath": "configs/p7.json",
+      "detailPath": null,
+      "failure": {
+        "code": "batteryCapacityLimitReached",
+        "message": "Storage sizing ended with BatteryCapacityLimitReached: The Battery capacity bounds are insufficient for region NSW1.",
+        "stage": "sizing"
+      },
+      "intervalPointers": null,
+      "label": "\u002B3,500 MW",
+      "pointId": "p7",
+      "reliability": null,
+      "scalars": null,
+      "status": "failed",
+      "storageSizing": null
+    },
+    {
+      "axisValue": 4000,
+      "configPath": "configs/p8.json",
+      "detailPath": null,
+      "failure": {
+        "code": "batteryCapacityLimitReached",
+        "message": "Storage sizing ended with BatteryCapacityLimitReached: The Battery capacity bounds are insufficient for region NSW1.",
+        "stage": "sizing"
+      },
+      "intervalPointers": null,
+      "label": "\u002B4,000 MW",
+      "pointId": "p8",
+      "reliability": null,
+      "scalars": null,
+      "status": "failed",
+      "storageSizing": null
     }
   ],
   "provenance": {
-    "gitCommitSha": "9db69d46a6d811da077b873c9bc9c2e465913006",
+    "gitCommitSha": "03a76cb28a750913b099e7f8925401ed57bb521b",
     "inputFiles": [
       {
         "path": "NEM.Web/wwwroot/data/demand-data.json",
@@ -132,49 +330,39 @@
       {
         "path": "scenarios/nsw1-baseline-dispatch.json",
         "purpose": "baseline-scenario-config",
-        "sha256": "fea1d0ecf0d8d631e291992d6911d2f8bd973e14b8a3d6c043ca9e26374b93be"
+        "sha256": "0f515cae7e693edf7ff90427b6fa93cd187352465de50ba934882e119b996bdf"
       },
       {
         "path": "sweeps/datacentre-nameplate-nsw1-fy2026.json",
         "purpose": "sweep-definition",
-        "sha256": "ee6f6df49e704aae96233ad55e5f5f53111fb7050bcb3985de3d8890ec1d4f93"
-      },
-      {
-        "path": "sweeps/datacentre-nameplate-nsw1-fy2026/configs/p0.json",
-        "purpose": "emitted-scenario-config",
-        "sha256": "4caf8e68655afdd19f11124c6d5019d248f955ab6e474ba86405908dc6cbaf89"
-      },
-      {
-        "path": "sweeps/datacentre-nameplate-nsw1-fy2026/configs/p1.json",
-        "purpose": "emitted-scenario-config",
-        "sha256": "67ad180cb647481ebc1a387df9622351e8b7912b123ab68d9c908999da6a8f6e"
-      },
-      {
-        "path": "sweeps/datacentre-nameplate-nsw1-fy2026/configs/p2.json",
-        "purpose": "emitted-scenario-config",
-        "sha256": "b6fbd1f7e8201c070d4aa98bba1a9bdf113d75a191125c5a2750d361409eeec9"
-      },
-      {
-        "path": "sweeps/datacentre-nameplate-nsw1-fy2026/configs/p3.json",
-        "purpose": "emitted-scenario-config",
-        "sha256": "8a238c72109ad97d498817212b43001489732b1c8186e174b543da63500acda7"
-      },
-      {
-        "path": "sweeps/datacentre-nameplate-nsw1-fy2026/configs/p4.json",
-        "purpose": "emitted-scenario-config",
-        "sha256": "c268ea681bd87da96e72f2f264ee593c7740b5a182b9bbba716ea3e0c4cb47d3"
+        "sha256": "1c3cb57887ce200216265c1e781a1eb743f9b52b852bcc231fbc04dae7a0b1a7"
       }
     ],
-    "resolvedDefinitionSha256": "e9c40b2ec44f58f3777e3a590c1a072e4ea2f0d21dcd24fe9fa6b195ecf98ace",
+    "resolvedDefinitionSha256": "11716b7461a446ffcc9f26fc05952da85a1bb09e1b9e98cc1569558f93e86bac",
     "schemaVersions": {
-      "dispatchResults": 4,
+      "dispatchResults": 5,
       "operationalDemand": 2,
+      "regularSeries": 1,
       "sweepDefinition": 1,
-      "sweepIndex": 1,
+      "sweepIndex": 2,
       "weather": 5
     },
     "workingTreeDirty": false
   },
-  "schemaVersion": 1,
+  "schemaVersion": 2,
+  "scope": {
+    "periodEnd": "2026-07-01T00:00:00\u002B10:00",
+    "periodStart": "2025-07-01T00:00:00\u002B10:00",
+    "regionIds": [
+      "NSW1"
+    ],
+    "resolution": "01:00:00",
+    "weatherBasis": {
+      "description": "Typical meteorological year from AUS_NSW_Sydney.Obs-Observatory.Hill.947680_TMYx.2011-2025.epw for Sydney.Obs-Observatory.Hill (WMO 947680), applied to the dispatch period by calendar hour. It represents typical rather than extreme years, so it does not contain the tail weather events that drive storage and reliability outcomes.",
+      "kind": "typicalMeteorologicalYear",
+      "locationName": "Sydney.Obs-Observatory.Hill (WMO 947680)",
+      "sourceFile": "AUS_NSW_Sydney.Obs-Observatory.Hill.947680_TMYx.2011-2025.epw"
+    }
+  },
   "sweepId": "datacentre-nameplate-nsw1-fy2026"
 }

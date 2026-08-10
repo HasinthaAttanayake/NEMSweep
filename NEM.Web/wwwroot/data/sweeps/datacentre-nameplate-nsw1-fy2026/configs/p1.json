@@ -159,6 +159,7 @@
     "maximumEnergyMwh": 100000,
     "maximumPasses": 256,
     "maximumPowerMw": 10000,
+    "reliabilityStandardName": "NEM reliability standard",
     "targetUsePercentage": 0.002
   },
   "weatherFile": "NEM.Web/wwwroot/data/weather-data.json"

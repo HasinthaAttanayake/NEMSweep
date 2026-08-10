@@ -1,0 +1,166 @@
+{
+  "costBasis": {
+    "realDiscountRate": 0.07,
+    "year": 2026
+  },
+  "dataCentreNameplateMw": 3000,
+  "demandFile": "NEM.Web/wwwroot/data/demand-data.json",
+  "id": "datacentre-nameplate-nsw1-fy2026-p6",
+  "name": "NSW1 baseline dispatch",
+  "provenance": {
+    "baselineConfigPath": "scenarios/nsw1-baseline-dispatch.json",
+    "pointId": "p6",
+    "sweepId": "datacentre-nameplate-nsw1-fy2026"
+  },
+  "regions": [
+    {
+      "generatingFleets": [
+        {
+          "costParameters": {
+            "capitalCostAudPerMw": 1516000,
+            "fixedOperatingCostAudPerMwYear": 12000,
+            "fuelPriceAudPerGj": 0,
+            "variableOperatingCostAudPerMwh": 0
+          },
+          "nameplateCapacityMw": 6600,
+          "technology": "Solar",
+          "technologyProfile": {
+            "heatRateGjPerMwh": 0,
+            "technicalLifeYears": 30
+          }
+        },
+        {
+          "costParameters": {
+            "capitalCostAudPerMw": 3248000,
+            "fixedOperatingCostAudPerMwYear": 29000,
+            "fuelPriceAudPerGj": 0,
+            "variableOperatingCostAudPerMwh": 0
+          },
+          "nameplateCapacityMw": 2500,
+          "technology": "Wind",
+          "technologyProfile": {
+            "heatRateGjPerMwh": 0,
+            "technicalLifeYears": 25
+          }
+        },
+        {
+          "costParameters": {
+            "capitalCostAudPerMw": 3884000,
+            "fixedOperatingCostAudPerMwYear": 30000,
+            "fuelPriceAudPerGj": 0,
+            "variableOperatingCostAudPerMwh": 0
+          },
+          "monthlyCapacityFactors": [
+            {
+              "capacityFactor": 0.09536282375678666,
+              "month": "2025-07-01"
+            },
+            {
+              "capacityFactor": 0.10710304694817772,
+              "month": "2025-08-01"
+            },
+            {
+              "capacityFactor": 0.08931152279595322,
+              "month": "2025-09-01"
+            },
+            {
+              "capacityFactor": 0.10791892888476357,
+              "month": "2025-10-01"
+            },
+            {
+              "capacityFactor": 0.09934634082249376,
+              "month": "2025-11-01"
+            },
+            {
+              "capacityFactor": 0.10514281112651044,
+              "month": "2025-12-01"
+            },
+            {
+              "capacityFactor": 0.06835395289500341,
+              "month": "2026-01-01"
+            },
+            {
+              "capacityFactor": 0.08905109146536029,
+              "month": "2026-02-01"
+            },
+            {
+              "capacityFactor": 0.07438830046494674,
+              "month": "2026-03-01"
+            },
+            {
+              "capacityFactor": 0.08490999868611221,
+              "month": "2026-04-01"
+            },
+            {
+              "capacityFactor": 0.1228167211294349,
+              "month": "2026-05-01"
+            },
+            {
+              "capacityFactor": 0.19643717426531773,
+              "month": "2026-06-01"
+            }
+          ],
+          "nameplateCapacityMw": 2537,
+          "technology": "Hydro",
+          "technologyProfile": {
+            "heatRateGjPerMwh": 0,
+            "technicalLifeYears": 80
+          }
+        },
+        {
+          "costParameters": {
+            "capitalCostAudPerMw": 6946000,
+            "fixedOperatingCostAudPerMwYear": 64851,
+            "fuelPriceAudPerGj": 4.175,
+            "variableOperatingCostAudPerMwh": 4.68
+          },
+          "nameplateCapacityMw": 8200,
+          "technology": "Coal",
+          "technologyProfile": {
+            "heatRateGjPerMwh": 8.547,
+            "technicalLifeYears": 30
+          }
+        },
+        {
+          "costParameters": {
+            "capitalCostAudPerMw": 2640000,
+            "fixedOperatingCostAudPerMwYear": 36000,
+            "fuelPriceAudPerGj": 15.313,
+            "variableOperatingCostAudPerMwh": 5
+          },
+          "nameplateCapacityMw": 6000,
+          "technology": "Gas",
+          "technologyProfile": {
+            "heatRateGjPerMwh": 7.073,
+            "technicalLifeYears": 25
+          }
+        }
+      ],
+      "regionId": "NSW1",
+      "storageFleets": [
+        {
+          "costParameters": {
+            "energyCapitalCostAudPerMwh": 246700,
+            "fixedOperatingCostAudPerMwYear": 15000,
+            "powerCapitalCostAudPerMw": 467200
+          },
+          "initialEnergyCapacityMwh": 5515,
+          "initialPowerCapacityMw": 940,
+          "technology": "Battery",
+          "technologyProfile": {
+            "roundTripEfficiency": 0.87,
+            "technicalLifeYears": 15
+          }
+        }
+      ]
+    }
+  ],
+  "storageSizing": {
+    "maximumEnergyMwh": 100000,
+    "maximumPasses": 256,
+    "maximumPowerMw": 10000,
+    "reliabilityStandardName": "NEM reliability standard",
+    "targetUsePercentage": 0.002
+  },
+  "weatherFile": "NEM.Web/wwwroot/data/weather-data.json"
+}

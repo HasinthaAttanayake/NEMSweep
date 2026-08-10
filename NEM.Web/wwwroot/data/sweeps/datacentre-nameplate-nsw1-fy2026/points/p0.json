@@ -61347,7 +61347,7 @@
     },
     "demand": {
       "additiveComponentsByNameMw": {},
-      "baseDemandSeriesPath": "../series/base-demand-3ec41fe71c5aede87d04a56a0a0c1546aff378e55d9e0315238a5eb048d05a40.json",
+      "baseDemandSeriesPath": "../series/base-demand-831978c8987c6b9845fcf1aa98a36e34df562355ecb84ef9754e9145718435ad.json",
       "totalDemandMw": [
         8477,
         8102.5,
@@ -96462,18 +96462,29 @@
       "PUBLIC_ACTUAL_OPERATIONAL_DEMAND_HH_20260705.zip",
       "PUBLIC_ARCHIVE#DEMANDOPERATIONALACTUAL#FILE01#202507010000.zip"
     ],
+    "weatherBasis": {
+      "description": "Typical meteorological year from AUS_NSW_Sydney.Obs-Observatory.Hill.947680_TMYx.2011-2025.epw for Sydney.Obs-Observatory.Hill (WMO 947680), applied to the dispatch period by calendar hour. It represents typical rather than extreme years, so it does not contain the tail weather events that drive storage and reliability outcomes.",
+      "kind": "typicalMeteorologicalYear",
+      "locationName": "Sydney.Obs-Observatory.Hill (WMO 947680)",
+      "sourceFile": "AUS_NSW_Sydney.Obs-Observatory.Hill.947680_TMYx.2011-2025.epw"
+    },
     "weatherInput": {
       "fileName": "weather-data.json",
       "schemaVersion": 5,
       "sha256": "e69f145f66ab83b8a57e98c637ac9d851f40267afe927a6a9a5be8fb4ef31ef8"
     }
   },
-  "generatedAt": "2026-08-09T12:02:19.1994717\u002B00:00",
+  "generatedAt": "2026-08-10T03:54:43.7346736\u002B00:00",
   "metrics": {
     "curtailedEnergyMwh": 598490.7,
     "deliveredGenerationMwh": 66282328.1,
     "demandMwh": 66275989,
     "hoursServedFraction": 1,
+    "intervalPointers": {
+      "minimumStateOfChargeIntervalIndex": 0,
+      "peakCurtailmentIntervalIndex": 1957,
+      "peakUnservedIntervalIndex": null
+    },
     "peakUnservedPowerMw": 0,
     "unservedEnergyMwh": 0,
     "unservedEnergyPercentageOfDemand": 0,
@@ -96511,6 +96522,12 @@
       }
     ]
   },
+  "reliability": {
+    "achievedUsePercentageOfDemand": 0,
+    "standardName": "NEM reliability standard",
+    "targetUsePercentageOfDemand": 0.002,
+    "withinTarget": true
+  },
   "scenario": {
     "id": "datacentre-nameplate-nsw1-fy2026-p0",
     "name": "NSW1 baseline dispatch",
@@ -96519,5 +96536,15 @@
     "region": "NSW1",
     "resolution": "01:00:00"
   },
-  "schemaVersion": 4
+  "schemaVersion": 5,
+  "storageSizing": {
+    "finalEnergyMwh": 5515,
+    "finalPowerMw": 940,
+    "initialEnergyMwh": 5515,
+    "initialPowerMw": 940,
+    "maximumEnergyMwh": 100000,
+    "maximumPowerMw": 10000,
+    "outcome": "notRequired",
+    "passesUsed": 1
+  }
 }
