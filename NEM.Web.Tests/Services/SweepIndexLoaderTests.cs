@@ -14,53 +14,38 @@ public sealed class SweepIndexLoaderTests
     [Fact]
     public async Task LoadAsync_ReturnsInvalidDataForAnUnsupportedSchema()
     {
-        using var http = new HttpClient(new StaticJsonHandler("""{ "schemaVersion": 99 }"""))
-        {
-            BaseAddress = new Uri("https://example.test/"),
-        };
+        ArtifactLoadResult<SweepIndexDTO> result = await LoadAsync("""{ "schemaVersion": 99 }""");
 
-        SweepIndexLoadState state = await new SweepIndexLoader().LoadAsync(http, "data/sweeps/test/index.json");
-
-        state.Status.Should().Be(SweepIndexLoadStatus.InvalidData);
-        state.Index.Should().BeNull();
-        state.Message.Should().Contain("schema 99 is not supported");
+        result.State.Status.Should().Be(ArtifactLoadStatus.InvalidData);
+        result.Value.Should().BeNull();
+        result.State.Message.Should().Contain("schema 99 is not supported");
     }
 
     [Fact]
     public async Task LoadAsync_ReturnsInvalidDataForSchemaOnlyJson()
     {
-        using var http = new HttpClient(new StaticJsonHandler(
-            $$"""{ "schemaVersion": {{ArtifactSchemaVersions.SweepIndex}} }"""))
-        {
-            BaseAddress = new Uri("https://example.test/"),
-        };
+        ArtifactLoadResult<SweepIndexDTO> result = await LoadAsync(
+            $$"""{ "schemaVersion": {{ArtifactSchemaVersions.SweepIndex}} }""");
 
-        SweepIndexLoadState state = await new SweepIndexLoader().LoadAsync(http, "data/sweeps/test/index.json");
-
-        state.Status.Should().Be(SweepIndexLoadStatus.InvalidData);
-        state.Index.Should().BeNull();
-        state.Message.Should().Be("Sweep index sweep id is missing.");
+        result.State.Status.Should().Be(ArtifactLoadStatus.InvalidData);
+        result.Value.Should().BeNull();
+        result.State.Message.Should().Be("Sweep index sweep id is missing.");
     }
 
     [Fact]
     public async Task LoadAsync_ReturnsInvalidDataForAStatusOutsideTheContract()
     {
-        using var http = new HttpClient(new StaticJsonHandler(
+        ArtifactLoadResult<SweepIndexDTO> result = await LoadAsync(
             $$"""
             {
               "schemaVersion": {{ArtifactSchemaVersions.SweepIndex}},
               "sweepId": "test",
               "points": [{ "pointId": "p0", "status": "pending" }]
             }
-            """))
-        {
-            BaseAddress = new Uri("https://example.test/"),
-        };
+            """);
 
-        SweepIndexLoadState state = await new SweepIndexLoader().LoadAsync(http, "data/sweeps/test/index.json");
-
-        state.Status.Should().Be(SweepIndexLoadStatus.InvalidData);
-        state.Index.Should().BeNull();
+        result.State.Status.Should().Be(ArtifactLoadStatus.InvalidData);
+        result.Value.Should().BeNull();
     }
 
     [Fact]
@@ -68,7 +53,7 @@ public sealed class SweepIndexLoaderTests
     {
         // The enum converter accepts bare numbers, so the loader cannot rely on deserialization
         // alone to reject a status outside the closed set.
-        using var http = new HttpClient(new StaticJsonHandler(
+        ArtifactLoadResult<SweepIndexDTO> result = await LoadAsync(
             $$"""
             {
               "schemaVersion": {{ArtifactSchemaVersions.SweepIndex}},
@@ -90,15 +75,31 @@ public sealed class SweepIndexLoaderTests
                 "configPath": "configs/p0.json"
               }]
             }
-            """))
-        {
-            BaseAddress = new Uri("https://example.test/"),
-        };
+            """);
 
-        SweepIndexLoadState state = await new SweepIndexLoader().LoadAsync(http, "data/sweeps/test/index.json");
+        result.State.Status.Should().Be(ArtifactLoadStatus.InvalidData);
+        result.State.Message.Should().Contain("unsupported status");
+    }
 
-        state.Status.Should().Be(SweepIndexLoadStatus.InvalidData);
-        state.Message.Should().Contain("unsupported status");
+    [Fact]
+    public void Validate_AcceptsAWellFormedIndex()
+    {
+        SweepIndexValidator.Validate(ValidIndex(ValidPoint())).Should().BeNull();
+    }
+
+    [Fact]
+    public void Validate_RejectsAnIndexWithNoPoints()
+    {
+        // A sweep page cannot choose a series to open on, so a successful-but-blank page would be
+        // the alternative.
+        SweepIndexValidator.Validate(ArtifactFixtures.Index())
+            .Should().Be("Sweep index contains no points.");
+    }
+
+    [Fact]
+    public void Validate_AcceptsAnIndexWithoutAScope()
+    {
+        SweepIndexValidator.Validate(ValidIndex(ValidPoint()) with { Scope = null }).Should().BeNull();
     }
 
     [Fact]
@@ -112,28 +113,8 @@ public sealed class SweepIndexLoaderTests
             Failure = new SweepPointFailureDTO(SweepFailureStage.Sizing, "capped", "Capped."),
         };
 
-        SweepIndexLoader.Validate(ValidIndex(failed)).Message
+        SweepIndexValidator.Validate(ValidIndex(failed))
             .Should().Contain("cannot include detail or results");
-    }
-
-    [Fact]
-    public void Validate_ReturnsExplicitLoadingAndReadyStates()
-    {
-        SweepIndexLoadState loading = SweepIndexLoadState.Loading();
-        SweepIndexLoadState ready = SweepIndexLoader.Validate(ValidIndex());
-
-        loading.Status.Should().Be(SweepIndexLoadStatus.Loading);
-        ready.Status.Should().Be(SweepIndexLoadStatus.Ready);
-        ready.Index!.SweepId.Should().Be("test");
-        ready.Index.Scope!.RegionIds.Should().Equal("NSW1");
-    }
-
-    [Fact]
-    public void Validate_AcceptsAnIndexWithoutAScope()
-    {
-        SweepIndexLoadState state = SweepIndexLoader.Validate(ValidIndex() with { Scope = null });
-
-        state.Status.Should().Be(SweepIndexLoadStatus.Ready);
     }
 
     [Theory]
@@ -162,42 +143,32 @@ public sealed class SweepIndexLoaderTests
                 : null,
         };
 
-        SweepIndexLoadState state = SweepIndexLoader.Validate(ValidIndex(point));
-
-        state.Status.Should().Be(SweepIndexLoadStatus.InvalidData);
-        state.Index.Should().BeNull();
-        state.Message.Should().Contain(expectedMessage);
+        SweepIndexValidator.Validate(ValidIndex(point)).Should().Contain(expectedMessage);
     }
 
     [Fact]
     public void Validate_ReturnsInvalidDataWhenASucceededPointOmitsItsModelFacts()
     {
-        SweepIndexLoadState missingReliability = SweepIndexLoader.Validate(
-            ValidIndex(ValidPoint() with { Reliability = null }));
-        SweepIndexLoadState missingSizing = SweepIndexLoader.Validate(
-            ValidIndex(ValidPoint() with { StorageSizing = null }));
-        SweepIndexLoadState missingPointers = SweepIndexLoader.Validate(
-            ValidIndex(ValidPoint() with { IntervalPointers = null }));
-
-        missingReliability.Message.Should().Contain("reliability basis is missing");
-        missingSizing.Message.Should().Contain("storage sizing outcome is missing");
-        missingPointers.Message.Should().Contain("interval pointers are missing");
+        SweepIndexValidator.Validate(ValidIndex(ValidPoint() with { Reliability = null }))
+            .Should().Contain("reliability basis is missing");
+        SweepIndexValidator.Validate(ValidIndex(ValidPoint() with { StorageSizing = null }))
+            .Should().Contain("storage sizing outcome is missing");
+        SweepIndexValidator.Validate(ValidIndex(ValidPoint() with { IntervalPointers = null }))
+            .Should().Contain("interval pointers are missing");
     }
 
     [Fact]
     public void Validate_ReturnsInvalidDataForAnUnusableScope()
     {
-        SweepIndexLoadState noRegions = SweepIndexLoader.Validate(ValidIndex() with
+        SweepIndexValidator.Validate(ValidIndex(ValidPoint()) with
         {
             Scope = ValidScope() with { RegionIds = [] },
-        });
-        SweepIndexLoadState invertedPeriod = SweepIndexLoader.Validate(ValidIndex() with
+        }).Should().Be("Sweep index scope is invalid.");
+
+        SweepIndexValidator.Validate(ValidIndex(ValidPoint()) with
         {
             Scope = ValidScope() with { PeriodEnd = PeriodStart.AddDays(-1) },
-        });
-
-        noRegions.Message.Should().Be("Sweep index scope is invalid.");
-        invertedPeriod.Message.Should().Be("Sweep index scope is invalid.");
+        }).Should().Be("Sweep index scope is invalid.");
     }
 
     [Fact]
@@ -206,13 +177,21 @@ public sealed class SweepIndexLoaderTests
         SweepIndexPointDTO first = ValidPoint();
         SweepIndexPointDTO second = ValidPoint() with { Label = "Second" };
 
-        SweepIndexLoadState duplicateId = SweepIndexLoader.Validate(ValidIndex(first, second));
-        SweepIndexLoadState duplicateLabel = SweepIndexLoader.Validate(ValidIndex(
-            first,
-            second with { PointId = "p1", Label = first.Label }));
+        SweepIndexValidator.Validate(ValidIndex(first, second))
+            .Should().Be("Sweep index point id 'p0' is duplicated.");
+        SweepIndexValidator.Validate(ValidIndex(first, second with { PointId = "p1", Label = first.Label }))
+            .Should().Be("Sweep index point label 'Baseline' is duplicated.");
+    }
 
-        duplicateId.Message.Should().Be("Sweep index point id 'p0' is duplicated.");
-        duplicateLabel.Message.Should().Be("Sweep index point label 'Baseline' is duplicated.");
+    private static async Task<ArtifactLoadResult<SweepIndexDTO>> LoadAsync(string json)
+    {
+        using var http = new HttpClient(new StaticJsonHandler(json))
+        {
+            BaseAddress = new Uri("https://example.test/"),
+        };
+
+        return await new SweepIndexLoader(new ArtifactLoader(http))
+            .LoadAsync("data/sweeps/test/index.json");
     }
 
     private static SweepIndexDTO ValidIndex(params SweepIndexPointDTO[] points) => new(

@@ -1,0 +1,125 @@
+@using NEM.Contracts
+@using NEM.Web.Services
+
+@* Every headline figure for every run. The index now carries the reliability metrics that used to
+   cost one multi-megabyte detail fetch each, so the whole table is free. *@
+<section class="run-table-section" aria-label="Runs in this sweep">
+    <div class="run-table-heading">
+        <div>
+            <h2>All runs</h2>
+            <p>Every figure the sweep index records, per run. Each run opens in the same viewer as the baseline dispatch.</p>
+        </div>
+    </div>
+
+    <div class="run-table-scroll">
+        <table class="run-table">
+            <thead>
+                <tr>
+                    <th scope="col" class="sticky-column">Run</th>
+                    <th scope="col">@Index.Axis.Label<small>@Index.Axis.Unit</small></th>
+                    <th scope="col">Outcome</th>
+                    <th scope="col">Reliability<small>vs target</small></th>
+                    <th scope="col">Storage sizing</th>
+                    @foreach (SweepChartYAxis column in SweepSeriesCatalogue.All)
+                    {
+                        <th scope="col">@column.Label<small>@column.Unit</small></th>
+                    }
+                    <th scope="col"><span class="visually-hidden">Open</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (SweepIndexPointDTO point in Index.Points)
+                {
+                    <tr>
+                        <th scope="row" class="sticky-column">@point.Label</th>
+                        <td>@point.AxisValue.ToString(_axisFormat)</td>
+                        <td>
+                            @if (point.Status == SweepPointStatus.Succeeded)
+                            {
+                                <span>Completed</span>
+                            }
+                            else
+                            {
+                                <span class="run-constrained" title="@point.Failure?.Message">
+                                    @StageLabel(point.Failure?.Stage) constraint
+                                </span>
+                            }
+                        </td>
+                        <td>
+                            @if (point.Reliability is null)
+                            {
+                                <span>—</span>
+                            }
+                            else
+                            {
+                                <span class="@(point.Reliability.WithinTarget ? "within-target" : "outside-target")">
+                                    @(point.Reliability.WithinTarget ? "Within" : "Outside")
+                                </span>
+                            }
+                        </td>
+                        <td>@SizingLabel(point.StorageSizing)</td>
+                        @foreach (SweepChartYAxis column in SweepSeriesCatalogue.All)
+                        {
+                            <td>@Scalar(point, column)</td>
+                        }
+                        <td>
+                            @if (point.Status == SweepPointStatus.Succeeded)
+                            {
+                                <a href="@SweepPaths.RunRoute(Index.SweepId, point.PointId)">Open run</a>
+                            }
+                            else
+                            {
+                                <span class="run-failure" title="@point.Failure?.Message">@point.Failure?.Code</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public SweepIndexDTO Index { get; set; } = default!;
+
+    private readonly Dictionary<string, string> _columnFormats = new(StringComparer.Ordinal);
+    private string _axisFormat = "N0";
+
+    protected override void OnParametersSet()
+    {
+        // A column reads as a column only when every cell in it shares a decimal count, so the
+        // precision is chosen per column from the values it actually holds.
+        _axisFormat = SweepValueFormat.ColumnFormat(Index.Points.Select(point => (double?)point.AxisValue));
+        _columnFormats.Clear();
+        foreach (SweepChartYAxis column in SweepSeriesCatalogue.All)
+        {
+            _columnFormats[column.Key] = SweepValueFormat.ColumnFormat(Index.Points.Select(point =>
+                point.Scalars is null ? null : column.SelectValue(point.Scalars)));
+        }
+    }
+
+    private string Scalar(SweepIndexPointDTO point, SweepChartYAxis column)
+    {
+        double? value = point.Scalars is null ? null : column.SelectValue(point.Scalars);
+        return value is null
+            ? "—"
+            : SweepValueFormat.WithPrefix(column.ValuePrefix, value.Value, value.Value.ToString(_columnFormats[column.Key]));
+    }
+
+    private static string SizingLabel(StorageSizingOutcomeDTO? sizing) => sizing?.Outcome switch
+    {
+        StorageSizingOutcome.NotRequired => "Not required",
+        StorageSizingOutcome.Resized => "Resized",
+        _ => "—",
+    };
+
+    private static string StageLabel(SweepFailureStage? stage) => stage switch
+    {
+        SweepFailureStage.Input => "Input",
+        SweepFailureStage.Dispatch => "Dispatch",
+        SweepFailureStage.Sizing => "Sizing",
+        SweepFailureStage.Costing => "Costing",
+        SweepFailureStage.Export => "Export",
+        _ => "Unattributed",
+    };
+}

@@ -1,25 +1,46 @@
 @page "/dispatch"
+@page "/runs/{SweepId}/{PointId}"
 @using NEM.Contracts
 @using NEM.Web.Services
 @using System.Globalization
-@using System.Text.Json
-@inject HttpClient Http
+@inject ArtifactLoader ArtifactLoader
+@inject SweepIndexLoader SweepIndexLoader
+@inject NavigationManager Navigation
 
-<PageTitle>Dispatch</PageTitle>
+<PageTitle>@PageTitleText</PageTitle>
 
 <main class="dispatch-page">
-    <header class="dispatch-header">
-        <div>
-            <p class="eyebrow">Merit-order simulation</p>
-            <h1>Dispatch</h1>
+    <PageHeader Eyebrow="@PageEyebrow" Title="@PageTitleText">
+        <ScopeContent>
             @if (_result is not null)
             {
-                <p class="scope-line">@RegionName(_result.Scenario.Region) · @_result.Scenario.Name</p>
+                <ScopeLine Region="@RegionName(_result.Scenario.Region)"
+                           Period="@ArtifactPeriod"
+                           Resolution="@ResolutionLabel" />
+                @if (_runContext is not null)
+                {
+                    <p class="run-axis">@_runContext.Sweep.Axis.Label: @_runContext.Point.Label (@_runContext.Point.AxisValue.ToString("N0") @_runContext.Sweep.Axis.Unit)</p>
+                }
             }
-        </div>
-        @if (!_isLoading && _errorMessage is null)
-        {
-            <div class="dispatch-controls">
+        </ScopeContent>
+        <TrailingContent>
+            @if (_loadState.Status == ArtifactLoadStatus.Success)
+            {
+                <div class="dispatch-controls">
+                @if (_runContext is not null)
+                {
+                    <nav class="run-navigation" aria-label="Sweep run navigation">
+                        <a href="@SweepPaths.PageRoute(_runContext.Sweep.SweepId)">All runs in this sweep</a>
+                        @if (_runContext.PreviousPoint is not null)
+                        {
+                            <a href="@RunRoute(_runContext.PreviousPoint)">Previous</a>
+                        }
+                        @if (_runContext.NextPoint is not null)
+                        {
+                            <a href="@RunRoute(_runContext.NextPoint)">Next</a>
+                        }
+                    </nav>
+                }
                 <MudSelect T="int" Label="View" Value="_selectedView" ValueChanged="OnViewChanged"
                            Variant="Variant.Outlined" Class="view-select">
                     <MudSelectItem T="int" Value="0">Full financial year</MudSelectItem>
@@ -38,26 +59,52 @@
                                @onchange="OnDateChanged" />
                     </label>
                 }
-            </div>
-        }
-    </header>
+                @if (_runContext is not null && ComparablePoints.Count > 0)
+                {
+                    <MudSelect T="string" Label="Compare with" Value="@(CompareId ?? string.Empty)"
+                               ValueChanged="OnComparisonChanged" Variant="Variant.Outlined" Class="view-select">
+                        <MudSelectItem T="string" Value="@string.Empty">No comparison</MudSelectItem>
+                        @foreach (SweepIndexPointDTO point in ComparablePoints)
+                        {
+                            <MudSelectItem T="string" Value="@point.PointId">@point.Label</MudSelectItem>
+                        }
+                    </MudSelect>
+                }
+                </div>
+            }
+        </TrailingContent>
+    </PageHeader>
 
-    @if (_isLoading)
-    {
-        <div class="status-block"><MudProgressCircular Color="Color.Primary" Indeterminate="true" /></div>
-    }
-    else if (_errorMessage is not null)
-    {
-        <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
-    }
-    else
-    {
-        <section class="metric-strip" aria-label="Selected dispatch period summary">
-            <div><span>Peak demand</span><strong>@_peakDemandMw.ToString("N0")</strong><small>MW</small></div>
-            <div><span>Energy delivered</span><strong>@_deliveredEnergyMwh.ToString("N0")</strong><small>MWh</small></div>
-            <div><span>Renewable share</span><strong>@_renewableSharePercent.ToString("N1")</strong><small>% of delivered generation</small></div>
-            <div><span>Unserved energy</span><strong>@_unservedEnergyMwh.ToString("N0")</strong><small>MWh · @_unservedEnergyPercent.ToString("N3")% USE · @_peakUnservedPowerMw.ToString("N0") MW peak</small></div>
-        </section>
+    <ArtifactLoadStateView State="_loadState">
+        <MetricStrip Items="@DispatchMetrics" AriaLabel="Selected dispatch period summary"
+                     Class="dispatch-metrics" />
+
+        @if (_events.Count > 0)
+        {
+            <nav class="event-jumps" aria-label="Jump to a notable interval">
+                <span>Jump to</span>
+                @foreach (DispatchEvent notableEvent in _events)
+                {
+                    <button type="button" @onclick="@(() => JumpTo(notableEvent))">
+                        @notableEvent.Label
+                        <small>@notableEvent.Instant.ToString("ddd d MMM yyyy")</small>
+                    </button>
+                }
+            </nav>
+        }
+
+        @if (_comparisonMessage is not null)
+        {
+            <MudAlert Severity="Severity.Warning" Class="comparison-alert">@_comparisonMessage</MudAlert>
+        }
+        else if (_comparison is not null)
+        {
+            <p class="comparison-note" role="status">
+                Dashed traces are <strong>@_comparison.Point.Label</strong>
+                (@_comparison.Point.AxisValue.ToString("N0") @_runContext!.Sweep.Axis.Unit),
+                drawn on the same axes.
+            </p>
+        }
 
         <div class="trace-context">
             <span>@_periodLabel</span>
@@ -71,7 +118,7 @@
                 <div>
                     <p class="section-label">Full financial year</p>
                     <h2 id="system-cost-heading">System cost</h2>
-                    <p>Annualised generation and storage asset costs per MWh served in @_result.Scenario.Region.</p>
+                    <p>Annualised generation and storage asset costs per MWh served in @RegionName(_result.Scenario.Region).</p>
                 </div>
                 <span class="cost-status">@_result.Cost.Status</span>
             </div>
@@ -79,7 +126,7 @@
             <div class="cost-layout">
                 <div class="cost-primary">
                     <span>System levelised cost</span>
-                    <strong>@_result.Cost.SlcoeAudPerMwh.ToString("N2")</strong>
+                    <strong>@FormatAudPerMwh(_result.Cost.SlcoeAudPerMwh)</strong>
                     <small>AUD/MWh served</small>
                     <p>Generation and storage assets are included. Transmission is not yet modelled.</p>
                 </div>
@@ -88,7 +135,7 @@
                     <div class="cost-component">
                         <div>
                             <span>Generation</span>
-                            <strong>@_result.Cost.GenerationSlcoeAudPerMwh.ToString("N2") AUD/MWh</strong>
+                            <strong>@FormatAudPerMwh(_result.Cost.GenerationSlcoeAudPerMwh) AUD/MWh</strong>
                         </div>
                         <div class="cost-track" aria-hidden="true">
                             <i style="@CostShareStyle(_result.Cost.GenerationSlcoeAudPerMwh)"></i>
@@ -97,7 +144,7 @@
                     <div class="cost-component storage-cost-component">
                         <div>
                             <span>Storage assets</span>
-                            <strong>@_result.Cost.StorageSlcoeAudPerMwh.ToString("N2") AUD/MWh</strong>
+                            <strong>@FormatAudPerMwh(_result.Cost.StorageSlcoeAudPerMwh) AUD/MWh</strong>
                         </div>
                         <div class="cost-track" aria-hidden="true">
                             <i style="@CostShareStyle(_result.Cost.StorageSlcoeAudPerMwh)"></i>
@@ -118,11 +165,9 @@
             </div>
         </section>
 
-        <section class="chart-section">
-            <div class="chart-heading">
-                <div><h2>Generation against demand</h2><p>Delivered generation is stacked by technology; the demand trace reveals any supply gap.</p></div>
-                <span class="unit-badge">MW</span>
-            </div>
+        <ChartFrame Heading="Generation against demand"
+                    Description="Delivered generation is stacked by technology; the demand trace reveals any supply gap."
+                    Unit="MW">
             <div class="dispatch-chart">
                 <svg viewBox="0 0 1000 440" role="img" aria-label="Stacked generation by technology against operational demand">
                     @for (int tick = 0; tick <= 4; tick++)
@@ -134,10 +179,21 @@
                     {
                         <polygon points="@area.Points" fill="@area.Color"><title>@area.Name</title></polygon>
                     }
+                    @if (_comparisonDemandPoints is not null)
+                    {
+                        <polyline class="demand-line comparison-trace"
+                                  points="@_comparisonDemandPoints"
+                                  fill="none"
+                                  stroke="var(--color-demand-line)"
+                                  stroke-width="2"
+                                  stroke-dasharray="6 4"
+                                  stroke-linejoin="round"
+                                  vector-effect="non-scaling-stroke" />
+                    }
                     <polyline class="demand-line"
                               points="@_demandPoints"
                               fill="none"
-                              stroke="#101820"
+                              stroke="var(--color-demand-line)"
                               stroke-width="2.5"
                               stroke-linejoin="round"
                               vector-effect="non-scaling-stroke" />
@@ -151,13 +207,12 @@
                 }
                 <span><i class="demand-key"></i>Demand</span>
             </div>
-        </section>
+        </ChartFrame>
 
-        <section class="chart-section storage-section">
-            <div class="chart-heading">
-                <div><h2>Storage state of charge</h2><p>Stored energy at the beginning of each interval for the selected period.</p></div>
-                <span class="unit-badge">MWh</span>
-            </div>
+        <ChartFrame Heading="Storage state of charge"
+                    Description="Stored energy at the beginning of each interval for the selected period."
+                    Unit="MWh"
+                    Class="storage-section">
             @if (_storageTraces.Count == 0)
             {
                 <div class="empty-storage" role="status">
@@ -173,6 +228,14 @@
                         {
                             double y = StorageChartY(_storageChartMaximumMwh * tick / 4);
                             <line class="grid-line" x1="64" y1="@y" x2="984" y2="@y" stroke="#dce1e5" stroke-width="1" />
+                        }
+                        @foreach (StorageTrace trace in _comparisonStorageTraces)
+                        {
+                            <polyline class="comparison-trace" points="@trace.Points" fill="none" stroke="@trace.Color"
+                                      stroke-width="2" stroke-dasharray="6 4" stroke-linejoin="round"
+                                      vector-effect="non-scaling-stroke">
+                                <title>@trace.Technology state of charge, @(_comparison?.Point.Label)</title>
+                            </polyline>
                         }
                         @foreach (StorageTrace trace in _storageTraces)
                         {
@@ -191,7 +254,72 @@
                     }
                 </div>
             }
+        </ChartFrame>
+
+        <ChartFrame Heading="Unserved demand and curtailment"
+                    Description="Demand the fleet could not meet, and available generation it could not use, over the selected period."
+                    Unit="MW"
+                    Class="headroom-section">
+            <div class="dispatch-chart headroom-chart">
+                <svg viewBox="0 0 1000 300" role="img" aria-label="Unserved demand and curtailment">
+                    @for (int tick = 0; tick <= 4; tick++)
+                    {
+                        double y = HeadroomChartY(_headroomChartMaximumMw * tick / 4);
+                        <line class="grid-line" x1="64" y1="@y" x2="984" y2="@y"
+                              stroke="var(--color-border)" stroke-width="1" />
+                    }
+                    @foreach (HeadroomTrace trace in _comparisonHeadroomTraces)
+                    {
+                        <polyline class="comparison-trace" points="@trace.Points" fill="none" stroke="@trace.Color"
+                                  stroke-width="2" stroke-dasharray="6 4" vector-effect="non-scaling-stroke">
+                            <title>@trace.Name, @(_comparison?.Point.Label)</title>
+                        </polyline>
+                    }
+                    @foreach (HeadroomTrace trace in _headroomTraces)
+                    {
+                        <polyline points="@trace.Points" fill="none" stroke="@trace.Color"
+                                  stroke-width="2.5" vector-effect="non-scaling-stroke">
+                            <title>@trace.Name</title>
+                        </polyline>
+                    }
+                </svg>
+                <div class="chart-axis-labels"><span>@_firstLabel</span><span>@_middleLabel</span><span>@_lastLabel</span></div>
+            </div>
+            <div class="chart-legend" aria-label="Headroom chart series">
+                @foreach (HeadroomTrace trace in _headroomTraces)
+                {
+                    <span><i style="background-color: @trace.Color"></i>@trace.Name</span>
+                }
+                <span class="headroom-peak">Peak in view: @_peakUnservedPowerMw.ToString("N0") MW unserved, @_peakCurtailmentMw.ToString("N0") MW curtailed</span>
+            </div>
+        </ChartFrame>
+
+        <section class="reliability-band" aria-label="Reliability and storage sizing">
+            <div>
+                <span>Reliability</span>
+                <strong class="@(_result.Reliability.WithinTarget ? "within-target" : "outside-target")">
+                    @(_result.Reliability.WithinTarget ? "Within target" : "Outside target")
+                </strong>
+                <small>
+                    @FormatUsePercentage(_result.Reliability.AchievedUsePercentageOfDemand) unserved
+                    against a @FormatUsePercentage(_result.Reliability.TargetUsePercentageOfDemand) target@(ReliabilityStandardSuffix)
+                </small>
+            </div>
+            <div>
+                <span>Storage sizing</span>
+                <strong>@(_result.StorageSizing.Outcome == StorageSizingOutcome.NotRequired ? "Not required" : "Resized")</strong>
+                <small>
+                    @_result.StorageSizing.InitialEnergyMwh.ToString("N0") MWh /
+                    @_result.StorageSizing.InitialPowerMw.ToString("N0") MW →
+                    @_result.StorageSizing.FinalEnergyMwh.ToString("N0") MWh /
+                    @_result.StorageSizing.FinalPowerMw.ToString("N0") MW
+                    · ceiling @_result.StorageSizing.MaximumEnergyMwh.ToString("N0") MWh
+                    · @_result.StorageSizing.PassesUsed dispatch @(_result.StorageSizing.PassesUsed == 1 ? "pass" : "passes")
+                </small>
+            </div>
         </section>
+
+        <WeatherBasisNote Basis="_result.DataSources.WeatherBasis" />
 
         <section class="assumption-band" aria-label="Scenario assumptions and provenance">
             <div><span>Scenario fleet</span><strong>@string.Join(" · ", _result!.PowerSystem.Fleets.Select(fleet => $"{fleet.Technology} {fleet.NameplateCapacityMw:N0} MW"))</strong></div>
@@ -201,13 +329,20 @@
                 <strong>@_result.Metrics.HoursServedFraction.ToString("P3") hours served</strong>
                 <small>@_result.Metrics.UnservedHours unserved hours · @_result.Metrics.UnservedEnergyMwh.ToString("N0") MWh USE</small>
             </div>
-            <div>
-                <span>Run provenance</span>
-                <strong>Generated @_result.GeneratedAt.ToString("dd MMM yyyy, HH:mm 'UTC'")</strong>
-                <small>@_result.DataSources.DemandInput.FileName · @_result.DataSources.WeatherInput.FileName</small>
-            </div>
         </section>
-    }
+        <ProvenanceFooter RunDate="@_result.GeneratedAt"
+                          CommitSha="@SweepCommitSha"
+                          CommitUrl="@SweepCommitUrl"
+                          IsDirty="@SweepWorkingTreeDirty"
+                          Inputs="@ProvenanceInputs"
+                          Region="@RegionName(_result.Scenario.Region)"
+                          Period="@ArtifactPeriod"
+                          Resolution="@ResolutionLabel" />
+        @if (_runContext is not null)
+        {
+            <p class="run-config-link"><a href="@_runContext.ConfigRepositoryUrl">View emitted run config</a></p>
+        }
+    </ArtifactLoadStateView>
 </main>
 
 @code {
@@ -232,11 +367,22 @@
         ["PumpedHydro"] = "#4f7db8",
     };
 
-    private bool _isLoading = true;
-    private string? _errorMessage;
+    private static readonly string[] HeadroomColors = ["#b3341f", "#7a6bbd"];
+
+    private ArtifactLoadState _loadState = ArtifactLoadState.Loading();
     private DispatchResultsDTO? _result;
+    private DispatchRunContext? _runContext;
+    private DispatchComparison? _comparison;
+    private string? _comparisonMessage;
+    private IReadOnlyList<DispatchEvent> _events = [];
     private List<AreaLayer> _areas = [];
     private List<StorageTrace> _storageTraces = [];
+    private List<StorageTrace> _comparisonStorageTraces = [];
+    private List<HeadroomTrace> _headroomTraces = [];
+    private List<HeadroomTrace> _comparisonHeadroomTraces = [];
+    private string? _comparisonDemandPoints;
+    private double _headroomChartMaximumMw = 1;
+    private double _peakCurtailmentMw;
     private string _demandPoints = string.Empty;
     private string _firstLabel = string.Empty;
     private string _middleLabel = string.Empty;
@@ -258,28 +404,214 @@
     private DateTime _selectedDate;
     private List<MonthOption> _months = [];
 
-    protected override async Task OnInitializedAsync()
+    [Parameter] public string? SweepId { get; set; }
+    [Parameter] public string? PointId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "compare")]
+    public string? CompareId { get; set; }
+
+    /// <summary>Every other point in the sweep that has a detail artifact to draw.</summary>
+    private IReadOnlyList<SweepIndexPointDTO> ComparablePoints => _runContext is null
+        ? []
+        : _runContext.Sweep.Points
+            .Where(point => point.Status == SweepPointStatus.Succeeded
+                && !string.IsNullOrWhiteSpace(point.DetailPath)
+                && point.PointId != _runContext.Point.PointId)
+            .ToArray();
+
+    private bool IsRunRoute => !string.IsNullOrWhiteSpace(SweepId) || !string.IsNullOrWhiteSpace(PointId);
+    private string PageTitleText => _runContext is null ? "Dispatch" : _runContext.Sweep.Name;
+    private string PageEyebrow => _runContext is null ? "Merit-order simulation" : "Sweep run";
+
+    private string? SweepCommitSha => _runContext?.Sweep.Provenance.GitCommitSha;
+    private string? SweepCommitUrl => SweepCommitSha is null
+        ? null
+        : $"https://github.com/HasinthaAttanayake/NemSim/commit/{SweepCommitSha}";
+    private bool? SweepWorkingTreeDirty => _runContext?.Sweep.Provenance.WorkingTreeDirty;
+
+    private IReadOnlyList<MetricStripItem> DispatchMetrics =>
+    [
+        new("Peak demand", _peakDemandMw.ToString("N0"), "MW"),
+        new("Energy delivered", _deliveredEnergyMwh.ToString("N0"), "MWh"),
+        new("Renewable share", _renewableSharePercent.ToString("N1"), "% of delivered generation"),
+        new("Unserved energy", _unservedEnergyMwh.ToString("N0"), $"MWh · {_unservedEnergyPercent:N3}% USE · {_peakUnservedPowerMw:N0} MW peak"),
+    ];
+
+    private IReadOnlyList<ProvenanceInputFile> ProvenanceInputs => _runContext is null
+        ?
+        [
+            new(_result!.DataSources.DemandInput.FileName, _result.DataSources.DemandInput.Sha256),
+            new(_result.DataSources.WeatherInput.FileName, _result.DataSources.WeatherInput.Sha256),
+        ]
+        : _runContext.Sweep.Provenance.InputFiles
+            .Select(input => new ProvenanceInputFile(input.Path, input.Sha256, input.Purpose))
+            .ToArray();
+
+    private string ReliabilityStandardSuffix => _result!.Reliability.StandardName is { Length: > 0 } name
+        ? $" ({name})"
+        : string.Empty;
+
+    /// <summary>Unserved-energy figures are small fractions of a percent; fixed decimals round them away.</summary>
+    private static string FormatUsePercentage(double value) => value == 0
+        ? "0%"
+        : $"{value.ToString(value >= 0.01 ? "N2" : "G3", CultureInfo.CurrentCulture)}%";
+
+    private string ArtifactPeriod => $"{_result!.Scenario.PeriodStart:dd MMM yyyy} to {_result.Scenario.PeriodEnd.AddTicks(-1):dd MMM yyyy}";
+    private string ResolutionLabel => $"{_result!.Scenario.Resolution.TotalHours:N0}-hour intervals";
+
+    protected override async Task OnParametersSetAsync()
     {
+        _loadState = ArtifactLoadState.Loading();
+        _result = null;
+        _runContext = null;
+        _comparison = null;
+        _comparisonMessage = null;
+        _events = [];
+
         try
         {
-            _result = await Http.GetFromJsonAsync<DispatchResultsDTO>(
-                "data/results.json",
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            if (_result is null || _result.SchemaVersion != ArtifactSchemaVersions.DispatchResults)
+            if (IsRunRoute)
             {
-                _errorMessage = "Dispatch results are missing or use an unsupported schema; expected schema "
-                    + $"{ArtifactSchemaVersions.DispatchResults}.";
+                await LoadRunAsync();
                 return;
             }
 
-            DispatchSeriesDTO? series = _result.DataSeries;
-            DispatchPowerSystemDTO? powerSystem = _result.PowerSystem;
+            ArtifactLoadResult<DispatchResultsDTO> loadResult = await ArtifactLoader.LoadAsync<DispatchResultsDTO>("data/results.json");
+            if (!loadResult.IsSuccess)
+            {
+                _loadState = loadResult.State;
+                return;
+            }
+
+            await InitialiseResultAsync(loadResult.Value!, null, loadResult.State);
+        }
+        catch (Exception exception)
+        {
+            _loadState = ArtifactLoadState.Failed($"Error loading dispatch results: {exception.Message}");
+        }
+    }
+
+    private async Task LoadRunAsync()
+    {
+        string indexPath = $"data/sweeps/{Uri.EscapeDataString(SweepId!)}/index.json";
+        ArtifactLoadResult<SweepIndexDTO> indexResult = await SweepIndexLoader.LoadAsync(indexPath);
+        if (!indexResult.IsSuccess)
+        {
+            _loadState = indexResult.State.Status == ArtifactLoadStatus.NotFound
+                ? ArtifactLoadState.NotFound("Sweep was not found.")
+                : indexResult.State;
+            return;
+        }
+
+        DispatchRunContext? context = DispatchRunContextResolver.Resolve(indexResult.Value!, SweepId, PointId);
+        if (context is null)
+        {
+            // A run that reached a constraint is a result, not a missing page: it is in the index
+            // and has no detail to show, so the page says which constraint rather than "not found".
+            SweepIndexPointDTO? constrained = indexResult.Value!.Points.FirstOrDefault(point =>
+                string.Equals(point.PointId, PointId, StringComparison.Ordinal)
+                && point.Status == SweepPointStatus.Failed);
+            _loadState = constrained?.Failure is { } failure
+                ? ArtifactLoadState.Empty(
+                    $"This run reached a constraint at the {failure.Stage.ToString().ToLowerInvariant()} "
+                    + $"stage and produced no results to view. {failure.Message}")
+                : ArtifactLoadState.NotFound("Sweep point was not found.");
+            return;
+        }
+
+        ArtifactLoadResult<DispatchResultsDTO> detailResult = await ArtifactLoader.LoadAsync<DispatchResultsDTO>(context.DetailArtifactPath);
+        if (!detailResult.IsSuccess)
+        {
+            _loadState = detailResult.State.Status == ArtifactLoadStatus.NotFound
+                ? ArtifactLoadState.NotFound("Sweep point detail was not found.")
+                : detailResult.State;
+            return;
+        }
+
+        await InitialiseResultAsync(detailResult.Value!, context, detailResult.State);
+        if (_loadState.Status == ArtifactLoadStatus.Success)
+        {
+            await LoadComparisonAsync(context);
+        }
+    }
+
+    /// <summary>
+    /// Loads the second run named by the compare query parameter. A comparison that cannot be
+    /// loaded or cannot share axes leaves the primary run intact and says why.
+    /// </summary>
+    private async Task LoadComparisonAsync(DispatchRunContext context)
+    {
+        if (string.IsNullOrWhiteSpace(CompareId))
+        {
+            return;
+        }
+
+        DispatchRunContext? comparisonContext = DispatchRunContextResolver.Resolve(
+            context.Sweep,
+            context.Sweep.SweepId,
+            CompareId);
+        if (comparisonContext is null)
+        {
+            _comparisonMessage = "The run selected for comparison is not part of this sweep.";
+            return;
+        }
+
+        ArtifactLoadResult<DispatchResultsDTO> detail =
+            await ArtifactLoader.LoadAsync<DispatchResultsDTO>(comparisonContext.DetailArtifactPath);
+        if (!detail.IsSuccess)
+        {
+            _comparisonMessage = "The run selected for comparison could not be loaded.";
+            return;
+        }
+
+        DispatchResultsDTO? comparison = await ResolveBaseDemandAsync(detail.Value!, comparisonContext);
+        if (comparison is null)
+        {
+            _comparisonMessage = "The run selected for comparison is missing its base demand series.";
+            return;
+        }
+
+        _comparisonMessage = DispatchComparisonValidator.Validate(_result!, comparison);
+        if (_comparisonMessage is null)
+        {
+            _comparison = new DispatchComparison(comparisonContext.Point, comparison);
+            BuildChart();
+        }
+    }
+
+    private void OnComparisonChanged(string pointId) => Navigation.NavigateTo(
+        string.IsNullOrEmpty(pointId)
+            ? RunPath(_runContext!.Point)
+            : $"{RunPath(_runContext!.Point)}?compare={Uri.EscapeDataString(pointId)}");
+
+    private async Task InitialiseResultAsync(
+        DispatchResultsDTO result,
+        DispatchRunContext? context,
+        ArtifactLoadState successState)
+    {
+        if (context is not null)
+        {
+            DispatchResultsDTO? resolved = await ResolveBaseDemandAsync(result, context);
+            if (resolved is null)
+            {
+                _loadState = ArtifactLoadState.InvalidData("Sweep point base demand series is missing or does not match the dispatch period.");
+                return;
+            }
+
+            result = resolved;
+        }
+
+        _result = result;
+        _runContext = context;
+        DispatchSeriesDTO? series = _result.DataSeries;
+        DispatchPowerSystemDTO? powerSystem = _result.PowerSystem;
             if (series is null
                 || powerSystem is null
                 || series.Demand is null
                 || series.Demand.BaseDemandMw is null
                 || series.Demand.AdditiveComponentsByNameMw is null
                 || series.Demand.TotalDemandMw is null
+                || series.CurtailmentMw is null
                 || series.UnservedDemandMw is null
                 || series.ChargeMw is null
                 || series.DischargeMw is null
@@ -287,7 +619,7 @@
                 || series.DeliveredGenerationByTechnologyMw is null
                 || powerSystem.StorageFleets is null)
             {
-                _errorMessage = "Dispatch result series are empty or misaligned.";
+                _loadState = ArtifactLoadState.InvalidData("Dispatch result series are empty or misaligned.");
                 return;
             }
 
@@ -299,6 +631,7 @@
                     string.IsNullOrWhiteSpace(component.Key)
                     || component.Value is null
                     || component.Value.Length != length)
+                || series.CurtailmentMw.Length != length
                 || series.UnservedDemandMw.Length != length
                 || series.ChargeMw.Length != length
                 || series.DischargeMw.Length != length
@@ -311,7 +644,7 @@
                 || series.DeliveredGenerationByTechnologyMw.Values.Any(values =>
                     values is null || values.Length != length))
             {
-                _errorMessage = "Dispatch result series are empty or misaligned.";
+                _loadState = ArtifactLoadState.InvalidData("Dispatch result series are empty or misaligned.");
                 return;
             }
 
@@ -322,7 +655,7 @@
                     series.Demand.AdditiveComponentsByNameMw.Values.Select(component => component[index]),
                     series.Demand.TotalDemandMw[index]))
                 {
-                    _errorMessage = "Dispatch demand decomposition does not add up.";
+                    _loadState = ArtifactLoadState.InvalidData("Dispatch demand decomposition does not add up.");
                     return;
                 }
             }
@@ -331,17 +664,75 @@
             _minimumDate = _result.Scenario.PeriodStart.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
             _maximumDate = _result.Scenario.PeriodEnd.AddTicks(-1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
             _months = BuildMonthOptions(_result.Scenario.PeriodStart, _result.Scenario.PeriodEnd);
+            _events = DispatchEventLocator.Locate(_result);
             BuildChart();
-        }
-        catch (Exception exception)
-        {
-            _errorMessage = $"Error loading dispatch results: {exception.Message}";
-        }
-        finally
-        {
-            _isLoading = false;
-        }
+        _loadState = successState;
     }
+
+    /// <summary>
+    /// Points in a sweep share one base demand series file, so it is resolved once and reused when
+    /// a second run is drawn over the first. Returns null when the series is absent or misaligned.
+    /// </summary>
+    private async Task<DispatchResultsDTO?> ResolveBaseDemandAsync(
+        DispatchResultsDTO result,
+        DispatchRunContext context)
+    {
+        if (result.DataSeries.Demand.BaseDemandMw is not null)
+        {
+            return result;
+        }
+
+        string? seriesPath = context.ResolveReferencedArtifactPath(result.DataSeries.Demand.BaseDemandSeriesPath);
+        if (seriesPath is null)
+        {
+            return null;
+        }
+
+        if (!_baseDemandCache.TryGetValue(seriesPath, out RegularSeriesDTO? baseDemand))
+        {
+            ArtifactLoadResult<RegularSeriesDTO> seriesResult =
+                await ArtifactLoader.LoadAsync<RegularSeriesDTO>(seriesPath);
+            if (!seriesResult.IsSuccess)
+            {
+                return null;
+            }
+
+            baseDemand = seriesResult.Value!;
+            _baseDemandCache[seriesPath] = baseDemand;
+        }
+
+        if (baseDemand!.Start != result.Scenario.PeriodStart
+            || baseDemand.Resolution != result.Scenario.Resolution)
+        {
+            return null;
+        }
+
+        return result with
+        {
+            DataSeries = result.DataSeries with
+            {
+                Demand = result.DataSeries.Demand with { BaseDemandMw = baseDemand.ValuesMw },
+            },
+        };
+    }
+
+    private void JumpTo(DispatchEvent notableEvent)
+    {
+        _selectedView = -1;
+        _selectedDate = notableEvent.Instant.Date;
+        BuildChart();
+    }
+
+    private string RunPath(SweepIndexPointDTO point) =>
+        $"/runs/{Uri.EscapeDataString(_runContext!.Sweep.SweepId)}/{Uri.EscapeDataString(point.PointId)}";
+
+    /// <summary>
+    /// Stepping along the sweep keeps whatever the reader is comparing against, so the comparison
+    /// survives Previous and Next rather than having to be reselected at every point.
+    /// </summary>
+    private string RunRoute(SweepIndexPointDTO point) => string.IsNullOrWhiteSpace(CompareId) || CompareId == point.PointId
+        ? RunPath(point)
+        : $"{RunPath(point)}?compare={Uri.EscapeDataString(CompareId)}";
 
     private void OnViewChanged(int view)
     {
@@ -426,7 +817,10 @@
                 AreaPoints(baseline, cumulative)));
         }
         _demandPoints = LinePoints(demand);
+        _peakCurtailmentMw = selectedIndexes.Max(index => result.DataSeries.CurtailmentMw[index]);
         BuildStorageChart(result, selectedIndexes, bucketSize);
+        BuildHeadroomChart(result, selectedIndexes, bucketSize);
+        BuildComparisonTraces(selectedIndexes, bucketSize);
 
         DateTimeOffset selectedStart = InstantAt(selectedIndexes[0]);
         DateTimeOffset selectedEnd = InstantAt(selectedIndexes[^1]) + result.Scenario.Resolution;
@@ -437,6 +831,91 @@
         _firstLabel = timestamps[0].ToString(labelFormat);
         _middleLabel = timestamps[timestamps.Count / 2].ToString(labelFormat);
         _lastLabel = timestamps[^1].ToString(labelFormat);
+    }
+
+    /// <summary>
+    /// Unserved demand and curtailment share one axis because they are the two ways the fleet and
+    /// the load fail to meet: both are peaks within the bucket, never averages, so a three-hour
+    /// event in a year view is still visible.
+    /// </summary>
+    private void BuildHeadroomChart(
+        DispatchResultsDTO result,
+        int[] selectedIndexes,
+        int bucketSize)
+    {
+        List<double> unserved = BucketPeaks(result.DataSeries.UnservedDemandMw, selectedIndexes, bucketSize);
+        List<double> curtailment = BucketPeaks(result.DataSeries.CurtailmentMw, selectedIndexes, bucketSize);
+        _headroomChartMaximumMw = Math.Max(1, Math.Max(
+            unserved.DefaultIfEmpty(0).Max(),
+            curtailment.DefaultIfEmpty(0).Max()));
+        _headroomTraces =
+        [
+            new HeadroomTrace("Unserved demand", HeadroomColors[0], HeadroomLinePoints(unserved)),
+            new HeadroomTrace("Curtailment", HeadroomColors[1], HeadroomLinePoints(curtailment)),
+        ];
+    }
+
+    private void BuildComparisonTraces(int[] selectedIndexes, int bucketSize)
+    {
+        _comparisonDemandPoints = null;
+        _comparisonStorageTraces = [];
+        _comparisonHeadroomTraces = [];
+        if (_comparison is null)
+        {
+            return;
+        }
+
+        DispatchResultsDTO comparison = _comparison.Result;
+        List<double> demand = BucketAverages(comparison.DataSeries.Demand.TotalDemandMw, selectedIndexes, bucketSize);
+        _comparisonDemandPoints = LinePoints(demand);
+
+        foreach (DispatchStorageFleetDTO fleet in comparison.PowerSystem.StorageFleets)
+        {
+            if (!comparison.DataSeries.StateOfChargeByTechnologyMwh.TryGetValue(fleet.Technology, out double[]? stateOfCharge))
+            {
+                continue;
+            }
+
+            _comparisonStorageTraces.Add(new StorageTrace(
+                fleet.Technology,
+                StorageColors.GetValueOrDefault(fleet.Technology, "#8a7d72"),
+                fleet.EnergyCapacityMwh,
+                fleet.PowerCapacityMw,
+                [],
+                StorageLinePoints(BucketFirsts(stateOfCharge, selectedIndexes, bucketSize))));
+        }
+
+        _comparisonHeadroomTraces =
+        [
+            new HeadroomTrace(
+                "Unserved demand",
+                HeadroomColors[0],
+                HeadroomLinePoints(BucketPeaks(comparison.DataSeries.UnservedDemandMw, selectedIndexes, bucketSize))),
+            new HeadroomTrace(
+                "Curtailment",
+                HeadroomColors[1],
+                HeadroomLinePoints(BucketPeaks(comparison.DataSeries.CurtailmentMw, selectedIndexes, bucketSize))),
+        ];
+    }
+
+    private static List<double> BucketPeaks(double[] series, int[] selectedIndexes, int bucketSize) =>
+        Bucket(selectedIndexes, bucketSize, bucket => bucket.Max(index => series[index]));
+
+    private static List<double> BucketAverages(double[] series, int[] selectedIndexes, int bucketSize) =>
+        Bucket(selectedIndexes, bucketSize, bucket => bucket.Average(index => series[index]));
+
+    private static List<double> BucketFirsts(double[] series, int[] selectedIndexes, int bucketSize) =>
+        Bucket(selectedIndexes, bucketSize, bucket => series[bucket[0]]);
+
+    private static List<double> Bucket(int[] selectedIndexes, int bucketSize, Func<int[], double> reduce)
+    {
+        var values = new List<double>();
+        for (int offset = 0; offset < selectedIndexes.Length; offset += bucketSize)
+        {
+            values.Add(reduce(selectedIndexes[offset..Math.Min(offset + bucketSize, selectedIndexes.Length)]));
+        }
+
+        return values;
     }
 
     private void BuildStorageChart(
@@ -491,6 +970,14 @@
 
     private double ChartY(double value) => ChartBottom - ((ChartBottom - ChartTop) * value / _chartMaximumMw);
 
+    private string HeadroomLinePoints(IReadOnlyList<double> values) => string.Join(" ",
+        values.Select((value, index) => FormattableString.Invariant(
+            $"{ChartLeft + ((ChartRight - ChartLeft) * index / Math.Max(1, values.Count - 1)):F2},{HeadroomChartY(value):F2}")));
+
+    private double HeadroomChartY(double value) =>
+        StorageChartBottom
+        - ((StorageChartBottom - StorageChartTop) * value / _headroomChartMaximumMw);
+
     private double StorageChartY(double value) =>
         StorageChartBottom
         - ((StorageChartBottom - StorageChartTop) * value / _storageChartMaximumMwh);
@@ -507,17 +994,22 @@
         return FormattableString.Invariant($"width: {percentage:F2}%");
     }
 
+    /// <summary>A money total, abbreviated, with the minus sign outside the currency symbol.</summary>
     private static string FormatAud(decimal value)
     {
         decimal magnitude = Math.Abs(value);
+        string sign = value < 0 ? "-" : string.Empty;
         return magnitude switch
         {
-            >= 1_000_000_000m => $"AUD {value / 1_000_000_000m:N2}b",
-            >= 1_000_000m => $"AUD {value / 1_000_000m:N2}m",
-            >= 1_000m => $"AUD {value / 1_000m:N2}k",
-            _ => $"AUD {value:N2}",
+            >= 1_000_000_000m => $"{sign}$" + $"{magnitude / 1_000_000_000m:N2}b",
+            >= 1_000_000m => $"{sign}$" + $"{magnitude / 1_000_000m:N2}m",
+            >= 1_000m => $"{sign}$" + $"{magnitude / 1_000m:N2}k",
+            _ => $"{sign}$" + $"{magnitude:N2}",
         };
     }
+
+    private static string FormatAudPerMwh(decimal value) =>
+        (value < 0 ? "-$" : "$") + Math.Abs(value).ToString("N2");
 
     private double AnnualServedEnergyMwh() =>
         _result!.Metrics.DemandMwh - _result.Metrics.UnservedEnergyMwh;
@@ -558,5 +1050,7 @@
         double PowerCapacityMw,
         IReadOnlyList<double> Values,
         string Points = "");
+    private sealed record HeadroomTrace(string Name, string Color, string Points);
     private sealed record MonthOption(int Month, string Label);
+    private readonly Dictionary<string, RegularSeriesDTO> _baseDemandCache = new(StringComparer.Ordinal);
 }

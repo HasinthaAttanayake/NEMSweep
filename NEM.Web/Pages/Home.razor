@@ -1,4 +1,8 @@
-﻿@page "/"
+@page "/"
+@using NEM.Contracts
+@using NEM.Web.Services
+@inject SweepManifestLoader SweepManifestLoader
+@inject SweepIndexLoader SweepIndexLoader
 
 <PageTitle>NemSim</PageTitle>
 
@@ -54,6 +58,51 @@
         </ol>
     </section>
 
+    @* An empty manifest legitimately means "no sweeps yet" and the section is omitted. A manifest
+       that could not be read is different, and says so rather than quietly hiding navigation. *@
+    @if (_manifestState.Status is ArtifactLoadStatus.Failed or ArtifactLoadStatus.InvalidData
+        or ArtifactLoadStatus.NotFound)
+    {
+        <section class="explore-section">
+            <div class="section-heading">
+                <div>
+                    <p class="section-label">Scenario sweeps</p>
+                    <h2>Compare runs across one varying input</h2>
+                </div>
+            </div>
+            <ArtifactLoadStateView State="_manifestState"><span /></ArtifactLoadStateView>
+        </section>
+    }
+    else if (_sweeps.Count > 0)
+    {
+        <section class="explore-section">
+            <div class="section-heading">
+                <div>
+                    <p class="section-label">Scenario sweeps</p>
+                    <h2>Compare runs across one varying input</h2>
+                </div>
+                <p>
+                    Every result the sweep recorded, point by point, with each run openable as a
+                    full year of hourly dispatch.
+                </p>
+            </div>
+
+            <div class="explore-links">
+                @foreach (SweepIndexDTO sweep in _sweeps)
+                {
+                    <a href="@SweepPaths.PageRoute(sweep.SweepId)">
+                        <MudIcon Icon="@Icons.Material.Filled.Insights" />
+                        <span>
+                            <strong>@sweep.Name</strong>
+                            <small>@sweep.Points.Length runs · @sweep.Axis.Label (@sweep.Axis.Unit)</small>
+                        </span>
+                        <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
+                    </a>
+                }
+            </div>
+        </section>
+    }
+
     <section class="explore-section">
         <div class="section-heading">
             <div>
@@ -75,7 +124,7 @@
                 </span>
                 <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
             </a>
-            <a href="demand">
+            <a href="inputs/demand">
                 <MudIcon Icon="@Icons.Material.Filled.ElectricBolt" />
                 <span>
                     <strong>Operational demand</strong>
@@ -83,7 +132,7 @@
                 </span>
                 <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
             </a>
-            <a href="weather">
+            <a href="inputs/weather">
                 <MudIcon Icon="@Icons.Material.Filled.WbSunny" />
                 <span>
                     <strong>Weather resources</strong>
@@ -91,7 +140,7 @@
                 </span>
                 <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
             </a>
-            <a href="generation">
+            <a href="inputs/generation">
                 <MudIcon Icon="@Icons.Material.Filled.Factory" />
                 <span>
                     <strong>Generation fleet</strong>
@@ -110,3 +159,28 @@
         </div>
     </section>
 </div>
+
+@code {
+    private List<SweepIndexDTO> _sweeps = [];
+    private ArtifactLoadState _manifestState = ArtifactLoadState.Loading();
+
+    protected override async Task OnInitializedAsync()
+    {
+        ArtifactLoadResult<SweepManifestDTO> manifest = await SweepManifestLoader.LoadAsync();
+        _manifestState = manifest.State;
+        if (!manifest.IsSuccess)
+        {
+            return;
+        }
+
+        foreach (SweepManifestEntryDTO entry in manifest.Value!.Sweeps)
+        {
+            ArtifactLoadResult<SweepIndexDTO> index =
+                await SweepIndexLoader.LoadAsync(SweepPaths.IndexPath(entry));
+            if (index.IsSuccess)
+            {
+                _sweeps.Add(index.Value!);
+            }
+        }
+    }
+}

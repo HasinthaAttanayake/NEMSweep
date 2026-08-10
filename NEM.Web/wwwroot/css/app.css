@@ -1,5 +1,56 @@
+/* Responsive thresholds remain in scoped rules because CSS custom properties cannot be used in media queries. */
+:root {
+    --color-ink: #17212b;
+    --color-muted: #5d6873;
+    --color-muted-generation: #64707b;
+    --color-border: #dce1e5;
+    --color-border-generation: #d9dfe3;
+    --color-border-control: #aeb7bf;
+    --color-surface: #fff;
+    --color-surface-muted: #f4f6f7;
+    --color-surface-table: #f2f4f5;
+    --color-solar: #d97706;
+    --color-solar-soft: #fff7e6;
+    --color-solar-zenith: #c85d16;
+    --color-solar-zenith-soft: #fff4e8;
+    --color-wind: #087f5b;
+    --color-wind-soft: #e9f7f1;
+    --color-temperature: #b33a3a;
+    --color-temperature-soft: #fff0f0;
+    --color-demand: #176b5b;
+    --color-demand-soft: #e8f5f1;
+    --color-generation: #b33b24;
+    --color-generation-soft: #fff1eb;
+    --color-generation-dark: #792615;
+    --color-production-solar: #2563a8;
+    --color-production-wind: #087f5b;
+    --color-home-status: #334b45;
+    --color-home-copy: #33414d;
+    --color-border-strong: #cbd3d9;
+    --color-accent-border: #82b6aa;
+    --color-notice: #a86000;
+    --color-track: #e3e7ea;
+    --color-track-fill: #3d667a;
+    --color-track-border: #9da8b1;
+    --color-chart-surface: #fbfcfc;
+    --color-demand-line: #101820;
+    --color-empty-storage: #f5f8f7;
+    --font-body: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    --font-display: Georgia, "Times New Roman", serif;
+    --type-eyebrow: 0.78rem;
+    --space-page-x: 1.25rem;
+    --space-page-top: 1.5rem;
+    --space-page-bottom: 3rem;
+    --breakpoint-wide: 980px;
+    --breakpoint-medium: 900px;
+    --breakpoint-compact: 760px;
+    --breakpoint-narrow: 700px;
+    --breakpoint-mobile: 640px;
+    --breakpoint-small: 420px;
+}
+
 html, body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-family: var(--font-body);
 }
 
 h1:focus {

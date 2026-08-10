@@ -1,0 +1,151 @@
+.run-table-section {
+    margin-top: 2rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--color-border);
+}
+
+.run-table-heading {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.run-table-heading h2 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.35rem;
+    font-weight: 600;
+}
+
+.run-table-heading p {
+    max-width: 60ch;
+    margin: 0.25rem 0 0;
+    color: var(--color-muted);
+    font-size: 0.85rem;
+}
+
+
+.run-table-scroll {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.run-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid var(--color-border);
+}
+
+.run-table th,
+.run-table td {
+    padding: 0.6rem 0.85rem;
+    border-bottom: 1px solid var(--color-border);
+    text-align: left;
+    white-space: nowrap;
+}
+
+.run-table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--color-surface-table);
+    color: var(--color-muted);
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    vertical-align: bottom;
+}
+
+.run-table thead th small {
+    display: block;
+    color: var(--color-muted);
+    font-size: 0.66rem;
+    font-weight: 400;
+    text-transform: none;
+}
+
+/* The run name stays visible while the reader scrolls across a wide row of figures. */
+.run-table .sticky-column {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    border-right: 1px solid var(--color-border);
+    background: var(--color-surface);
+}
+
+.run-table thead .sticky-column {
+    z-index: 2;
+    background: var(--color-surface-table);
+}
+
+.run-table tbody th {
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.run-table td {
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.run-table tbody tr:last-child th,
+.run-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.run-table tbody tr:hover td,
+.run-table tbody tr:hover .sticky-column {
+    background: var(--accent-soft);
+}
+
+.run-table a {
+    color: var(--accent);
+    font-weight: 700;
+}
+
+.run-failed {
+    color: var(--color-notice);
+    font-weight: 700;
+}
+
+.run-constrained {
+    color: var(--color-notice);
+    font-weight: 700;
+}
+
+.within-target {
+    color: var(--accent);
+    font-weight: 700;
+}
+
+.outside-target {
+    color: var(--color-notice);
+    font-weight: 700;
+}
+
+.run-failure {
+    display: inline-block;
+    max-width: 28ch;
+    overflow: hidden;
+    color: var(--color-muted);
+    text-overflow: ellipsis;
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+}
+
+@media (max-width: 760px) {
+    .run-table-heading {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+}

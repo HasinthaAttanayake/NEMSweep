@@ -1,0 +1,88 @@
+@using NEM.Contracts
+
+@* Every scalar the sweep index carries, against the sweep axis. The index is small, so showing
+   all of them costs nothing and answers "which of these actually moved?" without the reader
+   having to know in advance which series to ask for. *@
+<section class="scalar-grid" aria-label="@($"All sweep results by {Index.Axis.Label}")">
+    <div class="scalar-grid-heading">
+        <h3>All results by @Index.Axis.Label</h3>
+        <p>@Index.Points.Length points · @Index.Axis.Unit on the horizontal axis</p>
+    </div>
+    <div class="scalar-tiles">
+        @foreach (SweepSparkline sparkline in _sparklines)
+        {
+            <button type="button"
+                    class="scalar-tile @(sparkline.Axis.Key == SelectedKey ? "selected" : null)"
+                    disabled="@(!sparkline.HasValues)"
+                    aria-pressed="@(sparkline.Axis.Key == SelectedKey ? "true" : "false")"
+                    @onclick="@(() => OnSelect.InvokeAsync(sparkline.Axis.Key))">
+                <span class="scalar-tile-label">@sparkline.Axis.Label</span>
+                <span class="scalar-tile-unit">@sparkline.Axis.Unit</span>
+                @if (!sparkline.HasValues)
+                {
+                    <span class="scalar-tile-absent">Not carried by this artifact</span>
+                }
+                else
+                {
+                    <svg class="scalar-spark" viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true">
+                        <polyline points="@sparkline.Points" fill="none" stroke="currentColor"
+                                  stroke-width="1.5" vector-effect="non-scaling-stroke" />
+                    </svg>
+                    <span class="scalar-tile-range">
+                        @if (sparkline.IsFlat)
+                        {
+                            <em>No change across the sweep</em>
+                        }
+                        else
+                        {
+                            @($"{SweepValueFormat.Short(sparkline.First, sparkline.Axis.ValuePrefix)} → {SweepValueFormat.Short(sparkline.Last, sparkline.Axis.ValuePrefix)}")
+                        }
+                    </span>
+                }
+            </button>
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public SweepIndexDTO Index { get; set; } = default!;
+    [Parameter] public string? SelectedKey { get; set; }
+    [Parameter] public EventCallback<string> OnSelect { get; set; }
+
+    private List<SweepSparkline> _sparklines = [];
+
+    protected override void OnParametersSet() => _sparklines = SweepSeriesCatalogue.All
+        .Select(axis => SweepSparkline.Build(Index, axis))
+        .ToList();
+
+    private sealed record SweepSparkline(
+        SweepChartYAxis Axis,
+        bool HasValues,
+        bool IsFlat,
+        double First,
+        double Last,
+        string Points)
+    {
+        public static SweepSparkline Build(SweepIndexDTO index, SweepChartYAxis axis)
+        {
+            double[] values = SweepChartData.Build(index, axis).Values;
+            if (values.Length == 0)
+            {
+                return new SweepSparkline(axis, false, false, 0, 0, string.Empty);
+            }
+
+            double minimum = values.Min();
+            double maximum = values.Max();
+            double range = maximum - minimum;
+            string points = string.Join(" ", values.Select((value, position) =>
+            {
+                double x = values.Length == 1 ? 50 : 100.0 * position / (values.Length - 1);
+                // A flat series sits on the centre line rather than being amplified to full height.
+                double y = range == 0 ? 16 : 30 - (28 * (value - minimum) / range);
+                return FormattableString.Invariant($"{x:F2},{y:F2}");
+            }));
+
+            return new SweepSparkline(axis, true, range == 0, values[0], values[^1], points);
+        }
+    }
+}

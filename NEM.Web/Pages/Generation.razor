@@ -1,25 +1,25 @@
-@page "/generation"
+@page "/inputs/generation"
 @using NEM.Contracts
 @using System.Globalization
-@using System.Text.Json
-@inject HttpClient Http
+@inject ArtifactLoader ArtifactLoader
 
 <PageTitle>Generation fleet</PageTitle>
 
 <main class="generation-page">
-    <header class="generation-header">
-        <div>
-            <p class="eyebrow">AEMO generation information</p>
-            <h1>Generation fleet</h1>
+    <PageHeader Eyebrow="AEMO generation information" Title="Generation fleet"
+                Style="--page-header-padding-bottom: 1.35rem; --page-header-border: var(--color-border-generation); --page-header-title-size: clamp(2.1rem, 4vw, 3.6rem)">
+        <ScopeContent>
             @if (_data is not null)
             {
-                <p class="source-line">@_data.SourceFile · @_data.Rows.Length source units</p>
+                <ScopeLine Region="@_data.SourceFile"
+                           Period="@($"{_data.Rows.Length:N0} source units")"
+                           BaselineGlobal="true" />
             }
-        </div>
-
-        @if (!_isLoading && _errorMessage is null)
-        {
-            <div class="filters" aria-label="Generation filters">
+        </ScopeContent>
+        <TrailingContent>
+            @if (_loadState.Status == ArtifactLoadStatus.Success)
+            {
+                <div class="filters" aria-label="Generation filters">
                 <label>
                     <span>Date</span>
                     <input type="date"
@@ -47,26 +47,14 @@
                         <span>MW AC</span>
                     </div>
                 </label>
-            </div>
-        }
-    </header>
+                </div>
+            }
+        </TrailingContent>
+    </PageHeader>
 
-    @if (_isLoading)
-    {
-        <div class="status-block"><MudProgressCircular Color="Color.Primary" Indeterminate="true" /></div>
-    }
-    else if (_errorMessage is not null)
-    {
-        <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
-    }
-    else
-    {
-        <section class="metric-strip" aria-label="Filtered generation summary">
-            <div><span>Included units</span><strong>@_filteredRows.Count.ToString("N0")</strong></div>
-            <div><span>Sites</span><strong>@_siteCount.ToString("N0")</strong></div>
-            <div><span>Nameplate AC</span><strong>@_totalAcMw.ToString("N1")</strong><small>MW · nearest 0.1 MW</small></div>
-            <div><span>Storage</span><strong>@_totalStorageMwh.ToString("N1")</strong><small>MWh · nearest 0.1 MWh</small></div>
-        </section>
+    <ArtifactLoadStateView State="_loadState">
+        <MetricStrip Items="@GenerationMetrics" AriaLabel="Filtered generation summary"
+                     Style="--metric-border: var(--color-border-generation); --metric-muted: var(--color-muted-generation); --metric-label-size: .78rem; --metric-value-size: 1.8rem; --metric-value-margin: .15rem .3rem 0 0" />
 
         <p class="filter-summary">
             In-service units active on @_selectedDate.ToString("d MMMM yyyy") at sites of
@@ -81,11 +69,9 @@
         else
         {
             <section class="visual-grid" aria-label="Technology visualisations">
-                <div class="visual-panel">
-                    <div class="section-heading">
-                        <div><p class="section-index">01</p><h2>AC capacity share</h2></div>
-                        <span>MW AC · nearest 0.1 MW</span>
-                    </div>
+                <ChartFrame Heading="AC capacity share" SectionIndex="01"
+                            Class="visual-panel" Unit="MW AC · nearest 0.1 MW"
+                            Style="--chart-frame-padding-top: 0; --chart-frame-heading-padding-bottom: .65rem; --chart-frame-heading-border: 2px solid var(--color-ink); --chart-frame-heading-size: 1.15rem; --accent: var(--color-muted-generation); --accent-soft: transparent; --color-unit-border: transparent">
                     <MudChart T="double"
                               ChartType="ChartType.Donut"
                               ChartSeries="_acShareSeries"
@@ -102,20 +88,18 @@
                             </li>
                         }
                     </ul>
-                </div>
+                </ChartFrame>
 
-                <div class="visual-panel">
-                    <div class="section-heading">
-                        <div><p class="section-index">02</p><h2>Nameplate comparison</h2></div>
-                        <span>MW · nearest 0.1 MW</span>
-                    </div>
+                <ChartFrame Heading="Nameplate comparison" SectionIndex="02"
+                            Class="visual-panel" Unit="MW · nearest 0.1 MW"
+                            Style="--chart-frame-padding-top: 0; --chart-frame-heading-padding-bottom: .65rem; --chart-frame-heading-border: 2px solid var(--color-ink); --chart-frame-heading-size: 1.15rem; --accent: var(--color-muted-generation); --accent-soft: transparent; --color-unit-border: transparent">
                     <MudChart T="double"
                               ChartType="ChartType.Bar"
                               ChartSeries="_capacitySeries"
                               ChartLabels="_technologyLabels"
                               Width="100%"
                               Height="360px" />
-                </div>
+                </ChartFrame>
             </section>
 
             <section class="technology-section">
@@ -176,12 +160,11 @@
                 </MudTable>
             </section>
         }
-    }
+    </ArtifactLoadStateView>
 </main>
 
 @code {
-    private bool _isLoading = true;
-    private string? _errorMessage;
+    private ArtifactLoadState _loadState = ArtifactLoadState.Loading();
     private GenerationInformationDTO? _data;
     private DateOnly _selectedDate = DateOnly.FromDateTime(DateTime.Today);
     private string _selectedRegion = "All";
@@ -203,29 +186,34 @@
     private double _totalAcMw;
     private double _totalStorageMwh;
 
+    private IReadOnlyList<MetricStripItem> GenerationMetrics =>
+    [
+        new("Included units", _filteredRows.Count.ToString("N0")),
+        new("Sites", _siteCount.ToString("N0")),
+        new("Nameplate AC", _totalAcMw.ToString("N1"), "MW · nearest 0.1 MW"),
+        new("Storage", _totalStorageMwh.ToString("N1"), "MWh · nearest 0.1 MWh"),
+    ];
+
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            _data = await Http.GetFromJsonAsync<GenerationInformationDTO>(
-                "data/generation-information.json",
-                new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
-            if (_data is null || _data.SchemaVersion != ArtifactSchemaVersions.GenerationInformation)
+            ArtifactLoadResult<GenerationInformationDTO> loadResult =
+                await ArtifactLoader.LoadAsync<GenerationInformationDTO>("data/generation-information.json");
+            if (!loadResult.IsSuccess)
             {
-                _errorMessage = "Generation information is missing or has an unsupported schema.";
+                _loadState = loadResult.State;
                 return;
             }
 
+            _data = loadResult.Value!;
             _regions = _data.Rows.Select(row => row.Region).Distinct().Order().ToArray();
             ApplyFilters();
+            _loadState = loadResult.State;
         }
         catch (Exception exception)
         {
-            _errorMessage = $"Error loading generation information: {exception.Message}";
-        }
-        finally
-        {
-            _isLoading = false;
+            _loadState = ArtifactLoadState.Failed($"Error loading generation information: {exception.Message}");
         }
     }
 

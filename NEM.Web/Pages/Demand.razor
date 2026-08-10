@@ -1,27 +1,25 @@
-@page "/demand"
+@page "/inputs/demand"
 @using NEM.Contracts
 @using System.Globalization
-@using System.Text.Json
-@inject HttpClient Http
+@inject ArtifactLoader ArtifactLoader
 
 <PageTitle>Operational demand</PageTitle>
 
 <div class="demand-page">
-    <header class="demand-header">
-        <div>
-            <p class="eyebrow">Actual operational demand</p>
-            <h1>Demand</h1>
-            @if (!_isLoading && _errorMessage is null)
+    <PageHeader Eyebrow="Actual operational demand" Title="Demand">
+        <ScopeContent>
+            @if (_loadState.Status == ArtifactLoadStatus.Success)
             {
-                <p class="scope-line">
-                    @_regionName (@_regionCode) · Single region · Not a NEM-wide aggregate
-                </p>
+                <ScopeLine Region="@($"{_regionName} ({_regionCode})")"
+                           Period="@ArtifactPeriod"
+                           Resolution="@ResolutionLabel"
+                           BaselineGlobal="true" />
             }
-        </div>
-
-        @if (!_isLoading && _errorMessage is null)
-        {
-            <div class="demand-controls">
+        </ScopeContent>
+        <TrailingContent>
+            @if (_loadState.Status == ArtifactLoadStatus.Success)
+            {
+                <div class="demand-controls">
                 <MudSelect T="int"
                            Label="View"
                            Value="_selectedView"
@@ -47,44 +45,13 @@
                                @onchange="OnDateChanged" />
                     </label>
                 }
-            </div>
-        }
-    </header>
+                </div>
+            }
+        </TrailingContent>
+    </PageHeader>
 
-    @if (_isLoading)
-    {
-        <div class="status-block">
-            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
-        </div>
-    }
-    else if (_errorMessage is not null)
-    {
-        <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
-    }
-    else
-    {
-        <section class="metric-strip" aria-label="Selected demand period summary">
-            <div>
-                <span>Peak demand</span>
-                <strong>@_peakDemandMw.ToString("N0")</strong>
-                <small>MW</small>
-            </div>
-            <div>
-                <span>Mean demand</span>
-                <strong>@_meanDemandMw.ToString("N0")</strong>
-                <small>MW</small>
-            </div>
-            <div>
-                <span>Minimum demand</span>
-                <strong>@_minimumDemandMw.ToString("N0")</strong>
-                <small>MW</small>
-            </div>
-            <div>
-                <span>Energy supplied</span>
-                <strong>@_energyMegawattHours.ToString("N0")</strong>
-                <small>MWh</small>
-            </div>
-        </section>
+    <ArtifactLoadStateView State="_loadState">
+        <MetricStrip Items="@DemandMetrics" AriaLabel="Selected demand period summary" />
 
         <div class="trace-context">
             <span>@_periodLabel</span>
@@ -92,26 +59,18 @@
             <span>@_displayPointCount @_displayPointDescription</span>
         </div>
 
-        <section class="chart-section">
-            <div class="chart-heading">
-                <div>
-                    <h2>@_chartTitle</h2>
-                    <p>@_chartDescription</p>
-                </div>
-                <span class="unit-badge">MW</span>
-            </div>
+        <ChartFrame Heading="@_chartTitle" Description="@_chartDescription" Unit="MW">
             <MudChart ChartType="ChartType.Line"
                       ChartSeries="_series"
                       ChartLabels="_xAxisLabels"
                       Width="100%"
                       Height="500px" />
-        </section>
-    }
+        </ChartFrame>
+    </ArtifactLoadStateView>
 </div>
 
 @code {
-    private bool _isLoading = true;
-    private string? _errorMessage;
+    private ArtifactLoadState _loadState = ArtifactLoadState.Loading();
     private List<ChartSeries<double>> _series = [];
     private string[] _xAxisLabels = [];
     private int _rawPointCount;
@@ -136,26 +95,30 @@
     private DateTime _selectedDate;
     private List<MonthOption> _months = [];
 
+    private IReadOnlyList<MetricStripItem> DemandMetrics =>
+    [
+        new("Peak demand", _peakDemandMw.ToString("N0"), "MW"),
+        new("Mean demand", _meanDemandMw.ToString("N0"), "MW"),
+        new("Minimum demand", _minimumDemandMw.ToString("N0"), "MW"),
+        new("Energy supplied", _energyMegawattHours.ToString("N0"), "MWh"),
+    ];
+
+    private string ArtifactPeriod => $"{_periodStart:dd MMM yyyy} to {_periodEnd.AddTicks(-1):dd MMM yyyy}";
+    private string ResolutionLabel => $"{_resolution.TotalMinutes:N0}-minute intervals";
+
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
-            ModelInputOutputDTO? result =
-                await Http.GetFromJsonAsync<ModelInputOutputDTO>("data/demand-data.json", options);
-
-            if (result is null)
+            ArtifactLoadResult<ModelInputOutputDTO> loadResult =
+                await ArtifactLoader.LoadAsync<ModelInputOutputDTO>("data/demand-data.json");
+            if (!loadResult.IsSuccess)
             {
-                _errorMessage = "Failed to load results.json";
+                _loadState = loadResult.State;
                 return;
             }
 
-            if (result.SchemaVersion != ArtifactSchemaVersions.OperationalDemand)
-            {
-                _errorMessage = $"Demand data schema {result.SchemaVersion} is not supported; expected schema "
-                    + $"{ArtifactSchemaVersions.OperationalDemand}.";
-                return;
-            }
+            ModelInputOutputDTO result = loadResult.Value!;
 
             double[] demandMw = result.DataSeries.DemandMw;
             DateTimeOffset periodStart = result.Scenario.PeriodStart;
@@ -168,7 +131,7 @@
                 || (periodEnd - periodStart).Ticks % resolution.Ticks != 0
                 || (periodEnd - periodStart).Ticks / resolution.Ticks != demandMw.Length)
             {
-                _errorMessage = "Operational-demand timestamps and values are empty or misaligned.";
+                _loadState = ArtifactLoadState.InvalidData("Operational-demand timestamps and values are empty or misaligned.");
                 return;
             }
 
@@ -183,14 +146,11 @@
             _regionName = RegionName(_regionCode);
             _months = BuildMonthOptions(periodStart, periodEnd);
             BuildChart();
+            _loadState = loadResult.State;
         }
         catch (Exception exception)
         {
-            _errorMessage = $"Error loading demand data: {exception.Message}";
-        }
-        finally
-        {
-            _isLoading = false;
+            _loadState = ArtifactLoadState.Failed($"Error loading demand data: {exception.Message}");
         }
     }
 

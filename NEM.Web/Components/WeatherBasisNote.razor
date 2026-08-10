@@ -1,0 +1,20 @@
+@using NEM.Contracts
+
+@* The weather basis changes how a storage or reliability result should be read, so it is stated
+   on the page rather than left in provenance. The wording is the artifact's own. *@
+<aside class="weather-basis" aria-label="Weather basis">
+    <p class="weather-basis-label">@KindLabel(Basis.Kind)</p>
+    <p class="weather-basis-location">@Basis.LocationName</p>
+    <p class="weather-basis-description">@Basis.Description</p>
+    <p class="weather-basis-source">@Basis.SourceFile</p>
+</aside>
+
+@code {
+    [Parameter, EditorRequired] public WeatherBasisDTO Basis { get; set; } = default!;
+
+    private static string KindLabel(WeatherBasisKind kind) => kind switch
+    {
+        WeatherBasisKind.TypicalMeteorologicalYear => "Weather basis · typical meteorological year",
+        _ => "Weather basis",
+    };
+}

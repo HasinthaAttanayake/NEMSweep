@@ -1,0 +1,38 @@
+.weather-basis {
+    margin-top: 2rem;
+    padding: 0.9rem 1.1rem;
+    border-left: 3px solid var(--color-notice);
+    background: var(--color-surface-muted);
+}
+
+.weather-basis p {
+    margin: 0;
+}
+
+.weather-basis-label {
+    color: var(--color-notice);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.weather-basis-location {
+    margin-top: 0.2rem !important;
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.weather-basis-description {
+    max-width: 80ch;
+    margin-top: 0.35rem !important;
+    color: var(--color-muted);
+    font-size: 0.82rem;
+    line-height: 1.55;
+}
+
+.weather-basis-source {
+    margin-top: 0.4rem !important;
+    color: var(--color-muted);
+    font-size: 0.72rem;
+    overflow-wrap: anywhere;
+}

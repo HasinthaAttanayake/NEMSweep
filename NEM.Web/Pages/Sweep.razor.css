@@ -1,0 +1,14 @@
+.sweep-page {
+    --accent: var(--color-demand);
+    --accent-soft: var(--color-demand-soft);
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: var(--space-page-top) var(--space-page-x) var(--space-page-bottom);
+    color: var(--color-ink);
+}
+
+.sweep-axis {
+    margin: 0.45rem 0 0;
+    color: var(--color-muted);
+    font-size: 0.85rem;
+}
