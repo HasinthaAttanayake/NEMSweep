@@ -265,9 +265,10 @@
             _result = await Http.GetFromJsonAsync<DispatchResultsDTO>(
                 "data/results.json",
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            if (_result is null || _result.SchemaVersion != 4)
+            if (_result is null || _result.SchemaVersion != ArtifactSchemaVersions.DispatchResults)
             {
-                _errorMessage = "Dispatch results are missing or use an unsupported schema; expected schema 4.";
+                _errorMessage = "Dispatch results are missing or use an unsupported schema; expected schema "
+                    + $"{ArtifactSchemaVersions.DispatchResults}.";
                 return;
             }
 

@@ -21,6 +21,8 @@ internal static class SweepRunCommand
         var failedPointIds = new List<string>();
         var indexPoints = new List<SweepIndexPointDTO>();
         var configPaths = new List<string>();
+        var succeededResults = new List<DispatchResultsDTO>();
+        var referencedSeriesPaths = new List<string>();
 
         foreach (SweepPoint point in definition.Points)
         {
@@ -46,42 +48,60 @@ internal static class SweepRunCommand
             try
             {
                 ScenarioCommand.Run(context, configPath, resultPath);
-                SweepArtifactExport.ExternalizeBaseDemand(resultPath, sweepDirectory);
-                DispatchResultsDTO result = JsonSerializer.Deserialize<DispatchResultsDTO>(
-                    File.ReadAllBytes(resultPath),
-                    JsonFile.ReadOptions)
-                    ?? throw new FormatException($"Sweep point '{point.PointId}' result is empty.");
-                SweepPointScalarResultsDTO scalars = SweepArtifactExport.CreateScalars(result);
-                JsonFile.Write(new SweepPointStatus(point.PointId, point.AxisValue, "succeeded", null), statusPath);
+                (DispatchResultsDTO result, string seriesPath) = ExternalizeBaseDemand(
+                    point.PointId,
+                    resultPath,
+                    sweepDirectory);
+                referencedSeriesPaths.Add(seriesPath);
+                succeededResults.Add(result);
+                JsonFile.Write(
+                    new SweepPointStatusFile(
+                        point.PointId,
+                        point.AxisValue,
+                        SweepPointStatus.Succeeded,
+                        null),
+                    statusPath);
                 indexPoints.Add(new SweepIndexPointDTO(
                     point.PointId,
                     point.Label,
                     point.AxisValue,
-                    "succeeded",
+                    SweepPointStatus.Succeeded,
                     $"points/{point.PointId}.json",
                     $"configs/{point.PointId}.json",
-                    scalars,
+                    SweepArtifactExport.CreateScalars(result),
+                    result.Reliability,
+                    result.StorageSizing,
+                    result.Metrics.IntervalPointers,
                     null));
                 context.Output.WriteLine($"Sweep point {point.PointId}: succeeded.");
             }
             catch (Exception exception)
             {
                 File.Delete(resultPath);
+                SweepPointFailureDTO failure = SweepArtifactExport.CreateFailure(exception);
                 JsonFile.Write(
-                    new SweepPointStatus(point.PointId, point.AxisValue, "failed", exception.Message),
+                    new SweepPointStatusFile(
+                        point.PointId,
+                        point.AxisValue,
+                        SweepPointStatus.Failed,
+                        failure),
                     statusPath);
                 failedPointIds.Add(point.PointId);
                 indexPoints.Add(new SweepIndexPointDTO(
                     point.PointId,
                     point.Label,
                     point.AxisValue,
-                    "failed",
+                    SweepPointStatus.Failed,
                     null,
                     $"configs/{point.PointId}.json",
                     null,
-                    exception.Message));
+                    null,
+                    null,
+                    null,
+                    failure));
                 (context.Error ?? TextWriter.Null).WriteLine(
-                    $"Sweep point {point.PointId}: failed: {exception.Message}");
+                    $"Sweep point {point.PointId}: failed: {failure.Message} "
+                    + $"(stage {failure.Stage}, code {failure.Code})");
             }
         }
 
@@ -94,13 +114,18 @@ internal static class SweepRunCommand
             runMetadata);
         JsonFile.Write(
             new SweepIndexDTO(
-                SweepArtifactExport.IndexSchemaVersion,
+                ArtifactSchemaVersions.SweepIndex,
                 definition.SweepId,
                 definition.Name,
                 new SweepAxisDTO(definition.Axis.Label, definition.Axis.Unit),
+                SweepArtifactExport.CreateScope(succeededResults),
                 provenance,
                 indexPoints.ToArray()),
             Path.Combine(sweepDirectory, "index.json"));
+        SweepArtifactExport.WriteManifest(context.Paths.WebDataPath("sweeps"));
+        // Only once the new index is on disk: a series file is still referenced by the previously
+        // published index until that index is replaced.
+        SweepArtifactExport.PruneUnreferencedSeries(sweepDirectory, referencedSeriesPaths);
 
         if (failedPointIds.Count == 0)
         {
@@ -113,9 +138,39 @@ internal static class SweepRunCommand
         return 1;
     }
 
-    private sealed record SweepPointStatus(
+    /// <summary>
+    /// Moves the point's base-demand series into the shared series directory and reads the point
+    /// back. Failures here are export failures: the point itself ran.
+    /// </summary>
+    private static (DispatchResultsDTO Result, string SeriesPath) ExternalizeBaseDemand(
+        string pointId,
+        string resultPath,
+        string sweepDirectory)
+    {
+        try
+        {
+            string seriesPath = SweepArtifactExport.ExternalizeBaseDemand(resultPath, sweepDirectory);
+            DispatchResultsDTO result = JsonSerializer.Deserialize<DispatchResultsDTO>(
+                File.ReadAllBytes(resultPath),
+                JsonFile.ReadOptions)
+                ?? throw new FormatException($"Sweep point '{pointId}' result is empty.");
+            return (result, seriesPath);
+        }
+        catch (Exception exception) when (exception
+            is FormatException or IOException or JsonException)
+        {
+            throw new ScenarioRunException(
+                SweepFailureStage.Export,
+                "pointArtifactUnusable",
+                exception.Message,
+                exception);
+        }
+    }
+
+    /// <summary>Per-point status sidecar, written next to each point's detail artifact.</summary>
+    private sealed record SweepPointStatusFile(
         string PointId,
         double AxisValue,
-        string Status,
-        string? Failure);
+        SweepPointStatus Status,
+        SweepPointFailureDTO? Failure);
 }

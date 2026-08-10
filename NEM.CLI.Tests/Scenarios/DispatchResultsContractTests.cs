@@ -7,6 +7,7 @@ using NEM.Model.Grid;
 using NEM.Model.Scenarios;
 using NEM.Model.Series;
 using NEM.Model.Simulation;
+using NEM.Model.StorageSizing;
 using NEM.Model.Units;
 using System.Text;
 using System.Text.Json;
@@ -17,11 +18,11 @@ namespace NEM.CLI.Tests.Scenarios;
 public sealed class DispatchResultsContractTests
 {
     [Fact]
-    public void V4_RoundTripsWithVersionAndExplicitUnits()
+    public void V5_RoundTripsWithVersionAndExplicitUnits()
     {
         var start = new DateTimeOffset(2025, 7, 1, 0, 0, 0, TimeSpan.FromHours(10));
         var result = new DispatchResultsDTO(
-            4,
+            ArtifactSchemaVersions.DispatchResults,
             new DispatchScenarioDTO(
                 "nsw1-baseline-dispatch",
                 "NSW1 baseline dispatch",
@@ -33,6 +34,11 @@ public sealed class DispatchResultsContractTests
             new DispatchSourcesDTO(
                 new DispatchInputArtifactDTO("demand-data.json", 2, new string('a', 64)),
                 new DispatchInputArtifactDTO("weather-data.json", 5, new string('b', 64)),
+                new WeatherBasisDTO(
+                    WeatherBasisKind.TypicalMeteorologicalYear,
+                    "sydney.epw",
+                    "Sydney (WMO 947680)",
+                    "Typical meteorological year from sydney.epw."),
                 ["demand.zip"]),
             new DispatchPowerSystemDTO(
                 "nsw1-baseline-dispatch-system",
@@ -49,7 +55,26 @@ public sealed class DispatchResultsContractTests
                 [10, 0],
                 [0, 5],
                 new Dictionary<string, double[]> { ["Battery"] = [0, 8.7] }),
-            new DispatchMetricsDTO(170, 165, 35, 5, 5.0 / 170 * 100, 1, 0.5, 5),
+            new DispatchMetricsDTO(
+                170,
+                165,
+                35,
+                5,
+                5.0 / 170 * 100,
+                1,
+                0.5,
+                5,
+                new IntervalPointersDTO(1, 0, 0)),
+            new ReliabilityBasisDTO(0.002, 5.0 / 170 * 100, false, "NEM reliability standard"),
+            new StorageSizingOutcomeDTO(
+                StorageSizingOutcome.Resized,
+                120,
+                30,
+                240,
+                60,
+                100_000,
+                10_000,
+                3),
             new DispatchCostDTO("calculated", 1000m, 200m, 1200m, 10m, 2m, 12m));
 
         string json = JsonSerializer.Serialize(result, new JsonSerializerOptions
@@ -61,7 +86,7 @@ public sealed class DispatchResultsContractTests
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
         roundTripped.Should().BeEquivalentTo(result);
-    roundTripped!.SchemaVersion.Should().Be(4);
+    roundTripped!.SchemaVersion.Should().Be(5);
     json.Should().Contain("\"baseDemandMw\"");
     json.Should().Contain("\"additiveComponentsByNameMw\"");
     json.Should().Contain("\"totalDemandMw\"");
@@ -78,6 +103,13 @@ public sealed class DispatchResultsContractTests
         json.Should().Contain("\"storageSlcoeAudPerMwh\"");
         json.Should().Contain("\"slcoeAudPerMwh\"");
         json.Should().Contain("\"sha256\"");
+        json.Should().Contain("\"weatherBasis\"");
+        json.Should().Contain("\"kind\":\"typicalMeteorologicalYear\"");
+        json.Should().Contain("\"targetUsePercentageOfDemand\"");
+        json.Should().Contain("\"achievedUsePercentageOfDemand\"");
+        json.Should().Contain("\"withinTarget\"");
+        json.Should().Contain("\"outcome\":\"resized\"");
+        json.Should().Contain("\"peakUnservedIntervalIndex\"");
     }
 
     [Fact]
@@ -192,16 +224,46 @@ public sealed class DispatchResultsContractTests
                         new StorageTechnologyProfile(15u, 0.87)),
                 ])]);
 
-        DispatchResultsDTO result = DispatchResultsExport.Create(
+        var installedCapacity = new RegionalBatterySizing(
+            "NSW1",
+            Energy.FromMegawattHours(120),
+            Power.FromMegawatts(30),
+            wasChanged: false);
+        var sizingResult = new StorageSizingRunResult(
+            powerSystem,
+            [new RegionalSizingResult(
+                outcome,
+                installedCapacity,
+                meetsTarget: true,
+                StorageSizingStatus.TargetMet,
+                "The installed Battery meets the reliability target.")],
+            [new InstalledBatteryAssessment(
+                outcome,
+                installedCapacity,
+                meetsTarget: true,
+                "The installed Battery meets the reliability target.")],
+            dispatchPassCount: 1,
+            StorageSizingStatus.TargetMet,
+            "The installed Battery meets the reliability target.");
+
+        DispatchResultsDTO result = DispatchResultsExport.Create(new DispatchExportRequest(
             demandData,
             new DispatchInputArtifactDTO("demand.json", 2, new string('a', 64)),
             new DispatchInputArtifactDTO("weather.json", 5, new string('b', 64)),
+            new WeatherBasisDTO(
+                WeatherBasisKind.TypicalMeteorologicalYear,
+                "sydney.epw",
+                "Sydney (WMO 947680)",
+                "Typical meteorological year from sydney.epw."),
             scenario,
-            powerSystem,
-            outcome,
-            PowerSystemCostCalculator.Calculate(scenario, powerSystem, [outcome]));
+            sizingResult,
+            new StorageSizingOptions(
+                Power.FromMegawatts(10_000),
+                Energy.FromMegawattHours(100_000)),
+            "NEM reliability standard",
+            PowerSystemCostCalculator.Calculate(scenario, powerSystem, [outcome])));
 
-        result.SchemaVersion.Should().Be(4);
+        result.SchemaVersion.Should().Be(5);
         result.DataSeries.DeliveredGenerationByTechnologyMw["Coal"].Take(2)
             .Should().Equal(120, 50);
         result.DataSeries.DeliveredGenerationByTechnologyMw["Gas"].Take(2)
@@ -222,7 +284,23 @@ public sealed class DispatchResultsContractTests
             0,
             0,
             8760.0 / 8760,
-            0));
+            0,
+            new IntervalPointersDTO(null, 0, 0)));
+        result.Reliability.Should().Be(new ReliabilityBasisDTO(
+            0.002,
+            0,
+            true,
+            "NEM reliability standard"));
+        result.StorageSizing.Should().Be(new StorageSizingOutcomeDTO(
+            StorageSizingOutcome.NotRequired,
+            120,
+            30,
+            120,
+            30,
+            100_000,
+            10_000,
+            1));
+        result.DataSources.WeatherBasis.Kind.Should().Be(WeatherBasisKind.TypicalMeteorologicalYear);
         result.Cost.AnnualisedGenerationCostAud.Should().Be(0);
         result.Cost.AnnualisedStorageCostAud.Should().Be(0);
         result.Cost.SlcoeAudPerMwh.Should().Be(0);

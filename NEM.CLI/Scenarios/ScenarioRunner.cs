@@ -2,6 +2,7 @@ using NEM.Contracts;
 using NEM.CLI.Configuration;
 using NEM.CLI.Demand;
 using NEM.CLI.Infrastructure;
+using NEM.CLI.Weather;
 using NEM.Model.Economics;
 using NEM.Model.Grid;
 using NEM.Model.Scenarios;
@@ -24,12 +25,13 @@ internal static class ScenarioRunner
     {
         string demandPath = Path.GetFullPath(settings.DemandFile, solutionRoot);
         string weatherPath = Path.GetFullPath(settings.WeatherFile, solutionRoot);
-        LoadedInput<OperationalDemandData> demandInput = ReadDemand(demandPath);
+        LoadedInput<OperationalDemandData> demandInput = ReadInput(() => ReadDemand(demandPath));
         OperationalDemandData demandData = demandInput.Value;
         FlowSeries hourlyDemand = demandData.Demand.ResampleToHourly();
-        LoadedInput<WeatherDataDTO> weatherInput = ReadWeather(weatherPath);
+        LoadedInput<WeatherDataDTO> weatherInput = ReadInput(() => ReadWeather(weatherPath));
         WeatherDataDTO weatherData = weatherInput.Value;
-        RegionalResourceProfile resources = ReadWeatherForTimeline(weatherData, hourlyDemand);
+        RegionalResourceProfile resources = ReadInput(
+            () => ReadWeatherForTimeline(weatherData, hourlyDemand));
         DomainScenario scenario = BuildScenario(settings, hourlyDemand);
         if (scenario.Regions.Count != 1
             || !string.Equals(
@@ -37,7 +39,9 @@ internal static class ScenarioRunner
                 demandData.Region,
                 StringComparison.OrdinalIgnoreCase))
         {
-            throw new NotSupportedException(
+            throw new ScenarioRunException(
+                SweepFailureStage.Input,
+                "unsupportedRegionCount",
                 "The current scenario runner requires exactly one scenario region matching its demand input.");
         }
 
@@ -56,34 +60,86 @@ internal static class ScenarioRunner
             },
             additiveDemandComponents);
         StorageSizingSettings sizing = settings.StorageSizing;
-        StorageSizingRunResult sizingResult = StorageSizingService.Size(
-            powerSystem,
-            new StorageSizingOptions(
-                Power.FromMegawatts(sizing.MaximumPowerMw),
-                Energy.FromMegawattHours(sizing.MaximumEnergyMwh),
-                sizing.TargetUsePercentage,
-                sizing.MaximumPasses));
-        if (sizingResult.Status != StorageSizingStatus.TargetMet)
-        {
-            throw new InvalidOperationException(
-                $"Storage sizing ended with {sizingResult.Status}: "
-                + sizingResult.TerminationEvidence);
-        }
+        var sizingOptions = new StorageSizingOptions(
+            Power.FromMegawatts(sizing.MaximumPowerMw),
+            Energy.FromMegawattHours(sizing.MaximumEnergyMwh),
+            sizing.TargetUsePercentage,
+            sizing.MaximumPasses);
+        StorageSizingRunResult sizingResult = Size(powerSystem, sizingOptions);
+        PowerSystemCostBreakdown costBreakdown = Cost(scenario, sizingResult);
 
-        powerSystem = sizingResult.PowerSystem;
-        DispatchOutcome outcome = sizingResult.Regions.Single().DispatchOutcome;
-        PowerSystemCostBreakdown costBreakdown = PowerSystemCostCalculator.Calculate(
-            scenario,
-            sizingResult);
-
-        return DispatchResultsExport.Create(
+        return DispatchResultsExport.Create(new DispatchExportRequest(
             demandData,
             demandInput.Artifact,
             weatherInput.Artifact,
+            WeatherBasis.Create(weatherData),
             scenario,
-            powerSystem,
-            outcome,
-            costBreakdown);
+            sizingResult,
+            sizingOptions,
+            sizing.ReliabilityStandardName,
+            costBreakdown));
+    }
+
+    private static StorageSizingRunResult Size(
+        PowerSystem powerSystem,
+        StorageSizingOptions options)
+    {
+        StorageSizingRunResult result;
+        try
+        {
+            result = StorageSizingService.Size(powerSystem, options);
+        }
+        catch (Exception exception) when (exception is not ScenarioRunException)
+        {
+            throw new ScenarioRunException(
+                SweepFailureStage.Dispatch,
+                "dispatchFailed",
+                exception.Message,
+                exception);
+        }
+
+        return result.Status == StorageSizingStatus.TargetMet
+            ? result
+            : throw new ScenarioRunException(
+                SweepFailureStage.Sizing,
+                JsonNamingPolicy.CamelCase.ConvertName(result.Status.ToString()),
+                $"Storage sizing ended with {result.Status}: {result.TerminationEvidence}");
+    }
+
+    private static PowerSystemCostBreakdown Cost(
+        DomainScenario scenario,
+        StorageSizingRunResult sizingResult)
+    {
+        try
+        {
+            return PowerSystemCostCalculator.Calculate(scenario, sizingResult);
+        }
+        catch (Exception exception) when (exception is not ScenarioRunException)
+        {
+            throw new ScenarioRunException(
+                SweepFailureStage.Costing,
+                "costingFailed",
+                exception.Message,
+                exception);
+        }
+    }
+
+    /// <summary>Runs an input read, attributing any failure to the input stage.</summary>
+    private static T ReadInput<T>(Func<T> read)
+    {
+        try
+        {
+            return read();
+        }
+        catch (Exception exception) when (exception
+            is FormatException or IOException or JsonException or InvalidOperationException)
+        {
+            throw new ScenarioRunException(
+                SweepFailureStage.Input,
+                exception is IOException ? "inputUnreadable" : "invalidInput",
+                exception.Message,
+                exception);
+        }
     }
 
     private static LoadedInput<OperationalDemandData> ReadDemand(string path)
@@ -93,10 +149,11 @@ internal static class ScenarioRunner
             contents,
             JsonFile.ReadOptions)
             ?? throw new FormatException("Demand source JSON is empty.");
-        if (demand.SchemaVersion != 2)
+        if (demand.SchemaVersion != ArtifactSchemaVersions.OperationalDemand)
         {
             throw new FormatException(
-                $"Demand source schema {demand.SchemaVersion} is not supported; expected schema 2.");
+                $"Demand source schema {demand.SchemaVersion} is not supported; expected schema "
+                + $"{ArtifactSchemaVersions.OperationalDemand}.");
         }
 
         var demandData = new OperationalDemandData(
@@ -118,10 +175,11 @@ internal static class ScenarioRunner
             contents,
             JsonFile.ReadOptions)
             ?? throw new FormatException("Weather source JSON is empty.");
-        if (weather.SchemaVersion != 5)
+        if (weather.SchemaVersion != ArtifactSchemaVersions.Weather)
         {
             throw new FormatException(
-                $"Weather source schema {weather.SchemaVersion} is not supported; expected schema 5.");
+                $"Weather source schema {weather.SchemaVersion} is not supported; expected schema "
+                + $"{ArtifactSchemaVersions.Weather}.");
         }
 
         return new LoadedInput<WeatherDataDTO>(

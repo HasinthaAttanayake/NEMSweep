@@ -193,6 +193,7 @@ public sealed class PowerSystemCostBreakdownTests
         var regionalResult = new RegionalSizingResult(
             outcome,
             new RegionalBatterySizing("NSW1", Energy.Zero, Power.Zero, wasChanged: false),
+            meetsTarget: true,
             StorageSizingStatus.TargetMet,
             "Test dispatch is compliant.");
 

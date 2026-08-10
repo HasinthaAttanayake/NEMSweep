@@ -150,9 +150,10 @@
                 return;
             }
 
-            if (result.SchemaVersion != 2)
+            if (result.SchemaVersion != ArtifactSchemaVersions.OperationalDemand)
             {
-                _errorMessage = $"Demand data schema {result.SchemaVersion} is not supported; expected schema 2.";
+                _errorMessage = $"Demand data schema {result.SchemaVersion} is not supported; expected schema "
+                    + $"{ArtifactSchemaVersions.OperationalDemand}.";
                 return;
             }
 

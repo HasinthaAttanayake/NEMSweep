@@ -4,7 +4,7 @@
   "demandFile": "NEM.Web/wwwroot/data/demand-data.json",
   "weatherFile": "NEM.Web/wwwroot/data/weather-data.json",
   "costBasis": { "year": 2026, "realDiscountRate": 0.07 },
-  "storageSizing": { "maximumPowerMw": 10000, "maximumEnergyMwh": 100000, "targetUsePercentage": 0.002, "maximumPasses": 256 },
+  "storageSizing": { "maximumPowerMw": 10000, "maximumEnergyMwh": 100000, "targetUsePercentage": 0.002, "maximumPasses": 256, "reliabilityStandardName": "NEM reliability standard" },
   "regions": [
     {
       "regionId": "NSW1",

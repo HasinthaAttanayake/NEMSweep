@@ -210,7 +210,7 @@
             _data = await Http.GetFromJsonAsync<GenerationInformationDTO>(
                 "data/generation-information.json",
                 new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
-            if (_data is null || _data.SchemaVersion != 1)
+            if (_data is null || _data.SchemaVersion != ArtifactSchemaVersions.GenerationInformation)
             {
                 _errorMessage = "Generation information is missing or has an unsupported schema.";
                 return;

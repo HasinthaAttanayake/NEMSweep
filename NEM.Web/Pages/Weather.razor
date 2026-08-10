@@ -360,9 +360,10 @@
                 return;
             }
 
-            if (_weather.SchemaVersion != 5)
+            if (_weather.SchemaVersion != ArtifactSchemaVersions.Weather)
             {
-                _errorMessage = $"Weather data schema {_weather.SchemaVersion} is not supported; expected schema 5.";
+                _errorMessage = $"Weather data schema {_weather.SchemaVersion} is not supported; expected schema "
+                    + $"{ArtifactSchemaVersions.Weather}.";
                 return;
             }
 
