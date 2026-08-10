@@ -1,0 +1,10 @@
+{
+  "axisValue": 3500,
+  "failure": {
+    "code": "batteryCapacityLimitReached",
+    "message": "Storage sizing ended with BatteryCapacityLimitReached: The Battery capacity bounds are insufficient for region NSW1.",
+    "stage": "sizing"
+  },
+  "pointId": "p7",
+  "status": "failed"
+}

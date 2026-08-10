@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "sweeps": [
+    {
+      "indexPath": "datacentre-nameplate-nsw1-fy2026/index.json",
+      "name": "Data centre nameplate added, NSW1",
+      "sweepId": "datacentre-nameplate-nsw1-fy2026"
+    }
+  ]
+}
