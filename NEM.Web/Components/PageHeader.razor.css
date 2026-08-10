@@ -1,0 +1,33 @@
+.page-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 2rem;
+    padding-bottom: var(--page-header-padding-bottom, 1.25rem);
+    border-bottom: 1px solid var(--page-header-border, var(--color-border));
+}
+
+.eyebrow {
+    margin: 0 0 0.35rem;
+    color: var(--accent);
+    font-size: var(--type-eyebrow, 0.78rem);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0;
+}
+
+h1 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: var(--page-header-title-size, clamp(2rem, 4vw, 3.4rem));
+    font-weight: 600;
+    letter-spacing: 0;
+}
+
+@media (max-width: 760px) {
+    .page-header {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 1rem;
+    }
+}

@@ -3,8 +3,7 @@
 @using NEM.Model.Units
 @using NEM.Model.Weather
 @using System.Globalization
-@using System.Text.Json
-@inject HttpClient Http
+@inject ArtifactLoader ArtifactLoader
 
 <PageTitle>Solar zenith</PageTitle>
 
@@ -30,18 +29,9 @@
         </label>
     </header>
 
-    @if (_isLoading)
-    {
-        <div class="status-block">
-            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
-        </div>
-    }
-    else if (_errorMessage is not null)
-    {
-        <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
-    }
-    else if (_weather is not null)
-    {
+    <ArtifactLoadStateView State="_loadState">
+        @if (_weather is not null)
+        {
         <section class="zenith-summary" aria-label="Selected day summary">
             <div>
                 <span>Minimum zenith sample</span>
@@ -71,7 +61,8 @@
                       Width="100%"
                       Height="460px" />
         </section>
-    }
+        }
+    </ArtifactLoadStateView>
 </div>
 
 @code {
@@ -82,8 +73,7 @@
             .Select(hour => hour % 3 == 0 || hour == 23 ? $"{hour:D2}:30" : string.Empty)
             .ToArray();
 
-    private bool _isLoading = true;
-    private string? _errorMessage;
+    private ArtifactLoadState _loadState = ArtifactLoadState.Loading();
     private WeatherDataDTO? _weather;
     private DateTime _selectedDate = DateTime.Today;
     private List<ChartSeries<double>> _zenithSeries = [];
@@ -94,23 +84,21 @@
     {
         try
         {
-            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            _weather = await Http.GetFromJsonAsync<WeatherDataDTO>("data/weather-data.json", options);
-            if (_weather is null)
+            ArtifactLoadResult<WeatherDataDTO> loadResult =
+                await ArtifactLoader.LoadAsync<WeatherDataDTO>("data/weather-data.json");
+            if (!loadResult.IsSuccess)
             {
-                _errorMessage = "Failed to load weather-data.json";
+                _loadState = loadResult.State;
                 return;
             }
 
+            _weather = loadResult.Value!;
             BuildChart();
+            _loadState = loadResult.State;
         }
         catch (Exception exception)
         {
-            _errorMessage = $"Error loading weather data: {exception.Message}";
-        }
-        finally
-        {
-            _isLoading = false;
+            _loadState = ArtifactLoadState.Failed($"Error loading weather data: {exception.Message}");
         }
     }
 

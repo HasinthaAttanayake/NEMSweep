@@ -1,0 +1,95 @@
+@using NEM.Contracts
+@inject NavigationManager Navigation
+
+<ChartFrame Heading="@Heading" Description="@Description" Unit="@YAxis.Unit">
+    <div class="sweep-chart" aria-label="@($"{YAxis.Label} by {Index.Axis.Label}")">
+        @if (_chart.Points.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info">No achieved sweep results are available.</MudAlert>
+        }
+        else
+        {
+            <MudChart ChartType="ChartType.Line"
+                      ChartSeries="_series"
+                      ChartLabels="_chart.Labels"
+                      ChartOptions="_options"
+                      SelectedIndexChanged="OnSelectedIndexChanged"
+                      Width="100%"
+                      Height="420px" />
+            <p class="sweep-chart-note">Points are drawn at equal spacing in sweep index order; read the @Index.Axis.Label value from the label under each point.</p>
+        }
+    </div>
+
+    @if (_chart.OmittedPoints.Count > 0)
+    {
+        <section class="sweep-omissions" aria-label="Sweep points not plotted">
+            <h3>@_chart.OmittedPoints.Count of @Index.Points.Length points are not plotted</h3>
+            <ul>
+                @foreach (SweepChartOmittedPoint point in _chart.OmittedPoints)
+                {
+                    <li>
+                        <strong>@point.Label (@point.AxisValue.ToString(_axisFormat) @Index.Axis.Unit)</strong>
+                        <span>@point.Reason</span>
+                    </li>
+                }
+            </ul>
+        </section>
+    }
+</ChartFrame>
+
+@code {
+    [Parameter, EditorRequired] public SweepIndexDTO Index { get; set; } = default!;
+    [Parameter, EditorRequired] public SweepChartYAxis YAxis { get; set; } = default!;
+    [Parameter, EditorRequired] public string Heading { get; set; } = string.Empty;
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public Func<SweepIndexPointDTO, string?>? DrillDownTarget { get; set; }
+
+    private SweepChartData _chart = new([], [], [], []);
+    private string _axisFormat = "N0";
+    private List<ChartSeries<double>> _series = [];
+    private LineChartOptions _options = new();
+
+    protected override void OnParametersSet()
+    {
+        _chart = SweepChartData.Build(Index, YAxis);
+        // A fractional axis such as 0.1-0.4 rounds to "0" under a whole-number format.
+        _axisFormat = SweepValueFormat.ColumnFormat(Index.Points.Select(point => (double?)point.AxisValue));
+        _series =
+        [
+            new ChartSeries<double>
+            {
+                Name = $"{YAxis.Label} ({YAxis.Unit})",
+                Data = _chart.Values,
+            },
+        ];
+
+        double maximum = _chart.Values.Length == 0 ? 0 : _chart.Values.Max();
+        _options = new LineChartOptions
+        {
+            YAxisTicks = SweepChartScale.TickInterval(maximum),
+            MaxNumYAxisTicks = 8,
+            YAxisToStringFunc = value => SweepValueFormat.Short(value, YAxis.ValuePrefix),
+            YAxisTitle = $"{YAxis.Label} ({YAxis.Unit})",
+            XAxisTitle = $"{Index.Axis.Label} ({Index.Axis.Unit})",
+            // A sweep has a handful of points, and each one is a run the reader can open.
+            ShowDataMarkers = true,
+            YAxisLines = true,
+            // Anchored at zero so a small absolute movement is not drawn as a steep decline.
+            YAxisRequireZeroPoint = true,
+        };
+    }
+
+    private void OnSelectedIndexChanged(int selectedIndex)
+    {
+        if (selectedIndex < 0 || selectedIndex >= _chart.Points.Count || DrillDownTarget is null)
+        {
+            return;
+        }
+
+        string? target = DrillDownTarget(_chart.Points[selectedIndex].Point);
+        if (!string.IsNullOrWhiteSpace(target))
+        {
+            Navigation.NavigateTo(target);
+        }
+    }
+}

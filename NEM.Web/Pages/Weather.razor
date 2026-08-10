@@ -1,24 +1,21 @@
-@page "/weather"
+@page "/inputs/weather"
 @using NEM.Contracts
-@using System.Text.Json
-@inject HttpClient Http
+@inject ArtifactLoader ArtifactLoader
 
 <PageTitle>Weather traces</PageTitle>
 
 <div class="weather-page">
-    <header class="weather-header">
-        <div>
-            <p class="eyebrow">EPW resource traces</p>
-            <h1>Weather data</h1>
+    <PageHeader Eyebrow="EPW resource traces" Title="Weather data">
+        <ScopeContent>
             @if (_weather is not null)
             {
-                <p class="location-line">
-                    @_weather.Location.City · WMO @_weather.Location.Wmo ·
-                    @_weather.Location.Latitude.ToString("0.0000"), @_weather.Location.Longitude.ToString("0.0000")
-                </p>
+                <ScopeLine Region="@($"{_weather.Location.City} · WMO {_weather.Location.Wmo} · {_weather.Location.Latitude:0.0000}, {_weather.Location.Longitude:0.0000}")"
+                           Period="@WeatherPeriod"
+                           Resolution="@WeatherResolution"
+                           BaselineGlobal="true" />
             }
-        </div>
-
+        </ScopeContent>
+        <TrailingContent>
         @if (_weather is not null)
         {
             <MudSelect T="int"
@@ -34,52 +31,13 @@
                 }
             </MudSelect>
         }
-    </header>
+        </TrailingContent>
+    </PageHeader>
 
-    @if (_isLoading)
-    {
-        <div class="status-block">
-            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
-        </div>
-    }
-    else if (_errorMessage is not null)
-    {
-        <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
-    }
-    else if (_weather is not null)
-    {
-        <section class="metric-strip" aria-label="Selected period summary">
-            <div class="metric solar-metric">
-                <span>Peak DNI</span>
-                <strong>@_peakDni.ToString("N0")</strong>
-                <small>Wh/m²</small>
-            </div>
-            <div class="metric solar-metric">
-                <span>Mean daylight DNI</span>
-                <strong>@_meanDaylightDni.ToString("N0")</strong>
-                <small>Wh/m²</small>
-            </div>
-            <div class="metric wind-metric">
-                <span>Mean wind</span>
-                <strong>@_meanWind.ToString("N1")</strong>
-                <small>m/s at @_weather.WindMeasurementHeightMetres.ToString("N0") m</small>
-            </div>
-            <div class="metric wind-metric">
-                <span>Peak wind</span>
-                <strong>@_peakWind.ToString("N1")</strong>
-                <small>m/s</small>
-            </div>
-            <div class="metric temperature-metric">
-                <span>Mean dry bulb</span>
-                <strong>@_meanTemperature.ToString("N1")</strong>
-                <small>°C</small>
-            </div>
-            <div class="metric temperature-metric">
-                <span>Dry-bulb range</span>
-                <strong>@_minimumTemperature.ToString("N1") to @_maximumTemperature.ToString("N1")</strong>
-                <small>°C</small>
-            </div>
-        </section>
+    <ArtifactLoadStateView State="_loadState">
+        @if (_weather is not null)
+        {
+        <MetricStrip Items="@WeatherMetrics" Columns="3" AriaLabel="Selected period summary" />
 
         <div class="trace-context">
             <span>@_periodLabel</span>
@@ -87,14 +45,12 @@
             <span>@_displayPointCount displayed</span>
         </div>
 
-        <MudTabs Elevation="0" Class="weather-tabs">
+        <MudTabs Elevation="0" Class="weather-tabs" Style="max-width: 100%; overflow: hidden">
             <MudTabPanel Text="Solar production">
-                <section class="chart-section production-chart">
-                    <div class="chart-heading production-heading">
-                        <div>
-                            <h2>Dual-axis solar production</h2>
-                            <p>Modelled AC output for @_solarCapacityMegawatts.ToString("N1") MW at @_weather.Location.City</p>
-                        </div>
+                <ChartFrame Heading="Dual-axis solar production"
+                            Description="@($"Modelled AC output for {_solarCapacityMegawatts:N1} MW at {_weather.Location.City}")"
+                            Class="production-chart" HeadingClass="production-heading stack-on-mobile">
+                    <TrailingContent>
                         <div class="capacity-control" aria-label="Solar AC capacity">
                             <MudTooltip Text="Decrease capacity">
                                 <MudIconButton Icon="@Icons.Material.Filled.Remove"
@@ -124,7 +80,8 @@
                                                aria-label="Increase solar capacity" />
                             </MudTooltip>
                         </div>
-                    </div>
+                    </TrailingContent>
+                    <ChildContent>
                     <div class="production-summary" aria-label="Solar production summary">
                         <div>
                             <span>Peak output</span>
@@ -145,15 +102,14 @@
                               ChartOptions="_solarProductionChartOptions"
                               Width="100%"
                               Height="420px" />
-                </section>
+                    </ChildContent>
+                </ChartFrame>
             </MudTabPanel>
             <MudTabPanel Text="Wind production">
-                <section class="chart-section production-chart wind-production-chart">
-                    <div class="chart-heading production-heading">
-                        <div>
-                            <h2>Wind production</h2>
-                            <p>Modelled output for @_windCapacityMegawatts.ToString("N1") MW using the Goldwind GW 140/3MW(S) 3.4 MW variant at 120 m hub height</p>
-                        </div>
+                <ChartFrame Heading="Wind production"
+                            Description="@($"Modelled output for {_windCapacityMegawatts:N1} MW using the Goldwind GW 140/3MW(S) 3.4 MW variant at 120 m hub height")"
+                            Class="production-chart wind-production-chart" HeadingClass="production-heading stack-on-mobile">
+                    <TrailingContent>
                         <div class="capacity-control" aria-label="Installed wind capacity">
                             <MudTooltip Text="Decrease capacity">
                                 <MudIconButton Icon="@Icons.Material.Filled.Remove"
@@ -183,7 +139,8 @@
                                                aria-label="Increase wind capacity" />
                             </MudTooltip>
                         </div>
-                    </div>
+                    </TrailingContent>
+                    <ChildContent>
                     <div class="production-summary wind-production-summary" aria-label="Wind production summary">
                         <div>
                             <span>Peak output</span>
@@ -204,90 +161,62 @@
                               ChartOptions="_windProductionChartOptions"
                               Width="100%"
                               Height="420px" />
-                </section>
+                    </ChildContent>
+                </ChartFrame>
             </MudTabPanel>
             <MudTabPanel Text="Global horizontal radiation">
-                <section class="chart-section solar-chart">
-                    <div class="chart-heading">
-                        <div>
-                            <h2>Global horizontal radiation</h2>
-                            <p>Total hourly solar energy received by a horizontal surface</p>
-                        </div>
-                        <span class="unit-badge">Wh/m²</span>
-                    </div>
+                <ChartFrame Heading="Global horizontal radiation" Description="Total hourly solar energy received by a horizontal surface"
+                            Unit="Wh/m²" Style="--accent: var(--solar); --accent-soft: var(--solar-soft)">
                     <MudChart ChartType="ChartType.Line"
                               ChartSeries="_ghiSeries"
                               ChartLabels="_xAxisLabels"
                               Width="100%"
                               Height="420px" />
-                </section>
+                </ChartFrame>
             </MudTabPanel>
             <MudTabPanel Text="Direct normal radiation">
-                <section class="chart-section solar-chart">
-                    <div class="chart-heading">
-                        <div>
-                            <h2>Direct normal radiation</h2>
-                            <p>Hourly energy received normal to the sun's rays</p>
-                        </div>
-                        <span class="unit-badge">Wh/m²</span>
-                    </div>
+                <ChartFrame Heading="Direct normal radiation" Description="Hourly energy received normal to the sun's rays"
+                            Unit="Wh/m²" Style="--accent: var(--solar); --accent-soft: var(--solar-soft)">
                     <MudChart ChartType="ChartType.Line"
                               ChartSeries="_dniSeries"
                               ChartLabels="_xAxisLabels"
                               Width="100%"
                               Height="420px" />
-                </section>
+                </ChartFrame>
             </MudTabPanel>
             <MudTabPanel Text="Diffuse horizontal radiation">
-                <section class="chart-section solar-chart">
-                    <div class="chart-heading">
-                        <div>
-                            <h2>Diffuse horizontal radiation</h2>
-                            <p>Hourly sky radiation received by a horizontal surface</p>
-                        </div>
-                        <span class="unit-badge">Wh/m²</span>
-                    </div>
+                <ChartFrame Heading="Diffuse horizontal radiation" Description="Hourly sky radiation received by a horizontal surface"
+                            Unit="Wh/m²" Style="--accent: var(--solar); --accent-soft: var(--solar-soft)">
                     <MudChart ChartType="ChartType.Line"
                               ChartSeries="_dhiSeries"
                               ChartLabels="_xAxisLabels"
                               Width="100%"
                               Height="420px" />
-                </section>
+                </ChartFrame>
             </MudTabPanel>
             <MudTabPanel Text="Wind speed">
-                <section class="chart-section wind-chart">
-                    <div class="chart-heading">
-                        <div>
-                            <h2>Wind speed</h2>
-                            <p>Hourly speed at @_weather.WindMeasurementHeightMetres.ToString("N0") metres</p>
-                        </div>
-                        <span class="unit-badge">m/s</span>
-                    </div>
+                <ChartFrame Heading="Wind speed" Description="@($"Hourly speed at {_weather.WindMeasurementHeightMetres:N0} metres")"
+                            Unit="m/s" Style="--accent: var(--wind); --accent-soft: var(--wind-soft)">
                     <MudChart ChartType="ChartType.Line"
                               ChartSeries="_windSeries"
                               ChartLabels="_xAxisLabels"
                               Width="100%"
                               Height="420px" />
-                </section>
+                </ChartFrame>
             </MudTabPanel>
             <MudTabPanel Text="Dry-bulb temperature">
-                <section class="chart-section temperature-chart">
-                    <div class="chart-heading">
-                        <div>
-                            <h2>Dry-bulb temperature</h2>
-                            <p>Hourly ambient air temperature</p>
-                        </div>
-                        <span class="unit-badge">°C</span>
-                    </div>
+                <ChartFrame Heading="Dry-bulb temperature" Description="Hourly ambient air temperature"
+                            Unit="°C" Style="--accent: var(--temperature); --accent-soft: var(--temperature-soft)">
                     <MudChart ChartType="ChartType.Line"
                               ChartSeries="_temperatureSeries"
                               ChartLabels="_xAxisLabels"
                               Width="100%"
                               Height="420px" />
-                </section>
+                </ChartFrame>
             </MudTabPanel>
         </MudTabs>
-    }
+        }
+    </ArtifactLoadStateView>
 </div>
 
 @code {
@@ -312,8 +241,7 @@
         new(12, "December"),
     ];
 
-    private bool _isLoading = true;
-    private string? _errorMessage;
+    private ArtifactLoadState _loadState = ArtifactLoadState.Loading();
     private WeatherDataDTO? _weather;
     private int _selectedMonth;
     private List<ChartSeries<double>> _ghiSeries = [];
@@ -345,28 +273,49 @@
     private double _windCapacityFactor;
     private string _periodLabel = string.Empty;
 
+    private IReadOnlyList<MetricStripItem> WeatherMetrics =>
+    [
+        new("Peak DNI", _peakDni.ToString("N0"), "Wh/m²", "--metric-accent: var(--solar)"),
+        new("Mean daylight DNI", _meanDaylightDni.ToString("N0"), "Wh/m²", "--metric-accent: var(--solar)"),
+        new("Mean wind", _meanWind.ToString("N1"), $"m/s at {_weather!.WindMeasurementHeightMetres:N0} m", "--metric-accent: var(--wind)"),
+        new("Peak wind", _peakWind.ToString("N1"), "m/s", "--metric-accent: var(--wind)"),
+        new("Mean dry bulb", _meanTemperature.ToString("N1"), "°C", "--metric-accent: var(--temperature)"),
+        new("Dry-bulb range", $"{_minimumTemperature:N1} to {_maximumTemperature:N1}", "°C", "--metric-accent: var(--temperature)"),
+    ];
+
+    /// <summary>
+    /// The artifact carries a start and a resolution, not an end, so the inclusive end comes from
+    /// the trace length. Stating only the start read as a single-day period.
+    /// </summary>
+    private string WeatherPeriod
+    {
+        get
+        {
+            int intervals = _weather!.DataSeries.DryBulbTemperatureDegreesCelsius.Length;
+            if (intervals <= 1 || _weather.Resolution <= TimeSpan.Zero)
+            {
+                return _weather.Start.ToString("dd MMM yyyy");
+            }
+
+            DateTimeOffset end = _weather.Start.AddTicks(_weather.Resolution.Ticks * intervals).AddTicks(-1);
+            return $"{_weather.Start:dd MMM yyyy} to {end:dd MMM yyyy}";
+        }
+    }
+    private string WeatherResolution => $"{_weather!.Resolution.TotalHours:N0}-hour intervals";
+
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            var options = new JsonSerializerOptions
+            ArtifactLoadResult<WeatherDataDTO> loadResult =
+                await ArtifactLoader.LoadAsync<WeatherDataDTO>("data/weather-data.json");
+            if (!loadResult.IsSuccess)
             {
-                PropertyNameCaseInsensitive = true,
-            };
-            _weather = await Http.GetFromJsonAsync<WeatherDataDTO>("data/weather-data.json", options);
-            if (_weather is null)
-            {
-                _errorMessage = "Failed to load weather-data.json";
+                _loadState = loadResult.State;
                 return;
             }
 
-            if (_weather.SchemaVersion != ArtifactSchemaVersions.Weather)
-            {
-                _errorMessage = $"Weather data schema {_weather.SchemaVersion} is not supported; expected schema "
-                    + $"{ArtifactSchemaVersions.Weather}.";
-                return;
-            }
-
+            _weather = loadResult.Value!;
             int dniLength = _weather.DataSeries.DirectNormalRadiationWhPerSquareMetre.Length;
             int ghiLength = _weather.DataSeries.GlobalHorizontalRadiationWhPerSquareMetre.Length;
             int dhiLength = _weather.DataSeries.DiffuseHorizontalRadiationWhPerSquareMetre.Length;
@@ -384,19 +333,16 @@
                 || solarProductionLength != dniLength
                 || windProductionLength != dniLength)
             {
-                _errorMessage = "Weather traces are empty or misaligned.";
+                _loadState = ArtifactLoadState.InvalidData("Weather traces are empty or misaligned.");
                 return;
             }
 
             BuildCharts();
+            _loadState = loadResult.State;
         }
         catch (Exception exception)
         {
-            _errorMessage = $"Error loading weather data: {exception.Message}";
-        }
-        finally
-        {
-            _isLoading = false;
+            _loadState = ArtifactLoadState.Failed($"Error loading weather data: {exception.Message}");
         }
     }
 

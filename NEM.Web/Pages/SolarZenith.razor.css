@@ -1,12 +1,10 @@
 .zenith-page {
-    --solar: #c85d16;
-    --solar-soft: #fff4e8;
-    --ink: #17212b;
-    --muted: #5d6873;
+    --accent: var(--color-solar-zenith);
+    --accent-soft: var(--color-solar-zenith-soft);
     max-width: 1100px;
     margin: 0 auto;
     padding: 1.5rem 1.25rem 3rem;
-    color: var(--ink);
+    color: var(--color-ink);
 }
 
 .zenith-header {
@@ -15,13 +13,13 @@
     justify-content: space-between;
     gap: 2rem;
     padding-bottom: 1.25rem;
-    border-bottom: 1px solid #dce1e5;
+    border-bottom: 1px solid var(--color-border);
 }
 
 .eyebrow {
     margin: 0 0 0.35rem;
-    color: var(--solar);
-    font-size: 0.78rem;
+    color: var(--accent);
+    font-size: var(--type-eyebrow);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0;
@@ -29,7 +27,7 @@
 
 .zenith-header h1 {
     margin: 0;
-    font-family: Georgia, "Times New Roman", serif;
+    font-family: var(--font-display);
     font-size: clamp(2rem, 4vw, 3.4rem);
     font-weight: 600;
     letter-spacing: 0;
@@ -38,13 +36,13 @@
 .location-line,
 .chart-heading p {
     margin: 0.4rem 0 0;
-    color: var(--muted);
+    color: var(--color-muted);
 }
 
 .date-field {
     display: grid;
     gap: 0.35rem;
-    color: var(--muted);
+    color: var(--color-muted);
     font-size: 0.8rem;
     font-weight: 700;
 }
@@ -52,10 +50,10 @@
 .date-field input {
     min-width: 190px;
     padding: 0.75rem;
-    border: 1px solid #aeb7bf;
+    border: 1px solid var(--color-border-control);
     border-radius: 4px;
-    background: #fff;
-    color: var(--ink);
+    background: var(--color-surface);
+    color: var(--color-ink);
     font: inherit;
 }
 
@@ -69,13 +67,13 @@
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     margin-top: 1.5rem;
-    border-top: 1px solid #dce1e5;
-    border-bottom: 1px solid #dce1e5;
+    border-top: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
 }
 
 .zenith-summary div {
     padding: 1rem 1.15rem;
-    border-right: 1px solid #dce1e5;
+    border-right: 1px solid var(--color-border);
 }
 
 .zenith-summary div:last-child {
@@ -88,13 +86,13 @@
 }
 
 .zenith-summary span {
-    color: var(--muted);
+    color: var(--color-muted);
     font-size: 0.8rem;
 }
 
 .zenith-summary strong {
     margin-top: 0.2rem;
-    font-family: Georgia, "Times New Roman", serif;
+    font-family: var(--font-display);
     font-size: 1.5rem;
     font-weight: 600;
 }
@@ -118,10 +116,10 @@
 
 .unit-badge {
     padding: 0.25rem 0.5rem;
-    border: 1px solid var(--solar);
+    border: 1px solid var(--accent);
     border-radius: 4px;
-    background: var(--solar-soft);
-    color: var(--solar);
+    background: var(--accent-soft);
+    color: var(--accent);
     font-size: 0.78rem;
     font-weight: 700;
 }
@@ -151,7 +149,7 @@
 
     .zenith-summary div {
         border-right: 0;
-        border-bottom: 1px solid #dce1e5;
+        border-bottom: 1px solid var(--color-border);
     }
 
     .zenith-summary div:last-child {

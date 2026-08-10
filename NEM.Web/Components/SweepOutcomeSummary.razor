@@ -1,0 +1,204 @@
+@using System.Globalization
+@using NEM.Contracts
+
+@* What the sweep establishes, read straight off the index: how far the runs got, whether they met
+   the reliability target they were sized against, and what the sizing loop had to do. Every
+   sentence here is a restatement of a field — no figure is derived and nothing is interpreted. *@
+<section class="outcome-summary" aria-label="Sweep outcome">
+    <h2>What this sweep establishes</h2>
+
+    <div class="outcome-cards">
+        <div class="outcome-card">
+            <span class="outcome-label">Runs completed</span>
+            <strong>@_succeeded.Count<small>of @Index.Points.Length</small></strong>
+            @if (_failed.Count > 0)
+            {
+                <p>@_failed.Count reached a constraint and produced no results.</p>
+            }
+        </div>
+
+        @if (_reliability.Count > 0)
+        {
+            <div class="outcome-card @(_outsideTarget.Count == 0 ? "outcome-good" : "outcome-notice")">
+                <span class="outcome-label">Reliability</span>
+                <strong>
+                    @(_outsideTarget.Count == 0 ? "All within target" : $"{_outsideTarget.Count} outside target")
+                </strong>
+                <p>
+                    Target @FormatPercentage(_reliability[0].TargetUsePercentageOfDemand) of demand unserved@(StandardSuffix).
+                    Worst completed run reached @FormatPercentage(_reliability.Max(basis => basis.AchievedUsePercentageOfDemand)).
+                </p>
+            </div>
+        }
+
+        @if (_sizing.Count > 0)
+        {
+            <div class="outcome-card">
+                <span class="outcome-label">Storage sizing</span>
+                <strong>@SizingHeadline</strong>
+                <p>@SizingDetail</p>
+            </div>
+        }
+
+        @if (_boundary is not null)
+        {
+            <div class="outcome-card outcome-notice">
+                <span class="outcome-label">Range that completed</span>
+                <strong>
+                    @FormatAxis(_boundary.Value.LastSucceeded)<small>@Index.Axis.Unit</small>
+                </strong>
+                <p>
+                    Runs complete up to @FormatAxis(_boundary.Value.LastSucceeded) @Index.Axis.Unit;
+                    from @FormatAxis(_boundary.Value.FirstFailed) @Index.Axis.Unit they do not.
+                </p>
+            </div>
+        }
+    </div>
+
+    @if (_failureGroups.Count > 0)
+    {
+        <div class="outcome-failures">
+            <h3>Runs that reached a constraint</h3>
+            <ul>
+                @foreach (FailureGroup group in _failureGroups)
+                {
+                    <li>
+                        <div>
+                            <strong>@group.Count @(group.Count == 1 ? "run" : "runs") · @StageLabel(group.Stage) stage</strong>
+                            <code>@group.Code</code>
+                        </div>
+                        <span>@group.Message</span>
+                        <span class="outcome-failure-points">
+                            @string.Join(", ", group.Labels)
+                        </span>
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public SweepIndexDTO Index { get; set; } = default!;
+
+    private sealed record FailureGroup(
+        SweepFailureStage Stage,
+        string Code,
+        string Message,
+        int Count,
+        IReadOnlyList<string> Labels);
+
+    private List<SweepIndexPointDTO> _succeeded = [];
+    private List<SweepIndexPointDTO> _failed = [];
+    private List<ReliabilityBasisDTO> _reliability = [];
+    private List<ReliabilityBasisDTO> _outsideTarget = [];
+    private List<StorageSizingOutcomeDTO> _sizing = [];
+    private List<FailureGroup> _failureGroups = [];
+    private (double LastSucceeded, double FirstFailed)? _boundary;
+    private string _axisFormat = "N0";
+
+    protected override void OnParametersSet()
+    {
+        _axisFormat = SweepValueFormat.ColumnFormat(Index.Points.Select(point => (double?)point.AxisValue));
+        _succeeded = Index.Points.Where(point => point.Status == SweepPointStatus.Succeeded).ToList();
+        _failed = Index.Points.Where(point => point.Status == SweepPointStatus.Failed).ToList();
+        _reliability = _succeeded.Where(point => point.Reliability is not null)
+            .Select(point => point.Reliability!).ToList();
+        _outsideTarget = _reliability.Where(basis => !basis.WithinTarget).ToList();
+        _sizing = _succeeded.Where(point => point.StorageSizing is not null)
+            .Select(point => point.StorageSizing!).ToList();
+
+        _failureGroups = _failed
+            .Where(point => point.Failure is not null)
+            .GroupBy(point => (point.Failure!.Stage, point.Failure.Code))
+            .Select(group => new FailureGroup(
+                group.Key.Stage,
+                group.Key.Code,
+                group.First().Failure!.Message,
+                group.Count(),
+                group.Select(point => point.Label).ToArray()))
+            .OrderByDescending(group => group.Count)
+            .ToList();
+
+        _boundary = ResolveBoundary();
+    }
+
+    /// <summary>
+    /// The axis values either side of the point where runs stop completing, but only when the
+    /// sweep divides cleanly: every completed run below every failed one. A sweep that fails in
+    /// the middle has no single boundary and none is claimed.
+    /// </summary>
+    private (double LastSucceeded, double FirstFailed)? ResolveBoundary()
+    {
+        if (_succeeded.Count == 0 || _failed.Count == 0)
+        {
+            return null;
+        }
+
+        double lastSucceeded = _succeeded.Max(point => point.AxisValue);
+        double firstFailed = _failed.Min(point => point.AxisValue);
+        return firstFailed > lastSucceeded ? (lastSucceeded, firstFailed) : null;
+    }
+
+    private string StandardSuffix => _reliability[0].StandardName is { Length: > 0 } name
+        ? $" ({name})"
+        : string.Empty;
+
+    private string SizingHeadline
+    {
+        get
+        {
+            int resized = _sizing.Count(outcome => outcome.Outcome == StorageSizingOutcome.Resized);
+            return resized switch
+            {
+                0 => "Not required",
+                _ when resized == _sizing.Count => "Resized on every run",
+                _ => $"Resized on {resized} of {_sizing.Count}",
+            };
+        }
+    }
+
+    private string SizingDetail
+    {
+        get
+        {
+            int resized = _sizing.Count(outcome => outcome.Outcome == StorageSizingOutcome.Resized);
+            if (resized == 0)
+            {
+                double energy = _sizing[0].FinalEnergyMwh;
+                double power = _sizing[0].FinalPowerMw;
+                return $"The installed fleet — {SweepValueFormat.Short(energy)} MWh / "
+                    + $"{SweepValueFormat.Short(power)} MW — met the target unchanged on every completed run.";
+            }
+
+            double largest = _sizing.Max(outcome => outcome.FinalEnergyMwh);
+            return $"The sizing loop grew storage on {resized} completed "
+                + $"{(resized == 1 ? "run" : "runs")}, to at most {SweepValueFormat.Short(largest)} MWh "
+                + $"against a {SweepValueFormat.Short(_sizing[0].MaximumEnergyMwh)} MWh ceiling.";
+        }
+    }
+
+    private static string StageLabel(SweepFailureStage stage) => stage switch
+    {
+        SweepFailureStage.Input => "Input",
+        SweepFailureStage.Dispatch => "Dispatch",
+        SweepFailureStage.Sizing => "Storage sizing",
+        SweepFailureStage.Costing => "Costing",
+        SweepFailureStage.Export => "Export",
+        _ => "Unattributed",
+    };
+
+    /// <summary>
+    /// Axis values share one decimal count taken from the whole sweep, so a fractional axis is not
+    /// rounded into a boundary that reads the same on both sides.
+    /// </summary>
+    private string FormatAxis(double value) => value.ToString(_axisFormat, CultureInfo.CurrentCulture);
+
+    /// <summary>
+    /// Unserved-energy targets are small fractions of a percent, so a fixed two decimals would
+    /// round both the target and every achieved value to zero.
+    /// </summary>
+    private static string FormatPercentage(double value) => value == 0
+        ? "0%"
+        : $"{value.ToString(value >= 0.01 ? "N2" : "G3", CultureInfo.CurrentCulture)}%";
+}

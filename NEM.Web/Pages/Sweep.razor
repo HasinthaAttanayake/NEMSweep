@@ -1,0 +1,159 @@
+@page "/sweeps/{SweepId}"
+@using NEM.Contracts
+@using NEM.Web.Services
+@inject SweepManifestLoader SweepManifestLoader
+@inject SweepIndexLoader SweepIndexLoader
+
+<PageTitle>@(_index?.Name ?? "Sweep")</PageTitle>
+
+<main class="sweep-page">
+    <PageHeader Eyebrow="Scenario sweep" Title="@(_index?.Name ?? "Sweep")">
+        <ScopeContent>
+            @if (_index is not null)
+            {
+                @* The scope block is optional: a sweep whose points span different periods has
+                   none, and the page says nothing rather than inventing one. *@
+                @if (_index.Scope is not null)
+                {
+                    <ScopeLine Region="@string.Join(", ", _index.Scope.RegionIds)"
+                               Period="@Period(_index.Scope)"
+                               Resolution="@Resolution(_index.Scope)" />
+                }
+                <p class="sweep-axis">@_index.Points.Length runs · @_index.Axis.Label (@_index.Axis.Unit)</p>
+            }
+        </ScopeContent>
+    </PageHeader>
+
+    <ArtifactLoadStateView State="_loadState">
+        @if (_index is not null && _axis is not null)
+        {
+            <MetricStrip Items="@Metrics" AriaLabel="Sweep result summary" Columns="4" />
+
+            <SweepOutcomeSummary Index="_index" />
+
+            <SweepChart Index="@_index"
+                        YAxis="@_axis"
+                        Heading="@_axis.Label"
+                        Description="@($"Achieved {_axis.Label.ToLowerInvariant()} at each run of the sweep. Select a point to open that run.")"
+                        DrillDownTarget="ResolveDrillDownTarget" />
+            <SweepScalarGrid Index="@_index" SelectedKey="@_axis.Key" OnSelect="SelectSeries" />
+
+            <SweepRunTable Index="@_index" />
+
+            @if (_index.Scope is not null)
+            {
+                <WeatherBasisNote Basis="_index.Scope.WeatherBasis" />
+            }
+
+            <ProvenanceFooter CommitSha="@_index.Provenance.GitCommitSha"
+                              CommitUrl="@CommitUrl"
+                              IsDirty="@_index.Provenance.WorkingTreeDirty"
+                              Inputs="@ProvenanceInputs"
+                              Region="@(_index.Scope is null ? null : string.Join(", ", _index.Scope.RegionIds))"
+                              Period="@(_index.Scope is null ? null : Period(_index.Scope))"
+                              Resolution="@(_index.Scope is null ? null : Resolution(_index.Scope))" />
+        }
+    </ArtifactLoadStateView>
+</main>
+
+@code {
+    private const string CommitUrlPrefix = "https://github.com/HasinthaAttanayake/NemSim/commit/";
+
+    [Parameter] public string SweepId { get; set; } = string.Empty;
+
+    private ArtifactLoadState _loadState = ArtifactLoadState.Loading();
+    private SweepIndexDTO? _index;
+    private SweepChartYAxis? _axis;
+
+    private static string Period(SweepScopeDTO scope) =>
+        $"{scope.PeriodStart:dd MMM yyyy} to {scope.PeriodEnd.AddTicks(-1):dd MMM yyyy}";
+
+    private static string Resolution(SweepScopeDTO scope) =>
+        $"{scope.Resolution.TotalHours:N0}-hour intervals";
+
+    private IReadOnlyList<MetricStripItem> Metrics
+    {
+        get
+        {
+            SweepChartData chart = SweepChartData.Build(_index!, _axis!);
+            var metrics = new List<MetricStripItem>();
+            if (chart.Points.Count > 0)
+            {
+                SweepChartPoint first = chart.Points[0];
+                SweepChartPoint last = chart.Points[^1];
+                metrics.Add(new($"{_axis!.Label} at {first.Point.Label}", SweepValueFormat.Short(first.Value, _axis.ValuePrefix), _axis.Unit));
+                metrics.Add(new($"{_axis.Label} at {last.Point.Label}", SweepValueFormat.Short(last.Value, _axis.ValuePrefix), _axis.Unit));
+            }
+
+            metrics.Add(new("Runs plotted", chart.Points.Count.ToString("N0"), $"of {_index!.Points.Length:N0}"));
+            metrics.Add(new("Runs not plotted", chart.OmittedPoints.Count.ToString("N0")));
+            return metrics;
+        }
+    }
+
+    private IReadOnlyList<ProvenanceInputFile> ProvenanceInputs => _index!.Provenance.InputFiles
+        .Select(input => new ProvenanceInputFile(input.Path, input.Sha256, input.Purpose))
+        .ToArray();
+
+    private string CommitUrl => $"{CommitUrlPrefix}{_index!.Provenance.GitCommitSha}";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Navigating between sweeps reuses this component, so the previous route's state would
+        // otherwise stay on screen until the new index arrives.
+        _loadState = ArtifactLoadState.Loading();
+        _index = null;
+        _axis = null;
+
+        ArtifactLoadResult<SweepManifestDTO> manifest = await SweepManifestLoader.LoadAsync();
+        if (!manifest.IsSuccess)
+        {
+            _loadState = manifest.State;
+            return;
+        }
+
+        SweepManifestEntryDTO? entry = manifest.Value!.Sweeps
+            .FirstOrDefault(sweep => string.Equals(sweep.SweepId, SweepId, StringComparison.Ordinal));
+        if (entry is null)
+        {
+            _loadState = ArtifactLoadState.NotFound("This sweep does not exist.");
+            return;
+        }
+
+        ArtifactLoadResult<SweepIndexDTO> index = await SweepIndexLoader.LoadAsync(SweepPaths.IndexPath(entry));
+        _loadState = index.State;
+        _index = index.Value;
+        _axis = _index is null ? null : DefaultAxis(_index);
+    }
+
+    /// <summary>
+    /// Opens on the first series that actually varies across the sweep, falling back to the first
+    /// the artifact carries values for. Nothing here decides what the sweep means; the grid offers
+    /// every other series one click away.
+    /// </summary>
+    private static SweepChartYAxis? DefaultAxis(SweepIndexDTO index)
+    {
+        SweepChartYAxis? withValues = null;
+        foreach (SweepChartYAxis candidate in SweepSeriesCatalogue.All)
+        {
+            double[] values = SweepChartData.Build(index, candidate).Values;
+            if (values.Length == 0)
+            {
+                continue;
+            }
+
+            withValues ??= candidate;
+            if (values.Distinct().Count() > 1)
+            {
+                return candidate;
+            }
+        }
+
+        return withValues;
+    }
+
+    private void SelectSeries(string key) => _axis = SweepSeriesCatalogue.Resolve(key) ?? _axis;
+
+    private string ResolveDrillDownTarget(SweepIndexPointDTO point) =>
+        SweepPaths.RunRoute(SweepId, point.PointId);
+}

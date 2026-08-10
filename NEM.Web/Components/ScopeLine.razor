@@ -1,0 +1,20 @@
+@if (!string.IsNullOrWhiteSpace(Region)
+    || !string.IsNullOrWhiteSpace(Period)
+    || !string.IsNullOrWhiteSpace(Resolution))
+{
+    <p class="scope-line @Class">
+        @string.Join(" · ", new[] { Region, Period, Resolution }.Where(value => !string.IsNullOrWhiteSpace(value)))
+        @if (BaselineGlobal)
+        {
+            <span> · Baseline inputs · Global to site · Not run-specific</span>
+        }
+    </p>
+}
+
+@code {
+    [Parameter] public string? Region { get; set; }
+    [Parameter] public string? Period { get; set; }
+    [Parameter] public string? Resolution { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public bool BaselineGlobal { get; set; }
+}

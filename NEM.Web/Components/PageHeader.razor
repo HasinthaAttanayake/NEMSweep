@@ -1,0 +1,26 @@
+<header class="page-header @Class" style="@Style">
+    <div>
+        @if (!string.IsNullOrWhiteSpace(Eyebrow))
+        {
+            <p class="eyebrow">@Eyebrow</p>
+        }
+        <h1>@Title</h1>
+        @if (ScopeContent is not null)
+        {
+            @ScopeContent
+        }
+    </div>
+    @if (TrailingContent is not null)
+    {
+        @TrailingContent
+    }
+</header>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Eyebrow { get; set; }
+    [Parameter] public RenderFragment? ScopeContent { get; set; }
+    [Parameter] public RenderFragment? TrailingContent { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public string? Style { get; set; }
+}

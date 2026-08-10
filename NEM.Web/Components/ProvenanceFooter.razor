@@ -1,0 +1,53 @@
+@if (HasValues)
+{
+    <footer class="provenance-footer @Class">
+        @if (!string.IsNullOrWhiteSpace(CommitSha))
+        {
+            <div><span>Commit</span><strong><a href="@CommitUrl">@CommitSha</a></strong></div>
+        }
+        @if (IsDirty is not null)
+        {
+            <div><span>Working tree</span><strong>@(IsDirty.Value ? "Dirty" : "Clean")</strong></div>
+        }
+        @if (RunDate is not null)
+        {
+            <div><span>Generated</span><strong>@RunDate.Value.ToString("dd MMM yyyy, HH:mm 'UTC'")</strong></div>
+        }
+        @foreach (ProvenanceInputFile input in Inputs.Where(input => !string.IsNullOrWhiteSpace(input.FileName)))
+        {
+            <div><span>@(string.IsNullOrWhiteSpace(input.Purpose) ? "Input" : input.Purpose)</span><strong>@input.FileName</strong>@if (!string.IsNullOrWhiteSpace(input.Sha256)) { <small>@input.Sha256</small> }</div>
+        }
+        @if (!string.IsNullOrWhiteSpace(Region))
+        {
+            <div><span>Region</span><strong>@Region</strong></div>
+        }
+        @if (!string.IsNullOrWhiteSpace(Period))
+        {
+            <div><span>Period</span><strong>@Period</strong></div>
+        }
+        @if (!string.IsNullOrWhiteSpace(Resolution))
+        {
+            <div><span>Resolution</span><strong>@Resolution</strong></div>
+        }
+    </footer>
+}
+
+@code {
+    [Parameter] public string? CommitSha { get; set; }
+    [Parameter] public string? CommitUrl { get; set; }
+    [Parameter] public bool? IsDirty { get; set; }
+    [Parameter] public DateTimeOffset? RunDate { get; set; }
+    [Parameter] public IReadOnlyList<ProvenanceInputFile> Inputs { get; set; } = [];
+    [Parameter] public string? Region { get; set; }
+    [Parameter] public string? Period { get; set; }
+    [Parameter] public string? Resolution { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    private bool HasValues => !string.IsNullOrWhiteSpace(CommitSha)
+        || IsDirty is not null
+        || RunDate is not null
+        || Inputs.Any(input => !string.IsNullOrWhiteSpace(input.FileName))
+        || !string.IsNullOrWhiteSpace(Region)
+        || !string.IsNullOrWhiteSpace(Period)
+        || !string.IsNullOrWhiteSpace(Resolution);
+}

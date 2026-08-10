@@ -1,0 +1,21 @@
+<section class="metric-strip @Class" style="--metric-columns: @Columns; @Style" aria-label="@AriaLabel">
+    @foreach (MetricStripItem item in Items)
+    {
+        <div class="metric" style="@item.Style">
+            <span>@item.Label</span>
+            <strong>@item.Value</strong>
+            @if (!string.IsNullOrWhiteSpace(item.Unit))
+            {
+                <small>@item.Unit</small>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<MetricStripItem> Items { get; set; } = [];
+    [Parameter] public int Columns { get; set; } = 4;
+    [Parameter, EditorRequired] public string AriaLabel { get; set; } = string.Empty;
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public string? Style { get; set; }
+}
