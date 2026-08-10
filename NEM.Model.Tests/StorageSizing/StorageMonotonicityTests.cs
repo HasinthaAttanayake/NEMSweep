@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using NEM.Model.Generation.Solar;
 using NEM.Model.Generation.Wind;
 using NEM.Model.Grid;

@@ -1,5 +1,5 @@
 using System.Text.Json;
-using FluentAssertions;
+using AwesomeAssertions;
 using NEM.Contracts;
 
 namespace NEM.CLI.Tests.Scenarios;

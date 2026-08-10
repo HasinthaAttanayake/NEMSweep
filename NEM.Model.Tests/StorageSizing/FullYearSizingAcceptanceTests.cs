@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using FluentAssertions;
+using AwesomeAssertions;
 using NEM.Model.Generation.Wind;
 using NEM.Model.Grid;
 using NEM.Model.Scenarios;

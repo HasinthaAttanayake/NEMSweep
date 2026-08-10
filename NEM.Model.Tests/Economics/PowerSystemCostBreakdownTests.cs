@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using NEM.Model.Economics;
 using NEM.Model.Grid;
 using NEM.Model.Scenarios;

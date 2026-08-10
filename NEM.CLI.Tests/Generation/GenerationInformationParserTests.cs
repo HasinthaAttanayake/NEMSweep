@@ -1,5 +1,5 @@
 using ClosedXML.Excel;
-using FluentAssertions;
+using AwesomeAssertions;
 using NEM.CLI.Generation;
 
 namespace NEM.CLI.Tests.Generation;

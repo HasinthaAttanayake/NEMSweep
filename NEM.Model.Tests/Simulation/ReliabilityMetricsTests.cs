@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using NEM.Model.Grid;
 using NEM.Model.Series;
 using NEM.Model.Simulation;

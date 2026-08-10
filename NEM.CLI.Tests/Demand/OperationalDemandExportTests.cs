@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using NEM.CLI.Demand;
 using NEM.Contracts;
 using NEM.Model.Series;

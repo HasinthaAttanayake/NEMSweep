@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using NEM.Model.Series;
 
 namespace NEM.Model.Tests.Series

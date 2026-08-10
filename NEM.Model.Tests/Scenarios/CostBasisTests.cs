@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using NEM.Model.Scenarios;
 
 namespace NEM.Model.Tests.Scenarios;

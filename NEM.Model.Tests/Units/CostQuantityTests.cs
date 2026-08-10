@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using NEM.Model.Units;
 
 namespace NEM.Model.Tests.Units;

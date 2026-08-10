@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using NEM.Model.Generation.Solar;
 using NEM.Model.Series;
 using NEM.Model.Units;
@@ -27,7 +27,7 @@ namespace NEM.Model.Tests.Generation.Solar
                 Zenith(DaytimeStart, HalfHour),
                 Power.FromMegawatts(100.0));
 
-            // 500 Wh/m² over half an hour is 1000 W/m²; Tcell is 25°C, so only the 0.95 system factor applies.
+            // 500 Wh/mÂ² over half an hour is 1000 W/mÂ²; Tcell is 25Â°C, so only the 0.95 system factor applies.
             result[0].Megawatts.Should().BeApproximately(95.0, Tolerance(95.0));
             result.Integrate().MegawattHours.Should().BeApproximately(47.5, Tolerance(47.5));
         }

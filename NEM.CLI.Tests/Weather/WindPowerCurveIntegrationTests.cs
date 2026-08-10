@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using NEM.CLI.Weather;
 using NEM.Model.Generation.Wind;
 using NEM.Model.Series;

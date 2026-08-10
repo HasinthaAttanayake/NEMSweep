@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using NEM.Web.Services;
 
 namespace NEM.Web.Tests.Services;

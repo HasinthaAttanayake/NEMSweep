@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using NEM.CLI.Demand;
 using System.Globalization;
 using System.IO.Compression;
