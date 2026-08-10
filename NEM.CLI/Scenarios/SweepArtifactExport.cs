@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using NEM.CLI.Application;
 using NEM.CLI.Configuration;
@@ -12,8 +13,6 @@ namespace NEM.CLI.Scenarios;
 
 internal static class SweepArtifactExport
 {
-    internal const int IndexSchemaVersion = 1;
-
     public static SweepRunMetadata CaptureRunMetadata(string solutionRoot)
     {
         string? commitSha = TryRunGit(solutionRoot, "rev-parse", "HEAD");
@@ -46,13 +45,18 @@ internal static class SweepArtifactExport
         double[] values = baseDemand.Select(value => value?.GetValue<double>()
             ?? throw new FormatException($"Sweep point result '{pointResultPath}' has a null base demand value."))
             .ToArray();
-        string seriesJson = JsonFile.Serialize(new RegularSeriesDTO(start, resolution, values));
+        var series = new RegularSeriesDTO(
+            ArtifactSchemaVersions.RegularSeries,
+            start,
+            resolution,
+            values);
+        string seriesJson = JsonFile.Serialize(series);
         string hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(seriesJson))).ToLowerInvariant();
         string relativePath = $"../series/base-demand-{hash}.json";
         string seriesPath = Path.Combine(sweepDirectory, "series", $"base-demand-{hash}.json");
         if (!File.Exists(seriesPath))
         {
-            JsonFile.Write(new RegularSeriesDTO(start, resolution, values), seriesPath);
+            JsonFile.Write(series, seriesPath);
         }
 
         demand.Remove("baseDemandMw");
@@ -61,21 +65,153 @@ internal static class SweepArtifactExport
         return relativePath;
     }
 
+    /// <summary>
+    /// Deletes series files no point references. Series file names are content addressed, so a
+    /// change to the series contract or to the demand input leaves the previous file behind and
+    /// the published sweep would grow with every regeneration.
+    /// </summary>
+    public static void PruneUnreferencedSeries(
+        string sweepDirectory,
+        IEnumerable<string> referencedRelativePaths)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sweepDirectory);
+        ArgumentNullException.ThrowIfNull(referencedRelativePaths);
+        string seriesDirectory = Path.Combine(sweepDirectory, "series");
+        if (!Directory.Exists(seriesDirectory))
+        {
+            return;
+        }
+
+        var referenced = referencedRelativePaths
+            .Select(relativePath => Path.GetFullPath(Path.Combine(
+                sweepDirectory,
+                "points",
+                relativePath)))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (string path in Directory.EnumerateFiles(seriesDirectory, "*.json"))
+        {
+            if (!referenced.Contains(Path.GetFullPath(path)))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
     public static SweepPointScalarResultsDTO CreateScalars(DispatchResultsDTO result)
     {
         ArgumentNullException.ThrowIfNull(result);
+        DispatchMetricsDTO metrics = result.Metrics;
         return new SweepPointScalarResultsDTO(
             result.Cost.SlcoeAudPerMwh,
             result.Cost.GenerationSlcoeAudPerMwh,
             result.Cost.StorageSlcoeAudPerMwh,
-            result.Metrics.DemandMwh - result.Metrics.UnservedEnergyMwh,
+            metrics.DemandMwh,
+            metrics.DemandMwh - metrics.UnservedEnergyMwh,
+            metrics.DeliveredGenerationMwh,
             null,
             null,
             result.PowerSystem.StorageFleets.Sum(fleet => fleet.PowerCapacityMw),
             result.PowerSystem.StorageFleets.Sum(fleet => fleet.EnergyCapacityMwh),
-            result.Metrics.UnservedEnergyMwh,
-            result.Metrics.UnservedEnergyPercentageOfDemand,
-            result.Metrics.CurtailedEnergyMwh);
+            metrics.UnservedEnergyMwh,
+            metrics.UnservedEnergyPercentageOfDemand,
+            metrics.UnservedHours,
+            metrics.HoursServedFraction,
+            metrics.PeakUnservedPowerMw,
+            metrics.CurtailedEnergyMwh);
+    }
+
+    /// <summary>
+    /// The scope every succeeded point shares, or null when the points do not agree on one period
+    /// and resolution. Regions accumulate, so a multi-region sweep states every region it covers.
+    /// </summary>
+    public static SweepScopeDTO? CreateScope(IReadOnlyCollection<DispatchResultsDTO> results)
+    {
+        ArgumentNullException.ThrowIfNull(results);
+        if (results.Count == 0)
+        {
+            return null;
+        }
+
+        DispatchScenarioDTO first = results.First().Scenario;
+        WeatherBasisDTO weatherBasis = results.First().DataSources.WeatherBasis;
+        if (results.Any(result => result.Scenario.PeriodStart != first.PeriodStart
+            || result.Scenario.PeriodEnd != first.PeriodEnd
+            || result.Scenario.Resolution != first.Resolution
+            || result.DataSources.WeatherBasis != weatherBasis))
+        {
+            return null;
+        }
+
+        return new SweepScopeDTO(
+            results.Select(result => result.Scenario.Region)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(regionId => regionId, StringComparer.Ordinal)
+                .ToArray(),
+            first.PeriodStart,
+            first.PeriodEnd,
+            first.Resolution,
+            weatherBasis);
+    }
+
+    /// <summary>
+    /// Rewrites the manifest of published sweeps from what is on disk, so adding, renaming or
+    /// deleting a sweep is reflected without a hand-maintained list.
+    /// </summary>
+    public static void WriteManifest(string sweepsDirectory)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sweepsDirectory);
+        var entries = new List<SweepManifestEntryDTO>();
+        foreach (string indexPath in Directory
+            .EnumerateFiles(sweepsDirectory, "index.json", SearchOption.AllDirectories)
+            .Where(path => !string.Equals(
+                Path.GetDirectoryName(path),
+                sweepsDirectory,
+                StringComparison.Ordinal)))
+        {
+            SweepIndexDTO? index;
+            try
+            {
+                index = JsonSerializer.Deserialize<SweepIndexDTO>(
+                    File.ReadAllBytes(indexPath),
+                    JsonFile.ReadOptions);
+            }
+            catch (JsonException)
+            {
+                continue;
+            }
+
+            if (index is null || string.IsNullOrWhiteSpace(index.SweepId))
+            {
+                continue;
+            }
+
+            entries.Add(new SweepManifestEntryDTO(
+                index.SweepId,
+                index.Name,
+                Path.GetRelativePath(sweepsDirectory, indexPath).Replace('\\', '/')));
+        }
+
+        JsonFile.Write(
+            new SweepManifestDTO(
+                ArtifactSchemaVersions.SweepManifest,
+                entries.OrderBy(entry => entry.SweepId, StringComparer.Ordinal).ToArray()),
+            Path.Combine(sweepsDirectory, "index.json"));
+    }
+
+    /// <summary>
+    /// Describes a failed point by stage and code so failures can be grouped without matching on
+    /// message text. Failures the runner did not attribute are reported as unknown rather than
+    /// guessed at.
+    /// </summary>
+    public static SweepPointFailureDTO CreateFailure(Exception exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        return exception is ScenarioRunException failure
+            ? new SweepPointFailureDTO(failure.Stage, failure.Code, failure.Message)
+            : new SweepPointFailureDTO(
+                SweepFailureStage.Unknown,
+                "unhandled",
+                exception.Message);
     }
 
     public static SweepProvenanceDTO CreateProvenance(
@@ -85,6 +221,9 @@ internal static class SweepArtifactExport
         IEnumerable<string> configPaths,
         SweepRunMetadata runMetadata)
     {
+        // Genuine inputs only. The emitted per-point configs are outputs of the fan-out and are
+        // reachable from each point's configPath, so listing them here would grow the provenance
+        // block with the point count without adding a fact.
         var inputs = new Dictionary<string, SweepInputFileDTO>(StringComparer.OrdinalIgnoreCase);
         AddInput(inputs, context.Paths.SolutionRoot, definitionPath, "sweep-definition");
         AddInput(
@@ -94,7 +233,6 @@ internal static class SweepArtifactExport
             "baseline-scenario-config");
         foreach (string configPath in configPaths)
         {
-            AddInput(inputs, context.Paths.SolutionRoot, configPath, "emitted-scenario-config");
             ScenarioSettings? settings;
             try
             {
@@ -125,11 +263,12 @@ internal static class SweepArtifactExport
             inputs.Values.OrderBy(input => input.Path, StringComparer.Ordinal).ToArray(),
             new Dictionary<string, int>(StringComparer.Ordinal)
             {
-                ["dispatchResults"] = 4,
-                ["operationalDemand"] = 2,
+                ["dispatchResults"] = ArtifactSchemaVersions.DispatchResults,
+                ["operationalDemand"] = ArtifactSchemaVersions.OperationalDemand,
+                ["regularSeries"] = ArtifactSchemaVersions.RegularSeries,
                 ["sweepDefinition"] = definition.SchemaVersion,
-                ["sweepIndex"] = IndexSchemaVersion,
-                ["weather"] = 5,
+                ["sweepIndex"] = ArtifactSchemaVersions.SweepIndex,
+                ["weather"] = ArtifactSchemaVersions.Weather,
             });
     }
 

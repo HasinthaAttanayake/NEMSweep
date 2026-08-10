@@ -111,7 +111,10 @@ internal sealed record StorageSizingSettings(
     double MaximumPowerMw,
     double MaximumEnergyMwh,
     double TargetUsePercentage = 0.002,
-    int MaximumPasses = 256);
+    int MaximumPasses = 256,
+    // Names the standard the target represents, so an artifact can say what the number is
+    // without a client asserting it. Null when the target is not a published standard.
+    string? ReliabilityStandardName = null);
 
 internal sealed record GeneratingFleetSettings(
     string Technology,

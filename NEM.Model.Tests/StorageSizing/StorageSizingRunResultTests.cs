@@ -23,6 +23,7 @@ public sealed class StorageSizingRunResultTests
         var regionalResult = new RegionalSizingResult(
             gasDispatch,
             new RegionalBatterySizing("NSW1", Energy.Zero, Power.Zero, wasChanged: false),
+            meetsTarget: true,
             StorageSizingStatus.TargetMet,
             "Test dispatch is compliant.");
 

@@ -9,6 +9,7 @@ public sealed record RegionalSizingResult
     public RegionalSizingResult(
         DispatchOutcome dispatchOutcome,
         RegionalBatterySizing batterySizing,
+        bool meetsTarget,
         StorageSizingStatus status,
         string terminationEvidence)
     {
@@ -27,6 +28,7 @@ public sealed record RegionalSizingResult
 
         DispatchOutcome = dispatchOutcome;
         BatterySizing = batterySizing;
+        MeetsTarget = meetsTarget;
         Status = status;
         TerminationEvidence = terminationEvidence;
     }
@@ -35,6 +37,11 @@ public sealed record RegionalSizingResult
     public DispatchOutcome DispatchOutcome { get; }
     /// <summary>Total Battery capacity selected for the region.</summary>
     public RegionalBatterySizing BatterySizing { get; }
+    /// <summary>
+    /// Whether the final dispatch meets the configured reliability target. The search owns this
+    /// verdict so that everything downstream reports the same answer the sizing decision used.
+    /// </summary>
+    public bool MeetsTarget { get; }
     /// <summary>Terminal status as it applies to this region.</summary>
     public StorageSizingStatus Status { get; }
     /// <summary>Human-readable evidence explaining the regional status.</summary>

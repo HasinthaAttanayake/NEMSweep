@@ -29,11 +29,11 @@ public sealed class SweepRunTests
     File.Exists(fixture.PointResultPath("p0")).Should().BeTrue();
     File.Exists(fixture.PointResultPath("p1")).Should().BeTrue();
         JsonNode.Parse(File.ReadAllText(fixture.PointResultPath("p1")))!["schemaVersion"]!
-            .GetValue<int>().Should().Be(4);
+            .GetValue<int>().Should().Be(5);
         Status(fixture, "p0")["status"]!.GetValue<string>().Should().Be("succeeded");
         Status(fixture, "p1")["status"]!.GetValue<string>().Should().Be("succeeded");
         JsonObject index = ReadIndex(fixture);
-        index["schemaVersion"]!.GetValue<int>().Should().Be(1);
+        index["schemaVersion"]!.GetValue<int>().Should().Be(2);
         index["points"]!.AsArray().Should().HaveCount(2);
         JsonObject firstPoint = index["points"]![0]!.AsObject();
         firstPoint["status"]!.GetValue<string>().Should().Be("succeeded");
@@ -42,8 +42,26 @@ public sealed class SweepRunTests
         firstPoint["scalars"]!["energyServedMwh"]!.GetValue<double>().Should().Be(87_600);
         firstPoint["scalars"]!["achievedRenewableShareGridScale"].Should().BeNull();
         firstPoint["scalars"]!["achievedRenewableShareNative"].Should().BeNull();
-        index["provenance"]!["inputFiles"]!.AsArray().Select(input => input!["purpose"]!.GetValue<string>())
-            .Should().Contain(["demand-data", "weather-data", "sweep-definition"]);
+        firstPoint["scalars"]!["unservedHours"]!.GetValue<int>().Should().Be(0);
+        firstPoint["reliability"]!["targetUsePercentageOfDemand"]!.GetValue<double>()
+            .Should().Be(0.002);
+        firstPoint["reliability"]!["withinTarget"]!.GetValue<bool>().Should().BeTrue();
+        firstPoint["storageSizing"]!["outcome"]!.GetValue<string>().Should().Be("notRequired");
+        firstPoint["intervalPointers"]!.AsObject().Select(pointer => pointer.Key)
+            .Should().Contain("peakUnservedIntervalIndex");
+        index["scope"]!["regionIds"]!.AsArray().Select(region => region!.GetValue<string>())
+            .Should().Equal("NSW1");
+        index["scope"]!["resolution"]!.GetValue<string>().Should().Be("01:00:00");
+        index["scope"]!["weatherBasis"]!["kind"]!.GetValue<string>()
+            .Should().Be("typicalMeteorologicalYear");
+        string[] inputPurposes = index["provenance"]!["inputFiles"]!.AsArray()
+            .Select(input => input!["purpose"]!.GetValue<string>()).ToArray();
+        inputPurposes.Should().Contain(["demand-data", "weather-data", "sweep-definition"]);
+        inputPurposes.Should().NotContain("emitted-scenario-config");
+        JsonObject manifest = JsonNode.Parse(File.ReadAllText(fixture.ManifestPath))!.AsObject();
+        manifest["schemaVersion"]!.GetValue<int>().Should().Be(1);
+        manifest["sweeps"]!.AsArray().Should().ContainSingle().Which!["sweepId"]!.GetValue<string>()
+            .Should().Be("test-sweep");
         new FileInfo(fixture.IndexPath).Length.Should().BeLessThan(10_000);
         File.Exists(fixture.SharedBaseSeriesPath).Should().BeTrue();
         JsonObject pointResult = JsonNode.Parse(File.ReadAllText(fixture.PointResultPath("p0")))!.AsObject();
@@ -51,6 +69,23 @@ public sealed class SweepRunTests
         pointResult["dataSeries"]!["demand"]!["baseDemandSeriesPath"]!.GetValue<string>()
             .Should().StartWith("../series/base-demand-");
         output.ToString().Should().Contain("Running sweep point p1 (Capacity=1 MW).");
+    }
+
+    [Fact]
+    public void Run_DeletesSeriesFilesNoPointReferences()
+    {
+        using var fixture = new SweepRunFixture();
+        fixture.WriteDefinition(
+            """[{ "pointId": "p0", "axisValue": 0, "label": "Base", "overrides": {} }]""");
+        string stalePath = Path.Combine(fixture.SweepDataPath, "series", "base-demand-stale.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(stalePath)!);
+        File.WriteAllText(stalePath, "{}");
+
+        SweepRunCommand.Run(fixture.CreateContext(TextWriter.Null), "sweeps/test-sweep.json")
+            .Should().Be(0);
+
+        File.Exists(stalePath).Should().BeFalse();
+        File.Exists(fixture.SharedBaseSeriesPath).Should().BeTrue();
     }
 
     [Fact]
@@ -77,6 +112,9 @@ public sealed class SweepRunTests
         failedPoint["status"]!.GetValue<string>().Should().Be("failed");
         failedPoint["detailPath"].Should().BeNull();
         failedPoint["scalars"].Should().BeNull();
+        failedPoint["failure"]!["stage"]!.GetValue<string>().Should().Be("input");
+        failedPoint["failure"]!["code"]!.GetValue<string>().Should().Be("invalidConfig");
+        failedPoint["failure"]!["message"]!.GetValue<string>().Should().NotBeNullOrWhiteSpace();
         output.ToString().Should().NotContain("failed");
         error.ToString().Should().Contain("Sweep point p1: failed:");
         error.ToString().Should().Contain("failed points: p1");
@@ -209,13 +247,18 @@ public sealed class SweepRunTests
     public void CreateScalars_UsesDemandMinusUnservedEnergyWhenGenerationChargesStorage()
     {
         var result = new DispatchResultsDTO(
-            4,
+            ArtifactSchemaVersions.DispatchResults,
             new DispatchScenarioDTO("test", "Test", "NSW1", DateTimeOffset.UnixEpoch,
                 DateTimeOffset.UnixEpoch.AddHours(1), TimeSpan.FromHours(1)),
             DateTimeOffset.UnixEpoch,
             new DispatchSourcesDTO(
                 new DispatchInputArtifactDTO("demand.json", 2, "demand"),
                 new DispatchInputArtifactDTO("weather.json", 5, "weather"),
+                new WeatherBasisDTO(
+                    WeatherBasisKind.TypicalMeteorologicalYear,
+                    "test.epw",
+                    "Test",
+                    "Typical meteorological year from test.epw."),
                 []),
             new DispatchPowerSystemDTO("test", [], [new DispatchStorageFleetDTO("Battery", 20, 20)]),
             new DispatchSeriesDTO(
@@ -226,10 +269,18 @@ public sealed class SweepRunTests
                 [20],
                 [0],
                 new Dictionary<string, double[]> { ["Battery"] = [0] }),
-            new DispatchMetricsDTO(100, 120, 0, 10, 10, 1, 0, 10),
+            new DispatchMetricsDTO(100, 120, 0, 10, 10, 1, 0, 10, new IntervalPointersDTO(0, null, 0)),
+            new ReliabilityBasisDTO(0.002, 10, false, "NEM reliability standard"),
+            new StorageSizingOutcomeDTO(StorageSizingOutcome.Resized, 10, 10, 20, 20, 400, 100, 2),
             new DispatchCostDTO("calculated", 0, 0, 0, 0, 0, 0));
 
-        SweepArtifactExport.CreateScalars(result).EnergyServedMwh.Should().Be(90);
+        SweepPointScalarResultsDTO scalars = SweepArtifactExport.CreateScalars(result);
+
+        scalars.EnergyServedMwh.Should().Be(90);
+        scalars.DemandMwh.Should().Be(100);
+        scalars.DeliveredGenerationMwh.Should().Be(120);
+        scalars.UnservedHours.Should().Be(1);
+        scalars.PeakUnservedPowerMw.Should().Be(10);
     }
 
     private static JsonObject Status(SweepRunFixture fixture, string pointId) =>
@@ -328,6 +379,9 @@ public sealed class SweepRunTests
             RootPath, "NEM.Web", "wwwroot", "data", "sweeps", "test-sweep");
 
         public string IndexPath => Path.Combine(SweepDataPath, "index.json");
+
+        public string ManifestPath => Path.Combine(
+            RootPath, "NEM.Web", "wwwroot", "data", "sweeps", "index.json");
 
         public string DefinitionPath => Path.Combine(RootPath, "sweeps", "test-sweep.json");
 

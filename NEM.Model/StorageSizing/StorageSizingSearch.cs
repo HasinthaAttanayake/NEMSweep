@@ -331,6 +331,7 @@ internal sealed class StorageSizingSearch
                 powerCapacity,
                 energyCapacity != installedCapacity.EnergyCapacity
                     || powerCapacity != installedCapacity.PowerCapacity),
+            meetsTarget,
             meetsTarget ? StorageSizingStatus.TargetMet : runStatus,
             meetsTarget ? "The region meets its USE target." : runEvidence);
     }

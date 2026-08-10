@@ -8,6 +8,8 @@ public sealed record DispatchResultsDTO(
     DispatchPowerSystemDTO PowerSystem,
     DispatchSeriesDTO DataSeries,
     DispatchMetricsDTO Metrics,
+    ReliabilityBasisDTO Reliability,
+    StorageSizingOutcomeDTO StorageSizing,
     DispatchCostDTO Cost);
 
 public sealed record DispatchScenarioDTO(
@@ -21,6 +23,7 @@ public sealed record DispatchScenarioDTO(
 public sealed record DispatchSourcesDTO(
     DispatchInputArtifactDTO DemandInput,
     DispatchInputArtifactDTO WeatherInput,
+    WeatherBasisDTO WeatherBasis,
     string[] DemandSourceFiles);
 
 public sealed record DispatchInputArtifactDTO(
@@ -65,7 +68,8 @@ public sealed record DispatchMetricsDTO(
     double UnservedEnergyPercentageOfDemand,
     int UnservedHours,
     double HoursServedFraction,
-    double PeakUnservedPowerMw);
+    double PeakUnservedPowerMw,
+    IntervalPointersDTO IntervalPointers);
 
 public sealed record DispatchCostDTO(
     string Status,

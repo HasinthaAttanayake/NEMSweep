@@ -22,7 +22,7 @@ public sealed record SweepIndexLoadState(
 
 public sealed class SweepIndexLoader
 {
-    public const int SupportedSchemaVersion = 1;
+    public const int SupportedSchemaVersion = ArtifactSchemaVersions.SweepIndex;
 
     public async Task<SweepIndexLoadState> LoadAsync(
         HttpClient http,
@@ -89,6 +89,11 @@ public sealed class SweepIndexLoader
         if (string.IsNullOrWhiteSpace(index.Axis.Unit))
         {
             return Invalid("Sweep index axis unit is missing.");
+        }
+
+        if (index.Scope is not null && !IsValidScope(index.Scope))
+        {
+            return Invalid("Sweep index scope is invalid.");
         }
 
         if (index.Provenance is null)
@@ -169,27 +174,60 @@ public sealed class SweepIndexLoader
                 return Invalid($"Sweep index point '{point.PointId}' config path is missing.");
             }
 
+            // A string outside the closed set fails when the index is deserialized, but the enum
+            // converter also accepts bare numbers, so an undefined value can still arrive here.
+            if (!Enum.IsDefined(point.Status))
+            {
+                return Invalid(
+                    $"Sweep index point '{point.PointId}' has an unsupported status.");
+            }
+
             switch (point.Status)
             {
-                case "succeeded" when string.IsNullOrWhiteSpace(point.DetailPath):
+                case SweepPointStatus.Succeeded when string.IsNullOrWhiteSpace(point.DetailPath):
                     return Invalid($"Succeeded sweep point '{point.PointId}' detail path is missing.");
-                case "succeeded" when point.Scalars is null:
+                case SweepPointStatus.Succeeded when point.Scalars is null:
                     return Invalid($"Succeeded sweep point '{point.PointId}' scalars are missing.");
-                case "succeeded" when point.Failure is not null:
+                case SweepPointStatus.Succeeded when point.Reliability is null:
+                    return Invalid($"Succeeded sweep point '{point.PointId}' reliability basis is missing.");
+                case SweepPointStatus.Succeeded when point.StorageSizing is null:
+                    return Invalid($"Succeeded sweep point '{point.PointId}' storage sizing outcome is missing.");
+                case SweepPointStatus.Succeeded when point.IntervalPointers is null:
+                    return Invalid($"Succeeded sweep point '{point.PointId}' interval pointers are missing.");
+                case SweepPointStatus.Succeeded when point.Failure is not null:
                     return Invalid($"Succeeded sweep point '{point.PointId}' cannot include a failure.");
-                case "failed" when point.DetailPath is not null || point.Scalars is not null:
-                    return Invalid($"Failed sweep point '{point.PointId}' cannot include detail or scalars.");
-                case "failed" when string.IsNullOrWhiteSpace(point.Failure):
+                case SweepPointStatus.Failed when point.DetailPath is not null
+                    || point.Scalars is not null
+                    || point.Reliability is not null
+                    || point.StorageSizing is not null
+                    || point.IntervalPointers is not null:
+                    return Invalid($"Failed sweep point '{point.PointId}' cannot include detail or results.");
+                case SweepPointStatus.Failed when point.Failure is null
+                    || string.IsNullOrWhiteSpace(point.Failure.Code)
+                    || string.IsNullOrWhiteSpace(point.Failure.Message):
                     return Invalid($"Failed sweep point '{point.PointId}' failure is missing.");
-                case "succeeded" or "failed":
-                    break;
                 default:
-                    return Invalid($"Sweep index point '{point.PointId}' has unsupported status '{point.Status}'.");
+                    break;
             }
         }
 
         return new SweepIndexLoadState(SweepIndexLoadStatus.Ready, index, null);
     }
+
+    /// <summary>
+    /// A scope is optional — a sweep whose points span different periods has none — but when it is
+    /// present every part of it must be usable, because the site states scope wherever it states a
+    /// number.
+    /// </summary>
+    private static bool IsValidScope(SweepScopeDTO scope) =>
+        scope.RegionIds is { Length: > 0 }
+        && !scope.RegionIds.Any(string.IsNullOrWhiteSpace)
+        && scope.PeriodEnd > scope.PeriodStart
+        && scope.Resolution > TimeSpan.Zero
+        && scope.WeatherBasis is not null
+        && !string.IsNullOrWhiteSpace(scope.WeatherBasis.SourceFile)
+        && !string.IsNullOrWhiteSpace(scope.WeatherBasis.LocationName)
+        && !string.IsNullOrWhiteSpace(scope.WeatherBasis.Description);
 
     private static SweepIndexLoadState Invalid(string message) =>
         new(SweepIndexLoadStatus.InvalidData, null, message);
