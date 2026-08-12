@@ -3,6 +3,12 @@ using NEM.Model.Units;
 
 namespace NEM.Model.Simulation
 {
+    /// <summary>
+    /// Requests immediate storage discharge for demand deficits and immediate charging from
+    /// would-be-curtailed surplus generation. Unlike
+    /// <see cref="GreedySurplusAndIncrementalGenerationChargingPolicy"/>, it never requests
+    /// additional dispatchable generation to charge storage.
+    /// </summary>
     public sealed class GreedyPolicy : IStoragePolicy
     {
         public StorageDecision Decide(DispatchContext context)

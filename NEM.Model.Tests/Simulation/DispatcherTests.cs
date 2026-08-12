@@ -66,6 +66,35 @@ namespace NEM.Model.Tests.Simulation
             AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Coal], 10);
         }
 
+        [Fact]
+        public void Dispatch_ContextIncludesFleetShortRunMarginalCosts()
+        {
+            var policy = new ContextRecordingPolicy();
+            var region = new Region(
+                "NSW1",
+                [
+                    Fleet(GenerationTechnology.Coal, 30, shortRunMarginalCostAudPerMwh: 10),
+                    Fleet(GenerationTechnology.Gas, 30, shortRunMarginalCostAudPerMwh: 1),
+                ],
+                HourlyFlow(20));
+
+            Dispatch(region, policy);
+
+            policy.Contexts.Should().ContainSingle();
+            policy.Contexts[0].GenerationFleets.Should().BeEquivalentTo(
+                [
+                    new GenerationFleetSnapshot(
+                        GenerationTechnology.Gas,
+                        Power.FromMegawatts(10),
+                        GenerationEnergyCost.FromAudPerMwhGenerated(1)),
+                    new GenerationFleetSnapshot(
+                        GenerationTechnology.Coal,
+                        Power.FromMegawatts(30),
+                        GenerationEnergyCost.FromAudPerMwhGenerated(10)),
+                ],
+                options => options.WithStrictOrdering());
+        }
+
         [Theory]
         [InlineData(7)]
         [InlineData(41)]
@@ -556,6 +585,50 @@ namespace NEM.Model.Tests.Simulation
         }
 
         [Fact]
+        public void Dispatch_DefaultPolicy_ClosesEnergyBalanceWithIncrementalGenerationCharging()
+        {
+            FlowSeries demand = HourlyFlowAt(NemStart.AddHours(12), 0, 27.4);
+            var region = new Region(
+                "NSW1",
+                [
+                    Fleet(GenerationTechnology.Solar, 10),
+                    Fleet(GenerationTechnology.Coal, 10, shortRunMarginalCostAudPerMwh: 20),
+                    Fleet(GenerationTechnology.Gas, 0, shortRunMarginalCostAudPerMwh: 80),
+                ],
+                demand,
+                resourceProfile: RegionalResources(demand, directNormalRadiation: [2_000, 0]),
+                storageFleets: [Battery(storageCapacityMwh: 20, powerCapacityMw: 20)]);
+
+            DispatchOutcome outcome = Dispatch(region);
+
+            AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Solar], 10, 0);
+            AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Coal], 10, 10);
+            AssertSeries(outcome.PerFleetCharge[GenerationTechnology.Solar], 10, 0);
+            AssertSeries(outcome.PerFleetCharge[GenerationTechnology.Coal], 10, 0);
+            AssertSeries(outcome.Charge, 20, 0);
+            AssertSeries(outcome.Discharge, 0, 17.4);
+            AssertSeries(outcome.Unserved, 0, 0);
+            AssertSeries(outcome.Curtailment, 0, 0);
+
+            for (int hour = 0; hour < demand.Length; hour++)
+            {
+                double inputs = outcome.PerFleetGeneration.Values.Sum(
+                        flow => flow[hour].Megawatts)
+                    + outcome.Discharge[hour].Megawatts
+                    + outcome.Imports[hour].Megawatts
+                    + outcome.Unserved[hour].Megawatts;
+                double outputs = outcome.Demand[hour].Megawatts
+                    + outcome.Charge[hour].Megawatts
+                    + outcome.Exports[hour].Megawatts
+                    + outcome.Curtailment[hour].Megawatts;
+
+                inputs.Should().BeApproximately(outputs, 1e-9);
+                (outcome.Curtailment[hour] > Power.Zero
+                    && outcome.Unserved[hour] > Power.Zero).Should().BeFalse();
+            }
+        }
+
+        [Fact]
         public void Dispatch_IncrementalHydroChargingConsumesMonthlyEnergyBudget()
         {
             FlowSeries demand = HourlyFlow(0, 10);
@@ -888,6 +961,55 @@ namespace NEM.Model.Tests.Simulation
                 .WithMessage("Per-fleet energy balance failed at index 0*");
         }
 
+        [Fact]
+        public void DispatchOutcome_RejectsIncrementalGenerationChargeDoubleCount()
+        {
+            FlowSeries zero = HourlyFlow(0);
+            var act = () => new DispatchOutcome(
+                "NSW1",
+                new Dictionary<GenerationTechnology, FlowSeries>
+                {
+                    [GenerationTechnology.Coal] = HourlyFlow(10),
+                },
+                new Dictionary<GenerationTechnology, FlowSeries>
+                {
+                    [GenerationTechnology.Coal] = zero,
+                },
+                new Dictionary<GenerationTechnology, FlowSeries>
+                {
+                    [GenerationTechnology.Coal] = HourlyFlow(10),
+                },
+                new Dictionary<GenerationTechnology, FlowSeries>
+                {
+                    [GenerationTechnology.Coal] = HourlyFlow(10),
+                },
+                HourlyFlow(10),
+                zero,
+                HourlyFlow(10),
+                zero,
+                zero,
+                zero);
+
+            act.Should().Throw<InvalidOperationException>()
+                .WithMessage("Per-fleet energy balance failed at index 0*");
+        }
+
+        [Fact]
+        public void Dispatch_BrokenPolicyWithDuplicateIncrementalSource_Throws()
+        {
+            var region = new Region(
+                "NSW1",
+                [Fleet(GenerationTechnology.Coal, 10)],
+                HourlyFlow(0),
+                storageFleets: [Battery(storageCapacityMwh: 20, powerCapacityMw: 10)]);
+
+            var act = () => Dispatch(region, new DuplicateIncrementalGenerationChargingPolicy());
+
+            act.Should().Throw<ArgumentException>()
+                .WithParameterName("intents")
+                .WithMessage("A decision cannot contain multiple incremental-generation charge intents*");
+        }
+
         private static DispatchOutcome Outcome(
             double[] generation,
             double[] demand,
@@ -1084,6 +1206,32 @@ namespace NEM.Model.Tests.Simulation
                         ChargeSource.IncrementalGeneration(sourceTechnology)),
                 ]);
             }
+        }
+
+        private sealed class ContextRecordingPolicy : IStoragePolicy
+        {
+            public List<DispatchContext> Contexts { get; } = [];
+
+            public StorageDecision Decide(DispatchContext context)
+            {
+                Contexts.Add(context);
+                return StorageDecision.None;
+            }
+        }
+
+        private sealed class DuplicateIncrementalGenerationChargingPolicy : IStoragePolicy
+        {
+            public StorageDecision Decide(DispatchContext context) => new(
+            [
+                new StorageIntent(
+                    StorageTechnology.Battery,
+                    Power.FromMegawatts(-1),
+                    ChargeSource.IncrementalGeneration(GenerationTechnology.Coal)),
+                new StorageIntent(
+                    StorageTechnology.Battery,
+                    Power.FromMegawatts(-1),
+                    ChargeSource.IncrementalGeneration(GenerationTechnology.Coal)),
+            ]);
         }
 
         private static void AssertSeries(FlowSeries actual, params double[] expected)

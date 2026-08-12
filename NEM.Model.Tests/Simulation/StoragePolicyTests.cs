@@ -100,6 +100,78 @@ namespace NEM.Model.Tests.Simulation
             dischargeSource.Should().Throw<ArgumentException>().WithParameterName("chargeSource");
         }
 
+        [Fact]
+        public void StorageDecision_AllowsOneSurplusAndMultipleIncrementalChargesForOneFleet()
+        {
+            var intents = new[]
+            {
+                new StorageIntent(
+                    StorageTechnology.Battery,
+                    Power.FromMegawatts(-10),
+                    ChargeSource.Surplus),
+                new StorageIntent(
+                    StorageTechnology.Battery,
+                    Power.FromMegawatts(-5),
+                    ChargeSource.IncrementalGeneration(GenerationTechnology.Coal)),
+                new StorageIntent(
+                    StorageTechnology.Battery,
+                    Power.FromMegawatts(-3),
+                    ChargeSource.IncrementalGeneration(GenerationTechnology.Gas)),
+            };
+
+            StorageDecision decision = new(intents);
+
+            decision.Intents.Should().Equal(intents);
+        }
+
+        [Fact]
+        public void StorageDecision_RejectsMultipleSurplusChargesForOneFleet()
+        {
+            var action = () => new StorageDecision(
+            [
+                new StorageIntent(
+                    StorageTechnology.Battery,
+                    Power.FromMegawatts(-10),
+                    ChargeSource.Surplus),
+                new StorageIntent(
+                    StorageTechnology.Battery,
+                    Power.FromMegawatts(-5),
+                    ChargeSource.Surplus),
+            ]);
+
+            action.Should().Throw<ArgumentException>().WithParameterName("intents");
+        }
+
+        [Fact]
+        public void StorageDecision_RejectsMultipleIncrementalChargesFromOneGeneratorForOneFleet()
+        {
+            var action = () => new StorageDecision(
+            [
+                new StorageIntent(
+                    StorageTechnology.Battery,
+                    Power.FromMegawatts(-10),
+                    ChargeSource.IncrementalGeneration(GenerationTechnology.Coal)),
+                new StorageIntent(
+                    StorageTechnology.Battery,
+                    Power.FromMegawatts(-5),
+                    ChargeSource.IncrementalGeneration(GenerationTechnology.Coal)),
+            ]);
+
+            action.Should().Throw<ArgumentException>().WithParameterName("intents");
+        }
+
+        [Fact]
+        public void StorageDecision_RejectsMultipleDischargesForOneFleet()
+        {
+            var action = () => new StorageDecision(
+            [
+                new StorageIntent(StorageTechnology.Battery, Power.FromMegawatts(10)),
+                new StorageIntent(StorageTechnology.Battery, Power.FromMegawatts(5)),
+            ]);
+
+            action.Should().Throw<ArgumentException>().WithParameterName("intents");
+        }
+
         private static DispatchContext Context(
             double residualMw,
             params StorageFleetSnapshot[] storageFleets) =>

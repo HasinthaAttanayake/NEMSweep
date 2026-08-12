@@ -15,7 +15,7 @@ public sealed class PowerSystemCostBreakdownTests
         new(2026, 7, 1, 12, 0, 0, TimeSpan.FromHours(10));
 
     [Fact]
-    public void UsesLoadServedAndReconcilesAnnualGenerationCostComponents()
+    public void UsesGrossGenerationForVariableAndFuelCostWhenChargingStorage()
     {
         const decimal capitalCostPerMw = 1_000m;
         const decimal fixedOperatingCostPerMwYear = 100m;
@@ -61,6 +61,8 @@ public sealed class PowerSystemCostBreakdownTests
         breakdown.DeliveredEnergy.Should().Be(deliveredEnergy,
             "load served through storage discharge must remain in the system denominator");
         breakdown.TotalAnnualisedCost.Should().Be(expectedAnnualCost);
+        breakdown.TotalAnnualisedGenerationCost.Should().Be(expectedAnnualCost,
+            "the 190 MWh gross generation includes 40 MWh used to charge storage");
         breakdown.SystemLevelisedCostOfGeneration.Should()
             .Be(expectedAnnualCost.Per(deliveredEnergy));
         breakdown.SystemLevelisedCostOfElectricity.Should()

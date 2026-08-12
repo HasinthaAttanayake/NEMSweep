@@ -145,7 +145,8 @@ internal sealed class RegionalDispatchRun
                         Power.FromMegawatts(
                             _generationMwByTechnology[fleet.GenerationTechnology][index]),
                         instant,
-                        _resolution)))
+                        _resolution),
+                fleet.ShortRunMarginalCost))
             .ToArray();
 
         return new DispatchContext(
