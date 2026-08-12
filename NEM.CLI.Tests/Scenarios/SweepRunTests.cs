@@ -26,8 +26,8 @@ public sealed class SweepRunTests
         int exitCode = SweepRunCommand.Run(fixture.CreateContext(output), "sweeps/test-sweep.json");
 
         exitCode.Should().Be(0);
-    File.Exists(fixture.PointResultPath("p0")).Should().BeTrue();
-    File.Exists(fixture.PointResultPath("p1")).Should().BeTrue();
+        File.Exists(fixture.PointResultPath("p0")).Should().BeTrue();
+        File.Exists(fixture.PointResultPath("p1")).Should().BeTrue();
         JsonNode.Parse(File.ReadAllText(fixture.PointResultPath("p1")))!["schemaVersion"]!
             .GetValue<int>().Should().Be(5);
         Status(fixture, "p0")["status"]!.GetValue<string>().Should().Be("succeeded");
@@ -104,8 +104,8 @@ public sealed class SweepRunTests
         int exitCode = SweepRunCommand.Run(fixture.CreateContext(output, error), "sweeps/test-sweep.json");
 
         exitCode.Should().Be(1);
-    File.Exists(fixture.PointResultPath("p0")).Should().BeTrue();
-    File.Exists(fixture.PointResultPath("p1")).Should().BeFalse();
+        File.Exists(fixture.PointResultPath("p0")).Should().BeTrue();
+        File.Exists(fixture.PointResultPath("p1")).Should().BeFalse();
         Status(fixture, "p0")["status"]!.GetValue<string>().Should().Be("succeeded");
         Status(fixture, "p1")["status"]!.GetValue<string>().Should().Be("failed");
         JsonObject failedPoint = ReadIndex(fixture)["points"]![1]!.AsObject();

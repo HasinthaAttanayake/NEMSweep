@@ -15,9 +15,14 @@ namespace NEM.Model.Simulation
         Power ChargeHeadroom,
         Power DischargeHeadroom);
 
+    /// <summary>
+    /// Represents a generation fleet's incremental dispatch capacity and short-run marginal cost
+    /// for one dispatch interval. Cost is expressed in AUD per MWh generated.
+    /// </summary>
     public readonly record struct GenerationFleetSnapshot(
         GenerationTechnology GenerationTechnology,
-        Power IncrementalGenerationHeadroom);
+        Power IncrementalGenerationHeadroom,
+        GenerationEnergyCost ShortRunMarginalCost);
 
     public readonly record struct DispatchContext
     {
@@ -144,6 +149,11 @@ namespace NEM.Model.Simulation
         public ChargeSource? ChargeSource { get; }
     }
 
+    /// <summary>
+    /// Contains the ordered storage intents for one dispatch interval. A storage technology can
+    /// have one discharge intent, one surplus-charge intent, and one incremental-generation
+    /// charge intent per generation technology.
+    /// </summary>
     public sealed record StorageDecision
     {
         public static StorageDecision None { get; } = new([]);
@@ -151,11 +161,33 @@ namespace NEM.Model.Simulation
         public StorageDecision(IReadOnlyList<StorageIntent> intents)
         {
             ArgumentNullException.ThrowIfNull(intents);
-            if (intents.DistinctBy(intent => intent.StorageTechnology).Count() != intents.Count)
+            foreach (IGrouping<StorageTechnology, StorageIntent> fleetIntents in intents
+                         .GroupBy(intent => intent.StorageTechnology))
             {
-                throw new ArgumentException(
-                    "A decision cannot contain multiple intents for one storage technology.",
-                    nameof(intents));
+                if (fleetIntents.Count(intent => intent.RequestedFlow > Power.Zero) > 1)
+                {
+                    throw new ArgumentException(
+                        "A decision cannot contain multiple discharge intents for one storage technology.",
+                        nameof(intents));
+                }
+
+                if (fleetIntents.Count(intent => intent.ChargeSource == ChargeSource.Surplus) > 1)
+                {
+                    throw new ArgumentException(
+                        "A decision cannot contain multiple surplus-charge intents for one storage technology.",
+                        nameof(intents));
+                }
+
+                if (fleetIntents
+                    .Where(intent => intent.ChargeSource?.Kind == ChargeSourceKind.IncrementalGeneration)
+                    .GroupBy(intent => intent.ChargeSource!.Value.GenerationTechnology)
+                    .Any(sourceIntents => sourceIntents.Count() > 1))
+                {
+                    throw new ArgumentException(
+                        "A decision cannot contain multiple incremental-generation charge intents "
+                        + "from one generation technology for one storage technology.",
+                        nameof(intents));
+                }
             }
 
             Intents = new ReadOnlyCollection<StorageIntent>(intents.ToArray());

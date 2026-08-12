@@ -86,10 +86,10 @@ public sealed class DispatchResultsContractTests
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
         roundTripped.Should().BeEquivalentTo(result);
-    roundTripped!.SchemaVersion.Should().Be(5);
-    json.Should().Contain("\"baseDemandMw\"");
-    json.Should().Contain("\"additiveComponentsByNameMw\"");
-    json.Should().Contain("\"totalDemandMw\"");
+        roundTripped!.SchemaVersion.Should().Be(5);
+        json.Should().Contain("\"baseDemandMw\"");
+        json.Should().Contain("\"additiveComponentsByNameMw\"");
+        json.Should().Contain("\"totalDemandMw\"");
         json.Should().Contain("\"nameplateCapacityMw\"");
         json.Should().Contain("\"energyCapacityMwh\"");
         json.Should().Contain("\"powerCapacityMw\"");

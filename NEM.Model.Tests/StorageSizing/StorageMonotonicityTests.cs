@@ -41,6 +41,46 @@ public sealed class StorageMonotonicityTests
             .BeLessThanOrEqualTo(smaller.Reliability.UnservedEnergy);
     }
 
+    [Fact]
+    public void Dispatch_RandomizedDispatchableCharging_IncreasingBatteryCapacityDoesNotIncreaseUse()
+    {
+        var random = new Random(20260812);
+        for (int sample = 0; sample < 100; sample++)
+        {
+            double[] demand = Enumerable.Range(0, 24)
+                .Select(hour => hour % 4 == 0 ? 0d : random.Next(20, 101))
+                .ToArray();
+            double[] solar = Enumerable.Range(0, 24)
+                .Select(hour => hour % 4 == 0 ? 2_000d : 0d)
+                .ToArray();
+            double energyMwh = random.Next(20, 201);
+            double powerMw = random.Next(10, 51);
+
+            DispatchOutcome baseCase = DispatchWithDispatchableCharging(
+                demand,
+                solar,
+                energyMwh,
+                powerMw);
+            DispatchOutcome greaterEnergy = DispatchWithDispatchableCharging(
+                demand,
+                solar,
+                energyMwh + 20,
+                powerMw);
+            DispatchOutcome greaterPower = DispatchWithDispatchableCharging(
+                demand,
+                solar,
+                energyMwh,
+                powerMw + 10);
+
+            greaterEnergy.Reliability.UnservedEnergy.Should().BeLessThanOrEqualTo(
+                baseCase.Reliability.UnservedEnergy,
+                "sample {0}: increasing battery energy must not increase USE", sample);
+            greaterPower.Reliability.UnservedEnergy.Should().BeLessThanOrEqualTo(
+                baseCase.Reliability.UnservedEnergy,
+                "sample {0}: increasing battery power must not increase USE", sample);
+        }
+    }
+
     private static DispatchOutcome Dispatch(
         double[] demandMw,
         double[] directNormalRadiation,
@@ -64,6 +104,44 @@ public sealed class StorageMonotonicityTests
         var system = new PowerSystem(
             new PowerSystemId("test-system"),
             new ScenarioId("test-scenario"),
+            [region]);
+
+        return Dispatcher.Dispatch(system).Single();
+    }
+
+    private static DispatchOutcome DispatchWithDispatchableCharging(
+        double[] demandMw,
+        double[] directNormalRadiation,
+        double energyMwh,
+        double powerMw)
+    {
+        FlowSeries demand = Flow(demandMw);
+        var region = new Region(
+            "NSW1",
+            [
+                new GeneratingFleet(GenerationTechnology.Solar, Power.FromMegawatts(100)),
+                new GeneratingFleet(
+                    GenerationTechnology.Coal,
+                    Power.FromMegawatts(100),
+                    shortRunMarginalCost: GenerationEnergyCost.FromAudPerMwhGenerated(20)),
+                new GeneratingFleet(
+                    GenerationTechnology.Gas,
+                    Power.FromMegawatts(100),
+                    shortRunMarginalCost: GenerationEnergyCost.FromAudPerMwhGenerated(80)),
+            ],
+            demand,
+            resourceProfile: Resources(demand, directNormalRadiation),
+            storageFleets:
+            [
+                new StorageFleet(
+                    StorageTechnology.Battery,
+                    Energy.FromMegawattHours(energyMwh),
+                    Power.FromMegawatts(powerMw),
+                    new StorageTechnologyProfile(15u, 0.87)),
+            ]);
+        var system = new PowerSystem(
+            new PowerSystemId("dispatchable-charging-monotonicity"),
+            new ScenarioId("dispatchable-charging-monotonicity"),
             [region]);
 
         return Dispatcher.Dispatch(system).Single();

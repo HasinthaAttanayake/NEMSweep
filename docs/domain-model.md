@@ -73,6 +73,7 @@ classDiagram
     class ReliabilityMetrics
     class IStoragePolicy
     class GreedyPolicy
+    class GreedySurplusAndIncrementalGenerationChargingPolicy
     class DispatchContext
     class StorageDecision
     class StorageIntent
@@ -106,6 +107,7 @@ classDiagram
     IStoragePolicy --> StorageDecision : produces
     StorageDecision "1" *-- "0..*" StorageIntent
     GreedyPolicy ..|> IStoragePolicy
+    GreedySurplusAndIncrementalGenerationChargingPolicy ..|> IStoragePolicy
     Dispatcher --> StorageIntent : executes
     StorageFleet --> StorageOutcome : operates
     Dispatcher --> StorageOutcome : reconciles
@@ -329,19 +331,27 @@ records one interval-beginning `StockSeries` per storage technology. The
 dispatcher constructs a fresh `DispatchContext` after generation has been
 dispatched to demand and before storage operates. The context contains signed
 residual power, resolution, storage levels and operating headroom, and current
-incremental-generation headroom. Positive residual means unmet demand; negative
-residual means would-be-curtailed surplus.
+incremental-generation headroom and short-run marginal cost for each generation
+fleet. Positive residual means unmet demand; negative residual means
+would-be-curtailed surplus.
 
-`GreedyPolicy` is stateless. For a deficit it requests discharge; for a surplus
-it requests charging sourced only from that surplus. It allocates Battery before
-PumpedHydro and limits intent using the headroom snapshots. The fleet still
-clamps every request and remains the authority for power limits, energy limits,
-and round-trip loss.
+`GreedyPolicy` is a stateless surplus-only policy. For a deficit it requests
+discharge; for a surplus it requests charging sourced only from that surplus.
+`GreedySurplusAndIncrementalGenerationChargingPolicy` is the dispatcher's
+default stateless policy. It has the same deficit behavior and Battery-before-
+PumpedHydro storage priority, but after allocating surplus it may request
+incremental Coal and Gas generation to charge remaining storage headroom. It
+uses ascending short-run marginal cost, then generation technology, to order
+those incremental sources. Both policies limit intent using the headroom
+snapshots. The fleet still clamps every request and remains the authority for
+power limits, energy limits, and round-trip loss.
 
 A policy returns one `StorageDecision` per interval. The decision contains zero
 or more `StorageIntent` values, each targeting one storage technology with a
-requested MW flow and, for charging, its energy source. The dispatcher processes
-the intents in order. Each executable intent invokes that fleet's `Operate`
+requested MW flow and, for charging, its energy source. A fleet can receive one
+discharge intent, one surplus-charge intent, and one incremental-generation
+charge intent per generation technology. The dispatcher processes the intents in
+order. Each executable intent invokes that fleet's `Operate`
 transition and produces a separate `StorageOutcome` containing actual delivered
 MW and final state of charge. An intent can be skipped without an outcome when
 no deficit, surplus, or incremental-generation headroom remains. Outcomes are
