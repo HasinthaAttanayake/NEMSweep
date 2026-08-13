@@ -4,7 +4,8 @@ namespace NEM.Model.Simulation;
 
 public static class Dispatcher
 {
-    public static IReadOnlyList<DispatchOutcome> Dispatch(PowerSystem powerSystem) =>
+    public static IReadOnlyList<DispatchOutcome> Dispatch(
+        PowerSystem powerSystem) =>
         Dispatch(powerSystem, new GreedySurplusAndIncrementalGenerationChargingPolicy());
 
     public static IReadOnlyList<DispatchOutcome> Dispatch(

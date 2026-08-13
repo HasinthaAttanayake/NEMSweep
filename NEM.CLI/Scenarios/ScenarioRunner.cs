@@ -7,7 +7,6 @@ using NEM.Model.Economics;
 using NEM.Model.Grid;
 using NEM.Model.Scenarios;
 using NEM.Model.Series;
-using NEM.Model.Simulation;
 using NEM.Model.StorageSizing;
 using NEM.Model.Units;
 using NEM.Model.Weather;
@@ -21,7 +20,9 @@ internal static class ScenarioRunner
 {
     private static readonly TimeSpan HourlyResolution = TimeSpan.FromHours(1);
 
-    public static DispatchResultsDTO Run(ScenarioSettings settings, string solutionRoot)
+    public static DispatchResultsDTO Run(
+        ScenarioSettings settings,
+        string solutionRoot)
     {
         string demandPath = Path.GetFullPath(settings.DemandFile, solutionRoot);
         string weatherPath = Path.GetFullPath(settings.WeatherFile, solutionRoot);
@@ -98,7 +99,7 @@ internal static class ScenarioRunner
                 exception);
         }
 
-        return result.Status == StorageSizingStatus.TargetMet
+        return result.Status is StorageSizingStatus.TargetMet or StorageSizingStatus.EnergyLimited
             ? result
             : throw new ScenarioRunException(
                 SweepFailureStage.Sizing,

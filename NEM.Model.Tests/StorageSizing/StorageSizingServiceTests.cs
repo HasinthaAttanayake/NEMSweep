@@ -151,24 +151,74 @@ public sealed class StorageSizingServiceTests
     }
 
     [Fact]
-    public void Size_TargetCannotBeMetWithinBounds_ReturnsBatteryCapacityLimitReached()
+    public void Size_SystemAvailableEnergyBelowDemand_ReturnsEnergyLimitedWithShortfall()
     {
-        Region region = CoalRegion("NSW1", generationMw: 0, demandMw: [10, 10]);
+        Region nsw = CoalRegion("NSW1", generationMw: 0, demandMw: [10, 10]);
+        Region qld = CoalRegion("QLD1", generationMw: 5, demandMw: [10, 10]);
         var system = new PowerSystem(
             new PowerSystemId("insufficient-system"),
             new ScenarioId("test-scenario"),
-            [region]);
+            [nsw, qld]);
 
         StorageSizingRunResult result = StorageSizingService.Size(
             system,
             Options(maximumPowerMw: 60, maximumEnergyMwh: 240));
 
+        result.Status.Should().Be(StorageSizingStatus.EnergyLimited);
+        result.DispatchPassCount.Should().Be(1);
+        result.Regions.Should().OnlyContain(region => region.Status == StorageSizingStatus.EnergyLimited);
+        EnergyLimitedAssessment assessment = result.EnergyLimitedAssessment!;
+        assessment.PowerSystemId.Should().Be(system.Id);
+        assessment.AvailableEnergy.Should().Be(Energy.FromMegawattHours(10));
+        assessment.DemandEnergy.Should().Be(Energy.FromMegawattHours(40));
+        assessment.ShortfallEnergy.Should().Be(Energy.FromMegawattHours(30));
+        assessment.BindingIntervalIndices.Should().Equal(0, 1);
+        result.Regions.Should().OnlyContain(region =>
+            region.BatterySizing.PowerCapacity <= Power.FromMegawatts(60)
+            && region.BatterySizing.EnergyCapacity <= Energy.FromMegawattHours(240));
+    }
+
+    [Fact]
+    public void Size_SystemAdequateEnergyButInsufficientBatteryPower_ReturnsBatteryCapacityLimit()
+    {
+        PowerSystem system = SolarSystem(
+            "NSW1",
+            demandMw: [0, 50],
+            directNormalRadiation: [2_000, 0]);
+
+        StorageSizingRunResult result = StorageSizingService.Size(
+            system,
+            Options(maximumPowerMw: 30, maximumEnergyMwh: 120));
+
         result.Status.Should().Be(StorageSizingStatus.BatteryCapacityLimitReached);
-        result.Regions.Single().Status.Should().Be(StorageSizingStatus.BatteryCapacityLimitReached);
+        result.EnergyLimitedAssessment.Should().BeNull();
         result.Regions.Single().Reliability.UnservedEnergy.Should().BeGreaterThan(Energy.Zero);
-        var sizing = result.Regions.Single().BatterySizing;
-        sizing.PowerCapacity.Should().BeLessThanOrEqualTo(Power.FromMegawatts(60));
-        sizing.EnergyCapacity.Should().BeLessThanOrEqualTo(Energy.FromMegawattHours(240));
+        result.TerminationEvidence.Should().Contain("30 MW / 120 MWh reached");
+    }
+
+    [Fact]
+    public void Size_RegionalShortfallWithSystemAdequateEnergy_ReturnsStorageNoLongerImprovesReliability()
+    {
+        Region nsw = CoalRegion("NSW1", generationMw: 0, demandMw: [10, 10])
+            .WithBatteryStorage(
+                Energy.FromMegawattHours(120),
+                Power.FromMegawatts(30));
+        Region qld = CoalRegion("QLD1", generationMw: 20, demandMw: [10, 10]);
+        var system = new PowerSystem(
+            new PowerSystemId("system-adequate-energy"),
+            new ScenarioId("test-scenario"),
+            [nsw, qld]);
+
+        StorageSizingRunResult result = StorageSizingService.Size(
+            system,
+            Options(maximumPowerMw: 60, maximumEnergyMwh: 240));
+
+        result.Status.Should().Be(StorageSizingStatus.StorageNoLongerImprovesReliability);
+        result.EnergyLimitedAssessment.Should().BeNull();
+        result.DispatchPassCount.Should().Be(3);
+        result.TerminationEvidence.Should().Contain("did not materially reduce unserved energy");
+        result.Regions.Single(region => region.DispatchOutcome.RegionId == "NSW1")
+            .Reliability.UnservedEnergy.Should().BeGreaterThan(Energy.Zero);
     }
 
     [Fact]

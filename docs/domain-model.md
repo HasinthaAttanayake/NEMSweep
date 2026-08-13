@@ -85,6 +85,7 @@ classDiagram
     class RegionalSizingResult
     class RegionalBatterySizing
     class InstalledBatteryAssessment
+    class EnergyLimitedAssessment
 
     Scenario "1" *-- "1..*" ScenarioRegion
     Scenario "1" *-- "1" CostBasis
@@ -118,6 +119,7 @@ classDiagram
     StorageSizingService --> StorageSizingRunResult : produces
     StorageSizingRunResult "1" *-- "1..*" RegionalSizingResult
     StorageSizingRunResult "1" *-- "1..*" InstalledBatteryAssessment
+    StorageSizingRunResult "1" --> "0..1" EnergyLimitedAssessment : system evidence
     RegionalSizingResult "1" *-- "1" RegionalBatterySizing
     RegionalSizingResult --> DispatchOutcome : final evidence
     InstalledBatteryAssessment --> DispatchOutcome : installed-capacity evidence
@@ -295,10 +297,27 @@ candidate preserves a minimum four-hour duration.
 
 After the floor, total USE divided by current Battery energy and peak unserved
 power divided by current Battery power steer monotone geometric growth. Storage
-dispatch is stepwise, so increasing a dimension can plateau but must not increase
-USE. Explicit MW, MWh, and pass bounds provide termination; reaching a capacity
-bound returns `BatteryCapacityLimitReached`, while exhausting dispatch passes
-returns `PassLimitReached`.
+dispatch is stepwise. For a region outside its USE target, each growth iteration
+evaluates feasible larger Battery energy, power (with the four-hour duration
+floor), and combined candidates. It selects the candidate with the greatest
+material USE reduction. When none improves USE, the search returns
+`StorageNoLongerImprovesReliability`; this identifies solver stagnation and does
+not claim whether generation timing or storage policy is the underlying cause.
+Explicit MW, MWh, and pass bounds also provide termination; reaching a capacity
+bound before a larger probe is feasible returns `BatteryCapacityLimitReached`,
+while exhausting dispatch passes returns `PassLimitReached`.
+
+When a dispatch fails its USE target, `EnergyLimitedAssessment` also evaluates
+the whole `PowerSystem`. It sums generator availability and demand from every
+aligned region, applying the same resource and generation-budget rules as
+dispatch. When total available generation energy is below total demand energy,
+the run returns `EnergyLimited` with system-wide available energy, demand,
+shortfall, and the intervals where total available MW is below total demand MW.
+Storage is excluded because it cannot add energy. The assessment is attached to
+`StorageSizingRunResult`, rather than attributed to a region, because it is a
+system-level proof. A total-energy shortfall proves infeasibility even if future
+interconnectors permit unrestricted transfers; it does not establish network
+feasibility when total energy is adequate.
 
 Once every region complies, full-system probes refine power and energy to 1 MW
 and 1 MWh precision while retaining only compliant candidates. The result is a
@@ -339,10 +358,11 @@ would-be-curtailed surplus.
 discharge; for a surplus it requests charging sourced only from that surplus.
 `GreedySurplusAndIncrementalGenerationChargingPolicy` is the dispatcher's
 default stateless policy. It has the same deficit behavior and Battery-before-
-PumpedHydro storage priority, but after allocating surplus it may request
-incremental Coal and Gas generation to charge remaining storage headroom. It
-uses ascending short-run marginal cost, then generation technology, to order
-those incremental sources. Both policies limit intent using the headroom
+PumpedHydro storage priority. In a surplus interval, it first allocates surplus,
+then may request incremental Coal and Gas generation to charge remaining storage
+headroom. In a balanced interval, it may request those incremental sources
+directly. It uses ascending short-run marginal cost, then generation technology,
+to order incremental sources. Both policies limit intent using the headroom
 snapshots. The fleet still clamps every request and remains the authority for
 power limits, energy limits, and round-trip loss.
 
