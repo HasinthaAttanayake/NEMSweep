@@ -116,6 +116,61 @@ public sealed class PowerSystemCostBreakdownTests
     }
 
     [Fact]
+    public void Calculate_SeparatesRegionalCostsUsingEachRegionsDeliveredEnergy()
+    {
+        Scenario scenario = TwoRegionScenario();
+        DispatchOutcome nswOutcome = DispatchOutcomeFor("NSW1", deliveredMegawattHours: 1);
+        DispatchOutcome vicOutcome = DispatchOutcomeFor("VIC1", deliveredMegawattHours: 2);
+        var powerSystem = new PowerSystem(
+            new PowerSystemId("two-region-cost-system"),
+            scenario.Id,
+            [
+                RegionFor("NSW1", nswOutcome.Demand),
+                RegionFor("VIC1", vicOutcome.Demand),
+            ]);
+
+        PowerSystemCostBreakdown breakdown = PowerSystemCostCalculator.Calculate(
+            scenario,
+            powerSystem,
+            [nswOutcome, vicOutcome]);
+
+        RegionCostBreakdown nsw = breakdown.Regions.Single(region => region.RegionId == "NSW1");
+        RegionCostBreakdown vic = breakdown.Regions.Single(region => region.RegionId == "VIC1");
+
+        breakdown.Regions.Should().HaveCount(2);
+        breakdown.TotalAnnualisedGenerationCost.Should().Be(
+            nsw.AnnualisedGenerationCost + vic.AnnualisedGenerationCost);
+        breakdown.TotalAnnualisedStorageCost.Should().Be(
+            nsw.AnnualisedStorageCost + vic.AnnualisedStorageCost);
+        breakdown.TotalAnnualisedCost.Should().Be(
+            nsw.TotalAnnualisedCost + vic.TotalAnnualisedCost);
+        breakdown.DeliveredEnergy.Should().Be(nsw.DeliveredEnergy + vic.DeliveredEnergy);
+        nsw.LevelisedCostOfElectricity.Should().NotBe(vic.LevelisedCostOfElectricity,
+            "each region must use its own delivered energy denominator");
+        breakdown.SystemLevelisedCostOfElectricity.Should().Be(
+            breakdown.TotalAnnualisedCost.Per(breakdown.DeliveredEnergy));
+    }
+
+    [Fact]
+    public void Calculate_SingleRegionBreakdownEqualsSystemTotals()
+    {
+        PowerSystemCostBreakdown breakdown = PowerSystemCostCalculator.Calculate(
+            MinimalScenario(Start.AddYears(1)),
+            RunResult(DispatchOutcomeWithCurtailment()));
+
+        RegionCostBreakdown region = breakdown.Regions.Should().ContainSingle().Subject;
+
+        region.RegionId.Should().Be("NSW1");
+        region.AnnualisedGenerationCost.Should().Be(breakdown.TotalAnnualisedGenerationCost);
+        region.AnnualisedStorageCost.Should().Be(breakdown.TotalAnnualisedStorageCost);
+        region.TotalAnnualisedCost.Should().Be(breakdown.TotalAnnualisedCost);
+        region.DeliveredEnergy.Should().Be(breakdown.DeliveredEnergy);
+        region.LevelisedCostOfGeneration.Should().Be(breakdown.SystemLevelisedCostOfGeneration);
+        region.LevelisedCostOfStorage.Should().Be(breakdown.SystemLevelisedCostOfStorage);
+        region.LevelisedCostOfElectricity.Should().Be(breakdown.SystemLevelisedCostOfElectricity);
+    }
+
+    [Fact]
     public void Calculate_RejectsScenarioThatIsNotExactlyOneYear()
     {
         Scenario scenario = MinimalScenario(Start.AddHours(1));
@@ -152,7 +207,8 @@ public sealed class PowerSystemCostBreakdownTests
             RunResult(outcome));
 
         act.Should().Throw<ArgumentOutOfRangeException>()
-            .WithParameterName("deliveredEnergy");
+            .WithParameterName("deliveredEnergy")
+            .WithMessage("*region 'NSW1'*");
     }
 
     [Fact]
@@ -290,6 +346,71 @@ public sealed class PowerSystemCostBreakdownTests
                         technicalLifeYears: 10u))],
                 storageFleets)],
             new CostBasis(2026, realDiscountRate: 0m));
+
+    private static Scenario TwoRegionScenario() =>
+        new(
+            new ScenarioId("two-region-cost-scenario"),
+            "Two-region cost scenario",
+            Start,
+            Start.AddYears(1),
+            [
+                ScenarioRegionFor("NSW1"),
+                ScenarioRegionFor("VIC1"),
+            ],
+            new CostBasis(2026, realDiscountRate: 0m));
+
+    private static ScenarioRegion ScenarioRegionFor(string regionId) =>
+        new(
+            regionId,
+            [new ScenarioGeneratingFleet(
+                GenerationTechnology.Gas,
+                Power.FromMegawatts(10),
+                new GenerationCostParameters(
+                    PowerCapacityCost.FromAudPerMwCapacity(100m),
+                    AnnualPowerCapacityCost.FromAudPerMwYear(0m),
+                    GenerationEnergyCost.FromAudPerMwhGenerated(0m),
+                    FuelPrice.FromAudPerGjThermal(0m)),
+                new GenerationTechnologyProfile(
+                    HeatRate.FromGigajoulesPerMegawattHour(0),
+                    technicalLifeYears: 10u))]);
+
+    private static Region RegionFor(string regionId, FlowSeries demand) =>
+        new(
+            regionId,
+            [new GeneratingFleet(GenerationTechnology.Gas, Power.FromMegawatts(10))],
+            demand);
+
+    private static DispatchOutcome DispatchOutcomeFor(
+        string regionId,
+        double deliveredMegawattHours)
+    {
+        FlowSeries delivered = AnnualFlow(deliveredMegawattHours);
+        FlowSeries zero = AnnualFlow(0);
+        return new DispatchOutcome(
+            regionId,
+            new Dictionary<GenerationTechnology, FlowSeries>
+            {
+                [GenerationTechnology.Gas] = delivered,
+            },
+            new Dictionary<GenerationTechnology, FlowSeries>
+            {
+                [GenerationTechnology.Gas] = zero,
+            },
+            new Dictionary<GenerationTechnology, FlowSeries>
+            {
+                [GenerationTechnology.Gas] = delivered,
+            },
+            new Dictionary<GenerationTechnology, FlowSeries>
+            {
+                [GenerationTechnology.Gas] = zero,
+            },
+            delivered,
+            zero,
+            zero,
+            zero,
+            zero,
+            zero);
+    }
 
     private static FlowSeries AnnualFlow(params double[] initialMegawatts)
     {
