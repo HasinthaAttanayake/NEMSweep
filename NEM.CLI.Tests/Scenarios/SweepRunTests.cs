@@ -7,6 +7,8 @@ using NEM.CLI.Configuration;
 using NEM.CLI.Infrastructure;
 using NEM.CLI.Scenarios;
 using NEM.Contracts;
+using NEM.Model.Grid;
+using NEM.Model.Simulation;
 
 namespace NEM.CLI.Tests.Scenarios;
 
@@ -22,14 +24,15 @@ public sealed class SweepRunTests
              { "pointId": "p1", "axisValue": 1, "label": "Changed", "overrides": { "name": "Changed scenario" } }]
             """);
         using var output = new StringWriter();
-
         int exitCode = SweepRunCommand.Run(fixture.CreateContext(output), "sweeps/test-sweep.json");
 
         exitCode.Should().Be(0);
         File.Exists(fixture.PointResultPath("p0")).Should().BeTrue();
         File.Exists(fixture.PointResultPath("p1")).Should().BeTrue();
         JsonNode.Parse(File.ReadAllText(fixture.PointResultPath("p1")))!["schemaVersion"]!
-            .GetValue<int>().Should().Be(ArtifactSchemaVersions.DispatchResults);
+            .GetValue<int>().Should().Be(ArtifactSchemaVersions.SystemDispatchResults);
+        File.Exists(fixture.RegionResultPath("p0", "NSW1")).Should().BeTrue();
+        File.Exists(fixture.RegionResultPath("p1", "NSW1")).Should().BeTrue();
         Status(fixture, "p0")["status"]!.GetValue<string>().Should().Be("succeeded");
         Status(fixture, "p1")["status"]!.GetValue<string>().Should().Be("succeeded");
         JsonObject index = ReadIndex(fixture);
@@ -38,10 +41,15 @@ public sealed class SweepRunTests
         JsonObject firstPoint = index["points"]![0]!.AsObject();
         firstPoint["status"]!.GetValue<string>().Should().Be("succeeded");
         firstPoint["detailPath"]!.GetValue<string>().Should().Be("points/p0.json");
+        firstPoint["regionScalars"]!.AsArray().Should().ContainSingle();
+        firstPoint["regionScalars"]![0]!["regionId"]!.GetValue<string>().Should().Be("NSW1");
+        firstPoint["regionDetails"]!.AsArray().Should().ContainSingle();
+        firstPoint["regionDetails"]![0]!["detailPath"]!.GetValue<string>()
+            .Should().Be("points/p0-nsw1.json");
         firstPoint["configPath"]!.GetValue<string>().Should().Be("configs/p0.json");
         firstPoint["scalars"]!["energyServedMwh"]!.GetValue<double>().Should().Be(87_600);
-        firstPoint["scalars"]!["achievedRenewableShareGridScale"].Should().BeNull();
-        firstPoint["scalars"]!["achievedRenewableShareNative"].Should().BeNull();
+        firstPoint["scalars"]!["achievedRenewableShareGridScale"]!.GetValue<double>().Should().Be(0);
+        firstPoint["scalars"]!["achievedRenewableShareNative"]!.GetValue<double>().Should().Be(0);
         firstPoint["scalars"]!["unservedHours"]!.GetValue<int>().Should().Be(0);
         firstPoint["reliability"]!["targetUsePercentageOfDemand"]!.GetValue<double>()
             .Should().Be(0.002);
@@ -65,8 +73,11 @@ public sealed class SweepRunTests
         new FileInfo(fixture.IndexPath).Length.Should().BeLessThan(10_000);
         File.Exists(fixture.SharedBaseSeriesPath).Should().BeTrue();
         JsonObject pointResult = JsonNode.Parse(File.ReadAllText(fixture.PointResultPath("p0")))!.AsObject();
-        pointResult["dataSeries"]!["demand"]!["baseDemandMw"].Should().BeNull();
-        pointResult["dataSeries"]!["demand"]!["baseDemandSeriesPath"]!.GetValue<string>()
+        pointResult["dataSeries"]!["demand"]!["baseDemandMw"]!.AsArray().Should().HaveCount(8_760);
+        JsonObject regionResult = JsonNode.Parse(File.ReadAllText(
+            fixture.RegionResultPath("p0", "NSW1")))!.AsObject();
+        regionResult["dataSeries"]!["demand"]!["baseDemandMw"].Should().BeNull();
+        regionResult["dataSeries"]!["demand"]!["baseDemandSeriesPath"]!.GetValue<string>()
             .Should().StartWith("../series/base-demand-");
         output.ToString().Should().Contain("Running sweep point p1 (Capacity=1 MW).");
     }
@@ -94,7 +105,7 @@ public sealed class SweepRunTests
         using var fixture = new SweepRunFixture();
         fixture.WriteDefinition("""
             [{ "pointId": "p0", "axisValue": 0, "label": "Base", "overrides": {} },
-             { "pointId": "p1", "axisValue": 1, "label": "Invalid", "overrides": { "regions": [] } }]
+             { "pointId": "p1", "axisValue": 1, "label": "Invalid", "overrides": { "costBasis": { "year": 1999 } } }]
             """);
         Directory.CreateDirectory(Path.GetDirectoryName(fixture.PointResultPath("p1"))!);
         File.WriteAllText(fixture.PointResultPath("p1"), "stale result");
@@ -121,29 +132,25 @@ public sealed class SweepRunTests
     }
 
     [Fact]
-    public void Run_ProducesTheSameResultAsTheSingleScenarioPathAfterRestoringBaseDemand()
+    public void Run_ExternalizesRegionalDemandWhileKeepingSystemDemandInline()
     {
         using var fixture = new SweepRunFixture();
         fixture.WriteDefinition("""
             [{ "pointId": "p0", "axisValue": 0, "label": "Base", "overrides": {} },
              { "pointId": "p1", "axisValue": 1, "label": "Changed", "overrides": { "name": "Changed scenario" } }]
             """);
-        using var output = new StringWriter();
-        CliContext context = fixture.CreateContext(output);
+        CliContext context = fixture.CreateContext(TextWriter.Null);
 
         SweepRunCommand.Run(context, "sweeps/test-sweep.json").Should().Be(0);
-        string standalonePath = Path.Combine(fixture.RootPath, "standalone-p1.json");
-        ScenarioCommand.Run(context, "sweeps/test-sweep/configs/p1.json", standalonePath).Should().Be(0);
 
         JsonObject pointResult = JsonNode.Parse(File.ReadAllText(fixture.PointResultPath("p1")))!.AsObject();
-        JsonObject standaloneResult = JsonNode.Parse(File.ReadAllText(standalonePath))!.AsObject();
-        pointResult["dataSeries"]!["demand"]!["baseDemandMw"].Should().BeNull();
-        standaloneResult["dataSeries"]!["demand"]!["baseDemandMw"]!.AsArray()
+        pointResult["dataSeries"]!["demand"]!["baseDemandMw"]!.AsArray()
             .Should().HaveCount(8_760);
-        RestoreExternalizedBaseDemand(fixture.PointResultPath("p1"), pointResult);
-        pointResult.Remove("generatedAt");
-        standaloneResult.Remove("generatedAt");
-        JsonNode.DeepEquals(pointResult, standaloneResult).Should().BeTrue();
+        JsonObject regionResult = JsonNode.Parse(File.ReadAllText(
+            fixture.RegionResultPath("p1", "NSW1")))!.AsObject();
+        regionResult["dataSeries"]!["demand"]!["baseDemandMw"].Should().BeNull();
+        regionResult["dataSeries"]!["demand"]!["baseDemandSeriesPath"]!.GetValue<string>()
+            .Should().StartWith("../series/base-demand-");
     }
 
     [Fact]
@@ -262,23 +269,34 @@ public sealed class SweepRunTests
                 []),
             new DispatchPowerSystemDTO("test", [], [new DispatchStorageFleetDTO("Battery", 20, 20)]),
             new DispatchSeriesDTO(
-                new DispatchDemandDTO([100], [], [100]),
-                new Dictionary<string, double[]> { ["Solar"] = [120] },
+                new DispatchDemandDTO([100], new Dictionary<string, double[]> { ["Data centres"] = [50] }, [150]),
+                new Dictionary<string, double[]> { ["Solar"] = [40], ["Wind"] = [20], ["Hydro"] = [30], ["Gas"] = [30] },
                 [0],
                 [10],
                 [20],
                 [0],
                 new Dictionary<string, double[]> { ["Battery"] = [0] }),
-            new DispatchMetricsDTO(100, 120, 0, 10, 10, 1, 0, 10, new IntervalPointersDTO(0, null, 0)),
+            new DispatchMetricsDTO(150, 120, 0, 10, 10.0 / 150 * 100, 1, 0, 10, new IntervalPointersDTO(0, null, 0)),
             new ReliabilityBasisDTO(0.002, 10, false, "NEM reliability standard"),
             new StorageSizingOutcomeDTO(StorageSizingOutcome.Resized, 10, 10, 20, 20, 400, 100, 2),
             new DispatchCostDTO("calculated", 0, 0, 0, 0, 0, 0));
 
         SweepPointScalarResultsDTO scalars = SweepArtifactExport.CreateScalars(result);
+        RenewableShareMetrics sourceMetrics = RenewableShareMetrics.FromDeliveredEnergy(
+            new Dictionary<GenerationTechnology, double>
+            {
+                [GenerationTechnology.Solar] = 40,
+                [GenerationTechnology.Wind] = 20,
+                [GenerationTechnology.Hydro] = 30,
+                [GenerationTechnology.Gas] = 30,
+            },
+            100);
 
-        scalars.EnergyServedMwh.Should().Be(90);
-        scalars.DemandMwh.Should().Be(100);
+        scalars.EnergyServedMwh.Should().Be(140);
+        scalars.DemandMwh.Should().Be(150);
         scalars.DeliveredGenerationMwh.Should().Be(120);
+        scalars.AchievedRenewableShareGridScale.Should().Be(sourceMetrics.GridScaleShare);
+        scalars.AchievedRenewableShareNative.Should().Be(sourceMetrics.NativeShare);
         scalars.UnservedHours.Should().Be(1);
         scalars.PeakUnservedPowerMw.Should().Be(10);
     }
@@ -293,6 +311,7 @@ public sealed class SweepRunTests
     {
         JsonObject result = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
         result.Remove("generatedAt");
+        result.Remove("runId");
         return Encoding.UTF8.GetBytes(JsonFile.Serialize(result));
     }
 
@@ -342,23 +361,27 @@ public sealed class SweepRunTests
                     new Series(Enumerable.Repeat(10d, HoursPerYear).ToArray()))));
             File.WriteAllText(Path.Combine(RootPath, "weather.json"), JsonSerializer.Serialize(
                 new WeatherDataDTO(
-                    5,
-                    "test.epw",
-                    new WeatherLocation("Test", "00000", -33.9, 151.2),
+                    6,
+                    "NSW1",
                     start,
                     TimeSpan.FromHours(1),
-                    10,
-                    new WeatherSeriesData(
+                    new SolarWeatherData(
+                        "solar.epw",
+                        new WeatherLocation("Test", "00000", -33.9, 151.2),
                         zeroes,
                         zeroes,
                         zeroes,
                         Enumerable.Repeat(90d, HoursPerYear).ToArray(),
                         Enumerable.Repeat(20d, HoursPerYear).ToArray(),
+                        zeroes),
+                    new WindWeatherData(
+                        "wind.epw",
+                        new WeatherLocation("Test", "00000", -33.9, 151.2),
                         Enumerable.Repeat(5d, HoursPerYear).ToArray(),
-                        zeroes,
+                        10,
                         zeroes))));
             File.WriteAllText(Path.Combine(RootPath, "scenarios", "baseline.json"), """
-            { "id": "baseline", "name": "Baseline", "demandFile": "demand.json", "weatherFile": "weather.json", "costBasis": { "year": 2026, "realDiscountRate": 0.07 }, "storageSizing": { "maximumPowerMw": 100, "maximumEnergyMwh": 400 }, "regions": [{ "regionId": "NSW1", "generatingFleets": [{ "technology": "Gas", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 } }], "storageFleets": [{ "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0, "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 }, "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 } }] }] }
+            { "schemaVersion": 1, "id": "baseline", "name": "Baseline", "costBasis": { "year": 2026, "realDiscountRate": 0.07 }, "storageSizing": { "maximumPowerMw": 100, "maximumEnergyMwh": 400 }, "regions": [{ "regionId": "NSW1", "demandFile": "demand.json", "weatherFile": "weather.json", "generatingFleets": [{ "technology": "Gas", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 } }], "storageFleets": [{ "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0, "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 }, "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 } }] }] }
             """);
             Paths = RepositoryPaths.Discover(RootPath);
         }
@@ -371,6 +394,9 @@ public sealed class SweepRunTests
 
         public string PointResultPath(string pointId) => Path.Combine(
             SweepDataPath, "points", $"{pointId}.json");
+
+        public string RegionResultPath(string pointId, string regionId) => Path.Combine(
+            SweepDataPath, "points", $"{pointId}-{regionId.ToLowerInvariant()}.json");
 
         public string PointStatusPath(string pointId) => Path.Combine(
             SweepDataPath, "points", $"{pointId}.status.json");

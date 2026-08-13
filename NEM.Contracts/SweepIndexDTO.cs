@@ -50,7 +50,17 @@ public sealed record SweepIndexPointDTO(
     ReliabilityBasisDTO? Reliability,
     StorageSizingOutcomeDTO? StorageSizing,
     IntervalPointersDTO? IntervalPointers,
-    SweepPointFailureDTO? Failure);
+    SweepPointFailureDTO? Failure,
+    SweepPointRegionScalarsDTO[]? RegionScalars = null,
+    SweepPointRegionDetailDTO[]? RegionDetails = null);
+
+public sealed record SweepPointRegionScalarsDTO(
+    string RegionId,
+    SweepPointScalarResultsDTO Scalars);
+
+public sealed record SweepPointRegionDetailDTO(
+    string RegionId,
+    string DetailPath);
 
 /// <summary>Closed set of sweep point outcomes, so both sides fail at the boundary.</summary>
 [JsonConverter(typeof(JsonStringEnumConverter<SweepPointStatus>))]

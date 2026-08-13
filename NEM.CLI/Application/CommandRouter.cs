@@ -1,6 +1,7 @@
 using NEM.CLI.Demand;
 using NEM.CLI.Generation;
 using NEM.CLI.Infrastructure;
+using NEM.CLI.Ingest;
 using NEM.CLI.Scenarios;
 using NEM.CLI.Weather;
 
@@ -31,9 +32,18 @@ internal sealed class CommandRouter
                 ["--run-scenario", var scenarioConfigPath] => ScenarioCommand.Run(_context, scenarioConfigPath),
                 ["--fan-out-sweep", var definitionPath] => SweepFanOutCommand.Run(_context, definitionPath),
                 ["--run-sweep", var definitionPath] => SweepRunCommand.Run(_context, definitionPath),
+                ["--describe-schema", var format] when format is "scenario" or "sweep" =>
+                    SchemaDescriptionCommand.Run(_context, format),
+                ["--validate-inputs"] => ValidateInputsCommand.Run(_context),
+                ["--validate-inputs", var bundlePath] => ValidateInputsCommand.Run(_context, bundlePath),
+                ["--ingest"] => IngestCommand.Run(_context),
+                ["--ingest", var bundlePath] => IngestCommand.Run(_context, bundlePath),
                 ["--generation-information", var path] =>
                     GenerationInformationCommand.Run(_context, path),
-                ["--epw-report", var path] => EpwCommands.WriteReport(_context, path),
+                ["--epw-report", var regionId, var solarPath] =>
+                    EpwCommands.WriteReport(_context, regionId, solarPath),
+                ["--epw-report", var regionId, var solarPath, var windPath] =>
+                    EpwCommands.WriteReport(_context, regionId, solarPath, windPath),
                 ["--epw-series", var path] => EpwCommands.PrintSeries(_context, path),
                 ["--epw-validate", var path] => EpwCommands.Validate(_context, path),
                 ["--epw-gaps", var path] => EpwCommands.PrintGaps(_context, path),
@@ -58,8 +68,11 @@ internal sealed class CommandRouter
         _error.WriteLine("  NEM.CLI --run-scenario [scenario-config.json]");
         _error.WriteLine("  NEM.CLI --fan-out-sweep <sweep-definition.json>");
         _error.WriteLine("  NEM.CLI --run-sweep <sweep-definition.json>");
+        _error.WriteLine("  NEM.CLI --describe-schema <scenario|sweep>");
+        _error.WriteLine("  NEM.CLI --validate-inputs [input-bundle]");
+        _error.WriteLine("  NEM.CLI --ingest [input-bundle]");
         _error.WriteLine("  NEM.CLI --generation-information <workbook.xlsx>");
-        _error.WriteLine("  NEM.CLI --epw-report|--epw-series|--epw-validate|--epw-gaps|--epw-rows|--epw-header <file.epw>");
+        _error.WriteLine("  NEM.CLI --epw-report <region> <solar.epw> [wind.epw]");
         _error.WriteLine("  NEM.CLI [demand-output.json]");
         return 2;
     }
@@ -69,6 +82,9 @@ internal sealed class CommandRouter
         "--run-scenario" => "Scenario run",
         "--fan-out-sweep" => "Sweep fan-out",
         "--run-sweep" => "Sweep run",
+        "--describe-schema" => "Schema description",
+        "--validate-inputs" => "Input validation",
+        "--ingest" => "Input ingest",
         "--generation-information" => "Generation-information import",
         "--epw-report" => "EPW report",
         "--epw-series" => "EPW series",

@@ -14,23 +14,23 @@ internal static class WeatherBasis
     public static WeatherBasisDTO Create(WeatherDataDTO weather)
     {
         ArgumentNullException.ThrowIfNull(weather);
-        string locationName = string.IsNullOrWhiteSpace(weather.Location.Wmo)
-            ? weather.Location.City
+        string locationName = string.IsNullOrWhiteSpace(weather.Solar.Location.Wmo)
+            ? weather.Solar.Location.City
             : string.Format(
                 CultureInfo.InvariantCulture,
                 "{0} (WMO {1})",
-                weather.Location.City,
-                weather.Location.Wmo);
+                weather.Solar.Location.City,
+                weather.Solar.Location.Wmo);
         return new WeatherBasisDTO(
             WeatherBasisKind.TypicalMeteorologicalYear,
-            weather.SourceFile,
+            weather.Solar.SourceFile,
             locationName,
             string.Format(
                 CultureInfo.InvariantCulture,
                 "Typical meteorological year from {0} for {1}, applied to the dispatch period by "
                 + "calendar hour. It represents typical rather than extreme years, so it does not "
                 + "contain the tail weather events that drive storage and reliability outcomes.",
-                weather.SourceFile,
+                weather.Solar.SourceFile,
                 locationName));
     }
 }

@@ -21,7 +21,7 @@ internal static class SweepRunCommand
         var failedPointIds = new List<string>();
         var indexPoints = new List<SweepIndexPointDTO>();
         var configPaths = new List<string>();
-        var succeededResults = new List<DispatchResultsDTO>();
+        var succeededResults = new List<SystemDispatchResultsDTO>();
         var referencedSeriesPaths = new List<string>();
 
         foreach (SweepPoint point in definition.Points)
@@ -45,15 +45,53 @@ internal static class SweepRunCommand
 
             context.Output.WriteLine(
                 $"Running sweep point {point.PointId} ({definition.Axis.Label}={axisValue} {definition.Axis.Unit}).");
+            int referencedSeriesPathCount = referencedSeriesPaths.Count;
             try
             {
-                ScenarioCommand.Run(context, configPath, resultPath);
-                (DispatchResultsDTO result, string seriesPath) = ExternalizeBaseDemand(
-                    point.PointId,
-                    resultPath,
-                    sweepDirectory);
-                referencedSeriesPaths.Add(seriesPath);
-                succeededResults.Add(result);
+                ScenarioCommand.Run(context, configPath, resultPath, $"{point.PointId}-");
+                SystemDispatchResultsDTO systemResult = JsonSerializer.Deserialize<SystemDispatchResultsDTO>(
+                    File.ReadAllBytes(resultPath),
+                    JsonFile.ReadOptions)
+                    ?? throw new FormatException($"Sweep point '{point.PointId}' result is empty.");
+                var regionScalars = new List<SweepPointRegionScalarsDTO>();
+                var regionDetails = new List<SweepPointRegionDetailDTO>();
+                foreach (string regionId in systemResult.RegionIds.Order(StringComparer.Ordinal))
+                {
+                    RegionDispatchSummaryDTO summary = systemResult.RegionSummariesById.GetValueOrDefault(regionId)
+                        ?? throw new FormatException(
+                            $"Sweep point '{point.PointId}' has no summary for region '{regionId}'.");
+                    string detailPath = summary.DetailPath
+                        ?? throw new FormatException(
+                            $"Sweep point '{point.PointId}' has no detail path for region '{regionId}'.");
+                    string regionalResultPath = Path.Combine(pointsDirectory, detailPath);
+                    RegionDispatchResultsDTO regionalResult = JsonSerializer.Deserialize<RegionDispatchResultsDTO>(
+                        File.ReadAllBytes(regionalResultPath),
+                        JsonFile.ReadOptions)
+                        ?? throw new FormatException(
+                            $"Sweep point '{point.PointId}' regional result for '{regionId}' is empty.");
+                    SweepPointScalarResultsDTO regionalScalars =
+                        SweepArtifactExport.CreateScalars(regionalResult);
+                    string seriesPath = ExternalizeBaseDemand(
+                        point.PointId,
+                        regionalResultPath,
+                        sweepDirectory);
+                    if (!string.Equals(regionalResult.RegionId, regionId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new FormatException(
+                            $"Sweep point '{point.PointId}' regional result '{detailPath}' identifies region "
+                            + $"'{regionalResult.RegionId}' instead of '{regionId}'.");
+                    }
+
+                    referencedSeriesPaths.Add(seriesPath);
+                    regionScalars.Add(new SweepPointRegionScalarsDTO(
+                        regionId,
+                        regionalScalars));
+                    regionDetails.Add(new SweepPointRegionDetailDTO(
+                        regionId,
+                        $"points/{detailPath}"));
+                }
+
+                succeededResults.Add(systemResult);
                 JsonFile.Write(
                     new SweepPointStatusFile(
                         point.PointId,
@@ -68,16 +106,25 @@ internal static class SweepRunCommand
                     SweepPointStatus.Succeeded,
                     $"points/{point.PointId}.json",
                     $"configs/{point.PointId}.json",
-                    SweepArtifactExport.CreateScalars(result),
-                    result.Reliability,
-                    result.StorageSizing,
-                    result.Metrics.IntervalPointers,
-                    null));
+                    SweepArtifactExport.CreateScalars(systemResult),
+                    systemResult.Reliability,
+                    systemResult.StorageSizing,
+                    systemResult.Metrics.IntervalPointers,
+                    null,
+                    regionScalars.ToArray(),
+                    regionDetails.ToArray()));
                 context.Output.WriteLine($"Sweep point {point.PointId}: succeeded.");
             }
             catch (Exception exception)
             {
+                referencedSeriesPaths.RemoveRange(
+                    referencedSeriesPathCount,
+                    referencedSeriesPaths.Count - referencedSeriesPathCount);
                 File.Delete(resultPath);
+                foreach (string regionalPath in Directory.GetFiles(pointsDirectory, $"{point.PointId}-*.json"))
+                {
+                    File.Delete(regionalPath);
+                }
                 SweepPointFailureDTO failure = SweepArtifactExport.CreateFailure(exception);
                 JsonFile.Write(
                     new SweepPointStatusFile(
@@ -142,7 +189,7 @@ internal static class SweepRunCommand
     /// Moves the point's base-demand series into the shared series directory and reads the point
     /// back. Failures here are export failures: the point itself ran.
     /// </summary>
-    private static (DispatchResultsDTO Result, string SeriesPath) ExternalizeBaseDemand(
+    private static string ExternalizeBaseDemand(
         string pointId,
         string resultPath,
         string sweepDirectory)
@@ -150,11 +197,7 @@ internal static class SweepRunCommand
         try
         {
             string seriesPath = SweepArtifactExport.ExternalizeBaseDemand(resultPath, sweepDirectory);
-            DispatchResultsDTO result = JsonSerializer.Deserialize<DispatchResultsDTO>(
-                File.ReadAllBytes(resultPath),
-                JsonFile.ReadOptions)
-                ?? throw new FormatException($"Sweep point '{pointId}' result is empty.");
-            return (result, seriesPath);
+            return seriesPath;
         }
         catch (Exception exception) when (exception
             is FormatException or IOException or JsonException)

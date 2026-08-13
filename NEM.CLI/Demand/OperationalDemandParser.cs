@@ -30,13 +30,18 @@ internal static class OperationalDemandParser
         TrimOptions = TrimOptions.Trim,
     };
 
-    public static OperationalDemandData ReadFinancialYear(
-        string archiveDirectory,
-        string region,
-        DateTimeOffset periodStart)
+    public static IReadOnlyDictionary<string, OperationalDemandData> Read(
+        IReadOnlyList<string> archivePaths,
+        IReadOnlyCollection<string> regionIds,
+        DateTimeOffset periodStart,
+        DateTimeOffset periodEnd)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(archiveDirectory);
-        ArgumentException.ThrowIfNullOrWhiteSpace(region);
+        ArgumentNullException.ThrowIfNull(archivePaths);
+        ArgumentNullException.ThrowIfNull(regionIds);
+        if (regionIds.Count == 0)
+        {
+            throw new ArgumentException("At least one region must be requested.", nameof(regionIds));
+        }
 
         if (periodStart.Offset != NemOffset)
         {
@@ -45,64 +50,97 @@ internal static class OperationalDemandParser
                 nameof(periodStart));
         }
 
-        if (!Directory.Exists(archiveDirectory))
+        if (periodEnd.Offset != NemOffset)
         {
-            throw new DirectoryNotFoundException(
-                $"Operational-demand archive directory was not found: {archiveDirectory}");
+            throw new ArgumentException(
+                "The operational-demand period end must use NEM market time (UTC+10).",
+                nameof(periodEnd));
         }
 
-        DateTimeOffset periodEnd = periodStart.AddYears(1);
-        var valuesByIntervalStart = new Dictionary<DateTimeOffset, DemandValue>();
-        string[] sourceArchives = Directory
-            .EnumerateFiles(archiveDirectory, "*.zip", SearchOption.AllDirectories)
-            .Order(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        if (periodEnd <= periodStart)
+        {
+            throw new ArgumentException(
+                "The operational-demand period end must be after the period start.",
+                nameof(periodEnd));
+        }
 
+        long slotTicks = periodEnd.Subtract(periodStart).Ticks;
+        if (slotTicks % Resolution.Ticks != 0)
+        {
+            throw new ArgumentException(
+                "The operational-demand period must contain complete 30-minute intervals.",
+                nameof(periodEnd));
+        }
+
+        string[] requestedRegions = regionIds
+            .Select(region => region?.Trim() ?? string.Empty)
+            .ToArray();
+        if (requestedRegions.Any(string.IsNullOrWhiteSpace))
+        {
+            throw new ArgumentException("Requested region IDs must not be blank.", nameof(regionIds));
+        }
+
+        var valuesByRegion = requestedRegions.ToDictionary(
+            region => region,
+            _ => new Dictionary<DateTimeOffset, DemandValue>(),
+            StringComparer.OrdinalIgnoreCase);
+        string[] sourceArchives = archivePaths
+            .Select(Path.GetFullPath)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
         if (sourceArchives.Length == 0)
         {
-            throw new OperationalDemandDataQualityException(
-                $"No ZIP archives were found in {archiveDirectory}.");
+            throw new OperationalDemandDataQualityException("No operational-demand archives were provided.");
         }
 
         foreach (string sourceArchive in sourceArchives)
         {
+            if (!File.Exists(sourceArchive))
+            {
+                throw new FileNotFoundException("Operational-demand archive was not found.", sourceArchive);
+            }
+
             using ZipArchive archive = ZipFile.OpenRead(sourceArchive);
             ReadArchive(
                 archive,
                 Path.GetFileName(sourceArchive),
-                region,
+                valuesByRegion,
                 periodStart,
-                periodEnd,
-                valuesByIntervalStart);
+                periodEnd);
         }
 
-        int expectedLength = checked((int)((periodEnd - periodStart).Ticks / Resolution.Ticks));
-        var values = new double[expectedLength];
-        for (int index = 0; index < expectedLength; index++)
+        int expectedLength = checked((int)(slotTicks / Resolution.Ticks));
+        var result = new Dictionary<string, OperationalDemandData>(StringComparer.OrdinalIgnoreCase);
+        foreach (string region in requestedRegions)
         {
-            DateTimeOffset expectedInstant = periodStart + TimeSpan.FromTicks(Resolution.Ticks * index);
-            if (!valuesByIntervalStart.TryGetValue(expectedInstant, out DemandValue? demandValue))
+            var values = new double[expectedLength];
+            for (int index = 0; index < expectedLength; index++)
             {
-                throw new OperationalDemandDataQualityException(
-                    $"Operational demand for {region} is missing interval {expectedInstant:o}.");
+                DateTimeOffset expectedInstant = periodStart + TimeSpan.FromTicks(Resolution.Ticks * index);
+                if (!valuesByRegion[region].TryGetValue(expectedInstant, out DemandValue? demandValue))
+                {
+                    throw new OperationalDemandDataQualityException(
+                        $"Operational demand for {region} is missing interval {expectedInstant:o}.");
+                }
+
+                values[index] = demandValue.Megawatts;
             }
 
-            values[index] = demandValue.Megawatts;
+            result.Add(region, new OperationalDemandData(
+                region,
+                new FlowSeries(periodStart, Resolution, values),
+                sourceArchives.Select(path => Path.GetFileName(path)!).ToArray()));
         }
 
-        return new OperationalDemandData(
-            region,
-            new FlowSeries(periodStart, Resolution, values),
-            sourceArchives.Select(Path.GetFileName).ToArray()!);
+        return result;
     }
 
     private static void ReadArchive(
         ZipArchive archive,
         string sourcePath,
-        string region,
+        IReadOnlyDictionary<string, Dictionary<DateTimeOffset, DemandValue>> valuesByRegion,
         DateTimeOffset periodStart,
-        DateTimeOffset periodEnd,
-        Dictionary<DateTimeOffset, DemandValue> valuesByIntervalStart)
+        DateTimeOffset periodEnd)
     {
         foreach (ZipArchiveEntry entry in archive.Entries)
         {
@@ -122,10 +160,9 @@ internal static class OperationalDemandParser
                 ReadArchive(
                     nestedArchive,
                     entryPath,
-                    region,
+                    valuesByRegion,
                     periodStart,
-                    periodEnd,
-                    valuesByIntervalStart);
+                    periodEnd);
             }
             else if (entry.Name.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
             {
@@ -134,10 +171,9 @@ internal static class OperationalDemandParser
                 ReadCsv(
                     reader,
                     entryPath,
-                    region,
+                    valuesByRegion,
                     periodStart,
-                    periodEnd,
-                    valuesByIntervalStart);
+                    periodEnd);
             }
         }
     }
@@ -145,10 +181,9 @@ internal static class OperationalDemandParser
     private static void ReadCsv(
         TextReader reader,
         string sourcePath,
-        string region,
+        IReadOnlyDictionary<string, Dictionary<DateTimeOffset, DemandValue>> valuesByRegion,
         DateTimeOffset periodStart,
-        DateTimeOffset periodEnd,
-        Dictionary<DateTimeOffset, DemandValue> valuesByIntervalStart)
+        DateTimeOffset periodEnd)
     {
         using var csv = new CsvReader(reader, CsvConfiguration);
         IReadOnlyDictionary<string, int>? columns = null;
@@ -187,7 +222,7 @@ internal static class OperationalDemandParser
             }
 
             string recordRegion = Field(record, columns, "REGIONID", sourcePath);
-            if (!recordRegion.Equals(region, StringComparison.OrdinalIgnoreCase))
+            if (!valuesByRegion.TryGetValue(recordRegion, out Dictionary<DateTimeOffset, DemandValue>? valuesByIntervalStart))
             {
                 continue;
             }
@@ -210,7 +245,7 @@ internal static class OperationalDemandParser
             if (!double.IsFinite(megawatts) || megawatts < 0)
             {
                 throw new OperationalDemandDataQualityException(
-                    $"{sourcePath}: invalid operational demand {megawatts} MW for {region} at {intervalStart:o}.");
+                    $"{sourcePath}: invalid operational demand {megawatts} MW for {recordRegion} at {intervalStart:o}.");
             }
 
             if (valuesByIntervalStart.TryGetValue(intervalStart, out DemandValue? existing))
@@ -218,7 +253,7 @@ internal static class OperationalDemandParser
                 if (existing.Megawatts != megawatts)
                 {
                     throw new OperationalDemandDataQualityException(
-                        $"Conflicting operational demand for {region} at {intervalStart:o}: "
+                        $"Conflicting operational demand for {recordRegion} at {intervalStart:o}: "
                         + $"{existing.Megawatts} MW from {existing.SourcePath} and "
                         + $"{megawatts} MW from {sourcePath}.");
                 }

@@ -8,6 +8,8 @@ using NEM.CLI.Application;
 using NEM.CLI.Configuration;
 using NEM.CLI.Infrastructure;
 using NEM.Contracts;
+using NEM.Model.Grid;
+using NEM.Model.Simulation;
 
 namespace NEM.CLI.Scenarios;
 
@@ -24,15 +26,14 @@ internal static class SweepArtifactExport
     {
         JsonObject result = JsonNode.Parse(File.ReadAllBytes(pointResultPath))?.AsObject()
             ?? throw new FormatException($"Sweep point result '{pointResultPath}' is empty.");
-        JsonObject scenario = result["scenario"]?.AsObject()
-            ?? throw new FormatException($"Sweep point result '{pointResultPath}' has no scenario.");
         JsonObject demand = result["dataSeries"]?["demand"]?.AsObject()
             ?? throw new FormatException($"Sweep point result '{pointResultPath}' has no demand series.");
         JsonArray baseDemand = demand["baseDemandMw"]?.AsArray()
             ?? throw new FormatException($"Sweep point result '{pointResultPath}' has no base demand series.");
-        DateTimeOffset start = scenario["periodStart"]?.GetValue<DateTimeOffset>()
+        JsonObject metadata = result["scenario"]?.AsObject() ?? result;
+        DateTimeOffset start = metadata["periodStart"]?.GetValue<DateTimeOffset>()
             ?? throw new FormatException($"Sweep point result '{pointResultPath}' has no period start.");
-        string resolutionText = scenario["resolution"]?.GetValue<string>()
+        string resolutionText = metadata["resolution"]?.GetValue<string>()
             ?? throw new FormatException($"Sweep point result '{pointResultPath}' has no resolution.");
         if (!TimeSpan.TryParseExact(
                 resolutionText,
@@ -100,18 +101,62 @@ internal static class SweepArtifactExport
     public static SweepPointScalarResultsDTO CreateScalars(DispatchResultsDTO result)
     {
         ArgumentNullException.ThrowIfNull(result);
-        DispatchMetricsDTO metrics = result.Metrics;
+        return CreateScalars(
+            result.Metrics,
+            result.DataSeries,
+            result.PowerSystem.StorageFleets.Sum(fleet => fleet.PowerCapacityMw),
+            result.PowerSystem.StorageFleets.Sum(fleet => fleet.EnergyCapacityMwh),
+            result.Cost);
+    }
+
+    public static SweepPointScalarResultsDTO CreateScalars(
+        SystemDispatchResultsDTO result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        return CreateScalars(
+            result.Metrics,
+            result.DataSeries,
+            result.StorageSizing.FinalPowerMw,
+            result.StorageSizing.FinalEnergyMwh,
+            result.Cost);
+    }
+
+    public static SweepPointScalarResultsDTO CreateScalars(RegionDispatchResultsDTO result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        return CreateScalars(
+            result.Metrics,
+            result.DataSeries,
+            result.PowerSystem.StorageFleets.Sum(fleet => fleet.PowerCapacityMw),
+            result.PowerSystem.StorageFleets.Sum(fleet => fleet.EnergyCapacityMwh),
+            result.Cost);
+    }
+
+    private static SweepPointScalarResultsDTO CreateScalars(
+        DispatchMetricsDTO metrics,
+        DispatchSeriesDTO dataSeries,
+        double storagePowerMw,
+        double storageEnergyMwh,
+        DispatchCostDTO cost)
+    {
+        RenewableShareMetrics renewableShare = RenewableShareMetrics.FromDeliveredEnergy(
+            dataSeries.DeliveredGenerationByTechnologyMw.ToDictionary(
+                entry => ParseTechnology(entry.Key),
+                entry => entry.Value.Sum()),
+            dataSeries.Demand.BaseDemandMw?.Sum()
+                ?? throw new InvalidOperationException(
+                    "Sweep scalars require the point's base-demand series."));
         return new SweepPointScalarResultsDTO(
-            result.Cost.SlcoeAudPerMwh,
-            result.Cost.GenerationSlcoeAudPerMwh,
-            result.Cost.StorageSlcoeAudPerMwh,
+            cost.SlcoeAudPerMwh,
+            cost.GenerationSlcoeAudPerMwh,
+            cost.StorageSlcoeAudPerMwh,
             metrics.DemandMwh,
             metrics.DemandMwh - metrics.UnservedEnergyMwh,
             metrics.DeliveredGenerationMwh,
-            null,
-            null,
-            result.PowerSystem.StorageFleets.Sum(fleet => fleet.PowerCapacityMw),
-            result.PowerSystem.StorageFleets.Sum(fleet => fleet.EnergyCapacityMwh),
+            renewableShare.GridScaleShare,
+            renewableShare.NativeShare,
+            storagePowerMw,
+            storageEnergyMwh,
             metrics.UnservedEnergyMwh,
             metrics.UnservedEnergyPercentageOfDemand,
             metrics.UnservedHours,
@@ -120,11 +165,17 @@ internal static class SweepArtifactExport
             metrics.CurtailedEnergyMwh);
     }
 
+    private static GenerationTechnology ParseTechnology(string technology) =>
+        Enum.TryParse(technology, ignoreCase: false, out GenerationTechnology parsed)
+        && Enum.IsDefined(parsed)
+            ? parsed
+            : throw new FormatException($"Unknown generation technology '{technology}' in dispatch results.");
+
     /// <summary>
     /// The scope every succeeded point shares, or null when the points do not agree on one period
     /// and resolution. Regions accumulate, so a multi-region sweep states every region it covers.
     /// </summary>
-    public static SweepScopeDTO? CreateScope(IReadOnlyCollection<DispatchResultsDTO> results)
+    public static SweepScopeDTO? CreateScope(IReadOnlyCollection<SystemDispatchResultsDTO> results)
     {
         ArgumentNullException.ThrowIfNull(results);
         if (results.Count == 0)
@@ -132,18 +183,22 @@ internal static class SweepArtifactExport
             return null;
         }
 
-        DispatchScenarioDTO first = results.First().Scenario;
-        WeatherBasisDTO weatherBasis = results.First().DataSources.WeatherBasis;
-        if (results.Any(result => result.Scenario.PeriodStart != first.PeriodStart
-            || result.Scenario.PeriodEnd != first.PeriodEnd
-            || result.Scenario.Resolution != first.Resolution
-            || result.DataSources.WeatherBasis != weatherBasis))
+        SystemDispatchResultsDTO first = results.First();
+        WeatherBasisDTO weatherBasis = first.DataSourcesByRegion.Values
+            .OrderBy(source => source.DemandInput.FileName, StringComparer.Ordinal)
+            .First().WeatherBasis;
+        if (results.Any(result => result.PeriodStart != first.PeriodStart
+            || result.PeriodEnd != first.PeriodEnd
+            || result.Resolution != first.Resolution
+            || result.DataSourcesByRegion.Values
+                .OrderBy(source => source.DemandInput.FileName, StringComparer.Ordinal)
+                .First().WeatherBasis != weatherBasis))
         {
             return null;
         }
 
         return new SweepScopeDTO(
-            results.Select(result => result.Scenario.Region)
+            results.SelectMany(result => result.RegionIds)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(regionId => regionId, StringComparer.Ordinal)
                 .ToArray(),
@@ -236,7 +291,7 @@ internal static class SweepArtifactExport
             ScenarioSettings? settings;
             try
             {
-                settings = CliSettings.LoadScenario(configPath);
+                settings = ScenarioConfig.Load(configPath);
             }
             catch (FormatException)
             {

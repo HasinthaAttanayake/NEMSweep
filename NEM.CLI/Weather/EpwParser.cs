@@ -203,7 +203,11 @@ internal static class EpwParser
 
     public static RegionalResourceProfile ReadTimeSeries(string path)
     {
-        EpwFile epw = ReadValidated(path);
+        return ReadTimeSeries(ReadValidated(path));
+    }
+
+    public static RegionalResourceProfile ReadTimeSeries(EpwFile epw)
+    {
         double[] globalHorizontalRadiation = epw.Rows
             .Select(row => row.GlobalHorizontalRadiation)
             .ToArray();
@@ -271,6 +275,9 @@ internal static class EpwParser
     {
         return EpwProvenance.Create(ReadValidated(path));
     }
+
+    public static EpwProvenanceReport ReadProvenance(EpwFile epw) =>
+        EpwProvenance.Create(epw);
 
     private static void ValidateStructure(EpwFile epw)
     {

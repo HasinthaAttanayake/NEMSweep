@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 
 namespace NEM.CLI.Infrastructure;
 
@@ -8,6 +9,12 @@ internal static class JsonFile
     internal static JsonSerializerOptions ReadOptions { get; } = new()
     {
         PropertyNameCaseInsensitive = true,
+    };
+
+    internal static JsonSerializerOptions StrictReadOptions { get; } = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
     };
 
     private static JsonSerializerOptions WriteOptions { get; } = new()
