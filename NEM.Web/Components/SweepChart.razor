@@ -40,6 +40,7 @@
 @code {
     [Parameter, EditorRequired] public SweepIndexDTO Index { get; set; } = default!;
     [Parameter, EditorRequired] public SweepChartYAxis YAxis { get; set; } = default!;
+    [Parameter] public string? RegionId { get; set; }
     [Parameter, EditorRequired] public string Heading { get; set; } = string.Empty;
     [Parameter] public string? Description { get; set; }
     [Parameter] public Func<SweepIndexPointDTO, string?>? DrillDownTarget { get; set; }
@@ -51,7 +52,7 @@
 
     protected override void OnParametersSet()
     {
-        _chart = SweepChartData.Build(Index, YAxis);
+        _chart = SweepChartData.Build(Index, YAxis, RegionId);
         // A fractional axis such as 0.1-0.4 rounds to "0" under a whole-number format.
         _axisFormat = SweepValueFormat.ColumnFormat(Index.Points.Select(point => (double?)point.AxisValue));
         _series =

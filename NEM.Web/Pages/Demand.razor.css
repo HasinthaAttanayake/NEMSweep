@@ -13,6 +13,7 @@
     gap: 0.75rem;
 }
 
+.region-select,
 .view-select,
 .date-field input {
     width: 190px;
@@ -56,6 +57,7 @@
         flex-direction: column;
     }
 
+    .region-select,
     .view-select,
     .date-field input {
         width: 100%;

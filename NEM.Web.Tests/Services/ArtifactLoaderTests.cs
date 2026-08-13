@@ -20,6 +20,117 @@ public sealed class ArtifactLoaderTests
     }
 
     [Fact]
+    public async Task LoadAsync_ReturnsSuccessForSchema6WeatherArtifact()
+    {
+        ArtifactLoadResult<WeatherDataDTO> result = await LoadAsync<WeatherDataDTO>(
+            HttpStatusCode.OK,
+            """
+            {
+              "schemaVersion": 6,
+              "regionId": "NSW1",
+              "start": "2025-07-01T00:00:00+10:00",
+              "resolution": "01:00:00",
+              "solar": {
+                "sourceFile": "solar.epw",
+                "location": { "city": "Solar site", "wmo": "123456", "latitude": -33.9, "longitude": 151.2 },
+                "globalHorizontalRadiationWhPerSquareMetre": [],
+                "directNormalRadiationWhPerSquareMetre": [],
+                "diffuseHorizontalRadiationWhPerSquareMetre": [],
+                "solarZenithDegrees": [],
+                "dryBulbTemperatureDegreesCelsius": [],
+                "productionMegawattsAtOneMegawattAc": []
+              },
+              "wind": {
+                "sourceFile": "wind.epw",
+                "location": { "city": "Wind site", "wmo": "654321", "latitude": -34.0, "longitude": 151.3 },
+                "windSpeedMetresPerSecond": [],
+                "measurementHeightMetres": 120,
+                "productionMegawattsAtOneMegawattInstalled": []
+              }
+            }
+            """);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Solar.SourceFile.Should().Be("solar.epw");
+        result.Value.Wind.MeasurementHeightMetres.Should().Be(120);
+    }
+
+    [Fact]
+    public async Task LoadAsync_RejectsSchema5WeatherArtifact()
+    {
+        ArtifactLoadResult<WeatherDataDTO> result = await LoadAsync<WeatherDataDTO>(
+            HttpStatusCode.OK,
+            """{ "schemaVersion": 5 }""");
+
+        result.State.Status.Should().Be(ArtifactLoadStatus.InvalidData);
+        result.State.Message.Should().Contain("schema 5 is not supported; expected schema 6");
+    }
+
+    [Fact]
+    public async Task LoadAsync_ReturnsSuccessForSystemDispatchResultsSchema()
+    {
+        ArtifactLoadResult<SystemDispatchResultsDTO> result = await LoadAsync<SystemDispatchResultsDTO>(
+            HttpStatusCode.OK,
+            """{ "schemaVersion": 1, "runId": "run-1" }""");
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.RunId.Should().Be("run-1");
+    }
+
+    [Fact]
+    public async Task LoadAsync_RejectsUnsupportedSystemDispatchResultsSchema()
+    {
+        ArtifactLoadResult<SystemDispatchResultsDTO> result = await LoadAsync<SystemDispatchResultsDTO>(
+            HttpStatusCode.OK,
+            """{ "schemaVersion": 2 }""");
+
+        result.State.Status.Should().Be(ArtifactLoadStatus.InvalidData);
+        result.State.Message.Should().Be("Artifact schema 2 is not supported; expected schema 1.");
+    }
+
+    [Fact]
+    public async Task LoadAsync_ReturnsSuccessForRegionDispatchResultsSchema()
+    {
+        ArtifactLoadResult<RegionDispatchResultsDTO> result = await LoadAsync<RegionDispatchResultsDTO>(
+            HttpStatusCode.OK,
+            """{ "schemaVersion": 1, "runId": "run-1", "regionId": "NSW1" }""");
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.RegionId.Should().Be("NSW1");
+    }
+
+    [Fact]
+    public async Task LoadAsync_RejectsUnsupportedRegionDispatchResultsSchema()
+    {
+        ArtifactLoadResult<RegionDispatchResultsDTO> result = await LoadAsync<RegionDispatchResultsDTO>(
+            HttpStatusCode.OK,
+            """{ "schemaVersion": 2 }""");
+
+        result.State.Status.Should().Be(ArtifactLoadStatus.InvalidData);
+        result.State.Message.Should().Be("Artifact schema 2 is not supported; expected schema 1.");
+    }
+
+    [Fact]
+    public async Task LoadSystemWithRegionAsync_AcceptsMatchingRunIds()
+    {
+        ArtifactLoadResult<SystemRegionArtifactPair> result = await LoadPairAsync("run-1", "run-1");
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.System.RunId.Should().Be("run-1");
+        result.Value.Region.RegionId.Should().Be("NSW1");
+    }
+
+    [Fact]
+    public async Task LoadSystemWithRegionAsync_RejectsMismatchedRunIdsAsInvalidData()
+    {
+        ArtifactLoadResult<SystemRegionArtifactPair> result = await LoadPairAsync("run-1", "run-2");
+
+        result.State.Status.Should().Be(ArtifactLoadStatus.InvalidData);
+        result.State.Message.Should().Be("System and regional artifact run IDs do not match.");
+        result.Value.Should().BeNull();
+    }
+
+    [Fact]
     public async Task LoadUnversionedAsync_LoadsAReferencedSeries()
     {
         using var http = new HttpClient(new StaticResponseHandler(
@@ -94,6 +205,20 @@ public sealed class ArtifactLoaderTests
         return await new ArtifactLoader(http).LoadAsync<T>("data/test.json");
     }
 
+    private static async Task<ArtifactLoadResult<SystemRegionArtifactPair>> LoadPairAsync(
+        string systemRunId,
+        string regionRunId)
+    {
+        using var http = new HttpClient(new PairResponseHandler(systemRunId, regionRunId))
+        {
+            BaseAddress = new Uri("https://example.test/"),
+        };
+
+        return await new ArtifactLoader(http).LoadSystemWithRegionAsync(
+            "data/results.json",
+            "data/results-nsw1.json");
+    }
+
     private sealed class StaticResponseHandler(HttpStatusCode statusCode, string content) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(
@@ -111,5 +236,24 @@ public sealed class ArtifactLoaderTests
             HttpRequestMessage request,
             CancellationToken cancellationToken) =>
             throw new HttpRequestException("Connection failed.");
+    }
+
+    private sealed class PairResponseHandler(string systemRunId, string regionRunId) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            string runId = request.RequestUri!.AbsolutePath.EndsWith("results-nsw1.json", StringComparison.Ordinal)
+                ? regionRunId
+                : systemRunId;
+            string json = request.RequestUri.AbsolutePath.EndsWith("results-nsw1.json", StringComparison.Ordinal)
+                ? $"{{ \"schemaVersion\": 1, \"runId\": \"{runId}\", \"regionId\": \"NSW1\" }}"
+                : $"{{ \"schemaVersion\": 1, \"runId\": \"{runId}\" }}";
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json"),
+            });
+        }
     }
 }

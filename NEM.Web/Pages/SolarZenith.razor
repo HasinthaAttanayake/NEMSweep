@@ -15,8 +15,8 @@
             @if (_weather is not null)
             {
                 <p class="location-line">
-                    @_weather.Location.City ·
-                    @_weather.Location.Latitude.ToString("0.0000"), @_weather.Location.Longitude.ToString("0.0000")
+                    @_weather.Solar.Location.City ·
+                    @_weather.Solar.Location.Latitude.ToString("0.0000"), @_weather.Solar.Location.Longitude.ToString("0.0000")
                 </p>
             }
         </div>
@@ -136,8 +136,8 @@
                 start,
                 TimeSpan.FromHours(1),
                 24,
-                _weather.Location.Latitude,
-                _weather.Location.Longitude);
+                _weather.Solar.Location.Latitude,
+                _weather.Solar.Location.Longitude);
         double[] values = Enumerable.Range(0, series.Length)
             .Select(index => series[index].Degrees)
             .ToArray();

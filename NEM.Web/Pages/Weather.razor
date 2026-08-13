@@ -9,7 +9,7 @@
         <ScopeContent>
             @if (_weather is not null)
             {
-                <ScopeLine Region="@($"{_weather.Location.City} · WMO {_weather.Location.Wmo} · {_weather.Location.Latitude:0.0000}, {_weather.Location.Longitude:0.0000}")"
+                <ScopeLine Region="@($"Solar: {SolarLocationLabel} · Wind: {WindLocationLabel}")"
                            Period="@WeatherPeriod"
                            Resolution="@WeatherResolution"
                            BaselineGlobal="true" />
@@ -45,10 +45,23 @@
             <span>@_displayPointCount displayed</span>
         </div>
 
+        <section class="weather-provenance" aria-label="Weather source provenance">
+            <div>
+                <h2>Solar resource</h2>
+                <p>@SolarLocationLabel</p>
+                <small>@_weather.Solar.SourceFile</small>
+            </div>
+            <div>
+                <h2>Wind resource</h2>
+                <p>@WindLocationLabel</p>
+                <small>@_weather.Wind.SourceFile</small>
+            </div>
+        </section>
+
         <MudTabs Elevation="0" Class="weather-tabs" Style="max-width: 100%; overflow: hidden">
             <MudTabPanel Text="Solar production">
                 <ChartFrame Heading="Dual-axis solar production"
-                            Description="@($"Modelled AC output for {_solarCapacityMegawatts:N1} MW at {_weather.Location.City}")"
+                            Description="@($"Modelled AC output for {_solarCapacityMegawatts:N1} MW at {_weather.Solar.Location.City}")"
                             Class="production-chart" HeadingClass="production-heading stack-on-mobile">
                     <TrailingContent>
                         <div class="capacity-control" aria-label="Solar AC capacity">
@@ -107,7 +120,7 @@
             </MudTabPanel>
             <MudTabPanel Text="Wind production">
                 <ChartFrame Heading="Wind production"
-                            Description="@($"Modelled output for {_windCapacityMegawatts:N1} MW using the Goldwind GW 140/3MW(S) 3.4 MW variant at 120 m hub height")"
+                            Description="@($"Modelled output for {_windCapacityMegawatts:N1} MW at {_weather.Wind.Location.City} using the Goldwind GW 140/3MW(S) 3.4 MW variant at {_weather.Wind.MeasurementHeightMetres:N0} m hub height")"
                             Class="production-chart wind-production-chart" HeadingClass="production-heading stack-on-mobile">
                     <TrailingContent>
                         <div class="capacity-control" aria-label="Installed wind capacity">
@@ -195,7 +208,7 @@
                 </ChartFrame>
             </MudTabPanel>
             <MudTabPanel Text="Wind speed">
-                <ChartFrame Heading="Wind speed" Description="@($"Hourly speed at {_weather.WindMeasurementHeightMetres:N0} metres")"
+                <ChartFrame Heading="Wind speed" Description="@($"Hourly speed at {_weather.Wind.MeasurementHeightMetres:N0} metres")"
                             Unit="m/s" Style="--accent: var(--wind); --accent-soft: var(--wind-soft)">
                     <MudChart ChartType="ChartType.Line"
                               ChartSeries="_windSeries"
@@ -277,7 +290,7 @@
     [
         new("Peak DNI", _peakDni.ToString("N0"), "Wh/m²", "--metric-accent: var(--solar)"),
         new("Mean daylight DNI", _meanDaylightDni.ToString("N0"), "Wh/m²", "--metric-accent: var(--solar)"),
-        new("Mean wind", _meanWind.ToString("N1"), $"m/s at {_weather!.WindMeasurementHeightMetres:N0} m", "--metric-accent: var(--wind)"),
+        new("Mean wind", _meanWind.ToString("N1"), $"m/s at {_weather!.Wind.MeasurementHeightMetres:N0} m", "--metric-accent: var(--wind)"),
         new("Peak wind", _peakWind.ToString("N1"), "m/s", "--metric-accent: var(--wind)"),
         new("Mean dry bulb", _meanTemperature.ToString("N1"), "°C", "--metric-accent: var(--temperature)"),
         new("Dry-bulb range", $"{_minimumTemperature:N1} to {_maximumTemperature:N1}", "°C", "--metric-accent: var(--temperature)"),
@@ -291,7 +304,7 @@
     {
         get
         {
-            int intervals = _weather!.DataSeries.DryBulbTemperatureDegreesCelsius.Length;
+            int intervals = _weather!.Solar.DryBulbTemperatureDegreesCelsius.Length;
             if (intervals <= 1 || _weather.Resolution <= TimeSpan.Zero)
             {
                 return _weather.Start.ToString("dd MMM yyyy");
@@ -302,13 +315,18 @@
         }
     }
     private string WeatherResolution => $"{_weather!.Resolution.TotalHours:N0}-hour intervals";
+    private string SolarLocationLabel => FormatLocation(_weather!.Solar.Location);
+    private string WindLocationLabel => FormatLocation(_weather!.Wind.Location);
+
+    private static string FormatLocation(WeatherLocation location) =>
+        $"{location.City} · WMO {location.Wmo} · {location.Latitude:0.0000}, {location.Longitude:0.0000}";
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
             ArtifactLoadResult<WeatherDataDTO> loadResult =
-                await ArtifactLoader.LoadAsync<WeatherDataDTO>("data/weather-data.json");
+                await ArtifactLoader.LoadAsync<WeatherDataDTO>("data/weather-nsw1.json");
             if (!loadResult.IsSuccess)
             {
                 _loadState = loadResult.State;
@@ -316,14 +334,14 @@
             }
 
             _weather = loadResult.Value!;
-            int dniLength = _weather.DataSeries.DirectNormalRadiationWhPerSquareMetre.Length;
-            int ghiLength = _weather.DataSeries.GlobalHorizontalRadiationWhPerSquareMetre.Length;
-            int dhiLength = _weather.DataSeries.DiffuseHorizontalRadiationWhPerSquareMetre.Length;
-            int zenithLength = _weather.DataSeries.SolarZenithDegrees.Length;
-            int temperatureLength = _weather.DataSeries.DryBulbTemperatureDegreesCelsius.Length;
-            int windLength = _weather.DataSeries.WindSpeedMetresPerSecond.Length;
-            int solarProductionLength = _weather.DataSeries.SolarProductionMegawattsAtOneMegawattAc.Length;
-            int windProductionLength = _weather.DataSeries.WindProductionMegawattsAtOneMegawattInstalled.Length;
+            int dniLength = _weather.Solar.DirectNormalRadiationWhPerSquareMetre.Length;
+            int ghiLength = _weather.Solar.GlobalHorizontalRadiationWhPerSquareMetre.Length;
+            int dhiLength = _weather.Solar.DiffuseHorizontalRadiationWhPerSquareMetre.Length;
+            int zenithLength = _weather.Solar.SolarZenithDegrees.Length;
+            int temperatureLength = _weather.Solar.DryBulbTemperatureDegreesCelsius.Length;
+            int windLength = _weather.Wind.WindSpeedMetresPerSecond.Length;
+            int solarProductionLength = _weather.Solar.ProductionMegawattsAtOneMegawattAc.Length;
+            int windProductionLength = _weather.Wind.ProductionMegawattsAtOneMegawattInstalled.Length;
             if (dniLength == 0
                 || ghiLength != dniLength
                 || dhiLength != dniLength
@@ -387,15 +405,15 @@
             return;
         }
 
-        double[] ghi = _weather.DataSeries.GlobalHorizontalRadiationWhPerSquareMetre;
-        double[] dni = _weather.DataSeries.DirectNormalRadiationWhPerSquareMetre;
-        double[] dhi = _weather.DataSeries.DiffuseHorizontalRadiationWhPerSquareMetre;
-        double[] temperature = _weather.DataSeries.DryBulbTemperatureDegreesCelsius;
-        double[] wind = _weather.DataSeries.WindSpeedMetresPerSecond;
+        double[] ghi = _weather.Solar.GlobalHorizontalRadiationWhPerSquareMetre;
+        double[] dni = _weather.Solar.DirectNormalRadiationWhPerSquareMetre;
+        double[] dhi = _weather.Solar.DiffuseHorizontalRadiationWhPerSquareMetre;
+        double[] temperature = _weather.Solar.DryBulbTemperatureDegreesCelsius;
+        double[] wind = _weather.Wind.WindSpeedMetresPerSecond;
         double[] solarProductionAtOneMegawattAc =
-            _weather.DataSeries.SolarProductionMegawattsAtOneMegawattAc;
+            _weather.Solar.ProductionMegawattsAtOneMegawattAc;
         double[] windProductionAtOneMegawattInstalled =
-            _weather.DataSeries.WindProductionMegawattsAtOneMegawattInstalled;
+            _weather.Wind.ProductionMegawattsAtOneMegawattInstalled;
         var selectedIndexes = new List<int>();
 
         for (int index = 0; index < dni.Length; index++)

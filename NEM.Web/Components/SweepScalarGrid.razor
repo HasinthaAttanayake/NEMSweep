@@ -46,13 +46,14 @@
 
 @code {
     [Parameter, EditorRequired] public SweepIndexDTO Index { get; set; } = default!;
+    [Parameter] public string? RegionId { get; set; }
     [Parameter] public string? SelectedKey { get; set; }
     [Parameter] public EventCallback<string> OnSelect { get; set; }
 
     private List<SweepSparkline> _sparklines = [];
 
     protected override void OnParametersSet() => _sparklines = SweepSeriesCatalogue.All
-        .Select(axis => SweepSparkline.Build(Index, axis))
+        .Select(axis => SweepSparkline.Build(Index, axis, RegionId))
         .ToList();
 
     private sealed record SweepSparkline(
@@ -63,9 +64,12 @@
         double Last,
         string Points)
     {
-        public static SweepSparkline Build(SweepIndexDTO index, SweepChartYAxis axis)
+        public static SweepSparkline Build(
+            SweepIndexDTO index,
+            SweepChartYAxis axis,
+            string? regionId)
         {
-            double[] values = SweepChartData.Build(index, axis).Values;
+            double[] values = SweepChartData.Build(index, axis, regionId).Values;
             if (values.Length == 0)
             {
                 return new SweepSparkline(axis, false, false, 0, 0, string.Empty);
