@@ -1,0 +1,202 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using AwesomeAssertions;
+using NEM.CLI.Configuration;
+
+namespace NEM.CLI.Tests.Configuration;
+
+public sealed class ScenarioConfigTests
+{
+    [Fact]
+    public void Load_RequiresSchemaVersionOne()
+    {
+        var act = () => Load(config => config["schemaVersion"] = 2);
+
+        act.Should().Throw<FormatException>()
+            .WithMessage("*found 2*expected 1*");
+    }
+
+    [Fact]
+    public void Load_RejectsUnknownProperty()
+    {
+        var act = () => Load(config => config["nameplateMw"] = 1);
+
+        act.Should().Throw<JsonException>();
+    }
+
+    [Fact]
+    public void Load_RejectsTopLevelDemandFile()
+    {
+        var act = () => Load(config => config["demandFile"] = "demand.json");
+
+        act.Should().Throw<JsonException>();
+    }
+
+    [Fact]
+    public void Load_RejectsMissingRegionalDemandFileWithRegionName()
+    {
+        var act = () => Load(config => Region(config)["demandFile"] = " ");
+
+        act.Should().Throw<FormatException>().WithMessage("*NSW1*demandFile*blank*");
+    }
+
+    [Fact]
+    public void Load_UsesIndependentInputsForEachRegion()
+    {
+        ScenarioSettings scenario = Load(config =>
+        {
+            JsonObject secondRegion = Region(config).DeepClone().AsObject();
+            secondRegion["regionId"] = "VIC1";
+            secondRegion["demandFile"] = "demand-vic1.json";
+            secondRegion["weatherFile"] = "weather-vic1.json";
+            config["regions"] = new JsonArray(Region(config).DeepClone(), secondRegion);
+        });
+
+        scenario.Regions.Select(region => (region.RegionId, region.DemandFile, region.WeatherFile))
+            .Should().Equal(
+                ("NSW1", "demand.json", "weather.json"),
+                ("VIC1", "demand-vic1.json", "weather-vic1.json"));
+    }
+
+    [Fact]
+    public void Load_DefaultsRegionalDataCentreNameplateToZero()
+    {
+        ScenarioSettings scenario = Load(_ => { });
+
+        scenario.Regions.Single().DataCentreNameplateMw.Should().Be(0);
+    }
+
+    [Fact]
+    public void Load_AcceptsOptionalProvenance()
+    {
+        ScenarioSettings scenario = Load(config => config["provenance"] = new JsonObject { ["sweepId"] = "test" });
+
+        scenario.Provenance!["sweepId"]!.GetValue<string>().Should().Be("test");
+    }
+
+    [Fact]
+    public void Load_RejectsUnknownRegion()
+    {
+        var act = () => Load(config => Region(config)["regionId"] = "NARNIA9");
+
+        act.Should().Throw<FormatException>().WithMessage("*region*NARNIA9*");
+    }
+
+    [Fact]
+    public void Load_RejectsDuplicateRegion()
+    {
+        var act = () => Load(config => config["regions"] = new JsonArray(Region(config).DeepClone(), Region(config).DeepClone()));
+
+        act.Should().Throw<FormatException>().WithMessage("*region*distinct*");
+    }
+
+    [Fact]
+    public void Load_RejectsBlankGeneratingTechnology()
+    {
+        var act = () => Load(config => GeneratingFleet(config)["technology"] = " ");
+
+        act.Should().Throw<FormatException>().WithMessage("*region*technology*blank*");
+    }
+
+    [Fact]
+    public void Load_RejectsNegativeNameplateCapacity()
+    {
+        var act = () => Load(config => GeneratingFleet(config)["nameplateCapacityMw"] = -1);
+
+        act.Should().Throw<FormatException>().WithMessage("*NSW1*Coal*nameplateCapacityMw*");
+    }
+
+    [Fact]
+    public void Load_RejectsRoundTripEfficiencyOutsideRange()
+    {
+        var act = () => Load(config => StorageProfile(config)["roundTripEfficiency"] = 1.1);
+
+        act.Should().Throw<FormatException>().WithMessage("*NSW1*Battery*roundTripEfficiency*");
+    }
+
+    [Fact]
+    public void Load_RejectsNegativeHeatRate()
+    {
+        var act = () => Load(config => GeneratingProfile(config)["heatRateGjPerMwh"] = -1);
+
+        act.Should().Throw<FormatException>().WithMessage("*NSW1*Coal*heatRateGjPerMwh*");
+    }
+
+    [Fact]
+    public void Load_RejectsCapacityFactorOutsideRange()
+    {
+        var act = () => Load(config => GeneratingFleet(config)["monthlyCapacityFactors"] = new JsonArray(
+            new JsonObject { ["month"] = "2026-01-01", ["capacityFactor"] = 0 }));
+
+        act.Should().Throw<FormatException>().WithMessage("*NSW1*Coal*capacityFactor*");
+    }
+
+    [Fact]
+    public void Load_RejectsNegativeCost()
+    {
+        var act = () => Load(config => GeneratingCosts(config)["fuelPriceAudPerGj"] = -1);
+
+        act.Should().Throw<FormatException>().WithMessage("*NSW1*Coal*fuelPriceAudPerGj*");
+    }
+
+    [Fact]
+    public void Load_RejectsTargetUsePercentageOutsideRange()
+    {
+        var act = () => Load(config => config["storageSizing"]!["targetUsePercentage"] = 100.1);
+
+        act.Should().Throw<FormatException>().WithMessage("*targetUsePercentage*");
+    }
+
+    [Fact]
+    public void Load_RejectsImplausibleCostBasisYear()
+    {
+        var act = () => Load(config => config["costBasis"]!["year"] = 1900);
+
+        act.Should().Throw<FormatException>().WithMessage("*costBasis.year*1900*2000*2100*");
+    }
+
+    private static ScenarioSettings Load(Action<JsonObject> mutate)
+    {
+        JsonObject config = JsonNode.Parse("""
+        {
+          "schemaVersion": 1,
+          "id": "test",
+          "name": "Test",
+          "costBasis": { "year": 2026, "realDiscountRate": 0.07 },
+          "storageSizing": { "maximumPowerMw": 100, "maximumEnergyMwh": 400 },
+          "regions": [{
+            "regionId": "NSW1",
+                        "demandFile": "demand.json",
+                        "weatherFile": "weather.json",
+            "generatingFleets": [{
+              "technology": "Coal", "nameplateCapacityMw": 100,
+              "costParameters": { "capitalCostAudPerMw": 1, "fixedOperatingCostAudPerMwYear": 1, "variableOperatingCostAudPerMwh": 1, "fuelPriceAudPerGj": 1 },
+              "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 }
+            }],
+            "storageFleets": [{
+              "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0,
+              "costParameters": { "powerCapitalCostAudPerMw": 1, "energyCapitalCostAudPerMwh": 1, "fixedOperatingCostAudPerMwYear": 1 },
+              "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 }
+            }]
+          }]
+        }
+        """)!.AsObject();
+        mutate(config);
+        string path = Path.Combine(Path.GetTempPath(), $"scenario-{Guid.NewGuid():N}.json");
+        try
+        {
+            File.WriteAllText(path, config.ToJsonString());
+            return ScenarioConfig.Load(path);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    private static JsonObject Region(JsonObject config) => config["regions"]![0]!.AsObject();
+    private static JsonObject GeneratingFleet(JsonObject config) => Region(config)["generatingFleets"]![0]!.AsObject();
+    private static JsonObject GeneratingCosts(JsonObject config) => GeneratingFleet(config)["costParameters"]!.AsObject();
+    private static JsonObject GeneratingProfile(JsonObject config) => GeneratingFleet(config)["technologyProfile"]!.AsObject();
+    private static JsonObject StorageProfile(JsonObject config) => Region(config)["storageFleets"]![0]!["technologyProfile"]!.AsObject();
+}

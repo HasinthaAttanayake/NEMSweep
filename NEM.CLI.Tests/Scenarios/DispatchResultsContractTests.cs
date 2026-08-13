@@ -143,13 +143,16 @@ public sealed class DispatchResultsContractTests
             "25010854efed1ed4a47708a74f5c201dc04616acc95d7b3381e641ca0483ccaf"));
     }
 
-    [Fact]
-    public void Export_ReportsDeliveredGenerationSeparatelyFromCurtailment()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Export_PublishesCanonicalPerFleetDeliveredGeneration(bool includesStorage)
     {
         var start = new DateTimeOffset(2025, 7, 1, 0, 0, 0, TimeSpan.FromHours(10));
-        FlowSeries baseDemand = Flow(start, 100, 100);
+        double generationSourcedChargeMwh = includesStorage ? 20 : 0;
+        FlowSeries baseDemand = Flow(start, 100 - generationSourcedChargeMwh, 100);
         FlowSeries additiveDemand = Flow(start, 20, 10);
-        FlowSeries totalDemand = Flow(start, 120, 110);
+        FlowSeries totalDemand = Flow(start, 120 - generationSourcedChargeMwh, 110);
         FlowSeries zero = Flow(start, 0, 0);
         var outcome = new DispatchOutcome(
             "NSW1",
@@ -165,27 +168,29 @@ public sealed class DispatchResultsContractTests
             },
             new Dictionary<GenerationTechnology, FlowSeries>
             {
-                [GenerationTechnology.Coal] = Flow(start, 120, 50),
+                [GenerationTechnology.Coal] = Flow(start, 120 - generationSourcedChargeMwh, 50),
                 [GenerationTechnology.Gas] = Flow(start, 0, 60),
             },
             new Dictionary<GenerationTechnology, FlowSeries>
             {
-                [GenerationTechnology.Coal] = zero,
+                [GenerationTechnology.Coal] = Flow(start, generationSourcedChargeMwh, 0),
                 [GenerationTechnology.Gas] = zero,
             },
             totalDemand,
             zero,
+            Flow(start, generationSourcedChargeMwh, 0),
             zero,
             zero,
             zero,
-            zero,
-            stateOfChargeByTechnology: new Dictionary<StorageTechnology, StockSeries>
-            {
-                [StorageTechnology.Battery] = new StockSeries(
-                    start,
-                    TimeSpan.FromHours(1),
-                    AnnualValues(start, 0, 8.7)),
-            });
+            stateOfChargeByTechnology: includesStorage
+                ? new Dictionary<StorageTechnology, StockSeries>
+                {
+                    [StorageTechnology.Battery] = new StockSeries(
+                        start,
+                        TimeSpan.FromHours(1),
+                        AnnualValues(start, 0, 8.7)),
+                }
+                : []);
         GeneratingFleet[] fleets =
         [
             new(GenerationTechnology.Coal, Power.FromMegawatts(140)),
@@ -211,15 +216,17 @@ public sealed class DispatchResultsContractTests
                         CreateCostParameters(),
                         CreateTechnologyProfile()),
                 ],
-                [new ScenarioStorageFleet(
-                    StorageTechnology.Battery,
-                    Energy.FromMegawattHours(120),
-                    Power.FromMegawatts(30),
-                    new StorageCostParameters(
-                        PowerCapacityCost.FromAudPerMwCapacity(0),
-                        EnergyCapacityCost.FromAudPerMwhCapacity(0),
-                        AnnualPowerCapacityCost.FromAudPerMwYear(0)),
-                    new StorageTechnologyProfile(15u, 0.87))])],
+                includesStorage
+                    ? [new ScenarioStorageFleet(
+                        StorageTechnology.Battery,
+                        Energy.FromMegawattHours(120),
+                        Power.FromMegawatts(30),
+                        new StorageCostParameters(
+                            PowerCapacityCost.FromAudPerMwCapacity(0),
+                            EnergyCapacityCost.FromAudPerMwhCapacity(0),
+                            AnnualPowerCapacityCost.FromAudPerMwYear(0)),
+                        new StorageTechnologyProfile(15u, 0.87))]
+                    : [])],
             new CostBasis(2026, 0.07m));
         var powerSystem = new PowerSystem(
             new PowerSystemId("nsw1-baseline-dispatch-system"),
@@ -229,19 +236,21 @@ public sealed class DispatchResultsContractTests
                 fleets,
                 baseDemand,
                 [new DemandComponent("Data centres", additiveDemand)],
-                storageFleets:
-                [
-                    new StorageFleet(
-                        StorageTechnology.Battery,
-                        Energy.FromMegawattHours(120),
-                        Power.FromMegawatts(30),
-                        new StorageTechnologyProfile(15u, 0.87)),
-                ])]);
+                storageFleets: includesStorage
+                    ?
+                    [
+                        new StorageFleet(
+                            StorageTechnology.Battery,
+                            Energy.FromMegawattHours(120),
+                            Power.FromMegawatts(30),
+                            new StorageTechnologyProfile(15u, 0.87)),
+                    ]
+                    : [])]);
 
         var installedCapacity = new RegionalBatterySizing(
             "NSW1",
-            Energy.FromMegawattHours(120),
-            Power.FromMegawatts(30),
+            Energy.FromMegawattHours(includesStorage ? 120 : 0),
+            Power.FromMegawatts(includesStorage ? 30 : 0),
             wasChanged: false);
         var sizingResult = new StorageSizingRunResult(
             powerSystem,
@@ -279,27 +288,47 @@ public sealed class DispatchResultsContractTests
 
         result.SchemaVersion.Should().Be(7);
         result.DataSeries.DeliveredGenerationByTechnologyMw["Coal"].Take(2)
-            .Should().Equal(120, 50);
+            .Should().Equal(120 - generationSourcedChargeMwh, 50);
         result.DataSeries.DeliveredGenerationByTechnologyMw["Gas"].Take(2)
             .Should().Equal(0, 60);
-        result.DataSeries.Demand.BaseDemandMw!.Take(2).Should().Equal(100, 100);
+        result.DataSeries.DeliveredGenerationByTechnologyMw.Keys.Should().Equal("Coal", "Gas");
+        result.DataSeries.DeliveredGenerationByTechnologyMw["Coal"].Sum()
+            .Should().Be(
+                outcome.PerFleetGeneration[GenerationTechnology.Coal]
+                    .Subtract(outcome.PerFleetCurtailment[GenerationTechnology.Coal])
+                    .Integrate().MegawattHours - generationSourcedChargeMwh);
+        result.DataSeries.DeliveredGenerationByTechnologyMw.Values
+            .SelectMany(series => series)
+            .Sum()
+            .Should().Be(230 - generationSourcedChargeMwh);
+        result.DataSeries.Demand.BaseDemandMw!.Take(2)
+            .Should().Equal(100 - generationSourcedChargeMwh, 100);
         result.DataSeries.Demand.AdditiveComponentsByNameMw["Data centres"].Take(2)
             .Should().Equal(20, 10);
-        result.DataSeries.Demand.TotalDemandMw.Take(2).Should().Equal(120, 110);
-        result.PowerSystem.StorageFleets.Should().ContainSingle().Which
-            .Should().Be(new DispatchStorageFleetDTO("Battery", 120, 30));
-        result.DataSeries.StateOfChargeByTechnologyMwh["Battery"].Take(2)
-            .Should().Equal(0, 8.7);
+        result.DataSeries.Demand.TotalDemandMw.Take(2)
+            .Should().Equal(120 - generationSourcedChargeMwh, 110);
+        if (includesStorage)
+        {
+            result.PowerSystem.StorageFleets.Should().ContainSingle().Which
+                .Should().Be(new DispatchStorageFleetDTO("Battery", 120, 30));
+            result.DataSeries.StateOfChargeByTechnologyMwh["Battery"].Take(2)
+                .Should().Equal(0, 8.7);
+        }
+        else
+        {
+            result.PowerSystem.StorageFleets.Should().BeEmpty();
+            result.DataSeries.StateOfChargeByTechnologyMwh.Should().BeEmpty();
+        }
         result.Metrics.Should().Be(new DispatchMetricsDTO(
-            230,
-            230,
+            230 - generationSourcedChargeMwh,
+            230 - generationSourcedChargeMwh,
             20,
             0,
             0,
             0,
             8760.0 / 8760,
             0,
-            new IntervalPointersDTO(null, 0, 0)));
+            new IntervalPointersDTO(null, 0, includesStorage ? 0 : null)));
         result.Reliability.Should().Be(new ReliabilityBasisDTO(
             0.002,
             0,
@@ -307,10 +336,10 @@ public sealed class DispatchResultsContractTests
             "NEM reliability standard"));
         result.StorageSizing.Should().Be(new StorageSizingOutcomeDTO(
             StorageSizingOutcome.NotRequired,
-            120,
-            30,
-            120,
-            30,
+            includesStorage ? 120 : 0,
+            includesStorage ? 30 : 0,
+            includesStorage ? 120 : 0,
+            includesStorage ? 30 : 0,
             100_000,
             10_000,
             1));

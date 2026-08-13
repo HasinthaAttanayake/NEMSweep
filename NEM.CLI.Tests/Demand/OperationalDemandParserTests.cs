@@ -12,13 +12,13 @@ public sealed class OperationalDemandParserTests
         new(2025, 7, 1, 0, 0, 0, NemOffset);
 
     [Fact]
-    public void ReadFinancialYear_RecursesAndBuildsIntervalBeginningSeries()
+    public void Read_RecursesAndBuildsIntervalBeginningSeries()
     {
         using var fixture = new DemandArchiveFixture();
         fixture.AddFullYear("NSW1", nested: true);
 
-        OperationalDemandData result = OperationalDemandParser.ReadFinancialYear(
-            fixture.DirectoryPath, "NSW1", PeriodStart);
+        OperationalDemandData result = OperationalDemandParser.Read(
+            [fixture.PathFor("full-year.zip")], ["NSW1"], PeriodStart, PeriodStart.AddYears(1))["NSW1"];
 
         result.Demand.Start.Should().Be(PeriodStart);
         result.Demand.Resolution.Should().Be(TimeSpan.FromMinutes(30));
@@ -29,7 +29,7 @@ public sealed class OperationalDemandParserTests
     }
 
     [Fact]
-    public void ReadFinancialYear_DropsIdenticalOverlapsAcrossHeaderLayouts()
+    public void Read_DropsIdenticalOverlapsAcrossHeaderLayouts()
     {
         using var fixture = new DemandArchiveFixture();
         fixture.AddFullYear("NSW1", nested: true);
@@ -38,15 +38,16 @@ public sealed class OperationalDemandParserTests
             [(PeriodStart + TimeSpan.FromMinutes(30), "NSW1", 1_000)],
             intervalFirst: false);
 
-        OperationalDemandData result = OperationalDemandParser.ReadFinancialYear(
-            fixture.DirectoryPath, "NSW1", PeriodStart);
+        OperationalDemandData result = OperationalDemandParser.Read(
+            [fixture.PathFor("full-year.zip"), fixture.PathFor("duplicate.zip")],
+            ["NSW1"], PeriodStart, PeriodStart.AddYears(1))["NSW1"];
 
         result.Demand.Length.Should().Be(17_520);
         result.Demand[0].Megawatts.Should().Be(1_000);
     }
 
     [Fact]
-    public void ReadFinancialYear_RejectsConflictingOverlap()
+    public void Read_RejectsConflictingOverlapWithBothSources()
     {
         using var fixture = new DemandArchiveFixture();
         fixture.AddRows(
@@ -56,8 +57,9 @@ public sealed class OperationalDemandParserTests
             "conflict.zip",
             [(PeriodStart + TimeSpan.FromMinutes(30), "NSW1", 1_001)]);
 
-        var act = () => OperationalDemandParser.ReadFinancialYear(
-            fixture.DirectoryPath, "NSW1", PeriodStart);
+        var act = () => OperationalDemandParser.Read(
+            [fixture.PathFor("first.zip"), fixture.PathFor("conflict.zip")],
+            ["NSW1"], PeriodStart, PeriodStart.AddMinutes(30));
 
         OperationalDemandDataQualityException exception = act.Should()
             .Throw<OperationalDemandDataQualityException>()
@@ -65,21 +67,76 @@ public sealed class OperationalDemandParserTests
             .Which;
         exception.Message.Should().Contain("1000 MW");
         exception.Message.Should().Contain("1001 MW");
+        exception.Message.Should().Contain("first.zip");
+        exception.Message.Should().Contain("conflict.zip");
     }
 
     [Fact]
-    public void ReadFinancialYear_RejectsMissingInterval()
+    public void Read_RejectsMissingIntervalNamingRegionAndInstant()
     {
         using var fixture = new DemandArchiveFixture();
         fixture.AddRows(
             "partial.zip",
             [(PeriodStart + TimeSpan.FromMinutes(30), "NSW1", 1_000)]);
 
-        var act = () => OperationalDemandParser.ReadFinancialYear(
-            fixture.DirectoryPath, "NSW1", PeriodStart);
+        var act = () => OperationalDemandParser.Read(
+            [fixture.PathFor("partial.zip")], ["NSW1"], PeriodStart, PeriodStart.AddHours(1));
 
         act.Should().Throw<OperationalDemandDataQualityException>()
-            .WithMessage("*missing interval*2025-07-01T00:30:00*");
+            .WithMessage("*NSW1*missing interval*2025-07-01T00:30:00*");
+    }
+
+    [Fact]
+    public void Read_ReturnsEveryRequestedRegionAndOmitsUndeclaredRows()
+    {
+        using var fixture = new DemandArchiveFixture();
+        fixture.AddRows("regions.zip", [
+            (PeriodStart + TimeSpan.FromMinutes(30), "NSW1", 1_000),
+            (PeriodStart + TimeSpan.FromHours(1), "NSW1", 1_001),
+            (PeriodStart + TimeSpan.FromMinutes(30), "QLD1", 2_000),
+            (PeriodStart + TimeSpan.FromHours(1), "QLD1", 2_001),
+            (PeriodStart + TimeSpan.FromMinutes(30), "VIC1", 3_000),
+        ]);
+
+        IReadOnlyDictionary<string, OperationalDemandData> result = OperationalDemandParser.Read(
+            [fixture.PathFor("regions.zip")], ["NSW1", "QLD1"], PeriodStart, PeriodStart.AddHours(1));
+
+        result.Keys.Should().BeEquivalentTo(["NSW1", "QLD1"]);
+        result["NSW1"].Demand[^1].Megawatts.Should().Be(1_001);
+        result["QLD1"].Demand[^1].Megawatts.Should().Be(2_001);
+        result.ContainsKey("VIC1").Should().BeFalse();
+    }
+
+    [Fact]
+    public void Read_UsesExplicitEndAndExcludesRowsAtEnd()
+    {
+        using var fixture = new DemandArchiveFixture();
+        fixture.AddRows("bounded.zip", [
+            (PeriodStart + TimeSpan.FromMinutes(30), "NSW1", 1_000),
+            (PeriodStart + TimeSpan.FromHours(1), "NSW1", 1_001),
+            (PeriodStart + TimeSpan.FromMinutes(90), "NSW1", 1_002),
+        ]);
+
+        OperationalDemandData result = OperationalDemandParser.Read(
+            [fixture.PathFor("bounded.zip")], ["NSW1"], PeriodStart, PeriodStart.AddHours(1))["NSW1"];
+
+        result.Demand.Length.Should().Be(2);
+        result.Demand[^1].Megawatts.Should().Be(1_001);
+    }
+
+    [Fact]
+    public void Read_DeduplicatesRepeatedArchivePaths()
+    {
+        using var fixture = new DemandArchiveFixture();
+        fixture.AddRows("single.zip", [
+            (PeriodStart + TimeSpan.FromMinutes(30), "NSW1", 1_000),
+        ]);
+
+        OperationalDemandData result = OperationalDemandParser.Read(
+            [fixture.PathFor("single.zip"), fixture.PathFor("single.zip")],
+            ["NSW1"], PeriodStart, PeriodStart.AddMinutes(30))["NSW1"];
+
+        result.SourceArchives.Should().ContainSingle().Which.Should().Be("single.zip");
     }
 
     private sealed class DemandArchiveFixture : IDisposable
@@ -91,6 +148,8 @@ public sealed class OperationalDemandParserTests
         }
 
         public string DirectoryPath { get; }
+
+        public string PathFor(string archiveName) => Path.Combine(DirectoryPath, archiveName);
 
         public void AddFullYear(string region, bool nested)
         {
@@ -109,7 +168,7 @@ public sealed class OperationalDemandParserTests
             bool nested = false)
         {
             string csv = BuildCsv(rows, intervalFirst);
-            string archivePath = Path.Combine(DirectoryPath, archiveName);
+            string archivePath = PathFor(archiveName);
             using ZipArchive archive = ZipFile.Open(archivePath, ZipArchiveMode.Create);
             if (nested)
             {

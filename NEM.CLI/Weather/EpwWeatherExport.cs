@@ -11,43 +11,48 @@ namespace NEM.CLI.Weather;
 internal static class EpwWeatherExport
 {
     public static WeatherDataDTO Create(
-        EpwHeader header,
-        RegionalResourceProfile weather,
-        string sourceFile)
+        string regionId,
+        EpwHeader solarHeader,
+        RegionalResourceProfile solarWeather,
+        string solarSourceFile,
+        EpwHeader windHeader,
+        RegionalResourceProfile windWeather,
+        string windSourceFile)
     {
-        double windMeasurementHeightMetres = weather.WindSpeed.MeasurementHeightMetres
+        ValidateInputs(regionId, solarSourceFile, solarWeather, windSourceFile, windWeather);
+        double windMeasurementHeightMetres = windWeather.WindSpeed.MeasurementHeightMetres
             ?? throw new InvalidOperationException(
                 "Weather export requires a wind-speed trace with a measurement height.");
         FlowSeries solarProductionAtOneMegawattAc = DualAxisSolarPowerCurve.Calculate(
-            weather.GlobalHorizontalRadiation,
-            weather.DirectNormalRadiation,
-            weather.DiffuseHorizontalRadiation,
-            weather.DryBulbTemperature,
-            weather.SolarZenith,
+            solarWeather.GlobalHorizontalRadiation,
+            solarWeather.DirectNormalRadiation,
+            solarWeather.DiffuseHorizontalRadiation,
+            solarWeather.DryBulbTemperature,
+            solarWeather.SolarZenith,
             Power.FromMegawatts(1));
         FlowSeries windProductionAtOneMegawattInstalled = WindPowerCurve.Calculate(
-            weather.WindSpeed,
+            windWeather.WindSpeed,
             Power.FromMegawatts(1));
 
         return new WeatherDataDTO(
-            5,
-            sourceFile,
-            new WeatherLocation(
-                header.City,
-                header.Wmo,
-                header.Latitude,
-                header.Longitude),
-            weather.DirectNormalRadiation.Start,
-            weather.DirectNormalRadiation.Resolution,
-            windMeasurementHeightMetres,
-            new WeatherSeriesData(
-                ValuesOf(weather.GlobalHorizontalRadiation),
-                ValuesOf(weather.DirectNormalRadiation),
-                ValuesOf(weather.DiffuseHorizontalRadiation),
-                ZenithValuesOf(weather.SolarZenith),
-                ValuesOf(weather.DryBulbTemperature),
-                ValuesOf(weather.WindSpeed),
-                MegawattValuesOf(solarProductionAtOneMegawattAc),
+            ArtifactSchemaVersions.Weather,
+            regionId,
+            solarWeather.DirectNormalRadiation.Start,
+            solarWeather.DirectNormalRadiation.Resolution,
+            new SolarWeatherData(
+                solarSourceFile,
+                LocationOf(solarHeader),
+                ValuesOf(solarWeather.GlobalHorizontalRadiation),
+                ValuesOf(solarWeather.DirectNormalRadiation),
+                ValuesOf(solarWeather.DiffuseHorizontalRadiation),
+                ZenithValuesOf(solarWeather.SolarZenith),
+                ValuesOf(solarWeather.DryBulbTemperature),
+                MegawattValuesOf(solarProductionAtOneMegawattAc)),
+            new WindWeatherData(
+                windSourceFile,
+                LocationOf(windHeader),
+                ValuesOf(windWeather.WindSpeed),
+                windMeasurementHeightMetres,
                 MegawattValuesOf(windProductionAtOneMegawattInstalled)));
     }
 
@@ -85,5 +90,30 @@ internal static class EpwWeatherExport
         }
 
         return values;
+    }
+
+    private static WeatherLocation LocationOf(EpwHeader header) =>
+        new(header.City, header.Wmo, header.Latitude, header.Longitude);
+
+    private static void ValidateInputs(
+        string regionId,
+        string solarSourceFile,
+        RegionalResourceProfile solarWeather,
+        string windSourceFile,
+        RegionalResourceProfile windWeather)
+    {
+        int solarLength = solarWeather.DirectNormalRadiation.Length;
+        int windLength = windWeather.WindSpeed.Length;
+        bool validLength = solarLength == windLength;
+        bool validShape = solarLength is 8760 or 8784 && windLength is 8760 or 8784;
+        bool aligned = solarWeather.DirectNormalRadiation.Start == windWeather.WindSpeed.Start
+            && solarWeather.DirectNormalRadiation.Resolution == windWeather.WindSpeed.Resolution;
+        if (!validLength || !validShape || !aligned)
+        {
+            throw new FormatException(
+                $"Weather inputs for region '{regionId}' are incompatible: "
+                + $"solar source '{solarSourceFile}' and wind source '{windSourceFile}' "
+                + "must have matching start, resolution, and 8760 or 8784 intervals.");
+        }
     }
 }

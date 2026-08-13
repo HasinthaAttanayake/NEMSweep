@@ -9,14 +9,14 @@ internal static class ScenarioCommand
 {
     public static int Run(CliContext context)
     {
-        var settings = context.LoadSettings().Scenario;
-        return Run(context, settings, context.Paths.DispatchResultsPath);
+        string path = context.Paths.ResolveConfiguredPath(context.LoadSettings().DefaultScenarioPath);
+        return RunPublication(context, path);
     }
 
     public static int Run(CliContext context, string scenarioConfigPath)
     {
         string path = context.Paths.ResolveConfiguredPath(scenarioConfigPath);
-        return Run(context, path, context.Paths.DispatchResultsPath);
+        return RunPublication(context, path);
     }
 
     public static int Run(CliContext context, string scenarioConfigPath, string resultsPath)
@@ -25,12 +25,22 @@ internal static class ScenarioCommand
         return Run(context, LoadScenario(path), resultsPath);
     }
 
+    public static int Run(
+        CliContext context,
+        string scenarioConfigPath,
+        string resultsPath,
+        string regionFileNamePrefix)
+    {
+        string path = context.Paths.ResolveConfiguredPath(scenarioConfigPath);
+        return RunPublication(context, LoadScenario(path), resultsPath, regionFileNamePrefix);
+    }
+
     /// <summary>Reads a scenario config, attributing any failure to the input stage.</summary>
     private static ScenarioSettings LoadScenario(string path)
     {
         try
         {
-            return CliSettings.LoadScenario(path);
+            return ScenarioConfig.Load(path);
         }
         catch (Exception exception) when (exception
             is FormatException or IOException or JsonException or ArgumentException)
@@ -52,6 +62,81 @@ internal static class ScenarioCommand
             + $"{result.Scenario.Region}.");
         context.Output.WriteLine(
             $"Wrote scenario results to: {Path.GetFullPath(resultsPath)}");
+        return 0;
+    }
+
+    private static int RunPublication(CliContext context, string scenarioConfigPath)
+    {
+        ScenarioSettings settings = LoadScenario(scenarioConfigPath);
+        ScenarioDispatchResult dispatch = ScenarioRunner.RunForPublication(
+            settings,
+            context.Paths.SolutionRoot);
+        StorageSizingSettings sizing = settings.StorageSizing;
+        var sizingOptions = new NEM.Model.StorageSizing.StorageSizingOptions(
+            NEM.Model.Units.Power.FromMegawatts(sizing.MaximumPowerMw),
+            NEM.Model.Units.Energy.FromMegawattHours(sizing.MaximumEnergyMwh),
+            sizing.TargetUsePercentage,
+            sizing.MaximumPasses);
+        try
+        {
+            DispatchResultsExport.WritePublication(
+                new DispatchPublicationRequest(
+                    dispatch,
+                    sizingOptions,
+                    sizing.ReliabilityStandardName),
+                context.Paths.DispatchResultsPath);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            throw new ScenarioRunException(
+                SweepFailureStage.Export,
+                "resultsUnwritable",
+                exception.Message,
+                exception);
+        }
+
+        context.Output.WriteLine(
+            $"Dispatched {dispatch.SizingResult.Regions[0].DispatchOutcome.Demand.Length} hourly intervals for "
+            + $"{string.Join(", ", dispatch.PowerSystem.Regions.Select(region => region.RegionId))}.");
+        context.Output.WriteLine(
+            $"Wrote scenario results to: {Path.GetFullPath(context.Paths.DispatchResultsPath)}");
+        return 0;
+    }
+
+    private static int RunPublication(
+        CliContext context,
+        ScenarioSettings settings,
+        string resultsPath,
+        string regionFileNamePrefix)
+    {
+        ScenarioDispatchResult dispatch = ScenarioRunner.RunForPublication(
+            settings,
+            context.Paths.SolutionRoot);
+        StorageSizingSettings sizing = settings.StorageSizing;
+        var sizingOptions = new NEM.Model.StorageSizing.StorageSizingOptions(
+            NEM.Model.Units.Power.FromMegawatts(sizing.MaximumPowerMw),
+            NEM.Model.Units.Energy.FromMegawattHours(sizing.MaximumEnergyMwh),
+            sizing.TargetUsePercentage,
+            sizing.MaximumPasses);
+        try
+        {
+            DispatchResultsExport.WritePublication(
+                new DispatchPublicationRequest(
+                    dispatch,
+                    sizingOptions,
+                    sizing.ReliabilityStandardName,
+                    regionFileNamePrefix),
+                resultsPath);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            throw new ScenarioRunException(
+                SweepFailureStage.Export,
+                "resultsUnwritable",
+                exception.Message,
+                exception);
+        }
+
         return 0;
     }
 

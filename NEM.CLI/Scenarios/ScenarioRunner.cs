@@ -24,62 +24,174 @@ internal static class ScenarioRunner
         ScenarioSettings settings,
         string solutionRoot)
     {
-        string demandPath = Path.GetFullPath(settings.DemandFile, solutionRoot);
-        string weatherPath = Path.GetFullPath(settings.WeatherFile, solutionRoot);
-        LoadedInput<OperationalDemandData> demandInput = ReadInput(() => ReadDemand(demandPath));
-        OperationalDemandData demandData = demandInput.Value;
-        FlowSeries hourlyDemand = demandData.Demand.ResampleToHourly();
-        LoadedInput<WeatherDataDTO> weatherInput = ReadInput(() => ReadWeather(weatherPath));
-        WeatherDataDTO weatherData = weatherInput.Value;
-        RegionalResourceProfile resources = ReadInput(
-            () => ReadWeatherForTimeline(weatherData, hourlyDemand));
-        DomainScenario scenario = BuildScenario(settings, hourlyDemand);
-        if (scenario.Regions.Count != 1
-            || !string.Equals(
-                scenario.Regions[0].RegionId,
-                demandData.Region,
-                StringComparison.OrdinalIgnoreCase))
+        ScenarioDispatchResult dispatch = RunDispatch(settings, solutionRoot);
+        if (dispatch.Scenario.Regions.Count != 1)
         {
             throw new ScenarioRunException(
-                SweepFailureStage.Input,
-                "unsupportedRegionCount",
-                "The current scenario runner requires exactly one scenario region matching its demand input.");
+                SweepFailureStage.Export,
+                "multiRegionExportUnsupported",
+                "Dispatch results export currently supports exactly one scenario region.");
         }
 
-        IReadOnlyDictionary<string, IReadOnlyList<DemandComponent>>? additiveDemandComponents =
-            CreateDataCentreDemandComponents(settings, scenario);
+        StorageSizingSettings sizing = settings.StorageSizing;
+        StorageSizingOptions sizingOptions = CreateSizingOptions(sizing);
+        string regionId = dispatch.Scenario.Regions[0].RegionId;
+        LoadedInput<OperationalDemandData> demandInput = dispatch.DemandInputs[regionId];
+        LoadedInput<WeatherDataDTO> weatherInput = dispatch.WeatherInputs[regionId];
+
+        return DispatchResultsExport.Create(new DispatchExportRequest(
+            demandInput.Value,
+            demandInput.Artifact,
+            weatherInput.Artifact,
+            WeatherBasis.Create(weatherInput.Value),
+            dispatch.Scenario,
+            dispatch.SizingResult,
+            sizingOptions,
+            sizing.ReliabilityStandardName,
+            dispatch.CostBreakdown));
+    }
+
+    public static ScenarioDispatchResult RunForPublication(
+        ScenarioSettings settings,
+        string solutionRoot) =>
+        RunDispatch(settings, solutionRoot);
+
+    internal static ScenarioDispatchResult RunDispatch(
+        ScenarioSettings settings,
+        string solutionRoot)
+    {
+        RepositoryPaths paths = RepositoryPaths.Discover(solutionRoot);
+        string outputRoot = ResolveOutputRoot(paths, solutionRoot);
+        var demandInputs = new Dictionary<string, LoadedInput<OperationalDemandData>>(
+            StringComparer.OrdinalIgnoreCase);
+        var demandByRegion = new Dictionary<string, FlowSeries>(StringComparer.OrdinalIgnoreCase);
+        FlowSeries? scenarioTimeline = null;
+
+        foreach (ScenarioRegionSettings regionSettings in settings.Regions)
+        {
+            string demandPath = ResolveConfiguredPath(paths, outputRoot, regionSettings.DemandFile);
+            LoadedInput<OperationalDemandData> demandInput = ReadInput(() => ReadDemand(demandPath));
+            if (!string.Equals(
+                    demandInput.Value.Region,
+                    regionSettings.RegionId,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ScenarioRunException(
+                    SweepFailureStage.Input,
+                    "demandRegionMismatch",
+                    $"Demand artifact region '{demandInput.Value.Region}' does not match scenario region '{regionSettings.RegionId}'.");
+            }
+
+            FlowSeries hourlyDemand = demandInput.Value.Demand.ResampleToHourly();
+            if (scenarioTimeline is null)
+            {
+                scenarioTimeline = hourlyDemand;
+            }
+            else if (!SameTimeline(scenarioTimeline, hourlyDemand))
+            {
+                throw new ScenarioRunException(
+                    SweepFailureStage.Input,
+                    "demandTimelineMismatch",
+                    $"Demand timeline for region '{regionSettings.RegionId}' does not align with the other scenario regions.");
+            }
+
+            demandInputs.Add(regionSettings.RegionId, demandInput);
+            demandByRegion.Add(regionSettings.RegionId, hourlyDemand);
+        }
+
+        FlowSeries timeline = scenarioTimeline
+            ?? throw new ScenarioRunException(
+                SweepFailureStage.Input,
+                "missingScenarioRegions",
+                "Scenario must define at least one region.");
+        DomainScenario scenario = BuildScenario(settings, timeline);
+        var weatherInputs = new Dictionary<string, LoadedInput<WeatherDataDTO>>(
+            StringComparer.OrdinalIgnoreCase);
+        var resourcesByRegion = new Dictionary<string, RegionalResourceProfile?>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (ScenarioRegionSettings regionSettings in settings.Regions)
+        {
+            string weatherPath = ResolveConfiguredPath(paths, outputRoot, regionSettings.WeatherFile);
+            LoadedInput<WeatherDataDTO> weatherInput = ReadInput(() => ReadWeather(weatherPath));
+            if (!string.Equals(
+                    weatherInput.Value.RegionId,
+                    regionSettings.RegionId,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ScenarioRunException(
+                    SweepFailureStage.Input,
+                    "weatherRegionMismatch",
+                    $"Weather artifact region '{weatherInput.Value.RegionId}' does not match scenario region '{regionSettings.RegionId}'.");
+            }
+
+            resourcesByRegion.Add(
+                regionSettings.RegionId,
+                ReadInput(() => ReadWeatherForTimeline(
+                    weatherInput.Value,
+                    demandByRegion[regionSettings.RegionId])));
+            weatherInputs.Add(regionSettings.RegionId, weatherInput);
+        }
 
         PowerSystem powerSystem = ScenarioDerivation.Derive(
             scenario,
-            new Dictionary<string, FlowSeries>(StringComparer.OrdinalIgnoreCase)
-            {
-                [demandData.Region] = hourlyDemand,
-            },
-            new Dictionary<string, RegionalResourceProfile?>(StringComparer.OrdinalIgnoreCase)
-            {
-                [demandData.Region] = resources,
-            },
-            additiveDemandComponents);
-        StorageSizingSettings sizing = settings.StorageSizing;
-        var sizingOptions = new StorageSizingOptions(
+            demandByRegion,
+            resourcesByRegion,
+            CreateDataCentreDemandComponents(settings, scenario));
+        StorageSizingOptions sizingOptions = CreateSizingOptions(settings.StorageSizing);
+        StorageSizingRunResult sizingResult = Size(powerSystem, sizingOptions);
+        return new ScenarioDispatchResult(
+            scenario,
+            powerSystem,
+            sizingResult,
+            Cost(scenario, sizingResult),
+            demandInputs,
+            weatherInputs);
+    }
+
+    private static StorageSizingOptions CreateSizingOptions(StorageSizingSettings sizing) =>
+        new(
             Power.FromMegawatts(sizing.MaximumPowerMw),
             Energy.FromMegawattHours(sizing.MaximumEnergyMwh),
             sizing.TargetUsePercentage,
             sizing.MaximumPasses);
-        StorageSizingRunResult sizingResult = Size(powerSystem, sizingOptions);
-        PowerSystemCostBreakdown costBreakdown = Cost(scenario, sizingResult);
 
-        return DispatchResultsExport.Create(new DispatchExportRequest(
-            demandData,
-            demandInput.Artifact,
-            weatherInput.Artifact,
-            WeatherBasis.Create(weatherData),
-            scenario,
-            sizingResult,
-            sizingOptions,
-            sizing.ReliabilityStandardName,
-            costBreakdown));
+    private static string ResolveOutputRoot(RepositoryPaths paths, string solutionRoot)
+    {
+        string settingsDirectory = solutionRoot;
+        string settingsPath = Path.Combine(settingsDirectory, "appsettings.local.json");
+        if (!File.Exists(settingsPath)
+            && !File.Exists(Path.Combine(settingsDirectory, "appsettings.example.json")))
+        {
+            settingsDirectory = Path.Combine(solutionRoot, "NEM.CLI");
+            settingsPath = Path.Combine(settingsDirectory, "appsettings.local.json");
+        }
+
+        return File.Exists(settingsPath)
+            || File.Exists(Path.Combine(settingsDirectory, "appsettings.example.json"))
+            ? paths.ResolveConfiguredPath(CliSettings.Load(settingsDirectory).OutputRoot)
+            : solutionRoot;
     }
+
+    private static string ResolveConfiguredPath(
+        RepositoryPaths paths,
+        string outputRoot,
+        string configuredPath)
+    {
+        if (Path.IsPathRooted(configuredPath))
+        {
+            return Path.GetFullPath(configuredPath);
+        }
+
+        string outputPath = Path.GetFullPath(configuredPath, outputRoot);
+        return File.Exists(outputPath)
+            ? outputPath
+            : paths.ResolveConfiguredPath(configuredPath);
+    }
+
+    private static bool SameTimeline(FlowSeries first, FlowSeries second) =>
+        first.Start == second.Start
+        && first.Resolution == second.Resolution
+        && first.Length == second.Length;
 
     private static StorageSizingRunResult Size(
         PowerSystem powerSystem,
@@ -222,22 +334,32 @@ internal static class ScenarioRunner
     private static IReadOnlyDictionary<string, IReadOnlyList<DemandComponent>>?
         CreateDataCentreDemandComponents(ScenarioSettings settings, DomainScenario scenario)
     {
-        if (settings.DataCentreNameplateMw == 0)
+        if (settings.Regions.All(region => region.DataCentreNameplateMw == 0))
         {
             return null;
         }
 
         int intervalCount = checked((int)((scenario.PeriodEnd - scenario.PeriodStart).Ticks
             / HourlyResolution.Ticks));
-        FlowSeries demand = DataCentreDemand.Expand(
-            Power.FromMegawatts(settings.DataCentreNameplateMw),
-            scenario.PeriodStart,
-            HourlyResolution,
-            intervalCount);
-        return new Dictionary<string, IReadOnlyList<DemandComponent>>(StringComparer.OrdinalIgnoreCase)
+        var components = new Dictionary<string, IReadOnlyList<DemandComponent>>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (ScenarioRegionSettings region in settings.Regions)
         {
-            [scenario.Regions.Single().RegionId] = [new DemandComponent("Data centre", demand)],
-        };
+            if (region.DataCentreNameplateMw == 0)
+            {
+                components[region.RegionId] = [];
+                continue;
+            }
+
+            FlowSeries demand = DataCentreDemand.Expand(
+                Power.FromMegawatts(region.DataCentreNameplateMw),
+                scenario.PeriodStart,
+                HourlyResolution,
+                intervalCount);
+            components[region.RegionId] = [new DemandComponent("Data centre", demand)];
+        }
+
+        return components;
     }
 
     private static ScenarioGeneratingFleet CreateGeneratingFleet(
@@ -303,7 +425,7 @@ internal static class ScenarioRunner
                 storageFleetSettings.TechnologyProfile.RoundTripEfficiency));
     }
 
-    private static RegionalResourceProfile ReadWeatherForTimeline(
+    internal static RegionalResourceProfile ReadWeatherForTimeline(
         WeatherDataDTO weather,
         FlowSeries timeline)
     {
@@ -312,14 +434,18 @@ internal static class ScenarioRunner
             throw new FormatException("Scenario weather must use hourly resolution.");
         }
 
-        WeatherSeriesData source = weather.DataSeries;
-        int sourceLength = source.GlobalHorizontalRadiationWhPerSquareMetre.Length;
+        SolarWeatherData solar = weather.Solar;
+        WindWeatherData wind = weather.Wind;
+        int sourceLength = solar.GlobalHorizontalRadiationWhPerSquareMetre.Length;
         double[][] sourceSeries =
         [
-            source.DirectNormalRadiationWhPerSquareMetre,
-            source.DiffuseHorizontalRadiationWhPerSquareMetre,
-            source.DryBulbTemperatureDegreesCelsius,
-            source.WindSpeedMetresPerSecond,
+            solar.DirectNormalRadiationWhPerSquareMetre,
+            solar.DiffuseHorizontalRadiationWhPerSquareMetre,
+            solar.SolarZenithDegrees,
+            solar.DryBulbTemperatureDegreesCelsius,
+            solar.ProductionMegawattsAtOneMegawattAc,
+            wind.WindSpeedMetresPerSecond,
+            wind.ProductionMegawattsAtOneMegawattInstalled,
         ];
         if (sourceLength == 0 || sourceSeries.Any(values => values.Length != sourceLength))
         {
@@ -341,18 +467,24 @@ internal static class ScenarioRunner
         {
             DateTimeOffset instant = timeline.InstantAt(index);
             if (!indexesByCalendarHour.TryGetValue(
-                (instant.Month, instant.Day, instant.Hour),
-                out int sourceIndex))
+                    (instant.Month, instant.Day, instant.Hour),
+                    out int sourceIndex))
             {
-                throw new InvalidOperationException(
-                    $"Weather source has no typical-year value for {instant:MM-dd HH}:00.");
+                string reason = instant.Month == 2 && instant.Day == 29
+                    ? $"Weather source has no typical-year value for {instant:MM-dd HH}:00; "
+                        + "29 February is missing."
+                    : $"Weather source has no typical-year value for {instant:MM-dd HH}:00.";
+                throw new ScenarioRunException(
+                    SweepFailureStage.Input,
+                    "weatherMissingLeapDay",
+                    reason);
             }
 
-            globalHorizontalRadiation[index] = source.GlobalHorizontalRadiationWhPerSquareMetre[sourceIndex];
-            directNormalRadiation[index] = source.DirectNormalRadiationWhPerSquareMetre[sourceIndex];
-            diffuseHorizontalRadiation[index] = source.DiffuseHorizontalRadiationWhPerSquareMetre[sourceIndex];
-            dryBulbTemperature[index] = source.DryBulbTemperatureDegreesCelsius[sourceIndex];
-            windSpeed[index] = source.WindSpeedMetresPerSecond[sourceIndex];
+            globalHorizontalRadiation[index] = solar.GlobalHorizontalRadiationWhPerSquareMetre[sourceIndex];
+            directNormalRadiation[index] = solar.DirectNormalRadiationWhPerSquareMetre[sourceIndex];
+            diffuseHorizontalRadiation[index] = solar.DiffuseHorizontalRadiationWhPerSquareMetre[sourceIndex];
+            dryBulbTemperature[index] = solar.DryBulbTemperatureDegreesCelsius[sourceIndex];
+            windSpeed[index] = wind.WindSpeedMetresPerSecond[sourceIndex];
         }
 
         return new RegionalResourceProfile(
@@ -366,18 +498,26 @@ internal static class ScenarioRunner
                 timeline.Start,
                 HourlyResolution,
                 timeline.Length,
-                weather.Location.Latitude,
-                weather.Location.Longitude),
+                solar.Location.Latitude,
+                solar.Location.Longitude),
             TraceSeries.DryBulbTemperature(
                 timeline.Start, HourlyResolution, dryBulbTemperature),
             TraceSeries.WindSpeed(
                 timeline.Start,
                 HourlyResolution,
                 windSpeed,
-                weather.WindMeasurementHeightMetres));
+                wind.MeasurementHeightMetres));
     }
 }
 
 internal sealed record LoadedInput<T>(
     T Value,
     DispatchInputArtifactDTO Artifact);
+
+internal sealed record ScenarioDispatchResult(
+    DomainScenario Scenario,
+    PowerSystem PowerSystem,
+    StorageSizingRunResult SizingResult,
+    PowerSystemCostBreakdown CostBreakdown,
+    IReadOnlyDictionary<string, LoadedInput<OperationalDemandData>> DemandInputs,
+    IReadOnlyDictionary<string, LoadedInput<WeatherDataDTO>> WeatherInputs);

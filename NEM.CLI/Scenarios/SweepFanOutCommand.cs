@@ -42,7 +42,7 @@ internal static class SweepFanOutCommand
             JsonFile.WriteExact(config, outputPath);
             if (validateGeneratedConfigs)
             {
-                _ = CliSettings.LoadScenario(outputPath);
+                _ = ScenarioConfig.Load(outputPath);
             }
             context.Output.WriteLine($"Wrote scenario config: {Path.GetFullPath(outputPath)}");
         }

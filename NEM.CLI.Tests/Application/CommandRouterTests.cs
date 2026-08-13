@@ -52,6 +52,47 @@ public sealed class CommandRouterTests
         error.ToString().Should().StartWith("EPW header report failed:");
     }
 
+    [Theory]
+    [InlineData("scenario", "regionId", "demandFile", "weatherFile", "dataCentreNameplateMw")]
+    [InlineData("sweep", "overrides", "regions", "regionId", "$remove")]
+    public void DescribeSchema_WritesDeterministicStrictSchema(
+        string format,
+        params string[] expectedProperties)
+    {
+        using var fixture = new CliFixture();
+        using var firstOutput = new StringWriter();
+        using var firstError = new StringWriter();
+        using var secondOutput = new StringWriter();
+        var first = new CommandRouter(fixture.Paths, fixture.RootPath, firstOutput, firstError);
+        var second = new CommandRouter(fixture.Paths, fixture.RootPath, secondOutput, TextWriter.Null);
+
+        first.Run(["--describe-schema", format]).Should().Be(0);
+        second.Run(["--describe-schema", format]).Should().Be(0);
+
+        firstOutput.ToString().Should().Be(secondOutput.ToString());
+        using JsonDocument document = JsonDocument.Parse(firstOutput.ToString());
+        document.RootElement.GetProperty("additionalProperties").GetBoolean().Should().BeFalse();
+        foreach (string property in expectedProperties)
+        {
+            firstOutput.ToString().Should().Contain($"\"{property}\"");
+        }
+        firstError.ToString().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void DescribeSchema_RejectsMissingOrUnknownFormat()
+    {
+        using var fixture = new CliFixture();
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var application = new CommandRouter(fixture.Paths, fixture.RootPath, output, error);
+
+        application.Run(["--describe-schema"]).Should().Be(2);
+        application.Run(["--describe-schema", "contract"]).Should().Be(2);
+        error.ToString().Should().Contain("--describe-schema <scenario|sweep>");
+        output.ToString().Should().BeEmpty();
+    }
+
     [Fact]
     public void Settings_PreferLocalFileOverExample()
     {
@@ -61,9 +102,54 @@ public sealed class CommandRouterTests
 
         CliSettings settings = CliSettings.Load(fixture.RootPath);
 
-        settings.Scenario.Name.Should().Be("Local scenario");
-        settings.Scenario.Regions.Single().StorageFleets.Single().TechnologyProfile
-            .Should().Be(new StorageTechnologyProfileSettings(15u, 0.87));
+        settings.InputBundleRoot.Should().Be("NEM.CLI/data/nemsim-inputs");
+        settings.OutputRoot.Should().Be("NEM.Web/wwwroot/data");
+        settings.DefaultScenarioPath.Should().Be("scenarios/Local scenario.json");
+    }
+
+    [Fact]
+    public void RunScenario_WithoutPath_ResolvesConfiguredDefaultFromSolutionRoot()
+    {
+        using var fixture = new CliFixture();
+        fixture.WriteSettings("appsettings.local.json", "Local scenario");
+                Directory.CreateDirectory(Path.Combine(fixture.RootPath, "scenarios"));
+                File.WriteAllText(
+                        Path.Combine(fixture.RootPath, "scenarios", "Local scenario.json"),
+                        """
+                        {
+                            "schemaVersion": 1,
+                            "id": "test-scenario",
+                            "name": "Test scenario",
+                            "costBasis": { "year": 2026, "realDiscountRate": 0.07 },
+                            "storageSizing": { "maximumPowerMw": 100, "maximumEnergyMwh": 400 },
+                            "regions": [{
+                                "regionId": "NSW1",
+                                "demandFile": "missing-demand.json",
+                                "weatherFile": "missing-weather.json",
+                                "storageFleets": [{
+                                    "technology": "Battery",
+                                    "initialEnergyCapacityMwh": 0,
+                                    "initialPowerCapacityMw": 0,
+                                    "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 },
+                                    "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 }
+                                }],
+                                "generatingFleets": [{
+                                    "technology": "Gas",
+                                    "nameplateCapacityMw": 100,
+                                    "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 },
+                                    "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 }
+                                }]
+                            }]
+                        }
+                        """);
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var application = new CommandRouter(fixture.Paths, fixture.RootPath, output, error);
+
+        int exitCode = application.Run(["--run-scenario"]);
+
+        exitCode.Should().Be(1);
+        error.ToString().Should().Contain(Path.Combine(fixture.RootPath, "missing-demand.json"));
     }
 
     private sealed class CliFixture : IDisposable
@@ -84,76 +170,9 @@ public sealed class CommandRouterTests
         {
             var settings = new
             {
-                operationalDemand = new
-                {
-                    archiveDirectory = "NEM.CLI/data/demand-zips",
-                    region = "NSW1",
-                    periodStart = "2025-07-01T00:00:00+10:00",
-                },
-                scenario = new
-                {
-                    id = "test-scenario",
-                    name = scenarioName,
-                    demandFile = "demand.json",
-                    weatherFile = "weather.json",
-                    costBasis = new
-                    {
-                        year = 2026,
-                        realDiscountRate = 0.07,
-                    },
-                    storageSizing = new
-                    {
-                        maximumPowerMw = 100,
-                        maximumEnergyMwh = 400,
-                    },
-                    regions = new[]
-                    {
-                        new
-                        {
-                            regionId = "NSW1",
-                            storageFleets = new[]
-                            {
-                                new
-                                {
-                                    technology = "Battery",
-                                    initialEnergyCapacityMwh = 0,
-                                    initialPowerCapacityMw = 0,
-                                    costParameters = new
-                                    {
-                                        powerCapitalCostAudPerMw = 0m,
-                                        energyCapitalCostAudPerMwh = 0m,
-                                        fixedOperatingCostAudPerMwYear = 0m,
-                                    },
-                                    technologyProfile = new
-                                    {
-                                        technicalLifeYears = 15u,
-                                        roundTripEfficiency = 0.87,
-                                    },
-                                },
-                            },
-                            generatingFleets = new[]
-                            {
-                                new
-                                {
-                                    technology = "Gas",
-                                    nameplateCapacityMw = 100,
-                                    costParameters = new
-                                    {
-                                        capitalCostAudPerMw = 0m,
-                                        fixedOperatingCostAudPerMwYear = 0m,
-                                        variableOperatingCostAudPerMwh = 0m,
-                                        fuelPriceAudPerGj = 0m,
-                                    },
-                                    technologyProfile = new
-                                    {
-                                        heatRateGjPerMwh = 7,
-                                        technicalLifeYears = 30,
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
+                inputBundleRoot = "NEM.CLI/data/nemsim-inputs",
+                outputRoot = "NEM.Web/wwwroot/data",
+                defaultScenarioPath = $"scenarios/{scenarioName}.json",
             };
             File.WriteAllText(
                 Path.Combine(RootPath, fileName),

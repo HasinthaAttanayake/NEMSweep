@@ -7,7 +7,7 @@ namespace NEM.CLI.Tests.Scenarios;
 public sealed class SweepIndexContractTests
 {
     [Fact]
-    public void V4_RoundTripsWithExplicitUnitsAndUnavailableAchievedShares()
+    public void V4_RoundTripsWithExplicitUnitsAndAchievedShares()
     {
         var start = new DateTimeOffset(2025, 7, 1, 0, 0, 0, TimeSpan.FromHours(10));
         var weatherBasis = new WeatherBasisDTO(
@@ -46,8 +46,8 @@ public sealed class SweepIndexContractTests
                     87_600,
                     87_600,
                     90_000,
-                    null,
-                    null,
+                    0.7,
+                    0.6,
                     100,
                     400,
                     0,
@@ -67,7 +67,27 @@ public sealed class SweepIndexContractTests
                     10_000,
                     1),
                 new IntervalPointersDTO(null, 5, 12),
-                null)]);
+                null,
+                [new SweepPointRegionScalarsDTO(
+                    "NSW1",
+                    new SweepPointScalarResultsDTO(
+                        90m,
+                        70m,
+                        20m,
+                        87_600,
+                        87_600,
+                        90_000,
+                        0.7,
+                        0.6,
+                        100,
+                        400,
+                        0,
+                        0,
+                        0,
+                        1,
+                        0,
+                        10))],
+                [new SweepPointRegionDetailDTO("NSW1", "points/p0-nsw1.json")])]);
 
         string json = JsonSerializer.Serialize(index, new JsonSerializerOptions
         {
@@ -81,10 +101,12 @@ public sealed class SweepIndexContractTests
         json.Should().Contain("\"slcoeAudPerMwh\"");
         json.Should().Contain("\"storagePowerMw\"");
         json.Should().Contain("\"storageEnergyMwh\"");
-        json.Should().Contain("\"achievedRenewableShareGridScale\":null");
-        json.Should().Contain("\"achievedRenewableShareNative\":null");
+        json.Should().Contain("\"achievedRenewableShareGridScale\":0.7");
+        json.Should().Contain("\"achievedRenewableShareNative\":0.6");
         json.Should().Contain("\"status\":\"succeeded\"");
         json.Should().Contain("\"regionIds\"");
+        json.Should().Contain("\"regionScalars\"");
+        json.Should().Contain("\"regionDetails\"");
         json.Should().Contain("\"weatherBasis\"");
         json.Should().Contain("\"outcome\":\"notRequired\"");
         json.Should().Contain("\"unservedHours\"");

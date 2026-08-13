@@ -11,13 +11,19 @@ public static class ArtifactSchemaVersions
     public const int OperationalDemand = 2;
 
     /// <summary>Weather resources (<c>weather-data.json</c>).</summary>
-    public const int Weather = 5;
+    public const int Weather = 6;
 
     /// <summary>Generation information (<c>generation-information.json</c>).</summary>
     public const int GenerationInformation = 1;
 
     /// <summary>Dispatch results (<c>results.json</c> and each sweep point detail).</summary>
     public const int DispatchResults = 7;
+
+    /// <summary>Whole-system dispatch results artifact.</summary>
+    public const int SystemDispatchResults = 1;
+
+    /// <summary>Per-region dispatch results detail artifact.</summary>
+    public const int RegionDispatchResults = 1;
 
     /// <summary>Sweep index (<c>sweeps/{sweepId}/index.json</c>).</summary>
     public const int SweepIndex = 4;

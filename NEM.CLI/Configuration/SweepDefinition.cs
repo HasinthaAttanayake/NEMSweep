@@ -26,7 +26,7 @@ internal sealed record SweepDefinition(
 
         SweepDefinition definition = JsonSerializer.Deserialize<SweepDefinition>(
             File.ReadAllBytes(fullPath),
-            JsonFile.ReadOptions)
+            JsonFile.StrictReadOptions)
             ?? throw new FormatException($"Sweep definition '{path}' is empty.");
         definition.Validate(paths);
         return definition;

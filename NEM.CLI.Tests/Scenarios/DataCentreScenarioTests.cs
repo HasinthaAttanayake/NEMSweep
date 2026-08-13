@@ -57,20 +57,24 @@ public sealed class DataCentreScenarioTests
                     new Series(Enumerable.Repeat(10d, HoursPerYear).ToArray()))));
             File.WriteAllText(Path.Combine(RootPath, "weather.json"), JsonSerializer.Serialize(
                 new WeatherDataDTO(
-                    5,
-                    "test.epw",
-                    new WeatherLocation("Test", "00000", -33.9, 151.2),
+                    6,
+                    "NSW1",
                     start,
                     TimeSpan.FromHours(1),
-                    10,
-                    new WeatherSeriesData(
+                    new SolarWeatherData(
+                        "solar.epw",
+                        new WeatherLocation("Test", "00000", -33.9, 151.2),
                         zeroes,
                         zeroes,
                         zeroes,
                         Enumerable.Repeat(90d, HoursPerYear).ToArray(),
                         Enumerable.Repeat(20d, HoursPerYear).ToArray(),
+                        zeroes),
+                    new WindWeatherData(
+                        "wind.epw",
+                        new WeatherLocation("Test", "00000", -33.9, 151.2),
                         Enumerable.Repeat(5d, HoursPerYear).ToArray(),
-                        zeroes,
+                        10,
                         zeroes))));
             WriteScenario("baseline.json", string.Empty);
             WriteScenario("data-centre.json", ", \"dataCentreNameplateMw\": 1000");
@@ -97,7 +101,7 @@ public sealed class DataCentreScenarioTests
 
         private void WriteScenario(string fileName, string dataCentreProperty) => File.WriteAllText(
             Path.Combine(RootPath, "scenarios", fileName), $$"""
-            { "id": "{{Path.GetFileNameWithoutExtension(fileName)}}", "name": "Test", "demandFile": "demand.json", "weatherFile": "weather.json", "costBasis": { "year": 2026, "realDiscountRate": 0.07 }, "storageSizing": { "maximumPowerMw": 100, "maximumEnergyMwh": 400 }, "regions": [{ "regionId": "NSW1", "generatingFleets": [{ "technology": "Gas", "nameplateCapacityMw": 2000, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 } }], "storageFleets": [{ "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0, "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 }, "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 } }] }]{{dataCentreProperty}} }
+            { "schemaVersion": 1, "id": "{{Path.GetFileNameWithoutExtension(fileName)}}", "name": "Test", "costBasis": { "year": 2026, "realDiscountRate": 0.07 }, "storageSizing": { "maximumPowerMw": 100, "maximumEnergyMwh": 400 }, "regions": [{ "regionId": "NSW1", "demandFile": "demand.json", "weatherFile": "weather.json"{{dataCentreProperty}}, "generatingFleets": [{ "technology": "Gas", "nameplateCapacityMw": 2000, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 } }], "storageFleets": [{ "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0, "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 }, "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 } }] }] }
             """);
     }
 }

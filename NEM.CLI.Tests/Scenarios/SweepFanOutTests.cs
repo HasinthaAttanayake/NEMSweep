@@ -78,7 +78,7 @@ public sealed class SweepFanOutTests
         JsonObject config = JsonNode.Parse(first)!.AsObject();
         config["id"]!.GetValue<string>().Should().Be("test-sweep-p0");
         config["provenance"]!["sweepId"]!.GetValue<string>().Should().Be("test-sweep");
-        CliSettings.LoadScenario(path).Id.Should().Be("test-sweep-p0");
+        ScenarioConfig.Load(path).Id.Should().Be("test-sweep-p0");
     }
 
     [Fact]
@@ -107,17 +107,13 @@ public sealed class SweepFanOutTests
     }
 
     [Fact]
-    public void Run_ArrayOverrideRequiresTheCompleteFleetList()
+    public void Run_KeyedArrayOverride_MergesOnlyNamedFleets()
     {
         using var fixture = new SweepFixture();
         fixture.WriteDefinition("""
             [{ "pointId": "p1", "axisValue": 0.1, "label": "10% uplift", "overrides": {
-                "regions": [{ "regionId": "NSW1", "storageFleets": [{ "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0, "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 }, "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 } }], "generatingFleets": [
-                    { "technology": "Solar", "nameplateCapacityMw": 110, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 0, "technicalLifeYears": 30 } },
-                    { "technology": "Wind", "nameplateCapacityMw": 110, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 0, "technicalLifeYears": 25 } },
-                    { "technology": "Hydro", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 0, "technicalLifeYears": 80 } },
-                    { "technology": "Coal", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 4.175 }, "technologyProfile": { "heatRateGjPerMwh": 8.547, "technicalLifeYears": 30 } },
-                    { "technology": "Gas", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 15.313 }, "technologyProfile": { "heatRateGjPerMwh": 7.073, "technicalLifeYears": 30 } }
+                "regions": [{ "regionId": "NSW1", "generatingFleets": [
+                    { "technology": "Coal", "nameplateCapacityMw": 110 }
                 ] }]
             } }]
             """);
@@ -131,12 +127,9 @@ public sealed class SweepFanOutTests
             "configs",
             "p1.json")))!["regions"]![0]!["generatingFleets"]!.AsArray();
         fleets.Select(fleet => fleet!["technology"]!.GetValue<string>()).Should().Equal(
-            "Solar", "Wind", "Hydro", "Coal", "Gas");
+            "Coal", "Gas");
         fleets[0]!["nameplateCapacityMw"]!.GetValue<double>().Should().Be(110);
-        fleets[1]!["nameplateCapacityMw"]!.GetValue<double>().Should().Be(110);
-        fleets[2]!["nameplateCapacityMw"]!.GetValue<double>().Should().Be(100);
-        fleets[3]!["nameplateCapacityMw"]!.GetValue<double>().Should().Be(100);
-        fleets[4]!["nameplateCapacityMw"]!.GetValue<double>().Should().Be(100);
+        fleets[1]!["nameplateCapacityMw"]!.GetValue<double>().Should().Be(100);
     }
 
     private sealed class SweepFixture : IDisposable
@@ -149,11 +142,11 @@ public sealed class SweepFanOutTests
             File.WriteAllText(Path.Combine(RootPath, "NemSim.slnx"), string.Empty);
             File.WriteAllText(Path.Combine(RootPath, "scenarios", "baseline.json"), """
             {
-              "id": "baseline", "name": "Baseline", "demandFile": "demand.json", "weatherFile": "weather.json",
+              "schemaVersion": 1, "id": "baseline", "name": "Baseline",
               "costBasis": { "year": 2026, "realDiscountRate": 0.07 },
               "storageSizing": { "maximumPowerMw": 100, "maximumEnergyMwh": 400 },
               "regions": [{
-                                "regionId": "NSW1", "generatingFleets": [
+                                "regionId": "NSW1", "demandFile": "demand.json", "weatherFile": "weather.json", "generatingFleets": [
                                     { "technology": "Coal", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 4.175 }, "technologyProfile": { "heatRateGjPerMwh": 8.547, "technicalLifeYears": 30 } },
                                     { "technology": "Gas", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 15.313 }, "technologyProfile": { "heatRateGjPerMwh": 7.073, "technicalLifeYears": 30 } }
                                 ],
