@@ -33,9 +33,7 @@ public static class PowerSystemCostCalculator
         var outcomesByRegion = dispatchOutcomes.ToDictionary(
             outcome => outcome.RegionId,
             StringComparer.OrdinalIgnoreCase);
-        Money totalAnnualisedGenerationCost = Money.Zero;
-        Money totalAnnualisedStorageCost = Money.Zero;
-        Energy totalDeliveredEnergy = Energy.Zero;
+        var regionBreakdowns = new List<RegionCostBreakdown>();
 
         foreach (ScenarioRegion scenarioRegion in scenario.Regions)
         {
@@ -43,7 +41,7 @@ public static class PowerSystemCostCalculator
             var fleetsByTechnology = scenarioRegion.GeneratingFleets.ToDictionary(
                 fleet => fleet.Technology);
 
-            totalDeliveredEnergy += outcome.DeliveredToLoad.Integrate();
+            Money annualisedGenerationCost = Money.Zero;
             foreach ((GenerationTechnology technology, var generation) in outcome.PerFleetGeneration)
             {
                 ScenarioGeneratingFleet fleet = fleetsByTechnology[technology];
@@ -58,7 +56,7 @@ public static class PowerSystemCostCalculator
                 Money fuelCost = costs.FuelPrice.ForHeatRate(fleet.TechnologyProfile.HeatRate)
                     * generatedEnergy;
 
-                totalAnnualisedGenerationCost += annualisedCapex
+                annualisedGenerationCost += annualisedCapex
                     + fixedOpex
                     + variableOpex
                     + fuelCost;
@@ -71,6 +69,7 @@ public static class PowerSystemCostCalculator
                     StringComparison.OrdinalIgnoreCase));
             var storagePlansByTechnology = scenarioRegion.StorageFleets.ToDictionary(
                 fleet => fleet.Technology);
+            Money annualisedStorageCost = Money.Zero;
             foreach (StorageFleet storageFleet in systemRegion.StorageFleets)
             {
                 ScenarioStorageFleet storagePlan = storagePlansByTechnology[
@@ -86,16 +85,31 @@ public static class PowerSystemCostCalculator
                     storageFleet.PowerCapacity,
                     years: 1);
 
-                totalAnnualisedStorageCost += annualisedCapex + fixedOpex;
+                annualisedStorageCost += annualisedCapex + fixedOpex;
             }
+
+            regionBreakdowns.Add(new RegionCostBreakdown(
+                scenarioRegion.RegionId,
+                annualisedGenerationCost,
+                annualisedStorageCost,
+                outcome.DeliveredToLoad.Integrate()));
+        }
+
+        Money totalAnnualisedGenerationCost = Money.Zero;
+        Money totalAnnualisedStorageCost = Money.Zero;
+        Energy totalDeliveredEnergy = Energy.Zero;
+        foreach (RegionCostBreakdown region in regionBreakdowns)
+        {
+            totalAnnualisedGenerationCost += region.AnnualisedGenerationCost;
+            totalAnnualisedStorageCost += region.AnnualisedStorageCost;
+            totalDeliveredEnergy += region.DeliveredEnergy;
         }
 
         return new PowerSystemCostBreakdown(
-            totalAnnualisedGenerationCost.Per(totalDeliveredEnergy),
             totalAnnualisedGenerationCost,
-            totalAnnualisedStorageCost.Per(totalDeliveredEnergy),
             totalAnnualisedStorageCost,
-            totalDeliveredEnergy);
+            totalDeliveredEnergy,
+            regionBreakdowns);
     }
 
     private static void ValidateCorrespondence(

@@ -33,6 +33,8 @@ public sealed record DispatchOutcome
     public IReadOnlyDictionary<GenerationTechnology, FlowSeries> PerFleetCharge { get; }
     /// <summary>Total regional demand.</summary>
     public FlowSeries Demand { get; }
+    /// <summary>Demand before additive components, used as the native-demand denominator.</summary>
+    public FlowSeries NativeDemand { get; }
     /// <summary>Demand served by generation, storage discharge, and imports.</summary>
     public FlowSeries DeliveredToLoad { get; }
     /// <summary>Total storage charging.</summary>
@@ -51,6 +53,8 @@ public sealed record DispatchOutcome
     public IReadOnlyDictionary<StorageTechnology, StockSeries> StateOfChargeByTechnology { get; }
     /// <summary>Reliability measures calculated from <see cref="Unserved"/> and <see cref="Demand"/>.</summary>
     public ReliabilityMetrics Reliability { get; }
+    /// <summary>Delivered-generation renewable shares calculated from typed fleet technologies.</summary>
+    public RenewableShareMetrics RenewableShare { get; }
     private DemandProfile? DemandProfile { get; }
 
     public DispatchOutcome(
@@ -127,6 +131,7 @@ public sealed record DispatchOutcome
             new Dictionary<GenerationTechnology, FlowSeries>(perFleetCharge));
         DemandProfile = demandProfile;
         Demand = demand;
+        NativeDemand = demandProfile?.BaseDemand ?? demand;
         Unserved = unserved;
         DeliveredToLoad = Demand.Subtract(Unserved);
         Charge = charge;
@@ -140,6 +145,7 @@ public sealed record DispatchOutcome
 
         Validate();
         Reliability = ReliabilityMetrics.FromOutcome(this);
+        RenewableShare = RenewableShareMetrics.FromOutcome(this);
     }
 
     private static FlowSeries SumFlows(IEnumerable<FlowSeries> flows, FlowSeries timeline)
