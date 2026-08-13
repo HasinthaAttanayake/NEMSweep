@@ -149,6 +149,15 @@
         get
         {
             int resized = _sizing.Count(outcome => outcome.Outcome == StorageSizingOutcome.Resized);
+            int energyLimited = _sizing.Count(outcome =>
+                outcome.Outcome == StorageSizingOutcome.EnergyLimited);
+            if (energyLimited > 0)
+            {
+                return energyLimited == 1
+                    ? "1 energy-limited"
+                    : $"{energyLimited} energy-limited";
+            }
+
             return resized switch
             {
                 0 => "Not required",
@@ -163,6 +172,32 @@
         get
         {
             int resized = _sizing.Count(outcome => outcome.Outcome == StorageSizingOutcome.Resized);
+            StorageSizingOutcomeDTO[] energyLimited = _sizing
+                .Where(outcome => outcome.Outcome == StorageSizingOutcome.EnergyLimited)
+                .ToArray();
+            if (energyLimited.Length > 0)
+            {
+                double[] shortfallsGwh = energyLimited
+                    .Where(outcome => outcome.EnergyLimitedEvidence is not null)
+                    .Select(outcome => outcome.EnergyLimitedEvidence!.ShortfallEnergyGwh)
+                    .ToArray();
+                if (shortfallsGwh.Length == 0)
+                {
+                    return $"Additional generation is required on {energyLimited.Length} completed "
+                        + (energyLimited.Length == 1 ? "run." : "runs.");
+                }
+
+                double smallestShortfallGwh = shortfallsGwh.Min();
+                double largestShortfallGwh = shortfallsGwh.Max();
+                string shortfall = smallestShortfallGwh == largestShortfallGwh
+                    ? $"{SweepValueFormat.Short(smallestShortfallGwh)} GWh"
+                    : $"{SweepValueFormat.Short(smallestShortfallGwh)} to "
+                        + $"{SweepValueFormat.Short(largestShortfallGwh)} GWh";
+                return $"Additional generation is required: system generation shortfall is {shortfall} "
+                    + $"across {energyLimited.Length} completed "
+                    + (energyLimited.Length == 1 ? "run." : "runs.");
+            }
+
             if (resized == 0)
             {
                 double energy = _sizing[0].FinalEnergyMwh;

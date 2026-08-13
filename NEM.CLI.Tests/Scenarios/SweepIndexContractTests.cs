@@ -7,7 +7,7 @@ namespace NEM.CLI.Tests.Scenarios;
 public sealed class SweepIndexContractTests
 {
     [Fact]
-    public void V2_RoundTripsWithExplicitUnitsAndUnavailableAchievedShares()
+    public void V4_RoundTripsWithExplicitUnitsAndUnavailableAchievedShares()
     {
         var start = new DateTimeOffset(2025, 7, 1, 0, 0, 0, TimeSpan.FromHours(10));
         var weatherBasis = new WeatherBasisDTO(
@@ -31,7 +31,7 @@ public sealed class SweepIndexContractTests
                 true,
                 new string('a', 64),
                 [new SweepInputFileDTO("demand.json", "demand-data", new string('b', 64))],
-                new Dictionary<string, int> { ["dispatchResults"] = 4 }),
+                new Dictionary<string, int> { ["dispatchResults"] = ArtifactSchemaVersions.DispatchResults }),
             [new SweepIndexPointDTO(
                 "p0",
                 "Baseline",

@@ -26,14 +26,14 @@
       "scalars": {
         "achievedRenewableShareGridScale": null,
         "achievedRenewableShareNative": null,
-        "curtailedEnergyMwh": 598490.7,
+        "curtailedEnergyMwh": 604829.8,
         "deliveredGenerationMwh": 66282328.1,
         "demandMwh": 66275989,
         "energyServedMwh": 66275989,
         "generationSlcoeAudPerMwh": 167.36,
         "hoursServedFraction": 1,
         "peakUnservedPowerMw": 0,
-        "slcoeAudPerMwh": 170.55,
+        "slcoeAudPerMwh": 170.56,
         "storageEnergyMwh": 5515,
         "storagePowerMw": 940,
         "storageSlcoeAudPerMwh": 3.19,
@@ -43,6 +43,7 @@
       },
       "status": "succeeded",
       "storageSizing": {
+        "energyLimitedEvidence": null,
         "finalEnergyMwh": 5515,
         "finalPowerMw": 940,
         "initialEnergyMwh": 5515,
@@ -74,11 +75,11 @@
       "scalars": {
         "achievedRenewableShareGridScale": null,
         "achievedRenewableShareNative": null,
-        "curtailedEnergyMwh": 985120.9,
+        "curtailedEnergyMwh": 991460,
         "deliveredGenerationMwh": 66282328.1,
         "demandMwh": 66275989,
         "energyServedMwh": 66275989,
-        "generationSlcoeAudPerMwh": 168.94,
+        "generationSlcoeAudPerMwh": 168.95,
         "hoursServedFraction": 1,
         "peakUnservedPowerMw": 0,
         "slcoeAudPerMwh": 172.14,
@@ -91,6 +92,7 @@
       },
       "status": "succeeded",
       "storageSizing": {
+        "energyLimitedEvidence": null,
         "finalEnergyMwh": 5515,
         "finalPowerMw": 940,
         "initialEnergyMwh": 5515,
@@ -122,11 +124,11 @@
       "scalars": {
         "achievedRenewableShareGridScale": null,
         "achievedRenewableShareNative": null,
-        "curtailedEnergyMwh": 1503182,
+        "curtailedEnergyMwh": 1509521.1,
         "deliveredGenerationMwh": 66282328.1,
         "demandMwh": 66275989,
         "energyServedMwh": 66275989,
-        "generationSlcoeAudPerMwh": 170.61,
+        "generationSlcoeAudPerMwh": 170.62,
         "hoursServedFraction": 1,
         "peakUnservedPowerMw": 0,
         "slcoeAudPerMwh": 173.81,
@@ -139,6 +141,7 @@
       },
       "status": "succeeded",
       "storageSizing": {
+        "energyLimitedEvidence": null,
         "finalEnergyMwh": 5515,
         "finalPowerMw": 940,
         "initialEnergyMwh": 5515,
@@ -170,11 +173,11 @@
       "scalars": {
         "achievedRenewableShareGridScale": null,
         "achievedRenewableShareNative": null,
-        "curtailedEnergyMwh": 2149637.2,
+        "curtailedEnergyMwh": 2155976.3,
         "deliveredGenerationMwh": 66282328.1,
         "demandMwh": 66275989,
         "energyServedMwh": 66275989,
-        "generationSlcoeAudPerMwh": 172.35,
+        "generationSlcoeAudPerMwh": 172.36,
         "hoursServedFraction": 1,
         "peakUnservedPowerMw": 0,
         "slcoeAudPerMwh": 175.55,
@@ -187,6 +190,7 @@
       },
       "status": "succeeded",
       "storageSizing": {
+        "energyLimitedEvidence": null,
         "finalEnergyMwh": 5515,
         "finalPowerMw": 940,
         "initialEnergyMwh": 5515,
@@ -218,7 +222,7 @@
       "scalars": {
         "achievedRenewableShareGridScale": null,
         "achievedRenewableShareNative": null,
-        "curtailedEnergyMwh": 2917558,
+        "curtailedEnergyMwh": 2923897,
         "deliveredGenerationMwh": 66282328.1,
         "demandMwh": 66275989,
         "energyServedMwh": 66275989,
@@ -235,6 +239,7 @@
       },
       "status": "succeeded",
       "storageSizing": {
+        "energyLimitedEvidence": null,
         "finalEnergyMwh": 5515,
         "finalPowerMw": 940,
         "initialEnergyMwh": 5515,
@@ -247,7 +252,7 @@
     }
   ],
   "provenance": {
-    "gitCommitSha": "d66a9625b82a65b4d18168a8f50c6c93e9e46f1e",
+    "gitCommitSha": "8687a80007147299e4488e14d212f8f1ddc6e815",
     "inputFiles": [
       {
         "path": "NEM.Web/wwwroot/data/demand-data.json",
@@ -267,21 +272,21 @@
       {
         "path": "sweeps/renewable-penetration-nsw1-fy2026.json",
         "purpose": "sweep-definition",
-        "sha256": "2127d5affe233dee26c15c6c4a5768247e85c0f33800424c06300e6a03b76f1d"
+        "sha256": "72396b9f3556d80eac6fd59567d2f2b1c796053c0f38e9ca18701c08ae6d68fb"
       }
     ],
     "resolvedDefinitionSha256": "0483aabf2097acb8647eefdacf812f5ef12b17fd8fc9a56d05be6f1b09631586",
     "schemaVersions": {
-      "dispatchResults": 5,
+      "dispatchResults": 7,
       "operationalDemand": 2,
       "regularSeries": 1,
       "sweepDefinition": 1,
-      "sweepIndex": 2,
+      "sweepIndex": 4,
       "weather": 5
     },
     "workingTreeDirty": false
   },
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "scope": {
     "periodEnd": "2026-07-01T00:00:00\u002B10:00",
     "periodStart": "2025-07-01T00:00:00\u002B10:00",

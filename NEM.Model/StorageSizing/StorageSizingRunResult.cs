@@ -16,7 +16,8 @@ public sealed class StorageSizingRunResult
         IReadOnlyList<InstalledBatteryAssessment> installedBatteryAssessments,
         int dispatchPassCount,
         StorageSizingStatus status,
-        string terminationEvidence)
+        string terminationEvidence,
+        EnergyLimitedAssessment? energyLimitedAssessment = null)
     {
         ArgumentNullException.ThrowIfNull(powerSystem);
         ArgumentNullException.ThrowIfNull(regions);
@@ -37,6 +38,14 @@ public sealed class StorageSizingRunResult
         if (dispatchPassCount < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(dispatchPassCount));
+        }
+
+        if (energyLimitedAssessment is not null
+            && energyLimitedAssessment.PowerSystemId != powerSystem.Id)
+        {
+            throw new ArgumentException(
+                "Energy-limited assessment must describe the result power system.",
+                nameof(energyLimitedAssessment));
         }
 
         var systemRegionsById = powerSystem.Regions.ToDictionary(
@@ -95,6 +104,7 @@ public sealed class StorageSizingRunResult
         DispatchPassCount = dispatchPassCount;
         Status = status;
         TerminationEvidence = terminationEvidence;
+        EnergyLimitedAssessment = energyLimitedAssessment;
     }
 
     /// <summary>Final candidate power system evaluated by the search.</summary>
@@ -109,4 +119,9 @@ public sealed class StorageSizingRunResult
     public StorageSizingStatus Status { get; }
     /// <summary>Human-readable evidence explaining the terminal status.</summary>
     public string TerminationEvidence { get; }
+    /// <summary>
+    /// Whole-system generation-availability evidence when the result is energy-limited; otherwise
+    /// null.
+    /// </summary>
+    public EnergyLimitedAssessment? EnergyLimitedAssessment { get; }
 }

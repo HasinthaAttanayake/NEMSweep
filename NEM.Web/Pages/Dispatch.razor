@@ -307,15 +307,26 @@
             </div>
             <div>
                 <span>Storage sizing</span>
-                <strong>@(_result.StorageSizing.Outcome == StorageSizingOutcome.NotRequired ? "Not required" : "Resized")</strong>
-                <small>
-                    @_result.StorageSizing.InitialEnergyMwh.ToString("N0") MWh /
-                    @_result.StorageSizing.InitialPowerMw.ToString("N0") MW →
-                    @_result.StorageSizing.FinalEnergyMwh.ToString("N0") MWh /
-                    @_result.StorageSizing.FinalPowerMw.ToString("N0") MW
-                    · ceiling @_result.StorageSizing.MaximumEnergyMwh.ToString("N0") MWh
-                    · @_result.StorageSizing.PassesUsed dispatch @(_result.StorageSizing.PassesUsed == 1 ? "pass" : "passes")
-                </small>
+                <strong>@SizingLabel(_result.StorageSizing)</strong>
+                @if (_result.StorageSizing.EnergyLimitedEvidence is { } evidence)
+                {
+                    <small>
+                        @evidence.ShortfallEnergyGwh.ToString("N3") GWh system generation shortfall
+                        · @evidence.BindingIntervalIndices.Length binding @(
+                            evidence.BindingIntervalIndices.Length == 1 ? "hour" : "hours")
+                    </small>
+                }
+                else
+                {
+                    <small>
+                        @_result.StorageSizing.InitialEnergyMwh.ToString("N0") MWh /
+                        @_result.StorageSizing.InitialPowerMw.ToString("N0") MW →
+                        @_result.StorageSizing.FinalEnergyMwh.ToString("N0") MWh /
+                        @_result.StorageSizing.FinalPowerMw.ToString("N0") MW
+                        · ceiling @_result.StorageSizing.MaximumEnergyMwh.ToString("N0") MWh
+                        · @_result.StorageSizing.PassesUsed dispatch @(_result.StorageSizing.PassesUsed == 1 ? "pass" : "passes")
+                    </small>
+                }
             </div>
         </section>
 
@@ -452,6 +463,18 @@
         : string.Empty;
 
     /// <summary>Unserved-energy figures are small fractions of a percent; fixed decimals round them away.</summary>
+    private static string SizingLabel(StorageSizingOutcomeDTO sizing) => sizing.Outcome switch
+    {
+        StorageSizingOutcome.NotRequired => "Not required",
+        StorageSizingOutcome.Resized => "Resized",
+        StorageSizingOutcome.EnergyLimited => "Energy-limited",
+        StorageSizingOutcome.StorageNoLongerImprovesReliability =>
+            "Storage no longer improves reliability",
+        StorageSizingOutcome.BatteryCapacityLimitReached => "Battery capacity limit reached",
+        StorageSizingOutcome.PassLimitReached => "Pass limit reached",
+        _ => "Unknown",
+    };
+
     private static string FormatUsePercentage(double value) => value == 0
         ? "0%"
         : $"{value.ToString(value >= 0.01 ? "N2" : "G3", CultureInfo.CurrentCulture)}%";

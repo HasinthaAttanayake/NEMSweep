@@ -18,7 +18,7 @@ namespace NEM.CLI.Tests.Scenarios;
 public sealed class DispatchResultsContractTests
 {
     [Fact]
-    public void V5_RoundTripsWithVersionAndExplicitUnits()
+    public void V7_RoundTripsWithVersionAndExplicitUnits()
     {
         var start = new DateTimeOffset(2025, 7, 1, 0, 0, 0, TimeSpan.FromHours(10));
         var result = new DispatchResultsDTO(
@@ -74,7 +74,8 @@ public sealed class DispatchResultsContractTests
                 60,
                 100_000,
                 10_000,
-                3),
+                3,
+                new EnergyLimitedEvidenceDTO(10, 12, 2, [4, 7])),
             new DispatchCostDTO("calculated", 1000m, 200m, 1200m, 10m, 2m, 12m));
 
         string json = JsonSerializer.Serialize(result, new JsonSerializerOptions
@@ -86,7 +87,7 @@ public sealed class DispatchResultsContractTests
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
         roundTripped.Should().BeEquivalentTo(result);
-        roundTripped!.SchemaVersion.Should().Be(5);
+        roundTripped!.SchemaVersion.Should().Be(7);
         json.Should().Contain("\"baseDemandMw\"");
         json.Should().Contain("\"additiveComponentsByNameMw\"");
         json.Should().Contain("\"totalDemandMw\"");
@@ -109,7 +110,20 @@ public sealed class DispatchResultsContractTests
         json.Should().Contain("\"achievedUsePercentageOfDemand\"");
         json.Should().Contain("\"withinTarget\"");
         json.Should().Contain("\"outcome\":\"resized\"");
+        json.Should().Contain("\"energyLimitedEvidence\"");
+        json.Should().Contain("\"shortfallEnergyGwh\"");
+        json.Should().Contain("\"bindingIntervalIndices\"");
         json.Should().Contain("\"peakUnservedIntervalIndex\"");
+    }
+
+    [Fact]
+    public void StorageSizingOutcome_StorageNoLongerImprovesReliability_RoundTripsAsAString()
+    {
+        string json = JsonSerializer.Serialize(StorageSizingOutcome.StorageNoLongerImprovesReliability);
+
+        json.Should().Be("\"storageNoLongerImprovesReliability\"");
+        JsonSerializer.Deserialize<StorageSizingOutcome>(json)
+            .Should().Be(StorageSizingOutcome.StorageNoLongerImprovesReliability);
     }
 
     [Fact]
@@ -263,7 +277,7 @@ public sealed class DispatchResultsContractTests
             "NEM reliability standard",
             PowerSystemCostCalculator.Calculate(scenario, powerSystem, [outcome])));
 
-        result.SchemaVersion.Should().Be(5);
+        result.SchemaVersion.Should().Be(7);
         result.DataSeries.DeliveredGenerationByTechnologyMw["Coal"].Take(2)
             .Should().Equal(120, 50);
         result.DataSeries.DeliveredGenerationByTechnologyMw["Gas"].Take(2)

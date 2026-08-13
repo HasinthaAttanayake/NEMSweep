@@ -29,11 +29,11 @@ public sealed class SweepRunTests
         File.Exists(fixture.PointResultPath("p0")).Should().BeTrue();
         File.Exists(fixture.PointResultPath("p1")).Should().BeTrue();
         JsonNode.Parse(File.ReadAllText(fixture.PointResultPath("p1")))!["schemaVersion"]!
-            .GetValue<int>().Should().Be(5);
+            .GetValue<int>().Should().Be(ArtifactSchemaVersions.DispatchResults);
         Status(fixture, "p0")["status"]!.GetValue<string>().Should().Be("succeeded");
         Status(fixture, "p1")["status"]!.GetValue<string>().Should().Be("succeeded");
         JsonObject index = ReadIndex(fixture);
-        index["schemaVersion"]!.GetValue<int>().Should().Be(2);
+        index["schemaVersion"]!.GetValue<int>().Should().Be(ArtifactSchemaVersions.SweepIndex);
         index["points"]!.AsArray().Should().HaveCount(2);
         JsonObject firstPoint = index["points"]![0]!.AsObject();
         firstPoint["status"]!.GetValue<string>().Should().Be("succeeded");

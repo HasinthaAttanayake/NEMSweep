@@ -7,17 +7,21 @@ namespace NEM.Model.StorageSizing;
 internal sealed class StorageSizingSearch
 {
     private static readonly TimeSpan MinimumDuration = TimeSpan.FromHours(4);
+    private const double ReliabilityImprovementToleranceMwh = 0.001;
 
     private readonly PowerSystem _installedPowerSystem;
     private readonly StorageSizingOptions _options;
     private readonly IReadOnlyDictionary<string, StorageFleet?> _installedBatteryByRegion;
+    private readonly EnergyLimitedAssessment _energyLimitedAssessment;
     private readonly HashSet<string> _changedRegions = new(StringComparer.OrdinalIgnoreCase);
     private PowerSystem _candidate;
     private PowerSystem _lastDispatchedCandidate;
     private IReadOnlyList<DispatchOutcome> _outcomes = [];
     private IReadOnlyList<InstalledBatteryAssessment> _installedBatteryAssessments = [];
 
-    public StorageSizingSearch(PowerSystem powerSystem, StorageSizingOptions options)
+    public StorageSizingSearch(
+        PowerSystem powerSystem,
+        StorageSizingOptions options)
     {
         _installedPowerSystem = powerSystem;
         _options = options;
@@ -27,6 +31,7 @@ internal sealed class StorageSizingSearch
             region => region.RegionId,
             FindBattery,
             StringComparer.OrdinalIgnoreCase);
+        _energyLimitedAssessment = EnergyLimitedAssessment.Assess(powerSystem);
     }
 
     public int DispatchPassCount { get; private set; }
@@ -92,6 +97,16 @@ internal sealed class StorageSizingSearch
                 return null;
             }
 
+            if (_energyLimitedAssessment.IsEnergyLimited)
+            {
+                return CreateResult(
+                    _candidate,
+                    StorageSizingStatus.EnergyLimited,
+                    $"Available generation is {_energyLimitedAssessment.ShortfallEnergy.MegawattHours:F3} MWh "
+                    + "below total demand over the dispatch period.",
+                    _energyLimitedAssessment);
+            }
+
             StorageSizingRunResult? failure = GrowFailingRegions(failingOutcomes);
             if (failure is not null)
             {
@@ -116,16 +131,56 @@ internal sealed class StorageSizingSearch
                 continue;
             }
 
-            Region? grown = Grow(region, outcome.Reliability);
-            if (grown is null)
+            Region[] growthCandidates = GrowthCandidates(region);
+            if (growthCandidates.Length == 0)
             {
+                int firstUnservedIndex = Enumerable.Range(0, outcome.Unserved.Length)
+                    .First(index => outcome.Unserved[index] > Power.Zero);
                 return CreateResult(
                     _candidate,
                     StorageSizingStatus.BatteryCapacityLimitReached,
-                    $"The Battery capacity bounds are insufficient for region {region.RegionId}.");
+                    $"The Battery capacity bounds are insufficient for region {region.RegionId}: "
+                    + $"{BatterySizingDescription(region)} reached; "
+                    + $"{outcome.Reliability.UnservedEnergy.MegawattHours:F3} MWh remains unserved "
+                    + $"across {outcome.Reliability.UnservedHours} hours, first at "
+                    + $"{outcome.Unserved.InstantAt(firstUnservedIndex):O}; peak shortfall is "
+                    + $"{outcome.Reliability.PeakUnservedPower.Megawatts:F3} MW.");
             }
 
-            nextRegions.Add(grown);
+            var probes = new List<GrowthProbe>(growthCandidates.Length);
+            foreach (Region growthCandidate in growthCandidates)
+            {
+                PowerSystem probeSystem = ReplaceRegion(_candidate, growthCandidate);
+                if (!TryDispatch(probeSystem, out IReadOnlyList<DispatchOutcome> probeOutcomes))
+                {
+                    return CreateResult(
+                        _candidate,
+                        StorageSizingStatus.PassLimitReached,
+                        "The dispatch pass limit was reached while testing larger Battery candidates.");
+                }
+
+                probes.Add(new GrowthProbe(
+                    growthCandidate,
+                    probeOutcomes.Single(candidate => string.Equals(
+                        candidate.RegionId,
+                        region.RegionId,
+                        StringComparison.OrdinalIgnoreCase)).Reliability));
+            }
+
+            GrowthProbe? bestProbe = probes
+                .Where(probe => MateriallyImproves(outcome.Reliability, probe.Reliability))
+                .OrderBy(probe => probe.Reliability.UnservedEnergy)
+                .ThenBy(probe => probe.Reliability.PeakUnservedPower)
+                .FirstOrDefault();
+            if (bestProbe is null)
+            {
+                return CreateResult(
+                    _candidate,
+                    StorageSizingStatus.StorageNoLongerImprovesReliability,
+                    StagnationEvidence(region, outcome.Reliability, probes));
+            }
+
+            nextRegions.Add(bestProbe.Region);
             _changedRegions.Add(region.RegionId);
         }
 
@@ -133,7 +188,7 @@ internal sealed class StorageSizingSearch
         return null;
     }
 
-    private Region? Grow(Region region, ReliabilityMetrics reliability)
+    private Region[] GrowthCandidates(Region region)
     {
         StorageFleet? battery = FindBattery(region);
         Power minimumPower = Power.FromMegawatts(StorageSizingOptions.MinimumPowerMw);
@@ -147,48 +202,46 @@ internal sealed class StorageSizingSearch
             Energy energy = Energy.Max(
                 Energy.Max(minimumEnergy, battery?.StorageCapacity ?? Energy.Zero),
                 power * MinimumDuration);
-            if (power > _options.MaximumPower || energy > _options.MaximumEnergy)
-            {
-                return null;
-            }
-
-            return region.WithBatteryStorage(energy, power);
+            return power > _options.MaximumPower || energy > _options.MaximumEnergy
+                ? []
+                : [region.WithBatteryStorage(energy, power)];
         }
 
         Power currentPower = battery.PowerCapacity;
         Energy currentEnergy = battery.StorageCapacity;
-        double energyPressure = reliability.UnservedEnergy / currentEnergy;
-        double powerPressure = reliability.PeakUnservedPower / currentPower;
-
-        if (energyPressure >= powerPressure)
-        {
-            Energy grownEnergy = Energy.Min(currentEnergy * 2, _options.MaximumEnergy);
-            if (grownEnergy > currentEnergy)
-            {
-                return region.WithBatteryStorage(grownEnergy, currentPower);
-            }
-        }
-
         Power maximumPowerAtDuration = _options.MaximumEnergy / MinimumDuration;
         Power grownPower = Power.Min(
             currentPower * 2,
             Power.Min(_options.MaximumPower, maximumPowerAtDuration));
+        Energy grownEnergy = Energy.Min(currentEnergy * 2, _options.MaximumEnergy);
+        var candidates = new List<Region>();
+        if (grownEnergy > currentEnergy)
+        {
+            candidates.Add(region.WithBatteryStorage(grownEnergy, currentPower));
+        }
+
         if (grownPower > currentPower)
         {
-            Energy grownEnergy = Energy.Max(currentEnergy, grownPower * MinimumDuration);
-            return region.WithBatteryStorage(grownEnergy, grownPower);
+            candidates.Add(region.WithBatteryStorage(
+                Energy.Max(currentEnergy, grownPower * MinimumDuration),
+                grownPower));
         }
 
-        if (energyPressure < powerPressure)
+        if (grownEnergy > currentEnergy && grownPower > currentPower)
         {
-            Energy grownEnergy = Energy.Min(currentEnergy * 2, _options.MaximumEnergy);
-            if (grownEnergy > currentEnergy)
-            {
-                return region.WithBatteryStorage(grownEnergy, currentPower);
-            }
+            candidates.Add(region.WithBatteryStorage(
+                Energy.Max(grownEnergy, grownPower * MinimumDuration),
+                grownPower));
         }
 
-        return null;
+        return candidates
+            .GroupBy(candidate =>
+            {
+                StorageFleet candidateBattery = RequireBattery(candidate);
+                return (candidateBattery.PowerCapacity, candidateBattery.StorageCapacity);
+            })
+            .Select(group => group.First())
+            .ToArray();
     }
 
     private bool RefinePower(string regionId, double minimumPowerMw)
@@ -281,10 +334,35 @@ internal sealed class StorageSizingSearch
     private bool MeetsTarget(DispatchOutcome outcome) =>
         outcome.Reliability.UnservedEnergyPercentageOfDemand <= _options.TargetUsePercentage;
 
+    private static bool MateriallyImproves(
+        ReliabilityMetrics current,
+        ReliabilityMetrics probe) =>
+        probe.UnservedEnergy.MegawattHours
+            < current.UnservedEnergy.MegawattHours - ReliabilityImprovementToleranceMwh;
+
+    private static string StagnationEvidence(
+        Region region,
+        ReliabilityMetrics current,
+        IReadOnlyList<GrowthProbe> probes) =>
+        $"Larger Battery candidates did not materially reduce unserved energy for region "
+        + $"{region.RegionId}: {current.UnservedEnergy.MegawattHours:F3} MWh remains unserved "
+        + $"across {current.UnservedHours} hours with a peak shortfall of "
+        + $"{current.PeakUnservedPower.Megawatts:F3} MW. Tested "
+        + string.Join(", ", probes.Select(probe => BatterySizingDescription(probe.Region)))
+        + ".";
+
+    private static string BatterySizingDescription(Region region)
+    {
+        StorageFleet? battery = FindBattery(region);
+        return $"{(battery?.PowerCapacity.Megawatts ?? 0):F0} MW / "
+            + $"{(battery?.StorageCapacity.MegawattHours ?? 0):F0} MWh";
+    }
+
     private StorageSizingRunResult CreateResult(
         PowerSystem powerSystem,
         StorageSizingStatus status,
-        string evidence)
+        string evidence,
+        EnergyLimitedAssessment? energyLimitedAssessment = null)
     {
         var outcomeByRegion = _outcomes.ToDictionary(
             outcome => outcome.RegionId,
@@ -308,7 +386,8 @@ internal sealed class StorageSizingSearch
             _installedBatteryAssessments,
             DispatchPassCount,
             status,
-            evidence);
+            evidence,
+            energyLimitedAssessment);
     }
 
     private RegionalSizingResult CreateRegionalResult(
@@ -323,6 +402,13 @@ internal sealed class StorageSizingSearch
         Power powerCapacity = battery?.PowerCapacity ?? Power.Zero;
         bool meetsTarget = MeetsTarget(outcome);
 
+        StorageSizingStatus status = meetsTarget
+            ? StorageSizingStatus.TargetMet
+            : runStatus;
+        string evidence = meetsTarget
+            ? "The region meets its USE target."
+            : runEvidence;
+
         return new RegionalSizingResult(
             outcome,
             new RegionalBatterySizing(
@@ -332,8 +418,8 @@ internal sealed class StorageSizingSearch
                 energyCapacity != installedCapacity.EnergyCapacity
                     || powerCapacity != installedCapacity.PowerCapacity),
             meetsTarget,
-            meetsTarget ? StorageSizingStatus.TargetMet : runStatus,
-            meetsTarget ? "The region meets its USE target." : runEvidence);
+            status,
+            evidence);
     }
 
     private IReadOnlyList<InstalledBatteryAssessment> AssessInstalledBattery(
@@ -366,9 +452,18 @@ internal sealed class StorageSizingSearch
             fleet => fleet.StorageTechnology == StorageTechnology.Battery);
 
     private static StorageFleet RequireBattery(PowerSystem powerSystem, string regionId) =>
-        FindBattery(powerSystem.Regions.Single(
-            region => string.Equals(region.RegionId, regionId, StringComparison.OrdinalIgnoreCase)))
-        ?? throw new InvalidOperationException($"Region {regionId} has no Battery fleet to refine.");
+        RequireBattery(powerSystem.Regions.Single(
+            region => string.Equals(region.RegionId, regionId, StringComparison.OrdinalIgnoreCase)));
+
+    private static StorageFleet RequireBattery(Region region) =>
+        FindBattery(region)
+        ?? throw new InvalidOperationException($"Region {region.RegionId} has no Battery fleet to refine.");
+
+    private static PowerSystem ReplaceRegion(PowerSystem powerSystem, Region replacement) =>
+        powerSystem.WithRegions(powerSystem.Regions.Select(region =>
+            string.Equals(region.RegionId, replacement.RegionId, StringComparison.OrdinalIgnoreCase)
+                ? replacement
+                : region).ToArray());
 
     private static PowerSystem ReplaceBattery(
         PowerSystem powerSystem,
@@ -379,4 +474,6 @@ internal sealed class StorageSizingSearch
             string.Equals(region.RegionId, regionId, StringComparison.OrdinalIgnoreCase)
                 ? region.WithBatteryStorage(energy, power)
                 : region).ToArray());
+
+    private sealed record GrowthProbe(Region Region, ReliabilityMetrics Reliability);
 }

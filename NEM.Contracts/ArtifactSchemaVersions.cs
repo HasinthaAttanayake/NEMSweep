@@ -17,10 +17,10 @@ public static class ArtifactSchemaVersions
     public const int GenerationInformation = 1;
 
     /// <summary>Dispatch results (<c>results.json</c> and each sweep point detail).</summary>
-    public const int DispatchResults = 5;
+    public const int DispatchResults = 7;
 
     /// <summary>Sweep index (<c>sweeps/{sweepId}/index.json</c>).</summary>
-    public const int SweepIndex = 2;
+    public const int SweepIndex = 4;
 
     /// <summary>Sweep manifest (<c>sweeps/index.json</c>).</summary>
     public const int SweepManifest = 1;

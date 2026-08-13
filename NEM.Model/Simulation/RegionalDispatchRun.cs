@@ -22,7 +22,9 @@ internal sealed class RegionalDispatchRun
     private readonly double[] _unservedMw;
     private readonly double[] _dischargeMw;
 
-    public RegionalDispatchRun(Region region, IStoragePolicy storagePolicy)
+    public RegionalDispatchRun(
+        Region region,
+        IStoragePolicy storagePolicy)
     {
         _region = region;
         _storagePolicy = storagePolicy;

@@ -1055,7 +1055,10 @@ namespace NEM.Model.Tests.Simulation
                 ? Dispatcher.Dispatch(PowerSystem(region))
                 : Dispatcher.Dispatch(PowerSystem(region), storagePolicy)).Single();
 
-        private static DispatchOutcome RandomizedStorageOutcome(int seed)
+        private static DispatchOutcome RandomizedStorageOutcome(int seed) =>
+            Dispatch(RandomizedStorageRegion(seed));
+
+        private static Region RandomizedStorageRegion(int seed)
         {
             var random = new Random(seed);
             double[] demandValues = Enumerable.Range(0, 96)
@@ -1075,7 +1078,7 @@ namespace NEM.Model.Tests.Simulation
                 resourceProfile: RegionalResources(demand),
                 storageFleets: [Battery(storageCapacityMwh: 60, powerCapacityMw: 20)]);
 
-            return Dispatch(region);
+            return region;
         }
 
         private static PowerSystem PowerSystem(params Region[] regions) =>

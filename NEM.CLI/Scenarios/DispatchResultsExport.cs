@@ -127,17 +127,41 @@ internal static class DispatchResultsExport
                 regionalSizing.BatterySizing.RegionId,
                 StringComparison.OrdinalIgnoreCase));
         return new StorageSizingOutcomeDTO(
-            regionalSizing.BatterySizing.WasChanged
-                ? StorageSizingOutcome.Resized
-                : StorageSizingOutcome.NotRequired,
+            OutcomeFor(regionalSizing),
             installed.BatteryCapacity.EnergyCapacity.MegawattHours,
             installed.BatteryCapacity.PowerCapacity.Megawatts,
             regionalSizing.BatterySizing.EnergyCapacity.MegawattHours,
             regionalSizing.BatterySizing.PowerCapacity.Megawatts,
             request.SizingOptions.MaximumEnergy.MegawattHours,
             request.SizingOptions.MaximumPower.Megawatts,
-            request.SizingResult.DispatchPassCount);
+            request.SizingResult.DispatchPassCount,
+            EvidenceFor(request.SizingResult.EnergyLimitedAssessment));
     }
+
+    private static StorageSizingOutcome OutcomeFor(RegionalSizingResult regionalSizing) =>
+        regionalSizing.Status switch
+        {
+            StorageSizingStatus.TargetMet => regionalSizing.BatterySizing.WasChanged
+                ? StorageSizingOutcome.Resized
+                : StorageSizingOutcome.NotRequired,
+            StorageSizingStatus.EnergyLimited => StorageSizingOutcome.EnergyLimited,
+            StorageSizingStatus.StorageNoLongerImprovesReliability =>
+                StorageSizingOutcome.StorageNoLongerImprovesReliability,
+            StorageSizingStatus.BatteryCapacityLimitReached =>
+                StorageSizingOutcome.BatteryCapacityLimitReached,
+            StorageSizingStatus.PassLimitReached => StorageSizingOutcome.PassLimitReached,
+            _ => throw new ArgumentOutOfRangeException(nameof(regionalSizing)),
+        };
+
+    private static EnergyLimitedEvidenceDTO? EvidenceFor(
+        EnergyLimitedAssessment? assessment) =>
+        assessment is null
+            ? null
+            : new EnergyLimitedEvidenceDTO(
+                assessment.AvailableEnergy.MegawattHours / 1_000,
+                assessment.DemandEnergy.MegawattHours / 1_000,
+                assessment.ShortfallEnergy.MegawattHours / 1_000,
+                assessment.BindingIntervalIndices.ToArray());
 
     private static IntervalPointersDTO CreateIntervalPointers(DispatchOutcome outcome) =>
         new(

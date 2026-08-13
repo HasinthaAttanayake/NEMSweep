@@ -13,6 +13,14 @@
     { "pointId": "p5", "axisValue": 2500, "label": "+2,500 MW", "overrides": { "dataCentreNameplateMw": 2500 } },
     { "pointId": "p6", "axisValue": 3000, "label": "+3,000 MW", "overrides": { "dataCentreNameplateMw": 3000 } },
     { "pointId": "p7", "axisValue": 3500, "label": "+3,500 MW", "overrides": { "dataCentreNameplateMw": 3500 } },
-    { "pointId": "p8", "axisValue": 4000, "label": "+4,000 MW", "overrides": { "dataCentreNameplateMw": 4000 } }
+    { "pointId": "p8", "axisValue": 4000, "label": "+4,000 MW", "overrides": { "dataCentreNameplateMw": 4000 } },
+    { "pointId": "p9", "axisValue": 4500, "label": "+4,500 MW", "overrides": { "dataCentreNameplateMw": 4500 } },
+    { "pointId": "p10", "axisValue": 5000, "label": "+5,000 MW", "overrides": { "dataCentreNameplateMw": 5000 } },
+    { "pointId": "p11", "axisValue": 5500, "label": "+5,500 MW", "overrides": { "dataCentreNameplateMw": 5500 } },
+    { "pointId": "p12", "axisValue": 6000, "label": "+6,000 MW", "overrides": { "dataCentreNameplateMw": 6000 } },
+    { "pointId": "p13", "axisValue": 6500, "label": "+6,500 MW", "overrides": { "dataCentreNameplateMw": 6500 } },
+    { "pointId": "p14", "axisValue": 7000, "label": "+7,000 MW", "overrides": { "dataCentreNameplateMw": 7000 } },
+    { "pointId": "p15", "axisValue": 7500, "label": "+7,500 MW", "overrides": { "dataCentreNameplateMw": 7500 } },
+    { "pointId": "p16", "axisValue": 8000, "label": "+8,000 MW", "overrides": { "dataCentreNameplateMw": 8000 } }
   ]
 }

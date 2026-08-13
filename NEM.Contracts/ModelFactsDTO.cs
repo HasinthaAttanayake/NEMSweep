@@ -28,7 +28,20 @@ public sealed record StorageSizingOutcomeDTO(
     double FinalPowerMw,
     double MaximumEnergyMwh,
     double MaximumPowerMw,
-    int PassesUsed);
+    int PassesUsed,
+    EnergyLimitedEvidenceDTO? EnergyLimitedEvidence = null);
+
+/// <summary>
+/// System-wide evidence that storage cannot meet the reliability target because available
+/// generation energy is below demand energy over the dispatch period. Energies are expressed in
+/// GWh; interval indices identify hours where total available generation power is below total
+/// demand power.
+/// </summary>
+public sealed record EnergyLimitedEvidenceDTO(
+    double AvailableEnergyGwh,
+    double DemandEnergyGwh,
+    double ShortfallEnergyGwh,
+    int[] BindingIntervalIndices);
 
 /// <summary>Closed set of storage sizing outcomes an emitted artifact can carry.</summary>
 [JsonConverter(typeof(JsonStringEnumConverter<StorageSizingOutcome>))]
@@ -41,6 +54,28 @@ public enum StorageSizingOutcome
     /// <summary>The sizing loop grew the storage fleet to meet the reliability target.</summary>
     [JsonStringEnumMemberName("resized")]
     Resized,
+
+    /// <summary>
+    /// Available generation energy is below demand energy, so additional generation rather than
+    /// additional storage is required.
+    /// </summary>
+    [JsonStringEnumMemberName("energyLimited")]
+    EnergyLimited,
+
+    /// <summary>
+    /// Every feasible larger Battery power, energy, and combined-growth probe failed to materially
+    /// reduce unserved energy before the configured capacity limits were reached.
+    /// </summary>
+    [JsonStringEnumMemberName("storageNoLongerImprovesReliability")]
+    StorageNoLongerImprovesReliability,
+
+    /// <summary>The configured Battery capacity limit was reached before the target was met.</summary>
+    [JsonStringEnumMemberName("batteryCapacityLimitReached")]
+    BatteryCapacityLimitReached,
+
+    /// <summary>The configured dispatch-pass limit was reached before the target was met.</summary>
+    [JsonStringEnumMemberName("passLimitReached")]
+    PassLimitReached,
 }
 
 /// <summary>
