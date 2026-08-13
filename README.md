@@ -58,6 +58,7 @@ the [domain model](docs/domain-model.md).
 | `Demand` | Operational-demand import, validation, and export |
 | `Weather` | EPW parsing, provenance analysis, diagnostics, and weather export |
 | `Generation` | Generation-information workbook import and export |
+| `Ingest` | Input-bundle validation and coordinated artifact ingestion |
 | `Scenarios` | Scenario input adaptation, dispatch orchestration, and result export |
 
 `NEM.CLI.Tests` mirrors the same feature folders.
@@ -97,10 +98,29 @@ selected Battery capacity. Treat a runtime above a few minutes as a scope issue
 to record rather than an automatic optimisation task.
 
 Copy `NEM.CLI/appsettings.example.json` to
-`NEM.CLI/appsettings.local.json` for machine-local scenario settings. The local
-file is ignored by Git; the example is used as the fallback when it is absent.
+`NEM.CLI/appsettings.local.json` for machine-local input and output paths. The
+local file is ignored by Git; the example is used as the fallback when it is
+absent. Scenario content is kept in the tracked `scenarios` directory, and
+`defaultScenarioPath` selects the scenario used by `--run-scenario` without an
+argument.
 Scenario results record the schema version and SHA-256 digest of the exact
 demand and weather artifact bytes used by the run.
+
+Validate an input bundle without writing any artifacts:
+
+```powershell
+dotnet run --project .\NEM.CLI\NEM.CLI.csproj -- --validate-inputs
+dotnet run --project .\NEM.CLI\NEM.CLI.csproj -- --validate-inputs .\path\to\input-bundle
+```
+
+Ingest a validated input bundle into the configured `outputRoot`. Ingestion
+first performs the same complete validation and writes nothing when validation
+fails:
+
+```powershell
+dotnet run --project .\NEM.CLI\NEM.CLI.csproj -- --ingest
+dotnet run --project .\NEM.CLI\NEM.CLI.csproj -- --ingest .\path\to\input-bundle
+```
 
 Regenerate the committed dispatch artifact from the committed demand and weather
 inputs with:
@@ -128,4 +148,12 @@ Run all points in a sweep definition with:
 ```powershell
 dotnet run --project .\NEM.CLI\NEM.CLI.csproj -- `
   --run-sweep .\sweeps\datacentre-nameplate-nsw1-fy2026.json
+```
+
+Print the deterministic JSON Schema for either supported input format to
+standard output with:
+
+```powershell
+dotnet run --project .\NEM.CLI\NEM.CLI.csproj -- --describe-schema scenario
+dotnet run --project .\NEM.CLI\NEM.CLI.csproj -- --describe-schema sweep
 ```
