@@ -14,9 +14,20 @@
         <ScopeContent>
             @if (_result is not null)
             {
-                <ScopeLine Region="@RegionName(_result.Scenario.Region)"
+                <ScopeLine Region="@ScopeLabel"
                            Period="@ArtifactPeriod"
                            Resolution="@ResolutionLabel" />
+                @if (_systemResult is not null && _systemResult.RegionIds.Length > 0)
+                {
+                    <MudSelect T="string" Label="View scope" Value="@(_selectedRegionId ?? string.Empty)"
+                               ValueChanged="OnRegionChanged" Variant="Variant.Outlined" Class="view-select">
+                        <MudSelectItem T="string" Value="@string.Empty">NEM system</MudSelectItem>
+                        @foreach (string regionId in _systemResult.RegionIds)
+                        {
+                            <MudSelectItem T="string" Value="@regionId">@RegionName(regionId)</MudSelectItem>
+                        }
+                    </MudSelect>
+                }
                 @if (_runContext is not null)
                 {
                     <p class="run-axis">@_runContext.Sweep.Axis.Label: @_runContext.Point.Label (@_runContext.Point.AxisValue.ToString("N0") @_runContext.Sweep.Axis.Unit)</p>
@@ -30,7 +41,7 @@
                 @if (_runContext is not null)
                 {
                     <nav class="run-navigation" aria-label="Sweep run navigation">
-                        <a href="@SweepPaths.PageRoute(_runContext.Sweep.SweepId)">All runs in this sweep</a>
+                        <a href="@SweepPageRoute">All runs in this sweep</a>
                         @if (_runContext.PreviousPoint is not null)
                         {
                             <a href="@RunRoute(_runContext.PreviousPoint)">Previous</a>
@@ -118,7 +129,7 @@
                 <div>
                     <p class="section-label">Full financial year</p>
                     <h2 id="system-cost-heading">System cost</h2>
-                    <p>Annualised generation and storage asset costs per MWh served in @RegionName(_result.Scenario.Region).</p>
+                    <p>Annualised generation and storage asset costs per MWh served in @ScopeLabel.</p>
                 </div>
                 <span class="cost-status">@_result.Cost.Status</span>
             </div>
@@ -341,12 +352,12 @@
                 <small>@_result.Metrics.UnservedHours unserved hours · @_result.Metrics.UnservedEnergyMwh.ToString("N0") MWh USE</small>
             </div>
         </section>
-        <ProvenanceFooter RunDate="@_result.GeneratedAt"
+        <ProvenanceFooter
                           CommitSha="@SweepCommitSha"
                           CommitUrl="@SweepCommitUrl"
                           IsDirty="@SweepWorkingTreeDirty"
                           Inputs="@ProvenanceInputs"
-                          Region="@RegionName(_result.Scenario.Region)"
+                          Region="@ScopeLabel"
                           Period="@ArtifactPeriod"
                           Resolution="@ResolutionLabel" />
         @if (_runContext is not null)
@@ -382,6 +393,9 @@
 
     private ArtifactLoadState _loadState = ArtifactLoadState.Loading();
     private DispatchResultsDTO? _result;
+    private SystemDispatchResultsDTO? _systemResult;
+    private string? _selectedRegionId;
+    private string? _selectedRegionDetailPath;
     private DispatchRunContext? _runContext;
     private DispatchComparison? _comparison;
     private string? _comparisonMessage;
@@ -421,6 +435,9 @@
     [SupplyParameterFromQuery(Name = "compare")]
     public string? CompareId { get; set; }
 
+    [SupplyParameterFromQuery(Name = "region")]
+    public string? RegionQuery { get; set; }
+
     /// <summary>Every other point in the sweep that has a detail artifact to draw.</summary>
     private IReadOnlyList<SweepIndexPointDTO> ComparablePoints => _runContext is null
         ? []
@@ -431,6 +448,9 @@
             .ToArray();
 
     private bool IsRunRoute => !string.IsNullOrWhiteSpace(SweepId) || !string.IsNullOrWhiteSpace(PointId);
+    private string SweepPageRoute => string.IsNullOrWhiteSpace(RegionQuery)
+        ? SweepPaths.PageRoute(_runContext!.Sweep.SweepId)
+        : $"{SweepPaths.PageRoute(_runContext!.Sweep.SweepId)}?region={Uri.EscapeDataString(RegionQuery)}";
     private string PageTitleText => _runContext is null ? "Dispatch" : _runContext.Sweep.Name;
     private string PageEyebrow => _runContext is null ? "Merit-order simulation" : "Sweep run";
 
@@ -479,6 +499,7 @@
         ? "0%"
         : $"{value.ToString(value >= 0.01 ? "N2" : "G3", CultureInfo.CurrentCulture)}%";
 
+    private string ScopeLabel => _selectedRegionId is null ? "NEM system" : RegionName(_selectedRegionId);
     private string ArtifactPeriod => $"{_result!.Scenario.PeriodStart:dd MMM yyyy} to {_result.Scenario.PeriodEnd.AddTicks(-1):dd MMM yyyy}";
     private string ResolutionLabel => $"{_result!.Scenario.Resolution.TotalHours:N0}-hour intervals";
 
@@ -486,6 +507,9 @@
     {
         _loadState = ArtifactLoadState.Loading();
         _result = null;
+        _systemResult = null;
+        _selectedRegionId = null;
+        _selectedRegionDetailPath = null;
         _runContext = null;
         _comparison = null;
         _comparisonMessage = null;
@@ -499,14 +523,15 @@
                 return;
             }
 
-            ArtifactLoadResult<DispatchResultsDTO> loadResult = await ArtifactLoader.LoadAsync<DispatchResultsDTO>("data/results.json");
+            ArtifactLoadResult<SystemDispatchResultsDTO> loadResult = await ArtifactLoader.LoadAsync<SystemDispatchResultsDTO>("data/results.json");
             if (!loadResult.IsSuccess)
             {
                 _loadState = loadResult.State;
                 return;
             }
 
-            await InitialiseResultAsync(loadResult.Value!, null, loadResult.State);
+            _systemResult = loadResult.Value!;
+            await InitialiseResultAsync(ToEvidence(_systemResult), null, loadResult.State);
         }
         catch (Exception exception)
         {
@@ -542,7 +567,7 @@
             return;
         }
 
-        ArtifactLoadResult<DispatchResultsDTO> detailResult = await ArtifactLoader.LoadAsync<DispatchResultsDTO>(context.DetailArtifactPath);
+        ArtifactLoadResult<SystemDispatchResultsDTO> detailResult = await ArtifactLoader.LoadAsync<SystemDispatchResultsDTO>(context.DetailArtifactPath);
         if (!detailResult.IsSuccess)
         {
             _loadState = detailResult.State.Status == ArtifactLoadStatus.NotFound
@@ -551,9 +576,16 @@
             return;
         }
 
-        await InitialiseResultAsync(detailResult.Value!, context, detailResult.State);
+        _systemResult = detailResult.Value!;
+        await InitialiseResultAsync(ToEvidence(_systemResult), context, detailResult.State);
         if (_loadState.Status == ArtifactLoadStatus.Success)
         {
+            if (!string.IsNullOrWhiteSpace(RegionQuery)
+                && RegionDetailPath(context.Point, RegionQuery) is not null)
+            {
+                await OnRegionChanged(RegionQuery);
+            }
+
             await LoadComparisonAsync(context);
         }
     }
@@ -579,15 +611,19 @@
             return;
         }
 
-        ArtifactLoadResult<DispatchResultsDTO> detail =
-            await ArtifactLoader.LoadAsync<DispatchResultsDTO>(comparisonContext.DetailArtifactPath);
+        ArtifactLoadResult<SystemDispatchResultsDTO> detail =
+            await ArtifactLoader.LoadAsync<SystemDispatchResultsDTO>(comparisonContext.DetailArtifactPath);
         if (!detail.IsSuccess)
         {
             _comparisonMessage = "The run selected for comparison could not be loaded.";
             return;
         }
 
-        DispatchResultsDTO? comparison = await ResolveBaseDemandAsync(detail.Value!, comparisonContext);
+        DispatchResultsDTO? comparison = await LoadSelectedEvidenceAsync(
+            detail.Value!,
+            comparisonContext,
+            _selectedRegionId,
+            RegionDetailPath(comparisonContext.Point, _selectedRegionId));
         if (comparison is null)
         {
             _comparisonMessage = "The run selected for comparison is missing its base demand series.";
@@ -605,16 +641,17 @@
     private void OnComparisonChanged(string pointId) => Navigation.NavigateTo(
         string.IsNullOrEmpty(pointId)
             ? RunPath(_runContext!.Point)
-            : $"{RunPath(_runContext!.Point)}?compare={Uri.EscapeDataString(pointId)}");
+            : AddQuery(RunPath(_runContext!.Point), "compare", pointId));
 
     private async Task InitialiseResultAsync(
         DispatchResultsDTO result,
         DispatchRunContext? context,
-        ArtifactLoadState successState)
+        ArtifactLoadState successState,
+        string? artifactPath = null)
     {
         if (context is not null)
         {
-            DispatchResultsDTO? resolved = await ResolveBaseDemandAsync(result, context);
+            DispatchResultsDTO? resolved = await ResolveBaseDemandAsync(result, context, artifactPath);
             if (resolved is null)
             {
                 _loadState = ArtifactLoadState.InvalidData("Sweep point base demand series is missing or does not match the dispatch period.");
@@ -698,14 +735,17 @@
     /// </summary>
     private async Task<DispatchResultsDTO?> ResolveBaseDemandAsync(
         DispatchResultsDTO result,
-        DispatchRunContext context)
+        DispatchRunContext? context,
+        string? artifactPath = null)
     {
         if (result.DataSeries.Demand.BaseDemandMw is not null)
         {
             return result;
         }
 
-        string? seriesPath = context.ResolveReferencedArtifactPath(result.DataSeries.Demand.BaseDemandSeriesPath);
+        string? seriesPath = context is not null
+            ? context.ResolveReferencedArtifactPath(result.DataSeries.Demand.BaseDemandSeriesPath, artifactPath)
+            : ResolveDataArtifactPath(result.DataSeries.Demand.BaseDemandSeriesPath, artifactPath);
         if (seriesPath is null)
         {
             return null;
@@ -739,6 +779,134 @@
         };
     }
 
+    private static string? ResolveDataArtifactPath(string? reference, string? originPath)
+    {
+        if (string.IsNullOrWhiteSpace(reference) || string.IsNullOrWhiteSpace(originPath))
+        {
+            return null;
+        }
+
+        Uri origin = new("https://artifact.invalid/");
+        Uri sourceUri = new(origin, originPath);
+        if (!Uri.TryCreate(sourceUri, reference, out Uri? referenceUri)
+            || !referenceUri.Host.Equals(origin.Host, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        string path = referenceUri.AbsolutePath.TrimStart('/');
+        return path.StartsWith("data/", StringComparison.Ordinal) ? path : null;
+    }
+
+    private async Task OnRegionChanged(string regionId)
+    {
+        string? selectedRegionId = string.IsNullOrEmpty(regionId) ? null : regionId;
+        if (_systemResult is null || string.Equals(_selectedRegionId, selectedRegionId, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _selectedRegionId = selectedRegionId;
+        _selectedRegionDetailPath = selectedRegionId is null
+            ? null
+            : _runContext is null
+                ? _systemResult.RegionSummariesById.GetValueOrDefault(selectedRegionId)?.DetailPath
+                : RegionDetailPath(_runContext.Point, selectedRegionId);
+        if (selectedRegionId is null)
+        {
+            await InitialiseResultAsync(ToEvidence(_systemResult), _runContext, new(ArtifactLoadStatus.Success, null));
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_selectedRegionDetailPath))
+        {
+            _loadState = ArtifactLoadState.InvalidData($"Regional detail for {selectedRegionId} is missing.");
+            return;
+        }
+
+        string systemPath = _runContext?.DetailArtifactPath ?? "data/results.json";
+        string regionPath = _runContext is null
+            ? $"data/{_selectedRegionDetailPath}"
+            : $"{_runContext.SweepRootPath}/{_selectedRegionDetailPath}";
+        ArtifactLoadResult<SystemRegionArtifactPair> pair = await ArtifactLoader.LoadSystemWithRegionAsync(systemPath, regionPath);
+        if (!pair.IsSuccess)
+        {
+            _loadState = pair.State;
+            return;
+        }
+
+        await InitialiseResultAsync(
+            ToEvidence(pair.Value!.Region),
+            _runContext,
+            pair.State,
+            regionPath);
+    }
+
+    private async Task<DispatchResultsDTO?> LoadSelectedEvidenceAsync(
+        SystemDispatchResultsDTO system,
+        DispatchRunContext context,
+        string? regionId,
+        string? regionDetailPath)
+    {
+        if (regionId is null)
+        {
+            return ToEvidence(system);
+        }
+
+        if (string.IsNullOrWhiteSpace(regionDetailPath))
+        {
+            return null;
+        }
+
+        ArtifactLoadResult<SystemRegionArtifactPair> pair = await ArtifactLoader.LoadSystemWithRegionAsync(
+            context.DetailArtifactPath,
+            $"{context.SweepRootPath}/{regionDetailPath}");
+        if (!pair.IsSuccess)
+        {
+            return null;
+        }
+
+        DispatchResultsDTO regional = ToEvidence(pair.Value!.Region);
+        return await ResolveBaseDemandAsync(
+            regional,
+            context,
+            $"{context.SweepRootPath}/{regionDetailPath}");
+    }
+
+    private string? RegionDetailPath(SweepIndexPointDTO point, string? regionId) => regionId is null
+        ? null
+        : point.RegionDetails?.FirstOrDefault(detail =>
+            string.Equals(detail.RegionId, regionId, StringComparison.OrdinalIgnoreCase))?.DetailPath;
+
+    private static DispatchResultsDTO ToEvidence(SystemDispatchResultsDTO result)
+    {
+        DispatchSourcesDTO sources = result.DataSourcesByRegion.Values.FirstOrDefault()
+            ?? throw new InvalidOperationException("System dispatch has no regional data sources.");
+        return new(
+            result.SchemaVersion,
+            new("system", "NEM system", "NEM", result.PeriodStart, result.PeriodEnd, result.Resolution),
+            DateTimeOffset.MinValue,
+            sources,
+            new("system", [], []),
+            result.DataSeries,
+            result.Metrics,
+            result.Reliability,
+            result.StorageSizing,
+            result.Cost);
+    }
+
+    private static DispatchResultsDTO ToEvidence(RegionDispatchResultsDTO result) => new(
+        result.SchemaVersion,
+        new(result.RegionId, RegionName(result.RegionId), result.RegionId, result.PeriodStart, result.PeriodEnd, result.Resolution),
+        DateTimeOffset.MinValue,
+        result.DataSources,
+        result.PowerSystem,
+        result.DataSeries,
+        result.Metrics,
+        result.Reliability,
+        result.StorageSizing,
+        result.Cost);
+
     private void JumpTo(DispatchEvent notableEvent)
     {
         _selectedView = -1;
@@ -747,7 +915,7 @@
     }
 
     private string RunPath(SweepIndexPointDTO point) =>
-        $"/runs/{Uri.EscapeDataString(_runContext!.Sweep.SweepId)}/{Uri.EscapeDataString(point.PointId)}";
+        SweepPaths.RunRoute(_runContext!.Sweep.SweepId, point.PointId, RegionQuery);
 
     /// <summary>
     /// Stepping along the sweep keeps whatever the reader is comparing against, so the comparison
@@ -755,7 +923,10 @@
     /// </summary>
     private string RunRoute(SweepIndexPointDTO point) => string.IsNullOrWhiteSpace(CompareId) || CompareId == point.PointId
         ? RunPath(point)
-        : $"{RunPath(point)}?compare={Uri.EscapeDataString(CompareId)}";
+        : AddQuery(RunPath(point), "compare", CompareId);
+
+    private static string AddQuery(string path, string name, string value) =>
+        $"{path}{(path.Contains('?') ? '&' : '?')}{name}={Uri.EscapeDataString(value)}";
 
     private void OnViewChanged(int view)
     {

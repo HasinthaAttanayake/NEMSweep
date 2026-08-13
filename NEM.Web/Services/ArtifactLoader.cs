@@ -32,6 +32,10 @@ public sealed record ArtifactLoadResult<T>(ArtifactLoadState State, T? Value)
     public bool IsSuccess => State.Status == ArtifactLoadStatus.Success;
 }
 
+public sealed record SystemRegionArtifactPair(
+    SystemDispatchResultsDTO System,
+    RegionDispatchResultsDTO Region);
+
 public sealed class ArtifactLoader(HttpClient http)
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -48,6 +52,34 @@ public sealed class ArtifactLoader(HttpClient http)
         string path,
         CancellationToken cancellationToken = default)
         where T : class => await LoadCoreAsync<T>(path, validateSchema: false, cancellationToken);
+
+    public async Task<ArtifactLoadResult<SystemRegionArtifactPair>> LoadSystemWithRegionAsync(
+        string systemPath,
+        string regionPath,
+        CancellationToken cancellationToken = default)
+    {
+        ArtifactLoadResult<SystemDispatchResultsDTO> systemResult =
+            await LoadAsync<SystemDispatchResultsDTO>(systemPath, cancellationToken);
+        if (!systemResult.IsSuccess)
+        {
+            return new(systemResult.State, null);
+        }
+
+        ArtifactLoadResult<RegionDispatchResultsDTO> regionResult =
+            await LoadAsync<RegionDispatchResultsDTO>(regionPath, cancellationToken);
+        if (!regionResult.IsSuccess)
+        {
+            return new(regionResult.State, null);
+        }
+
+        if (!string.Equals(systemResult.Value!.RunId, regionResult.Value!.RunId, StringComparison.Ordinal))
+        {
+            return new(ArtifactLoadState.InvalidData("System and regional artifact run IDs do not match."), null);
+        }
+
+        return new(new(ArtifactLoadStatus.Success, null),
+            new(systemResult.Value, regionResult.Value));
+    }
 
     private async Task<ArtifactLoadResult<T>> LoadCoreAsync<T>(
         string path,
@@ -104,6 +136,8 @@ public static class ArtifactSchemaRegistry
         {
             [typeof(ModelInputOutputDTO)] = (artifact => ((ModelInputOutputDTO)artifact).SchemaVersion, new HashSet<int> { ArtifactSchemaVersions.OperationalDemand }),
             [typeof(DispatchResultsDTO)] = (artifact => ((DispatchResultsDTO)artifact).SchemaVersion, new HashSet<int> { ArtifactSchemaVersions.DispatchResults }),
+            [typeof(SystemDispatchResultsDTO)] = (artifact => ((SystemDispatchResultsDTO)artifact).SchemaVersion, new HashSet<int> { ArtifactSchemaVersions.SystemDispatchResults }),
+            [typeof(RegionDispatchResultsDTO)] = (artifact => ((RegionDispatchResultsDTO)artifact).SchemaVersion, new HashSet<int> { ArtifactSchemaVersions.RegionDispatchResults }),
             [typeof(GenerationInformationDTO)] = (artifact => ((GenerationInformationDTO)artifact).SchemaVersion, new HashSet<int> { ArtifactSchemaVersions.GenerationInformation }),
             [typeof(RegularSeriesDTO)] = (artifact => ((RegularSeriesDTO)artifact).SchemaVersion, new HashSet<int> { ArtifactSchemaVersions.RegularSeries }),
             [typeof(SweepIndexDTO)] = (artifact => ((SweepIndexDTO)artifact).SchemaVersion, new HashSet<int> { ArtifactSchemaVersions.SweepIndex }),

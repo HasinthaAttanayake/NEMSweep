@@ -77,6 +77,8 @@ public static class SweepPaths
 
     public static string PageRoute(string sweepId) => $"/sweeps/{Uri.EscapeDataString(sweepId)}";
 
-    public static string RunRoute(string sweepId, string pointId) =>
-        $"/runs/{Uri.EscapeDataString(sweepId)}/{Uri.EscapeDataString(pointId)}";
+    public static string RunRoute(string sweepId, string pointId, string? regionId = null) =>
+        string.IsNullOrWhiteSpace(regionId)
+            ? $"/runs/{Uri.EscapeDataString(sweepId)}/{Uri.EscapeDataString(pointId)}"
+            : $"/runs/{Uri.EscapeDataString(sweepId)}/{Uri.EscapeDataString(pointId)}?region={Uri.EscapeDataString(regionId)}";
 }

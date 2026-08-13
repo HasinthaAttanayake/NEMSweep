@@ -20,6 +20,21 @@
             @if (_loadState.Status == ArtifactLoadStatus.Success)
             {
                 <div class="demand-controls">
+                @if (_regionOptions.Count > 1)
+                {
+                    <MudSelect T="string"
+                               Label="Region"
+                               Value="_selectedRegion"
+                               ValueChanged="OnRegionChanged"
+                               Variant="Variant.Outlined"
+                               Class="region-select">
+                        @foreach (string region in _regionOptions)
+                        {
+                            <MudSelectItem T="string" Value="region">@RegionName(region) (@region)</MudSelectItem>
+                        }
+                    </MudSelect>
+                }
+
                 <MudSelect T="int"
                            Label="View"
                            Value="_selectedView"
@@ -94,6 +109,9 @@
     private int _selectedView;
     private DateTime _selectedDate;
     private List<MonthOption> _months = [];
+    private List<string> _regionOptions = [];
+    private Dictionary<string, string> _demandPathsByRegion = new(StringComparer.OrdinalIgnoreCase);
+    private string _selectedRegion = string.Empty;
 
     private IReadOnlyList<MetricStripItem> DemandMetrics =>
     [
@@ -110,48 +128,163 @@
     {
         try
         {
-            ArtifactLoadResult<ModelInputOutputDTO> loadResult =
-                await ArtifactLoader.LoadAsync<ModelInputOutputDTO>("data/demand-data.json");
-            if (!loadResult.IsSuccess)
+            ArtifactLoadResult<SystemDispatchResultsDTO> systemResult =
+                await ArtifactLoader.LoadAsync<SystemDispatchResultsDTO>("data/results.json");
+            if (systemResult.IsSuccess)
             {
-                _loadState = loadResult.State;
+                if (!TryConfigureRegions(systemResult.Value!, out string? validationMessage))
+                {
+                    _loadState = ArtifactLoadState.InvalidData(validationMessage!);
+                    return;
+                }
+
+                await LoadDemandAsync(_demandPathsByRegion[_selectedRegion], _selectedRegion);
                 return;
             }
 
-            ModelInputOutputDTO result = loadResult.Value!;
-
-            double[] demandMw = result.DataSeries.DemandMw;
-            DateTimeOffset periodStart = result.Scenario.PeriodStart;
-            DateTimeOffset periodEnd = result.Scenario.PeriodEnd;
-            TimeSpan resolution = result.Scenario.Resolution;
-            if (demandMw is null
-                || demandMw.Length == 0
-                || resolution <= TimeSpan.Zero
-                || periodEnd <= periodStart
-                || (periodEnd - periodStart).Ticks % resolution.Ticks != 0
-                || (periodEnd - periodStart).Ticks / resolution.Ticks != demandMw.Length)
+            if (!IsLegacyFallback(systemResult.State))
             {
-                _loadState = ArtifactLoadState.InvalidData("Operational-demand timestamps and values are empty or misaligned.");
+                _loadState = systemResult.State;
                 return;
             }
 
-            _demandMw = demandMw;
-            _periodStart = periodStart;
-            _periodEnd = periodEnd;
-            _resolution = resolution;
-            _selectedDate = periodStart.Date;
-            _minimumDate = periodStart.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-            _maximumDate = periodEnd.AddTicks(-1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-            _regionCode = result.Scenario.Region.ToUpperInvariant();
-            _regionName = RegionName(_regionCode);
-            _months = BuildMonthOptions(periodStart, periodEnd);
-            BuildChart();
-            _loadState = loadResult.State;
+            _regionOptions = [];
+            _demandPathsByRegion.Clear();
+            _selectedRegion = string.Empty;
+            await LoadDemandAsync("data/demand-data.json", expectedRegion: null);
         }
         catch (Exception exception)
         {
             _loadState = ArtifactLoadState.Failed($"Error loading demand data: {exception.Message}");
         }
+    }
+
+    private async Task OnRegionChanged(string region)
+    {
+        if (!_demandPathsByRegion.TryGetValue(region, out string? demandPath)
+            || string.Equals(region, _selectedRegion, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _selectedRegion = region;
+        _loadState = ArtifactLoadState.Loading();
+        await LoadDemandAsync(demandPath, region);
+    }
+
+    private async Task LoadDemandAsync(string path, string? expectedRegion)
+    {
+        ArtifactLoadResult<ModelInputOutputDTO> loadResult =
+            await ArtifactLoader.LoadAsync<ModelInputOutputDTO>(path);
+        if (!loadResult.IsSuccess)
+        {
+            _loadState = loadResult.State;
+            return;
+        }
+
+        ModelInputOutputDTO result = loadResult.Value!;
+        if (expectedRegion is not null
+            && !string.Equals(result.Scenario.Region, expectedRegion, StringComparison.OrdinalIgnoreCase))
+        {
+            _loadState = ArtifactLoadState.InvalidData(
+                $"Demand artifact region {result.Scenario.Region} does not match selected region {expectedRegion}.");
+            return;
+        }
+
+        double[]? demandMw = result.DataSeries.DemandMw;
+        DateTimeOffset periodStart = result.Scenario.PeriodStart;
+        DateTimeOffset periodEnd = result.Scenario.PeriodEnd;
+        TimeSpan resolution = result.Scenario.Resolution;
+        if (demandMw is null
+            || demandMw.Length == 0
+            || resolution <= TimeSpan.Zero
+            || periodEnd <= periodStart
+            || (periodEnd - periodStart).Ticks % resolution.Ticks != 0
+            || (periodEnd - periodStart).Ticks / resolution.Ticks != demandMw.Length)
+        {
+            _loadState = ArtifactLoadState.InvalidData("Operational-demand timestamps and values are empty or misaligned.");
+            return;
+        }
+
+        _demandMw = demandMw;
+        _periodStart = periodStart;
+        _periodEnd = periodEnd;
+        _resolution = resolution;
+        _selectedDate = periodStart.Date;
+        _minimumDate = periodStart.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        _maximumDate = periodEnd.AddTicks(-1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        _regionCode = result.Scenario.Region.ToUpperInvariant();
+        _regionName = RegionName(_regionCode);
+        _months = BuildMonthOptions(periodStart, periodEnd);
+        BuildChart();
+        _loadState = loadResult.State;
+    }
+
+    private bool TryConfigureRegions(
+        SystemDispatchResultsDTO system,
+        out string? validationMessage)
+    {
+        validationMessage = null;
+        if (system.RegionIds is null || system.RegionIds.Length == 0)
+        {
+            validationMessage = "System dispatch results do not define any regions.";
+            return false;
+        }
+
+        if (system.DataSourcesByRegion is null)
+        {
+            validationMessage = "System dispatch results do not define regional data sources.";
+            return false;
+        }
+
+        var pathsByRegion = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string? regionId in system.RegionIds)
+        {
+            if (string.IsNullOrWhiteSpace(regionId)
+                || !system.DataSourcesByRegion.TryGetValue(regionId, out DispatchSourcesDTO? sources)
+                || sources?.DemandInput is null
+                || !TryGetDataArtifactPath(sources.DemandInput.FileName, out string? demandPath))
+            {
+                validationMessage = "System dispatch results contain a region without a valid demand artifact reference.";
+                return false;
+            }
+
+            pathsByRegion[regionId.ToUpperInvariant()] = demandPath;
+        }
+
+        _regionOptions = pathsByRegion.Keys.Order(StringComparer.Ordinal).ToList();
+        _demandPathsByRegion = pathsByRegion;
+        _selectedRegion = _regionOptions[0];
+        return true;
+    }
+
+    private static bool IsLegacyFallback(ArtifactLoadState state) =>
+        state.Status == ArtifactLoadStatus.NotFound
+        || (state.Status == ArtifactLoadStatus.InvalidData
+            && state.Message?.StartsWith("Artifact schema ", StringComparison.Ordinal) == true);
+
+    private static bool TryGetDataArtifactPath(string fileName, out string path)
+    {
+        path = string.Empty;
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return false;
+        }
+
+        string normalized = fileName.Replace('\\', '/').TrimStart('/');
+        if (normalized.StartsWith("data/", StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = normalized["data/".Length..];
+        }
+
+        if (normalized.Length == 0
+            || normalized.Split('/').Any(segment => segment is "" or "." or ".."))
+        {
+            return false;
+        }
+
+        path = $"data/{normalized}";
+        return true;
     }
 
     private void OnViewChanged(int view)

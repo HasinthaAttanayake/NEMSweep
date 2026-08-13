@@ -76,6 +76,25 @@ public sealed class SweepChartDataTests
     }
 
     [Fact]
+    public void Build_UsesRegionalScalarsAndOmitsPointsWithoutThatRegion()
+    {
+        SweepIndexDTO index = ArtifactFixtures.Index(
+            ArtifactFixtures.SucceededPoint("p0", "Baseline", 0) with
+            {
+                RegionScalars = [new SweepPointRegionScalarsDTO("VIC1", ArtifactFixtures.Scalars(200))],
+            },
+            ArtifactFixtures.SucceededPoint("p1", "+1 MW", 1));
+
+        SweepChartData chart = SweepChartData.Build(
+            index,
+            SweepSeriesCatalogue.Resolve("storageEnergyMwh")!,
+            "VIC1");
+
+        chart.Values.Should().Equal(200);
+        chart.OmittedPoints.Should().ContainSingle().Which.Label.Should().Be("+1 MW");
+    }
+
+    [Fact]
     public void SweepSeriesCatalogue_ReadsEveryScalarTheContractDeclares()
     {
         SweepSeriesCatalogue.UnmappedScalarNames.Should().BeEmpty(

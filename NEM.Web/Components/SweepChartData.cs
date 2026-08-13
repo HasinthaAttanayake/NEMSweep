@@ -33,7 +33,10 @@ public sealed record SweepChartData(
     IReadOnlyList<SweepChartPoint> Points,
     IReadOnlyList<SweepChartOmittedPoint> OmittedPoints)
 {
-    public static SweepChartData Build(SweepIndexDTO index, SweepChartYAxis yAxis)
+    public static SweepChartData Build(
+        SweepIndexDTO index,
+        SweepChartYAxis yAxis,
+        string? regionId = null)
     {
         ArgumentNullException.ThrowIfNull(index);
         ArgumentNullException.ThrowIfNull(yAxis);
@@ -54,7 +57,8 @@ public sealed record SweepChartData(
                 continue;
             }
 
-            double? value = point.Scalars is null ? null : yAxis.SelectValue(point.Scalars);
+            SweepPointScalarResultsDTO? scalars = SelectScalars(point, regionId);
+            double? value = scalars is null ? null : yAxis.SelectValue(scalars);
             if (value is null)
             {
                 // A succeeded point the artifact carries no value for is still a gap in the
@@ -74,6 +78,23 @@ public sealed record SweepChartData(
             points.Select(point => point.Value).ToArray(),
             points,
             omittedPoints);
+    }
+
+    public static SweepPointScalarResultsDTO? SelectScalars(
+        SweepIndexPointDTO point,
+        string? regionId = null)
+    {
+        if (string.IsNullOrWhiteSpace(regionId))
+        {
+            return point.Scalars;
+        }
+
+        return point.RegionScalars?
+            .FirstOrDefault(region => string.Equals(
+                region.RegionId,
+                regionId,
+                StringComparison.OrdinalIgnoreCase))
+            ?.Scalars;
     }
 }
 

@@ -3,6 +3,7 @@
 @using NEM.Web.Services
 @inject SweepManifestLoader SweepManifestLoader
 @inject SweepIndexLoader SweepIndexLoader
+@inject NavigationManager Navigation
 
 <PageTitle>@(_index?.Name ?? "Sweep")</PageTitle>
 
@@ -22,6 +23,22 @@
                 <p class="sweep-axis">@_index.Points.Length runs · @_index.Axis.Label (@_index.Axis.Unit)</p>
             }
         </ScopeContent>
+        <TrailingContent>
+            @if (_index is not null && RegionOptions.Count > 1)
+            {
+                <MudSelect T="string"
+                           Label="Results"
+                           Value="_selectedRegion"
+                           ValueChanged="OnRegionChanged"
+                           Variant="Variant.Outlined"
+                           Class="region-select">
+                    @foreach (string region in RegionOptions)
+                    {
+                        <MudSelectItem T="string" Value="region">@RegionLabel(region)</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+        </TrailingContent>
     </PageHeader>
 
     <ArtifactLoadStateView State="_loadState">
@@ -33,12 +50,16 @@
 
             <SweepChart Index="@_index"
                         YAxis="@_axis"
+                        RegionId="@SelectedRegionId"
                         Heading="@_axis.Label"
                         Description="@($"Achieved {_axis.Label.ToLowerInvariant()} at each run of the sweep. Select a point to open that run.")"
                         DrillDownTarget="ResolveDrillDownTarget" />
-            <SweepScalarGrid Index="@_index" SelectedKey="@_axis.Key" OnSelect="SelectSeries" />
+            <SweepScalarGrid Index="@_index"
+                             RegionId="@SelectedRegionId"
+                             SelectedKey="@_axis.Key"
+                             OnSelect="SelectSeries" />
 
-            <SweepRunTable Index="@_index" />
+            <SweepRunTable Index="@_index" RegionId="@SelectedRegionId" />
 
             @if (_index.Scope is not null)
             {
@@ -61,9 +82,24 @@
 
     [Parameter] public string SweepId { get; set; } = string.Empty;
 
+    [SupplyParameterFromQuery(Name = "region")]
+    public string? RegionQuery { get; set; }
+
     private ArtifactLoadState _loadState = ArtifactLoadState.Loading();
     private SweepIndexDTO? _index;
     private SweepChartYAxis? _axis;
+    private string _selectedRegion = "System";
+
+    private IReadOnlyList<string> RegionOptions => _index?.Points
+        .SelectMany(point => point.RegionScalars ?? [])
+        .Select(region => region.RegionId)
+        .Where(region => !string.IsNullOrWhiteSpace(region))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .Order(StringComparer.OrdinalIgnoreCase)
+        .Prepend("System")
+        .ToArray() ?? ["System"];
+
+    private string? SelectedRegionId => _selectedRegion == "System" ? null : _selectedRegion;
 
     private static string Period(SweepScopeDTO scope) =>
         $"{scope.PeriodStart:dd MMM yyyy} to {scope.PeriodEnd.AddTicks(-1):dd MMM yyyy}";
@@ -75,7 +111,7 @@
     {
         get
         {
-            SweepChartData chart = SweepChartData.Build(_index!, _axis!);
+            SweepChartData chart = SweepChartData.Build(_index!, _axis!, SelectedRegionId);
             var metrics = new List<MetricStripItem>();
             if (chart.Points.Count > 0)
             {
@@ -104,6 +140,7 @@
         _loadState = ArtifactLoadState.Loading();
         _index = null;
         _axis = null;
+        _selectedRegion = "System";
 
         ArtifactLoadResult<SweepManifestDTO> manifest = await SweepManifestLoader.LoadAsync();
         if (!manifest.IsSuccess)
@@ -123,7 +160,10 @@
         ArtifactLoadResult<SweepIndexDTO> index = await SweepIndexLoader.LoadAsync(SweepPaths.IndexPath(entry));
         _loadState = index.State;
         _index = index.Value;
-        _axis = _index is null ? null : DefaultAxis(_index);
+        _selectedRegion = RegionOptions.FirstOrDefault(region =>
+            !string.Equals(region, "System", StringComparison.Ordinal)
+            && string.Equals(region, RegionQuery, StringComparison.OrdinalIgnoreCase)) ?? "System";
+        _axis = _index is null ? null : DefaultAxis(_index, SelectedRegionId);
     }
 
     /// <summary>
@@ -131,12 +171,12 @@
     /// the artifact carries values for. Nothing here decides what the sweep means; the grid offers
     /// every other series one click away.
     /// </summary>
-    private static SweepChartYAxis? DefaultAxis(SweepIndexDTO index)
+    private static SweepChartYAxis? DefaultAxis(SweepIndexDTO index, string? regionId)
     {
         SweepChartYAxis? withValues = null;
         foreach (SweepChartYAxis candidate in SweepSeriesCatalogue.All)
         {
-            double[] values = SweepChartData.Build(index, candidate).Values;
+            double[] values = SweepChartData.Build(index, candidate, regionId).Values;
             if (values.Length == 0)
             {
                 continue;
@@ -155,5 +195,14 @@
     private void SelectSeries(string key) => _axis = SweepSeriesCatalogue.Resolve(key) ?? _axis;
 
     private string ResolveDrillDownTarget(SweepIndexPointDTO point) =>
-        SweepPaths.RunRoute(SweepId, point.PointId);
+        SweepPaths.RunRoute(SweepId, point.PointId, SelectedRegionId);
+
+    private void OnRegionChanged(string region) => Navigation.NavigateTo(
+        string.Equals(region, "System", StringComparison.Ordinal)
+            ? SweepPaths.PageRoute(SweepId)
+            : $"{SweepPaths.PageRoute(SweepId)}?region={Uri.EscapeDataString(region)}");
+
+    private static string RegionLabel(string region) => region == "System"
+        ? "System"
+        : $"{region} regional detail";
 }

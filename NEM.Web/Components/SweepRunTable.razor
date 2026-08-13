@@ -81,6 +81,7 @@
 
 @code {
     [Parameter, EditorRequired] public SweepIndexDTO Index { get; set; } = default!;
+    [Parameter] public string? RegionId { get; set; }
 
     private readonly Dictionary<string, string> _columnFormats = new(StringComparer.Ordinal);
     private string _axisFormat = "N0";
@@ -94,13 +95,17 @@
         foreach (SweepChartYAxis column in SweepSeriesCatalogue.All)
         {
             _columnFormats[column.Key] = SweepValueFormat.ColumnFormat(Index.Points.Select(point =>
-                point.Scalars is null ? null : column.SelectValue(point.Scalars)));
+            {
+                SweepPointScalarResultsDTO? scalars = SweepChartData.SelectScalars(point, RegionId);
+                return scalars is null ? null : column.SelectValue(scalars);
+            }));
         }
     }
 
     private string Scalar(SweepIndexPointDTO point, SweepChartYAxis column)
     {
-        double? value = point.Scalars is null ? null : column.SelectValue(point.Scalars);
+        SweepPointScalarResultsDTO? scalars = SweepChartData.SelectScalars(point, RegionId);
+        double? value = scalars is null ? null : column.SelectValue(scalars);
         return value is null
             ? "—"
             : SweepValueFormat.WithPrefix(column.ValuePrefix, value.Value, value.Value.ToString(_columnFormats[column.Key]));

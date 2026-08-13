@@ -30,6 +30,49 @@
     font-size: 0.85rem;
 }
 
+.weather-provenance {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    padding: 0.75rem 0 0.5rem;
+}
+
+.weather-provenance div {
+    min-width: 0;
+    padding: 0.75rem 1rem;
+    border-left: 3px solid var(--solar);
+    background: var(--color-surface-muted);
+}
+
+.weather-provenance div:last-child {
+    border-left-color: var(--wind);
+}
+
+.weather-provenance h2,
+.weather-provenance p,
+.weather-provenance small {
+    display: block;
+    margin: 0;
+}
+
+.weather-provenance h2 {
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.weather-provenance p {
+    margin-top: 0.2rem;
+    color: var(--color-ink);
+    font-size: 0.85rem;
+}
+
+.weather-provenance small {
+    margin-top: 0.35rem;
+    overflow-wrap: anywhere;
+    color: var(--color-muted);
+    font-size: 0.75rem;
+}
+
 .weather-tabs {
     margin-top: 0.5rem;
 }
@@ -102,6 +145,10 @@
 
     .capacity-input {
         width: min(100%, 240px);
+    }
+
+    .weather-provenance {
+        grid-template-columns: 1fr;
     }
 }
 

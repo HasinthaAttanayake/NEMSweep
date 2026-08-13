@@ -73,6 +73,8 @@ public sealed class SweepManifestLoaderTests
         SweepPaths.DetailPath("a b", "points/p0.json").Should().Be("data/sweeps/a%20b/points/p0.json");
         SweepPaths.PageRoute("a b").Should().Be("/sweeps/a%20b");
         SweepPaths.RunRoute("a b", "p 1").Should().Be("/runs/a%20b/p%201");
+        SweepPaths.RunRoute("a b", "p 1", "VIC1")
+            .Should().Be("/runs/a%20b/p%201?region=VIC1");
     }
 
     private static async Task<ArtifactLoadResult<SweepManifestDTO>> LoadAsync(string json)

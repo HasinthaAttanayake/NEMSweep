@@ -17,7 +17,7 @@ public sealed record DispatchRunContext(
     public string ConfigRepositoryUrl =>
         $"https://github.com/HasinthaAttanayake/NemSim/blob/{Sweep.Provenance.GitCommitSha}/NEM.Web/wwwroot/{ConfigArtifactPath}";
 
-    public string? ResolveReferencedArtifactPath(string? reference)
+    public string? ResolveReferencedArtifactPath(string? reference, string? originPath = null)
     {
         if (string.IsNullOrWhiteSpace(reference))
         {
@@ -25,7 +25,7 @@ public sealed record DispatchRunContext(
         }
 
         Uri origin = new("https://artifact.invalid/");
-        Uri detailUri = new(origin, DetailArtifactPath);
+        Uri detailUri = new(origin, originPath ?? DetailArtifactPath);
         if (!Uri.TryCreate(detailUri, reference, out Uri? referenceUri)
             || !referenceUri.Host.Equals(origin.Host, StringComparison.OrdinalIgnoreCase))
         {
