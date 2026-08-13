@@ -70,7 +70,10 @@ classDiagram
         RegionalResourceProfile resourceProfile
     }
     class DispatchOutcome
+    class SystemDispatchOutcome
     class ReliabilityMetrics
+    class SystemReliabilityAssessment
+    class RegionReliabilityVerdict
     class IStoragePolicy
     class GreedyPolicy
     class GreedySurplusAndIncrementalGenerationChargingPolicy
@@ -114,6 +117,11 @@ classDiagram
     Dispatcher --> StorageOutcome : reconciles
     Dispatcher "1" --> "1..*" DispatchOutcome : produces per region
     DispatchOutcome "1" *-- "1" ReliabilityMetrics
+    SystemDispatchOutcome --> PowerSystem : validates correspondence
+    SystemDispatchOutcome "1" *-- "1..*" DispatchOutcome : aggregates regional evidence
+    SystemDispatchOutcome "1" *-- "1" ReliabilityMetrics
+    SystemReliabilityAssessment --> SystemDispatchOutcome : assesses
+    SystemReliabilityAssessment "1" *-- "1..*" RegionReliabilityVerdict
     StorageSizingService --> PowerSystem : sizes immutable candidates
     StorageSizingService --> Dispatcher : reruns whole system
     StorageSizingService --> StorageSizingRunResult : produces
@@ -177,6 +185,20 @@ classDiagram
 - `IStoragePolicy` owns storage intent and fleet ordering. It receives scalar
   snapshots rather than mutable fleet objects and does not own state of charge,
   execute storage physics, or book unserved demand and curtailment.
+- `SystemDispatchOutcome` is immutable whole-system dispatch evidence. Its factory
+  requires exactly one hourly `DispatchOutcome` per `PowerSystem` region, checks
+  every regional demand timeline and rejects nonzero regional import/export
+  boundaries. It sums common demand, residual, storage, and per-technology flow
+  series element-wise, zero-fills technologies absent from a region, sums storage
+  state of charge by technology, and recalculates served load and reliability from
+  the resulting system series. It retains the validated regional outcomes as
+  read-only evidence for future export.
+- `SystemReliabilityAssessment` is immutable whole-system target evidence. Its
+  factory compares the aggregate USE calculated by `SystemDispatchOutcome` and
+  each retained regional `DispatchOutcome` against one maximum USE percentage.
+  It passes only when the system measurement and every `RegionReliabilityVerdict`
+  are within that target; system USE is calculated from aggregate demand and
+  unserved energy, never by averaging regional percentages.
 - `StorageSizingService` is a pure whole-system orchestration service. It creates
   immutable `PowerSystem` candidates, reruns dispatch, and changes Battery
   storage only in regions that fail the configured USE target. Pumped hydro is
@@ -193,10 +215,13 @@ classDiagram
   it annualises combined power and energy capex over that technology's technical
   life and adds one year of fixed power OPEX. This costs total final capacity,
   including capacity introduced by sizing, and rejects storage without matching
-  scenario assumptions. It sums `DispatchOutcome.DeliveredToLoad` and divides
-  each component and their reconciled total once by total served energy.
-  `PowerSystemCostBreakdown` is a value-only result, not a calculation service.
-  Transmission remains an explicit zero placeholder.
+  scenario assumptions. It produces one `RegionCostBreakdown` per region with
+  annualised generation, storage, and total costs and each of their levelised
+  costs divided by that region's `DispatchOutcome.DeliveredToLoad`. It derives
+  system annual costs and served energy by exactly summing these regional values,
+  then divides the reconciled system components once by total served energy.
+  `PowerSystemCostBreakdown` and `RegionCostBreakdown` are value-only results,
+  not calculation services. Transmission remains an explicit zero placeholder.
 - Exported run results cite scenario and power-system identities rather than
   serialising the domain object graph.
 
@@ -236,6 +261,13 @@ energy denominator; it is not a standalone LCoS. These costs are modelled
 estimates, not audited figures; `decimal` prevents base-10 accumulation
 artefacts from appearing as model defects.
 
+Each `RegionCostBreakdown` retains the equivalent annual costs and delivered
+energy for one region. Its three levelised costs use only that region's
+`DispatchOutcome.DeliveredToLoad`; they are not divided by total system served
+energy. `PowerSystemCostBreakdown.Regions` carries these regional values while
+its existing system totals remain the exact sums of the regional annual costs
+and delivered energy.
+
 Flow series are interval-average MW and integrate to MWh through
 `FlowSeries.Integrate()`. The dispatch invariant is:
 
@@ -263,6 +295,19 @@ totals. The resulting per-fleet identity is:
 fleet generation = fleet curtailment + allocated fleet charge
   + allocated generator-supplied load
 ```
+
+Published delivered generation uses `PerFleetDelivered` rather than generation
+minus curtailment.
+
+`DispatchOutcome.RenewableShare` is calculated from that same delivered
+generation using explicit `GenerationTechnology` classification. Grid-scale
+renewable share is delivered Solar, Wind, and Hydro energy divided by total
+delivered generation. Native renewable share is delivered Solar and Wind energy
+divided by `DemandProfile.BaseDemand` energy, excluding additive demand
+components. Both fractions are clamped to 0 through 1 and are zero when their
+denominator is zero or no relevant renewable fleet exists. Sweep scalars copy
+these definitions from the canonical delivered-generation and base-demand
+artifact series before base demand is externalized.
 
 Generator-supplied load sums to `deliveredToLoad - discharge - imports +
 exports`, while allocated fleet charge sums to regional `charge`. This
