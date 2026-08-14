@@ -92,7 +92,8 @@ public static class PowerSystemCostCalculator
                 scenarioRegion.RegionId,
                 annualisedGenerationCost,
                 annualisedStorageCost,
-                outcome.DeliveredToLoad.Integrate()));
+                outcome.DeliveredToLoad.Integrate(),
+                outcome.Imports.Integrate() - outcome.Exports.Integrate()));
         }
 
         Money totalAnnualisedGenerationCost = Money.Zero;
@@ -108,9 +109,37 @@ public static class PowerSystemCostCalculator
         return new PowerSystemCostBreakdown(
             totalAnnualisedGenerationCost,
             totalAnnualisedStorageCost,
+            AnnualisedTransmissionCost(scenario),
             totalDeliveredEnergy,
             regionBreakdowns);
     }
+
+    /// <summary>
+    /// Interconnector capital and fixed operating cost, charged against each declared
+    /// directed capacity. There is no variable term: transmission has no marginal fuel
+    /// cost here, and losses already raise cost implicitly by requiring more generation
+    /// per MWh delivered.
+    /// </summary>
+    private static Money AnnualisedTransmissionCost(Scenario scenario)
+    {
+        Money total = Money.Zero;
+        foreach (ScenarioInterconnector interconnector in scenario.Interconnectors)
+        {
+            TransmissionCostParameters costs = interconnector.CostParameters;
+            Power capacity = interconnector.Capacity;
+            total += LevelisedCostCalculator.Annuitise(
+                    costs.CapitalCost * capacity,
+                    scenario.CostBasis.RealDiscountRate,
+                    interconnector.TechnicalLifeYears)
+                + costs.FixedOperatingCost.For(capacity, years: 1);
+        }
+
+        return total;
+    }
+
+    /// <summary>Directed endpoint identity normalised only for case-insensitive region matching.</summary>
+    private static (string From, string To) Direction(string fromRegionId, string toRegionId) =>
+        (fromRegionId.ToUpperInvariant(), toRegionId.ToUpperInvariant());
 
     private static void ValidateCorrespondence(
         Scenario scenario,
@@ -142,6 +171,22 @@ public static class PowerSystemCostCalculator
         {
             throw new ArgumentException(
                 "Scenario and power system must contain the same regions.",
+                nameof(powerSystem));
+        }
+
+        // Transmission cost comes from scenario intent while flows come from the realised
+        // system, so the two must describe the same links or the cost would be charged
+        // against assets that were never dispatched.
+        HashSet<(string, string)> scenarioLinks = scenario.Interconnectors
+            .Select(link => Direction(link.FromRegionId, link.ToRegionId))
+            .ToHashSet();
+        HashSet<(string, string)> systemLinks = powerSystem.Interconnectors
+            .Select(link => Direction(link.FromRegionId, link.ToRegionId))
+            .ToHashSet();
+        if (!scenarioLinks.SetEquals(systemLinks))
+        {
+            throw new ArgumentException(
+                "Scenario and power system must contain the same interconnectors.",
                 nameof(powerSystem));
         }
 

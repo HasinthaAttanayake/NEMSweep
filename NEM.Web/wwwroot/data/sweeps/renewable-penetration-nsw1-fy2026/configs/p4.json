@@ -3,7 +3,6 @@
     "realDiscountRate": 0.07,
     "year": 2026
   },
-  "demandFile": "NEM.Web/wwwroot/data/demand-data.json",
   "id": "renewable-penetration-nsw1-fy2026-p4",
   "name": "NSW1 baseline dispatch",
   "provenance": {
@@ -13,6 +12,7 @@
   },
   "regions": [
     {
+      "demandFile": "demand-nsw1.json",
       "generatingFleets": [
         {
           "costParameters": {
@@ -151,15 +151,16 @@
             "technicalLifeYears": 15
           }
         }
-      ]
+      ],
+      "weatherFile": "weather-nsw1.json"
     }
   ],
+  "schemaVersion": 3,
   "storageSizing": {
     "maximumEnergyMwh": 100000,
     "maximumPasses": 256,
     "maximumPowerMw": 10000,
     "reliabilityStandardName": "NEM reliability standard",
     "targetUsePercentage": 0.002
-  },
-  "weatherFile": "NEM.Web/wwwroot/data/weather-data.json"
+  }
 }

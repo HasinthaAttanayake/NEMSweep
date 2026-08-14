@@ -82,19 +82,134 @@ public sealed class SystemDispatchOutcomeTests
                 + outcome.Unserved[index].Megawatts;
             double outputs = outcome.Demand[index].Megawatts
                 + outcome.Charge[index].Megawatts
-                + outcome.PerFleetCurtailment.Values.Sum(flow => flow[index].Megawatts);
+                + outcome.PerFleetCurtailment.Values.Sum(flow => flow[index].Megawatts)
+                + outcome.TransmissionLosses[index].Megawatts;
             inputs.Should().BeApproximately(outputs, 1e-9);
         }
     }
 
     [Fact]
-    public void Create_RejectsNonzeroRegionalBoundaryFlow()
+    public void Create_ReconcilesTransmissionLossesAgainstImportsAndExports()
+    {
+        PowerSystem system = LinkedSystem();
+        DispatchOutcome[] outcomes =
+        [
+            Outcome("NSW1", GenerationTechnology.Coal, [200, 200], demand: [100, 100], exports: [100, 100]),
+            Outcome("VIC1", GenerationTechnology.Gas, [5, 5], demand: [100, 100], imports: [95, 95]),
+        ];
+        SystemDispatchOutcome outcome = SystemDispatchOutcome.Create(
+            system,
+            new SystemDispatchRunResult(
+                outcomes,
+                [new InterconnectorFlow(
+                    system.Interconnectors.Single(),
+                    Hourly([100, 100]),
+                    Hourly([5, 5]))]));
+
+        AssertFlow(outcome.Exports, 100, 100);
+        AssertFlow(outcome.Imports, 95, 95);
+        AssertFlow(outcome.TransmissionLosses, 5, 5);
+    }
+
+    [Fact]
+    public void Create_AcceptsCaseInsensitiveSolverEvidenceTopology()
+    {
+        PowerSystem system = LinkedSystem();
+        DispatchOutcome[] outcomes =
+        [
+            Outcome("NSW1", GenerationTechnology.Coal, [200, 200], demand: [100, 100], exports: [100, 100]),
+            Outcome("VIC1", GenerationTechnology.Gas, [5, 5], demand: [100, 100], imports: [95, 95]),
+        ];
+
+        SystemDispatchOutcome outcome = SystemDispatchOutcome.Create(
+            system,
+            new SystemDispatchRunResult(
+                outcomes,
+                [new InterconnectorFlow(
+                    new Interconnector("nsw1", "vic1", Power.FromMegawatts(1_000)),
+                    Hourly([100, 100]),
+                    Hourly([5, 5]))]));
+
+        outcome.InterconnectorFlows.Single().Interconnector.FromRegionId.Should().Be("nsw1");
+    }
+
+    [Fact]
+    public void Create_RejectsBoundaryFlowsWithoutInterconnectors()
     {
         var act = () => SystemDispatchOutcome.Create(System("NSW1"),
             [Outcome("NSW1", GenerationTechnology.Coal, [99, 100], demand: [100, 100], imports: [1, 0])]);
 
         act.Should().Throw<ArgumentException>()
-            .WithMessage("*NSW1*nonzero imports or exports at the system boundary*");
+            .WithMessage("*NSW1*boundary flow at index 0*no interconnectors*");
+    }
+
+    [Fact]
+    public void Create_LinkedOutcomesWithoutSolverEvidence_Throws()
+    {
+        var act = () => SystemDispatchOutcome.Create(LinkedSystem(),
+        [
+            Outcome("NSW1", GenerationTechnology.Coal, [200, 200], demand: [100, 100], exports: [100, 100]),
+            Outcome("VIC1", GenerationTechnology.Gas, [5, 5], demand: [100, 100], imports: [95, 95]),
+        ]);
+
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("*linked power system*solver evidence*");
+    }
+
+    [Fact]
+    public void Create_RejectsSolverLossesThatDoNotMatchRegionalBoundaryFlows()
+    {
+        PowerSystem system = LinkedSystem();
+        DispatchOutcome[] outcomes =
+        [
+            Outcome("NSW1", GenerationTechnology.Coal, [200, 200], demand: [100, 100], exports: [100, 100]),
+            Outcome("VIC1", GenerationTechnology.Gas, [5, 5], demand: [100, 100], imports: [95, 95]),
+        ];
+
+        var act = () => SystemDispatchOutcome.Create(
+            system,
+            new SystemDispatchRunResult(
+                outcomes,
+                [new InterconnectorFlow(
+                    system.Interconnectors.Single(),
+                    Hourly([100, 100]),
+                    Hourly([4, 4]))]));
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*transmission loss reconciliation failed at index 0*");
+    }
+
+    [Fact]
+    public void Create_RejectsSolverLossGreaterThanItsDirectedFlow()
+    {
+        PowerSystem system = LinkedSystem();
+        DispatchOutcome[] outcomes =
+        [
+            Outcome("NSW1", GenerationTechnology.Coal, [102, 102], demand: [100, 100], exports: [2, 2]),
+            Outcome("VIC1", GenerationTechnology.Gas, [0, 0], demand: [100, 100], unserved: [100, 100]),
+        ];
+
+        var act = () => SystemDispatchOutcome.Create(
+            system,
+            new SystemDispatchRunResult(
+                outcomes,
+                [new InterconnectorFlow(
+                    system.Interconnectors.Single(),
+                    Hourly([1, 1]),
+                    Hourly([2, 2]))]));
+
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("*Solver evidence exceeds non-negative limits*");
+    }
+
+    [Fact]
+    public void Create_RejectsNegativeBoundaryFlow()
+    {
+        var act = () => SystemDispatchOutcome.Create(System("NSW1"),
+            [Outcome("NSW1", GenerationTechnology.Coal, [99, 100], demand: [100, 100], exports: [-1, 0])]);
+
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("*NSW1*negative imports or exports at index 0*");
     }
 
     [Fact]
@@ -133,6 +248,14 @@ public sealed class SystemDispatchOutcomeTests
             [new GeneratingFleet(GenerationTechnology.Coal, Power.FromMegawatts(1_000))],
             Hourly([100, 100]))).ToArray());
 
+    private static PowerSystem LinkedSystem() => System("NSW1", "VIC1").WithInterconnectors(
+    [
+        new Interconnector(
+            "NSW1",
+            "VIC1",
+            Power.FromMegawatts(1_000)),
+    ]);
+
     private static DispatchOutcome Outcome(
         string regionId,
         GenerationTechnology technology,
@@ -143,6 +266,7 @@ public sealed class SystemDispatchOutcomeTests
         double[]? discharge = null,
         double[]? curtailment = null,
         double[]? imports = null,
+        double[]? exports = null,
         double[]? stateOfCharge = null,
         DateTimeOffset? start = null)
     {
@@ -154,6 +278,7 @@ public sealed class SystemDispatchOutcomeTests
         FlowSeries dischargeFlow = Hourly(discharge ?? new double[length], start);
         FlowSeries curtailmentFlow = Hourly(curtailment ?? new double[length], start);
         FlowSeries importsFlow = Hourly(imports ?? new double[length], start);
+        FlowSeries exportsFlow = Hourly(exports ?? new double[length], start);
         FlowSeries zero = Hourly(new double[length], start);
         FlowSeries delivered = generationFlow.Subtract(curtailmentFlow).Subtract(chargeFlow);
         return new DispatchOutcome(
@@ -167,7 +292,7 @@ public sealed class SystemDispatchOutcomeTests
             chargeFlow,
             dischargeFlow,
             importsFlow,
-            zero,
+            exportsFlow,
             stateOfCharge is null
                 ? null
                 : new Dictionary<StorageTechnology, StockSeries>

@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace NEM.Contracts;
 
 public sealed record DispatchResultsDTO(
@@ -58,7 +60,18 @@ public sealed record DispatchSeriesDTO(
     double[] UnservedDemandMw,
     double[] ChargeMw,
     double[] DischargeMw,
-    Dictionary<string, double[]> StateOfChargeByTechnologyMwh);
+    Dictionary<string, double[]> StateOfChargeByTechnologyMwh,
+    [property: JsonRequired] double[] ImportsMw,
+    [property: JsonRequired] double[] ExportsMw,
+    [property: JsonRequired] double[] TransmissionLossesMw);
+
+/// <summary>Directed interconnector evidence retained in a system artifact.</summary>
+public sealed record DispatchInterconnectorDTO(
+    [property: JsonRequired] string FromRegionId,
+    [property: JsonRequired] string ToRegionId,
+    [property: JsonRequired] double CapacityMw,
+    [property: JsonRequired] double[] FlowMw,
+    [property: JsonRequired] double[] LossesMw);
 
 public sealed record DispatchMetricsDTO(
     double DemandMwh,
@@ -78,4 +91,7 @@ public sealed record DispatchCostDTO(
     decimal TotalAnnualisedCostAud,
     decimal GenerationSlcoeAudPerMwh,
     decimal StorageSlcoeAudPerMwh,
-    decimal SlcoeAudPerMwh);
+    decimal SlcoeAudPerMwh,
+    [property: JsonRequired] decimal AnnualisedTransmissionCostAud,
+    [property: JsonRequired] decimal TransmissionSlcotAudPerMwh,
+    [property: JsonRequired] double NetImportedEnergyMwh);

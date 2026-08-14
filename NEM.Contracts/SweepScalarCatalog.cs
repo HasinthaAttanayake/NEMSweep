@@ -39,6 +39,8 @@ public static class SweepScalarCatalog
         new("hoursServedFraction", "Hours served", "fraction"),
         new("peakUnservedPowerMw", "Peak unserved power", "MW"),
         new("curtailedEnergyMwh", "Curtailed energy", "MWh"),
+        new("transmissionSlcotAudPerMwh", "Transmission levelised cost", "AUD/MWh served", "AUD"),
+        new("netImportedEnergyMwh", "Net imported energy", "MWh"),
     ];
 
     private static readonly ReadOnlyDictionary<string, SweepScalarDescriptor> ByName =

@@ -27,13 +27,22 @@
 .cost-track { height: 7px; margin-top: .4rem; overflow: hidden; background: var(--color-track); }
 .cost-track i { display: block; height: 100%; background: var(--color-track-fill); }
 .storage-cost-component .cost-track i { background: var(--accent); }
-.zero-cost-note { margin: 0; padding-top: .75rem; border-top: 1px solid var(--color-track); color: var(--color-muted); font-size: .78rem; line-height: 1.45; }
+.zero-cost-note, .regional-cost-note { margin: 0; padding-top: .75rem; border-top: 1px solid var(--color-track); color: var(--color-muted); font-size: .78rem; line-height: 1.45; }
 .cost-ledger { margin: 0; }
 .cost-ledger div { display: flex; justify-content: space-between; gap: 1rem; padding: .38rem 0; border-bottom: 1px solid var(--color-track); }
 .cost-ledger dt { color: var(--color-muted); font-size: .8rem; }
 .cost-ledger dd { margin: 0; font-size: .82rem; font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; }
 .cost-ledger .cost-total { border-bottom-color: var(--color-track-border); }
 .cost-ledger .cost-total dt, .cost-ledger .cost-total dd { color: var(--color-ink); font-weight: 700; }
+.transmission-cost-component .cost-track i { background: var(--color-accent-warm); }
+.transmission-section { margin-top: 1.5rem; padding: 1.25rem 0 1.5rem; border-block: 1px solid var(--color-border); }
+.section-heading h2 { margin: 0; font-family: var(--font-display); font-size: 1.65rem; font-weight: 600; }
+.section-heading p:not(.section-label) { max-width: 720px; margin: .35rem 0 1rem; color: var(--color-muted); }
+.transmission-table-wrap { overflow-x: auto; border-block: 1px solid var(--color-border); }
+.transmission-table { width: 100%; min-width: 640px; border-collapse: collapse; font-size: .82rem; }
+.transmission-table th, .transmission-table td { padding: .7rem .8rem; border-bottom: 1px solid var(--color-border); text-align: right; font-variant-numeric: tabular-nums; }
+.transmission-table th:first-child, .transmission-table td:first-child { text-align: left; }
+.transmission-table thead th { color: var(--color-muted); font-size: .74rem; text-transform: uppercase; }
 .event-jumps { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; padding: 1rem 0 0; }
 .event-jumps > span { color: var(--color-muted); font-size: .78rem; font-weight: 700; text-transform: uppercase; }
 .event-jumps button { display: inline-grid; gap: .1rem; padding: .4rem .7rem; border: 1px solid var(--color-border-strong); border-radius: 4px; background: var(--color-surface); color: var(--color-ink); font: inherit; font-size: .82rem; font-weight: 700; text-align: left; cursor: pointer; }

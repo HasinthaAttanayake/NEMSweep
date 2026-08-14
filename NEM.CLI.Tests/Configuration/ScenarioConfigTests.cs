@@ -8,12 +8,12 @@ namespace NEM.CLI.Tests.Configuration;
 public sealed class ScenarioConfigTests
 {
     [Fact]
-    public void Load_RequiresSchemaVersionOne()
+    public void Load_RequiresSchemaVersionThree()
     {
-        var act = () => Load(config => config["schemaVersion"] = 2);
+        var act = () => Load(config => config["schemaVersion"] = 1);
 
         act.Should().Throw<FormatException>()
-            .WithMessage("*found 2*expected 1*");
+            .WithMessage("*found 1*expected 3*");
     }
 
     [Fact]
@@ -72,6 +72,92 @@ public sealed class ScenarioConfigTests
         ScenarioSettings scenario = Load(config => config["provenance"] = new JsonObject { ["sweepId"] = "test" });
 
         scenario.Provenance!["sweepId"]!.GetValue<string>().Should().Be("test");
+    }
+
+    [Fact]
+    public void Load_AcceptsAnInterconnectorBetweenScenarioRegions()
+    {
+        ScenarioSettings scenario = Load(config =>
+        {
+            AddVicRegion(config);
+            config["interconnectors"] = new JsonArray(Interconnector("NSW1", "VIC1"));
+        });
+
+        ScenarioInterconnectorSettings interconnector = scenario.Interconnectors!
+            .Should().ContainSingle().Subject;
+        interconnector.FromRegionId.Should().Be("NSW1");
+        interconnector.ToRegionId.Should().Be("VIC1");
+        interconnector.CapacityMw.Should().Be(1_000);
+        interconnector.TechnicalLifeYears.Should().Be(50);
+    }
+
+    [Fact]
+    public void Load_RejectsInterconnectorWhoseEndpointIsNotInScenarioRegions()
+    {
+        var act = () => Load(config =>
+            config["interconnectors"] = new JsonArray(Interconnector("NSW1", "QLD1")));
+
+        act.Should().Throw<FormatException>()
+            .WithMessage("*interconnectors*regions*must belong*");
+    }
+
+    [Fact]
+    public void Load_RejectsInterconnectorWithZeroTechnicalLife()
+    {
+        var act = () => Load(config =>
+        {
+            AddVicRegion(config);
+            JsonObject interconnector = Interconnector("NSW1", "VIC1");
+            interconnector["technicalLifeYears"] = 0;
+            config["interconnectors"] = new JsonArray(interconnector);
+        });
+
+        act.Should().Throw<FormatException>()
+            .WithMessage("*interconnectors*technicalLifeYears*nonzero*");
+    }
+
+    [Fact]
+    public void Load_AllowsReciprocalInterconnectorDirections()
+    {
+        ScenarioSettings scenario = Load(config =>
+        {
+            AddVicRegion(config);
+            config["interconnectors"] = new JsonArray(
+                Interconnector("NSW1", "VIC1"),
+                Interconnector("VIC1", "NSW1"));
+        });
+
+        scenario.Interconnectors!.Select(link => (link.FromRegionId, link.ToRegionId)).Should()
+            .Equal(("NSW1", "VIC1"), ("VIC1", "NSW1"));
+    }
+
+    [Fact]
+    public void Load_RejectsDuplicateInterconnectorDirectionsIgnoringCasing()
+    {
+        var act = () => Load(config =>
+        {
+            AddVicRegion(config);
+            config["interconnectors"] = new JsonArray(
+                Interconnector("NSW1", "VIC1"),
+                Interconnector("nsw1", "vic1"));
+        });
+
+        act.Should().Throw<FormatException>()
+            .WithMessage("*interconnectors*duplicate direction*");
+    }
+
+    [Fact]
+    public void Load_RejectsInterconnectorWithoutRequiredCapacity()
+    {
+        var act = () => Load(config =>
+        {
+            AddVicRegion(config);
+            JsonObject interconnector = Interconnector("NSW1", "VIC1");
+            interconnector.Remove("capacityMw");
+            config["interconnectors"] = new JsonArray(interconnector);
+        });
+
+        act.Should().Throw<JsonException>();
     }
 
     [Fact]
@@ -159,7 +245,7 @@ public sealed class ScenarioConfigTests
     {
         JsonObject config = JsonNode.Parse("""
         {
-          "schemaVersion": 1,
+                    "schemaVersion": 3,
           "id": "test",
           "name": "Test",
           "costBasis": { "year": 2026, "realDiscountRate": 0.07 },
@@ -193,6 +279,25 @@ public sealed class ScenarioConfigTests
             File.Delete(path);
         }
     }
+
+    private static void AddVicRegion(JsonObject config)
+    {
+        JsonObject vic = Region(config).DeepClone().AsObject();
+        vic["regionId"] = "VIC1";
+        vic["demandFile"] = "demand-vic.json";
+        vic["weatherFile"] = "weather-vic.json";
+        config["regions"] = new JsonArray(Region(config).DeepClone(), vic);
+    }
+
+    private static JsonObject Interconnector(string fromRegionId, string toRegionId) => new()
+    {
+        ["fromRegionId"] = fromRegionId,
+        ["toRegionId"] = toRegionId,
+        ["capacityMw"] = 1_000,
+        ["capitalCostAudPerMw"] = 1_000,
+        ["fixedOperatingCostAudPerMwYear"] = 10,
+        ["technicalLifeYears"] = 50,
+    };
 
     private static JsonObject Region(JsonObject config) => config["regions"]![0]!.AsObject();
     private static JsonObject GeneratingFleet(JsonObject config) => Region(config)["generatingFleets"]![0]!.AsObject();

@@ -124,6 +124,8 @@ public static class SweepSeriesCatalogue
             ["hoursServedFraction"] = scalars => scalars.HoursServedFraction,
             ["peakUnservedPowerMw"] = scalars => scalars.PeakUnservedPowerMw,
             ["curtailedEnergyMwh"] = scalars => scalars.CurtailedEnergyMwh,
+            ["transmissionSlcotAudPerMwh"] = scalars => (double)scalars.TransmissionSlcotAudPerMwh,
+            ["netImportedEnergyMwh"] = scalars => scalars.NetImportedEnergyMwh,
         };
 
     private static readonly IReadOnlyDictionary<string, SweepChartYAxis> ByKey =

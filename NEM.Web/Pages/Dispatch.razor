@@ -124,25 +124,25 @@
             <span>Schema v@_result!.SchemaVersion</span>
         </div>
 
-        <section class="cost-section" aria-labelledby="system-cost-heading">
+        <section class="cost-section" aria-labelledby="cost-heading">
             <div class="cost-heading">
                 <div>
                     <p class="section-label">Full financial year</p>
-                    <h2 id="system-cost-heading">System cost</h2>
-                    <p>Annualised generation and storage asset costs per MWh served in @ScopeLabel.</p>
+                    <h2 id="cost-heading">@CostHeading</h2>
+                    <p>@CostDescription</p>
                 </div>
                 <span class="cost-status">@_result.Cost.Status</span>
             </div>
 
             <div class="cost-layout">
                 <div class="cost-primary">
-                    <span>System levelised cost</span>
+                    <span>@LevelisedCostLabel</span>
                     <strong>@FormatAudPerMwh(_result.Cost.SlcoeAudPerMwh)</strong>
                     <small>AUD/MWh served</small>
-                    <p>Generation and storage assets are included. Transmission is not yet modelled.</p>
+                    <p>@CostInclusionsDescription</p>
                 </div>
 
-                <div class="cost-components" aria-label="SLCoE component contributions">
+                <div class="cost-components" aria-label="Levelised cost component contributions">
                     <div class="cost-component">
                         <div>
                             <span>Generation</span>
@@ -161,20 +161,73 @@
                             <i style="@CostShareStyle(_result.Cost.StorageSlcoeAudPerMwh)"></i>
                         </div>
                     </div>
+                    @if (IsSystemScope)
+                    {
+                        <div class="cost-component transmission-cost-component">
+                            <div>
+                                <span>Transmission</span>
+                                <strong>@FormatAudPerMwh(_result.Cost.TransmissionSlcotAudPerMwh) AUD/MWh</strong>
+                            </div>
+                            <div class="cost-track" aria-hidden="true">
+                                <i style="@CostShareStyle(_result.Cost.TransmissionSlcotAudPerMwh)"></i>
+                            </div>
+                        </div>
+                    }
                     @if (_result.Cost.TotalAnnualisedCostAud == 0)
                     {
                         <p class="zero-cost-note">The current scenario uses zero-valued economic inputs; the calculation path is active.</p>
+                    }
+                    @if (!IsSystemScope)
+                    {
+                        <p class="regional-cost-note">Positive net imported energy denotes imports. Regional costs exclude system transmission and do not price transferred energy, so they can understate imported supply costs.</p>
                     }
                 </div>
 
                 <dl class="cost-ledger">
                     <div><dt>Generation annual cost</dt><dd>@FormatAud(_result.Cost.AnnualisedGenerationCostAud)</dd></div>
                     <div><dt>Storage annual cost</dt><dd>@FormatAud(_result.Cost.AnnualisedStorageCostAud)</dd></div>
+                    @if (IsSystemScope)
+                    {
+                        <div><dt>Transmission annual cost</dt><dd>@FormatAud(_result.Cost.AnnualisedTransmissionCostAud)</dd></div>
+                    }
                     <div class="cost-total"><dt>Total annual cost</dt><dd>@FormatAud(_result.Cost.TotalAnnualisedCostAud)</dd></div>
                     <div><dt>Electricity served</dt><dd>@AnnualServedEnergyMwh().ToString("N0") MWh</dd></div>
+                    @if (!IsSystemScope)
+                    {
+                        <div><dt>Net imported energy</dt><dd>@_result.Cost.NetImportedEnergyMwh.ToString("N0") MWh</dd></div>
+                    }
                 </dl>
             </div>
         </section>
+
+        @if (_selectedRegionId is null && _systemResult?.Interconnectors is { Length: > 0 } links)
+        {
+            <section class="transmission-section" aria-labelledby="transmission-heading">
+                <div class="section-heading">
+                    <p class="section-label">System view</p>
+                    <h2 id="transmission-heading">Transmission</h2>
+                    <p>Directed solver evidence over the selected dispatch period. Flow is metered at the sending end; losses are shown separately.</p>
+                </div>
+                <div class="transmission-table-wrap">
+                    <table class="transmission-table">
+                        <thead>
+                            <tr><th scope="col">Link</th><th scope="col">Capacity</th><th scope="col">Flow</th><th scope="col">Losses</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (DispatchInterconnectorDTO link in links)
+                            {
+                                <tr>
+                                    <th scope="row">@link.FromRegionId to @link.ToRegionId</th>
+                                    <td>@link.CapacityMw.ToString("N0") MW</td>
+                                    <td>@Average(link.FlowMw).ToString("N2") MW</td>
+                                    <td>@Average(link.LossesMw).ToString("N2") MW</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        }
 
         <ChartFrame Heading="Generation against demand"
                     Description="Delivered generation is stacked by technology; the demand trace reveals any supply gap."
@@ -499,7 +552,16 @@
         ? "0%"
         : $"{value.ToString(value >= 0.01 ? "N2" : "G3", CultureInfo.CurrentCulture)}%";
 
-    private string ScopeLabel => _selectedRegionId is null ? "NEM system" : RegionName(_selectedRegionId);
+    private bool IsSystemScope => _selectedRegionId is null;
+    private string ScopeLabel => IsSystemScope ? "NEM system" : RegionName(_selectedRegionId!);
+    private string CostHeading => IsSystemScope ? "System cost" : "Regional cost";
+    private string LevelisedCostLabel => IsSystemScope ? "System levelised cost" : "Regional levelised cost";
+    private string CostDescription => IsSystemScope
+        ? $"Annualised generation, storage, and transmission asset costs per MWh served in {ScopeLabel}."
+        : $"Annualised generation and storage asset costs per MWh served in {ScopeLabel}.";
+    private string CostInclusionsDescription => IsSystemScope
+        ? "Generation, storage, and system-level transmission assets are included."
+        : "Generation and storage assets are included; system transmission is not allocated to regions.";
     private string ArtifactPeriod => $"{_result!.Scenario.PeriodStart:dd MMM yyyy} to {_result.Scenario.PeriodEnd.AddTicks(-1):dd MMM yyyy}";
     private string ResolutionLabel => $"{_result!.Scenario.Resolution.TotalHours:N0}-hour intervals";
 
@@ -1187,6 +1249,8 @@
         decimal percentage = total <= 0 ? 0 : Math.Clamp(100 * componentAudPerMwh / total, 0, 100);
         return FormattableString.Invariant($"width: {percentage:F2}%");
     }
+
+    private static double Average(double[] values) => values.Length == 0 ? 0 : values.Average();
 
     /// <summary>A money total, abbreviated, with the minus sign outside the currency symbol.</summary>
     private static string FormatAud(decimal value)

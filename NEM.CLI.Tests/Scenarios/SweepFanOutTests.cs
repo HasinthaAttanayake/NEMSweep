@@ -142,7 +142,7 @@ public sealed class SweepFanOutTests
             File.WriteAllText(Path.Combine(RootPath, "NemSim.slnx"), string.Empty);
             File.WriteAllText(Path.Combine(RootPath, "scenarios", "baseline.json"), """
             {
-              "schemaVersion": 1, "id": "baseline", "name": "Baseline",
+              "schemaVersion": 3, "id": "baseline", "name": "Baseline",
               "costBasis": { "year": 2026, "realDiscountRate": 0.07 },
               "storageSizing": { "maximumPowerMw": 100, "maximumEnergyMwh": 400 },
               "regions": [{

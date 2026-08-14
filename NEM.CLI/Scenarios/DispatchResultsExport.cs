@@ -126,7 +126,9 @@ internal static class DispatchResultsExport
         StorageSizingRunResult sizingResult = dispatch.SizingResult;
         SystemDispatchOutcome systemOutcome = SystemDispatchOutcome.Create(
             sizingResult.PowerSystem,
-            sizingResult.Regions.Select(region => region.DispatchOutcome).ToArray());
+            new SystemDispatchRunResult(
+                sizingResult.Regions.Select(region => region.DispatchOutcome).ToArray(),
+                sizingResult.InterconnectorFlows));
         SystemReliabilityAssessment systemReliability = SystemReliabilityAssessment.Create(
             systemOutcome,
             request.SizingOptions.TargetUsePercentage);
@@ -208,7 +210,13 @@ internal static class DispatchResultsExport
                 systemReliability.WithinTarget,
                 request.ReliabilityStandardName),
             CreateSystemStorageSizingOutcome(request, sizingResult),
-            systemCost);
+            systemCost,
+            systemOutcome.InterconnectorFlows.Select(flow => new DispatchInterconnectorDTO(
+                flow.Interconnector.FromRegionId,
+                flow.Interconnector.ToRegionId,
+                flow.Interconnector.Capacity.Megawatts,
+                ValuesOf(flow.Flow),
+                ValuesOf(flow.Losses))).ToArray());
         return new DispatchPublication(system, regions);
     }
 
@@ -251,7 +259,10 @@ internal static class DispatchResultsExport
             ValuesOf(outcome.Discharge),
             outcome.StateOfChargeByTechnology.ToDictionary(
                 entry => entry.Key.ToString(),
-                entry => ValuesOf(entry.Value)));
+                entry => ValuesOf(entry.Value)),
+            ValuesOf(outcome.Imports),
+            ValuesOf(outcome.Exports),
+            ValuesOf(outcome.TransmissionLosses));
     }
 
     private static DispatchMetricsDTO CreateMetrics(SystemDispatchOutcome outcome)
@@ -315,7 +326,10 @@ internal static class DispatchResultsExport
             cost.TotalAnnualisedCost.Aud,
             cost.SystemLevelisedCostOfGeneration.AudPerMwhDelivered,
             cost.SystemLevelisedCostOfStorage.AudPerMwhDelivered,
-            cost.SystemLevelisedCostOfElectricity.AudPerMwhDelivered);
+            cost.SystemLevelisedCostOfElectricity.AudPerMwhDelivered,
+            cost.TotalAnnualisedTransmissionCost.Aud,
+            cost.SystemLevelisedCostOfTransmission.AudPerMwhDelivered,
+            0);
 
     private static DispatchCostDTO CreateCost(RegionCostBreakdown cost) =>
         new(
@@ -325,7 +339,10 @@ internal static class DispatchResultsExport
             cost.TotalAnnualisedCost.Aud,
             cost.LevelisedCostOfGeneration.AudPerMwhDelivered,
             cost.LevelisedCostOfStorage.AudPerMwhDelivered,
-            cost.LevelisedCostOfElectricity.AudPerMwhDelivered);
+            cost.LevelisedCostOfElectricity.AudPerMwhDelivered,
+            0,
+            0,
+            cost.NetImportedEnergy.MegawattHours);
 
     private static void AddValues(double[] target, double[] source)
     {
@@ -449,7 +466,10 @@ internal static class DispatchResultsExport
                 ValuesOf(outcome.Discharge),
                 outcome.StateOfChargeByTechnology.ToDictionary(
                     entry => entry.Key.ToString(),
-                    entry => ValuesOf(entry.Value))),
+                    entry => ValuesOf(entry.Value)),
+                ValuesOf(outcome.Imports),
+                ValuesOf(outcome.Exports),
+                new double[outcome.Demand.Length]),
             new DispatchMetricsDTO(
                 outcome.Demand.Integrate().MegawattHours,
                 deliveredGenerationMwh,
@@ -473,7 +493,11 @@ internal static class DispatchResultsExport
                 request.CostBreakdown.TotalAnnualisedCost.Aud,
                 request.CostBreakdown.SystemLevelisedCostOfGeneration.AudPerMwhDelivered,
                 request.CostBreakdown.SystemLevelisedCostOfStorage.AudPerMwhDelivered,
-                request.CostBreakdown.SystemLevelisedCostOfElectricity.AudPerMwhDelivered));
+                request.CostBreakdown.SystemLevelisedCostOfElectricity.AudPerMwhDelivered,
+                0,
+                0,
+                outcome.Imports.Integrate().MegawattHours
+                    - outcome.Exports.Integrate().MegawattHours));
     }
 
     public static void WriteJson(DispatchResultsDTO result, string path)

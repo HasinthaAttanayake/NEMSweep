@@ -89,7 +89,7 @@ public sealed class ScenarioRunnerMultiRegionTests
     [Fact]
     public void Run_PublishesSystemAndRegionalResultsWithOneRunId()
     {
-        using var fixture = new RunnerFixture();
+        using var fixture = new RunnerFixture { IncludeInterconnector = true };
         fixture.WriteScenario();
         var context = new CliContext(fixture.Paths, fixture.RootPath, TextWriter.Null);
 
@@ -114,6 +114,30 @@ public sealed class ScenarioRunnerMultiRegionTests
         system.RegionSummariesById["NSW1"].DetailPath.Should().Be("results-nsw1.json");
         nsw.RegionId.Should().Be("NSW1");
         vic.RegionId.Should().Be("VIC1");
+        DispatchInterconnectorDTO link = system.Interconnectors.Should().ContainSingle().Subject;
+        link.FromRegionId.Should().Be("NSW1");
+        link.ToRegionId.Should().Be("VIC1");
+        link.CapacityMw.Should().Be(30);
+        link.FlowMw.Should().HaveCount(8_760);
+        link.LossesMw.Should().HaveCount(8_760);
+        nsw.DataSeries.TransmissionLossesMw.Should().OnlyContain(value => value == 0);
+        vic.DataSeries.TransmissionLossesMw.Should().OnlyContain(value => value == 0);
+    }
+
+    [Fact]
+    public void RunDispatch_RealisesConfiguredInterconnectorAndRetainsSolverEvidence()
+    {
+        using var fixture = new RunnerFixture { IncludeInterconnector = true };
+
+        ScenarioDispatchResult result = fixture.Run();
+
+        Interconnector link = result.PowerSystem.Interconnectors.Should().ContainSingle().Subject;
+        link.FromRegionId.Should().Be("NSW1");
+        link.ToRegionId.Should().Be("VIC1");
+        link.Capacity.Should().Be(Power.FromMegawatts(30));
+        result.SizingResult.InterconnectorFlows.Should().ContainSingle();
+        result.SizingResult.InterconnectorFlows[0].Flow.Length.Should().Be(8_760);
+        result.SizingResult.InterconnectorFlows[0].Losses.Length.Should().Be(8_760);
     }
 
     [Fact]
@@ -175,6 +199,7 @@ public sealed class ScenarioRunnerMultiRegionTests
         public DateTimeOffset VicStart { get; init; } = fixtureStart;
         public double NswDataCentreNameplateMw { get; init; }
         public double VicDataCentreNameplateMw { get; init; }
+        public bool IncludeInterconnector { get; init; }
 
         public ScenarioDispatchResult Run()
         {
@@ -206,23 +231,38 @@ public sealed class ScenarioRunnerMultiRegionTests
                     4),
                 null);
 
-        public void WriteScenario() => File.WriteAllText(
+        public void WriteScenario()
+        {
+            string interconnectors = IncludeInterconnector
+                ? "\"interconnectors\": [{ \"fromRegionId\": \"NSW1\", \"toRegionId\": \"VIC1\", \"capacityMw\": 30, \"capitalCostAudPerMw\": 1000, \"fixedOperatingCostAudPerMwYear\": 10, \"technicalLifeYears\": 50 }],"
+                : string.Empty;
+            File.WriteAllText(
             Path.Combine(RootPath, "scenario.json"),
-            """
-            { "schemaVersion": 1, "id": "two-region", "name": "Two region", "costBasis": { "year": 2026, "realDiscountRate": 0.07 }, "regions": [
+            $$"""
+            { "schemaVersion": 3, "id": "two-region", "name": "Two region", "costBasis": { "year": 2026, "realDiscountRate": 0.07 }, {{interconnectors}} "regions": [
               { "regionId": "NSW1", "demandFile": "demand-nsw1.json", "weatherFile": "weather-nsw1.json", "generatingFleets": [{ "technology": "Gas", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 } }], "storageFleets": [{ "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0, "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 }, "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 } }] },
               { "regionId": "VIC1", "demandFile": "demand-vic1.json", "weatherFile": "weather-vic1.json", "generatingFleets": [{ "technology": "Gas", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 } }], "storageFleets": [{ "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0, "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 }, "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 } }] }
             ], "storageSizing": { "maximumPowerMw": 100, "maximumEnergyMwh": 400, "maximumPasses": 4 } }
             """);
+        }
 
         private ScenarioSettings CreateSettings() => new(
-                1,
+                3,
                 "two-region",
                 "Two region",
                 new CostBasisSettings(2026, 0.07m),
                 [Region("NSW1", "demand-nsw1.json", "weather-nsw1.json", NswDataCentreNameplateMw),
                  Region("VIC1", "demand-vic1.json", "weather-vic1.json", VicDataCentreNameplateMw)],
-                new StorageSizingSettings(100, 400, MaximumPasses: 4));
+                new StorageSizingSettings(100, 400, MaximumPasses: 4),
+                Interconnectors: IncludeInterconnector ? [InterconnectorSettings()] : null);
+
+        private static ScenarioInterconnectorSettings InterconnectorSettings() => new(
+            "NSW1",
+            "VIC1",
+            30,
+            1_000,
+            10,
+            50);
 
         public void Dispose() => Directory.Delete(RootPath, recursive: true);
 

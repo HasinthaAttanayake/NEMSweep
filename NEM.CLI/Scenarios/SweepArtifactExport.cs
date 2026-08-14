@@ -162,7 +162,9 @@ internal static class SweepArtifactExport
             metrics.UnservedHours,
             metrics.HoursServedFraction,
             metrics.PeakUnservedPowerMw,
-            metrics.CurtailedEnergyMwh);
+            metrics.CurtailedEnergyMwh,
+            cost.TransmissionSlcotAudPerMwh,
+            cost.NetImportedEnergyMwh);
     }
 
     private static GenerationTechnology ParseTechnology(string technology) =>
@@ -301,12 +303,12 @@ internal static class SweepArtifactExport
             AddInput(
                 inputs,
                 context.Paths.SolutionRoot,
-                context.Paths.ResolveConfiguredPath(settings.DemandFile),
+                ScenarioRunner.ResolveScenarioInputPath(context.Paths, settings.DemandFile),
                 "demand-data");
             AddInput(
                 inputs,
                 context.Paths.SolutionRoot,
-                context.Paths.ResolveConfiguredPath(settings.WeatherFile),
+                ScenarioRunner.ResolveScenarioInputPath(context.Paths, settings.WeatherFile),
                 "weather-data");
         }
 

@@ -17,6 +17,7 @@ internal sealed class StorageSizingSearch
     private PowerSystem _candidate;
     private PowerSystem _lastDispatchedCandidate;
     private IReadOnlyList<DispatchOutcome> _outcomes = [];
+    private IReadOnlyList<InterconnectorFlow> _interconnectorFlows = [];
     private IReadOnlyList<InstalledBatteryAssessment> _installedBatteryAssessments = [];
 
     public StorageSizingSearch(
@@ -44,7 +45,7 @@ internal sealed class StorageSizingSearch
             return growthFailure;
         }
 
-        foreach (string regionId in _changedRegions)
+        foreach (string regionId in _changedRegions.OrderBy(regionId => regionId, StringComparer.Ordinal))
         {
             StorageFleet? installedBattery = _installedBatteryByRegion[regionId];
             double minimumPowerMw = Math.Max(
@@ -74,7 +75,10 @@ internal sealed class StorageSizingSearch
     {
         while (true)
         {
-            if (!TryDispatch(_candidate, out IReadOnlyList<DispatchOutcome> dispatchedOutcomes))
+            if (!TryDispatch(
+                _candidate,
+                out IReadOnlyList<DispatchOutcome> dispatchedOutcomes,
+                out IReadOnlyList<InterconnectorFlow> interconnectorFlows))
             {
                 return CreateResult(
                     _lastDispatchedCandidate,
@@ -83,6 +87,7 @@ internal sealed class StorageSizingSearch
             }
 
             _outcomes = dispatchedOutcomes;
+            _interconnectorFlows = interconnectorFlows;
             _lastDispatchedCandidate = _candidate;
             if (_installedBatteryAssessments.Count == 0)
             {
@@ -121,15 +126,11 @@ internal sealed class StorageSizingSearch
         var failingByRegion = failingOutcomes.ToDictionary(
             outcome => outcome.RegionId,
             StringComparer.OrdinalIgnoreCase);
-        var nextRegions = new List<Region>(_candidate.Regions.Count);
-
-        foreach (Region region in _candidate.Regions)
+        foreach (Region region in _candidate.Regions
+                     .Where(region => failingByRegion.ContainsKey(region.RegionId))
+                     .OrderBy(region => region.RegionId, StringComparer.Ordinal))
         {
-            if (!failingByRegion.TryGetValue(region.RegionId, out DispatchOutcome? outcome))
-            {
-                nextRegions.Add(region);
-                continue;
-            }
+            DispatchOutcome outcome = failingByRegion[region.RegionId];
 
             Region[] growthCandidates = GrowthCandidates(region);
             if (growthCandidates.Length == 0)
@@ -180,11 +181,10 @@ internal sealed class StorageSizingSearch
                     StagnationEvidence(region, outcome.Reliability, probes));
             }
 
-            nextRegions.Add(bestProbe.Region);
+            _candidate = ReplaceRegion(_candidate, bestProbe.Region);
             _changedRegions.Add(region.RegionId);
+            return null;
         }
-
-        _candidate = _candidate.WithRegions(nextRegions);
         return null;
     }
 
@@ -257,7 +257,10 @@ internal sealed class StorageSizingSearch
                 regionId,
                 battery.StorageCapacity,
                 Power.FromMegawatts(probeMw));
-            if (!TryDispatch(probe, out IReadOnlyList<DispatchOutcome> probeOutcomes))
+            if (!TryDispatch(
+                probe,
+                out IReadOnlyList<DispatchOutcome> probeOutcomes,
+                out IReadOnlyList<InterconnectorFlow> probeInterconnectorFlows))
             {
                 return false;
             }
@@ -266,6 +269,7 @@ internal sealed class StorageSizingSearch
             {
                 _candidate = probe;
                 _outcomes = probeOutcomes;
+                _interconnectorFlows = probeInterconnectorFlows;
                 upperMw = probeMw;
                 battery = RequireBattery(_candidate, regionId);
             }
@@ -292,7 +296,10 @@ internal sealed class StorageSizingSearch
                 regionId,
                 Energy.FromMegawattHours(probeMwh),
                 battery.PowerCapacity);
-            if (!TryDispatch(probe, out IReadOnlyList<DispatchOutcome> probeOutcomes))
+            if (!TryDispatch(
+                probe,
+                out IReadOnlyList<DispatchOutcome> probeOutcomes,
+                out IReadOnlyList<InterconnectorFlow> probeInterconnectorFlows))
             {
                 return false;
             }
@@ -301,6 +308,7 @@ internal sealed class StorageSizingSearch
             {
                 _candidate = probe;
                 _outcomes = probeOutcomes;
+                _interconnectorFlows = probeInterconnectorFlows;
                 upperMwh = probeMwh;
                 battery = RequireBattery(_candidate, regionId);
             }
@@ -315,18 +323,27 @@ internal sealed class StorageSizingSearch
 
     private bool TryDispatch(
         PowerSystem powerSystem,
-        out IReadOnlyList<DispatchOutcome> outcomes)
+        out IReadOnlyList<DispatchOutcome> outcomes,
+        out IReadOnlyList<InterconnectorFlow> interconnectorFlows)
     {
         if (DispatchPassCount >= _options.MaximumPasses)
         {
             outcomes = [];
+            interconnectorFlows = [];
             return false;
         }
 
-        outcomes = Dispatcher.Dispatch(powerSystem);
+        SystemDispatchRunResult result = Dispatcher.DispatchSystem(powerSystem);
+        outcomes = result.RegionalOutcomes;
+        interconnectorFlows = result.InterconnectorFlows;
         DispatchPassCount++;
         return true;
     }
+
+    private bool TryDispatch(
+        PowerSystem powerSystem,
+        out IReadOnlyList<DispatchOutcome> outcomes) =>
+        TryDispatch(powerSystem, out outcomes, out _);
 
     private bool AllMeetTarget(IReadOnlyList<DispatchOutcome> outcomes) =>
         outcomes.All(MeetsTarget);
@@ -387,7 +404,8 @@ internal sealed class StorageSizingSearch
             DispatchPassCount,
             status,
             evidence,
-            energyLimitedAssessment);
+            energyLimitedAssessment,
+            _interconnectorFlows);
     }
 
     private RegionalSizingResult CreateRegionalResult(

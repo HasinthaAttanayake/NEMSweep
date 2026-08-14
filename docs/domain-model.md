@@ -19,11 +19,18 @@ classDiagram
         ScenarioGeneratingFleet[] generatingFleets
       ScenarioStorageFleet[] storageFleets
     }
-      class ScenarioGeneratingFleet {
-        GenerationTechnology generationTechnology
-        Power nameplateCapacity
-        GenerationCostParameters costParameters
-        GenerationTechnologyProfile technologyProfile
+    class ScenarioInterconnector {
+      string fromRegionId
+      string toRegionId
+      Power capacity
+      TransmissionCostParameters costParameters
+      uint technicalLifeYears
+    }
+    class ScenarioGeneratingFleet {
+      GenerationTechnology generationTechnology
+      Power nameplateCapacity
+      GenerationCostParameters costParameters
+      GenerationTechnologyProfile technologyProfile
         monthlyCapacityFactors
     }
     class CostBasis {
@@ -71,6 +78,7 @@ classDiagram
     }
     class DispatchOutcome
     class SystemDispatchOutcome
+    class InterconnectorFlow
     class ReliabilityMetrics
     class SystemReliabilityAssessment
     class RegionReliabilityVerdict
@@ -91,6 +99,7 @@ classDiagram
     class EnergyLimitedAssessment
 
     Scenario "1" *-- "1..*" ScenarioRegion
+    Scenario "1" *-- "0..*" ScenarioInterconnector
     Scenario "1" *-- "1" CostBasis
     ScenarioRegion "1" *-- "1..*" ScenarioGeneratingFleet
     ScenarioRegion "1" *-- "0..*" ScenarioStorageFleet
@@ -100,6 +109,7 @@ classDiagram
     ScenarioStorageFleet "1" *-- "1" StorageTechnologyProfile
     Scenario --> PowerSystem : ScenarioDerivation.Derive
     PowerSystem "1" *-- "1..*" Region
+    PowerSystem "1" *-- "0..*" Interconnector
     Region "1" *-- "1..*" GeneratingFleet
     Region "1" *-- "0..*" StorageFleet
     Region "1" *-- "1" DemandProfile
@@ -116,6 +126,7 @@ classDiagram
     StorageFleet --> StorageOutcome : operates
     Dispatcher --> StorageOutcome : reconciles
     Dispatcher "1" --> "1..*" DispatchOutcome : produces per region
+    SystemDispatchOutcome "1" *-- "0..*" InterconnectorFlow : solver evidence
     DispatchOutcome "1" *-- "1" ReliabilityMetrics
     SystemDispatchOutcome --> PowerSystem : validates correspondence
     SystemDispatchOutcome "1" *-- "1..*" DispatchOutcome : aggregates regional evidence
@@ -127,6 +138,7 @@ classDiagram
     StorageSizingService --> StorageSizingRunResult : produces
     StorageSizingRunResult "1" *-- "1..*" RegionalSizingResult
     StorageSizingRunResult "1" *-- "1..*" InstalledBatteryAssessment
+    StorageSizingRunResult "1" *-- "0..*" InterconnectorFlow : final evidence
     StorageSizingRunResult "1" --> "0..1" EnergyLimitedAssessment : system evidence
     RegionalSizingResult "1" *-- "1" RegionalBatterySizing
     RegionalSizingResult --> DispatchOutcome : final evidence
@@ -168,7 +180,19 @@ classDiagram
 - `DataCentreDemand` expands a validated nameplate into a flat,
   full-load-factor component for the scenario period.
 - `PowerSystem` is the realised grid aggregate and cites its source scenario by
-  `ScenarioId`. It owns one or more `Region` aggregates.
+  `ScenarioId`. It owns one or more `Region` aggregates and zero or more
+  `Interconnector` values.
+- `Interconnector` is owned by `PowerSystem`, not by either endpoint, because it
+  belongs to neither region alone. It holds one directed transfer capacity from
+  `FromRegionId` to `ToRegionId`, metered at the sending end, and endpoints
+  identified by the same bare region strings compared case-insensitively that are
+  used everywhere else. A reciprocal path is a separate interconnector.
+  `PowerSystem` requires both endpoints to be its own regions and permits at most
+  one interconnector per exact direction. `WithRegions` forwards the collection,
+  so the repeated region rebuilds performed by storage sizing cannot silently drop
+  links. `ScenarioInterconnector` is the matching intent, hung off `Scenario`
+  alongside `CostBasis` because it is cross-regional, and it carries
+  `TransmissionCostParameters` and a technical life for that directed capacity.
 - `Region` requires one or more generating fleets with distinct generation
   technologies and may own storage fleets with distinct storage technologies.
   Its `DemandProfile` owns the base demand and zero or more labelled
@@ -182,17 +206,35 @@ classDiagram
   It orders generating fleets by short-run marginal cost and then technology for
   deterministic ties, builds an immutable storage-policy context for each
   interval, and executes policy intent through fleet physics.
+- `SystemDispatchRun` owns the horizon. The **interval is the outer loop and the
+  region the inner loop**, so every region is at the same hour at the same time
+  and surplus in one can serve a deficit in another. Order within an interval is
+  generation, then inter-regional transfer, then storage. Each region's own
+  sequence of operations is unchanged by the inversion, so a system with no
+  interconnectors produces results identical to dispatching each region alone.
+- `InterRegionalTransfer` is the only place the domain meets the graph. It maps
+  regional surplus and deficit onto nodes, delegates to the pure algorithms in
+  `NEM.Model/Algorithms`, and books deliveries back as imports and exports. The
+  algorithm layer knows nothing of regions, power, or losses; the transfer layer
+  knows nothing of how maximum flow is found. Losses are applied over the result,
+  never inside the search, which is what keeps it a standard max-flow problem.
+  Exports draw on curtailment first and then start dispatchable plant in merit
+  order; pumped hydro is excluded because storage is decided after transfer.
 - `IStoragePolicy` owns storage intent and fleet ordering. It receives scalar
   snapshots rather than mutable fleet objects and does not own state of charge,
   execute storage physics, or book unserved demand and curtailment.
 - `SystemDispatchOutcome` is immutable whole-system dispatch evidence. Its factory
-  requires exactly one hourly `DispatchOutcome` per `PowerSystem` region, checks
-  every regional demand timeline and rejects nonzero regional import/export
-  boundaries. It sums common demand, residual, storage, and per-technology flow
-  series element-wise, zero-fills technologies absent from a region, sums storage
-  state of charge by technology, and recalculates served load and reliability from
-  the resulting system series. It retains the validated regional outcomes as
-  read-only evidence for future export.
+  requires exactly one hourly `DispatchOutcome` per `PowerSystem` region and checks
+  every regional demand timeline. An unlinked system rejects nonzero regional
+  import/export boundaries; a linked system must be created from
+  `SystemDispatchRunResult` solver evidence, whose interconnector losses reconcile
+  with regional exports less imports. `InterconnectorFlow` stores one non-negative
+  directed `Flow` series from the link's sending region and a loss series no greater
+  than that flow. The aggregate sums common demand, residual, storage, and
+  per-technology flow series element-wise, zero-fills technologies absent from a
+  region, sums storage state of charge by technology, and recalculates served load
+  and reliability from the resulting system series. It retains validated regional
+  outcomes and directional link evidence as read-only export evidence.
 - `SystemReliabilityAssessment` is immutable whole-system target evidence. Its
   factory compares the aggregate USE calculated by `SystemDispatchOutcome` and
   each retained regional `DispatchOutcome` against one maximum USE percentage.
@@ -207,6 +249,9 @@ classDiagram
 - `StorageSizingRunResult` validates that its regional results correspond exactly
   to final `PowerSystem` regions, their generation technologies match the final
   system fleets, and their dispatch timelines align with the final system demand.
+  It also requires exactly one aligned `InterconnectorFlow` for every final link,
+  matching endpoint order case-insensitively, directed capacity, and non-negative
+  flow/loss values.
 - `PowerSystemCostCalculator` calculates a `PowerSystemCostBreakdown` after
   validating scenario, realised system, and dispatch correspondence. It requires
   exactly one scenario year. For each generation fleet it adds annualised power
@@ -221,7 +266,9 @@ classDiagram
   system annual costs and served energy by exactly summing these regional values,
   then divides the reconciled system components once by total served energy.
   `PowerSystemCostBreakdown` and `RegionCostBreakdown` are value-only results,
-  not calculation services. Transmission remains an explicit zero placeholder.
+  not calculation services. Transmission is annuitised from scenario
+  directed interconnector capacity assumptions and charged once at system level, so
+  regional costs do not sum to the system total.
 - Exported run results cite scenario and power-system identities rather than
   serialising the domain object graph.
 
@@ -276,6 +323,20 @@ generation + discharge + imports + unserved
     = demand + charge + exports + curtailment
 ```
 
+That identity is per region. Summing it across the system leaves exports
+exceeding imports by exactly what transmission consumed, so the system-level
+identity carries a losses term instead of import and export terms:
+
+```text
+generation + discharge + unserved
+    = demand + charge + curtailment + transmission losses
+```
+
+`SystemDispatchOutcome.TransmissionLosses` is `exports - imports`, and is
+cross-checked every interval against the loss the transfer solver reports
+directly. Nothing enters or leaves the system as a whole: every export is
+another region's import plus the loss incurred on the way.
+
 `DispatchOutcome.DeliveredToLoad` is `demand - unserved`; it is the regional
 load served by generation, storage discharge, and imports, and is the SLCoE
 denominator. Storage charging is recorded only as total `charge`; dispatch
@@ -314,10 +375,15 @@ exports`, while allocated fleet charge sums to regional `charge`. This
 distinction is necessary because storage discharge and imports serve load but
 are not current-interval generation by any generating fleet.
 
-The current single-region model sets imports and exports to zero. A region
-without storage also sets charge and discharge to zero. The current published
-result JSON has no storage, so `generation - curtailment` is generation
-delivered to load and uses the reduced identity:
+An unlinked `PowerSystem` sets imports, exports, and transmission losses to zero.
+Regional artifacts retain non-negative imports and exports plus annual net imported
+energy; their required transmission-loss series is zero because loss is system-level
+link evidence, not a regional attribution. Only a system artifact publishes directional
+forward/reverse link series and the reconciled total transmission-loss series.
+
+A region without storage also sets charge and discharge to zero. For such a regional
+outcome, `generation - curtailment` is generation delivered to load and uses the reduced
+identity:
 
 ```text
 delivered generation + unserved = demand
@@ -364,11 +430,12 @@ system-level proof. A total-energy shortfall proves infeasibility even if future
 interconnectors permit unrestricted transfers; it does not establish network
 feasibility when total energy is adequate.
 
-Once every region complies, full-system probes refine power and energy to 1 MW
-and 1 MWh precision while retaining only compliant candidates. The result is a
-deterministic coordinate-wise near-frontier point, not a globally minimum or
-cost-optimal point. Multi-region orchestration is implemented, but regions remain
-independent until interconnectors are introduced.
+Growth and every refinement probe dispatch the entire linked system. The growth phase
+advances a failing region in deterministic ordinal region order; once every region
+complies, full-system probes refine each changed region's power and energy to 1 MW and
+1 MWh precision while retaining only compliant candidates and their matching
+interconnector-flow evidence. The result is a deterministic coordinate-wise
+near-frontier point, not a globally minimum or cost-optimal point.
 
 ## Storage
 

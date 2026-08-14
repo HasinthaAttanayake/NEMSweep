@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 3,
   "id": "nsw1-baseline-dispatch",
   "name": "NSW1 baseline dispatch",
   "costBasis": { "year": 2026, "realDiscountRate": 0.07 },

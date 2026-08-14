@@ -228,6 +228,210 @@ public sealed class PowerSystemCostBreakdownTests
             .WithMessage("Storage fleets lack scenario cost assumptions*");
     }
 
+    [Fact]
+    public void Calculate_ChargesInterconnectorCostAgainstItsDirectedCapacity()
+    {
+        Scenario scenario = TwoRegionScenario(Interconnectors());
+        PowerSystemCostBreakdown breakdown = CalculateTwoRegion(scenario);
+
+        breakdown.TotalAnnualisedTransmissionCost.Should().Be(
+            Money.FromAud(21_000m),
+            "700 MW at 1000/MW over 50 years at zero discount is 14000, plus 7000 fixed");
+        breakdown.SystemLevelisedCostOfTransmission.Should().Be(
+            Money.FromAud(21_000m).Per(breakdown.DeliveredEnergy));
+        breakdown.TotalAnnualisedCost.Should().Be(
+            breakdown.TotalAnnualisedGenerationCost
+            + breakdown.TotalAnnualisedStorageCost
+            + Money.FromAud(21_000m));
+    }
+
+    [Fact]
+    public void Calculate_ChargesReciprocalInterconnectorsIndependently()
+    {
+        Scenario scenario = TwoRegionScenario(Interconnectors(includeReverse: true));
+
+        PowerSystemCostBreakdown breakdown = CalculateTwoRegion(scenario);
+
+        breakdown.TotalAnnualisedTransmissionCost.Should().Be(
+            Money.FromAud(33_000m),
+            "the 700 MW NSW1 to VIC1 and 400 MW VIC1 to NSW1 assets each carry their own cost");
+    }
+
+    [Fact]
+    public void Calculate_RegionalCostsExcludeTransmissionAndSoDoNotSumToTheSystemTotal()
+    {
+        Scenario scenario = TwoRegionScenario(Interconnectors());
+        PowerSystemCostBreakdown breakdown = CalculateTwoRegion(scenario);
+
+        Money regionalTotal = breakdown.Regions
+            .Select(region => region.TotalAnnualisedCost)
+            .Aggregate(Money.Zero, (left, right) => left + right);
+
+        regionalTotal.Should().NotBe(
+            breakdown.TotalAnnualisedCost,
+            "an interconnector spans two regions and is deliberately not split between them");
+        (breakdown.TotalAnnualisedCost - regionalTotal).Should().Be(
+            breakdown.TotalAnnualisedTransmissionCost,
+            "the gap between regional and system cost is exactly transmission");
+    }
+
+    [Fact]
+    public void Calculate_WithoutInterconnectors_LeavesTransmissionCostAtZero()
+    {
+        PowerSystemCostBreakdown breakdown = CalculateTwoRegion(TwoRegionScenario());
+
+        breakdown.TotalAnnualisedTransmissionCost.Should().Be(Money.Zero);
+        breakdown.SystemLevelisedCostOfTransmission.Should().Be(default(EnergyPrice));
+        breakdown.TotalAnnualisedCost.Should().Be(
+            breakdown.Regions
+                .Select(region => region.TotalAnnualisedCost)
+                .Aggregate(Money.Zero, (left, right) => left + right),
+            "with no links the regional and system totals must still agree");
+    }
+
+    [Fact]
+    public void Calculate_ReportsNetImportedEnergySoTheRegionalDenominatorBiasIsVisible()
+    {
+        Scenario scenario = TwoRegionScenario(Interconnectors());
+        DispatchOutcome exporter = TransferOutcome("NSW1", generation: 3, demand: 1, exports: 2);
+        DispatchOutcome importer = TransferOutcome("VIC1", generation: 1, demand: 3, imports: 2);
+        var powerSystem = new PowerSystem(
+            new PowerSystemId("two-region-cost-system"),
+            scenario.Id,
+            [RegionFor("NSW1", exporter.Demand), RegionFor("VIC1", importer.Demand)],
+            [Link()]);
+
+        PowerSystemCostBreakdown breakdown = PowerSystemCostCalculator.Calculate(
+            scenario,
+            powerSystem,
+            [exporter, importer]);
+
+        breakdown.Regions.Single(region => region.RegionId == "NSW1").NetImportedEnergy
+            .Should().Be(Energy.FromMegawattHours(-2));
+        breakdown.Regions.Single(region => region.RegionId == "VIC1").NetImportedEnergy
+            .Should().Be(
+                Energy.FromMegawattHours(2),
+                "a net importer serves load its own plant did not produce");
+    }
+
+    [Fact]
+    public void Calculate_RejectsPowerSystemWhoseInterconnectorsDifferFromTheScenario()
+    {
+        Scenario scenario = TwoRegionScenario(Interconnectors());
+        DispatchOutcome nswOutcome = DispatchOutcomeFor("NSW1", deliveredMegawattHours: 1);
+        DispatchOutcome vicOutcome = DispatchOutcomeFor("VIC1", deliveredMegawattHours: 2);
+        var powerSystem = new PowerSystem(
+            new PowerSystemId("two-region-cost-system"),
+            scenario.Id,
+            [RegionFor("NSW1", nswOutcome.Demand), RegionFor("VIC1", vicOutcome.Demand)]);
+
+        var act = () => PowerSystemCostCalculator.Calculate(
+            scenario,
+            powerSystem,
+            [nswOutcome, vicOutcome]);
+
+        act.Should().Throw<ArgumentException>()
+            .WithParameterName("powerSystem")
+            .WithMessage("Scenario and power system must contain the same interconnectors*");
+    }
+
+    [Fact]
+    public void Calculate_RejectsReciprocalSystemInterconnectorForTheWrongScenarioDirection()
+    {
+        Scenario scenario = TwoRegionScenario(Interconnectors());
+        DispatchOutcome nswOutcome = DispatchOutcomeFor("NSW1", deliveredMegawattHours: 1);
+        DispatchOutcome vicOutcome = DispatchOutcomeFor("VIC1", deliveredMegawattHours: 2);
+        var powerSystem = new PowerSystem(
+            new PowerSystemId("two-region-cost-system"),
+            scenario.Id,
+            [RegionFor("NSW1", nswOutcome.Demand), RegionFor("VIC1", vicOutcome.Demand)],
+            [new Interconnector("VIC1", "NSW1", Power.FromMegawatts(700))]);
+
+        var act = () => PowerSystemCostCalculator.Calculate(
+            scenario,
+            powerSystem,
+            [nswOutcome, vicOutcome]);
+
+        act.Should().Throw<ArgumentException>()
+            .WithParameterName("powerSystem")
+            .WithMessage("Scenario and power system must contain the same interconnectors*");
+    }
+
+    private static PowerSystemCostBreakdown CalculateTwoRegion(Scenario scenario)
+    {
+        DispatchOutcome nswOutcome = DispatchOutcomeFor("NSW1", deliveredMegawattHours: 1);
+        DispatchOutcome vicOutcome = DispatchOutcomeFor("VIC1", deliveredMegawattHours: 2);
+        var powerSystem = new PowerSystem(
+            new PowerSystemId("two-region-cost-system"),
+            scenario.Id,
+            [RegionFor("NSW1", nswOutcome.Demand), RegionFor("VIC1", vicOutcome.Demand)],
+            scenario.Interconnectors.Count == 0
+                ? null
+                : scenario.Interconnectors.Select(interconnector => interconnector.ToInterconnector()).ToArray());
+
+        return PowerSystemCostCalculator.Calculate(scenario, powerSystem, [nswOutcome, vicOutcome]);
+    }
+
+    private static Interconnector Link() =>
+        new("NSW1", "VIC1", Power.FromMegawatts(700));
+
+    private static IReadOnlyList<ScenarioInterconnector> Interconnectors(bool includeReverse = false) =>
+        includeReverse
+            ?
+            [
+                Interconnector("NSW1", "VIC1", 700),
+                Interconnector("VIC1", "NSW1", 400),
+            ]
+            : [Interconnector("NSW1", "VIC1", 700)];
+
+    private static ScenarioInterconnector Interconnector(
+        string fromRegionId,
+        string toRegionId,
+        double capacityMw) =>
+        new(
+            fromRegionId,
+            toRegionId,
+            Power.FromMegawatts(capacityMw),
+            new TransmissionCostParameters(
+                PowerCapacityCost.FromAudPerMwCapacity(1_000m),
+                AnnualPowerCapacityCost.FromAudPerMwYear(10m)),
+            technicalLifeYears: 50u);
+
+    private static DispatchOutcome TransferOutcome(
+        string regionId,
+        double generation,
+        double demand,
+        double imports = 0,
+        double exports = 0)
+    {
+        FlowSeries generationFlow = AnnualFlow(generation);
+        FlowSeries zero = AnnualFlow(0);
+        return new DispatchOutcome(
+            regionId,
+            new Dictionary<GenerationTechnology, FlowSeries>
+            {
+                [GenerationTechnology.Gas] = generationFlow,
+            },
+            new Dictionary<GenerationTechnology, FlowSeries>
+            {
+                [GenerationTechnology.Gas] = zero,
+            },
+            new Dictionary<GenerationTechnology, FlowSeries>
+            {
+                [GenerationTechnology.Gas] = generationFlow,
+            },
+            new Dictionary<GenerationTechnology, FlowSeries>
+            {
+                [GenerationTechnology.Gas] = zero,
+            },
+            AnnualFlow(demand),
+            zero,
+            zero,
+            zero,
+            AnnualFlow(imports),
+            AnnualFlow(exports));
+    }
+
     private static StorageSizingRunResult RunResult(
         DispatchOutcome outcome,
         Energy? storageEnergy = null,
@@ -347,7 +551,8 @@ public sealed class PowerSystemCostBreakdownTests
                 storageFleets)],
             new CostBasis(2026, realDiscountRate: 0m));
 
-    private static Scenario TwoRegionScenario() =>
+    private static Scenario TwoRegionScenario(
+        IReadOnlyList<ScenarioInterconnector>? interconnectors = null) =>
         new(
             new ScenarioId("two-region-cost-scenario"),
             "Two-region cost scenario",
@@ -357,7 +562,8 @@ public sealed class PowerSystemCostBreakdownTests
                 ScenarioRegionFor("NSW1"),
                 ScenarioRegionFor("VIC1"),
             ],
-            new CostBasis(2026, realDiscountRate: 0m));
+            new CostBasis(2026, realDiscountRate: 0m),
+            interconnectors);
 
     private static ScenarioRegion ScenarioRegionFor(string regionId) =>
         new(

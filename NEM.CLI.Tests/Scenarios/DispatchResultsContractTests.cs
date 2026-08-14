@@ -18,7 +18,7 @@ namespace NEM.CLI.Tests.Scenarios;
 public sealed class DispatchResultsContractTests
 {
     [Fact]
-    public void V7_RoundTripsWithVersionAndExplicitUnits()
+    public void V8_RoundTripsWithTransmissionEvidenceAndExplicitUnits()
     {
         var start = new DateTimeOffset(2025, 7, 1, 0, 0, 0, TimeSpan.FromHours(10));
         var result = new DispatchResultsDTO(
@@ -54,7 +54,10 @@ public sealed class DispatchResultsContractTests
                 [0, 5],
                 [10, 0],
                 [0, 5],
-                new Dictionary<string, double[]> { ["Battery"] = [0, 8.7] }),
+                new Dictionary<string, double[]> { ["Battery"] = [0, 8.7] },
+                ImportsMw: [12, 0],
+                ExportsMw: [0, 15],
+                TransmissionLossesMw: [0.6, 0.75]),
             new DispatchMetricsDTO(
                 170,
                 165,
@@ -76,7 +79,17 @@ public sealed class DispatchResultsContractTests
                 10_000,
                 3,
                 new EnergyLimitedEvidenceDTO(10, 12, 2, [4, 7])),
-            new DispatchCostDTO("calculated", 1000m, 200m, 1200m, 10m, 2m, 12m));
+            new DispatchCostDTO(
+                "calculated",
+                1000m,
+                200m,
+                1250m,
+                10m,
+                2m,
+                12.5m,
+                AnnualisedTransmissionCostAud: 50m,
+                TransmissionSlcotAudPerMwh: 0.5m,
+                NetImportedEnergyMwh: 12));
 
         string json = JsonSerializer.Serialize(result, new JsonSerializerOptions
         {
@@ -87,7 +100,7 @@ public sealed class DispatchResultsContractTests
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
         roundTripped.Should().BeEquivalentTo(result);
-        roundTripped!.SchemaVersion.Should().Be(7);
+        roundTripped!.SchemaVersion.Should().Be(ArtifactSchemaVersions.DispatchResults);
         json.Should().Contain("\"baseDemandMw\"");
         json.Should().Contain("\"additiveComponentsByNameMw\"");
         json.Should().Contain("\"totalDemandMw\"");
@@ -96,6 +109,9 @@ public sealed class DispatchResultsContractTests
         json.Should().Contain("\"powerCapacityMw\"");
         json.Should().Contain("\"deliveredGenerationByTechnologyMw\"");
         json.Should().Contain("\"stateOfChargeByTechnologyMwh\"");
+        json.Should().Contain("\"importsMw\"");
+        json.Should().Contain("\"exportsMw\"");
+        json.Should().Contain("\"transmissionLossesMw\"");
         json.Should().Contain("\"peakUnservedPowerMw\"");
         json.Should().Contain("\"annualisedGenerationCostAud\"");
         json.Should().Contain("\"annualisedStorageCostAud\"");
@@ -103,6 +119,9 @@ public sealed class DispatchResultsContractTests
         json.Should().Contain("\"generationSlcoeAudPerMwh\"");
         json.Should().Contain("\"storageSlcoeAudPerMwh\"");
         json.Should().Contain("\"slcoeAudPerMwh\"");
+        json.Should().Contain("\"annualisedTransmissionCostAud\"");
+        json.Should().Contain("\"transmissionSlcotAudPerMwh\"");
+        json.Should().Contain("\"netImportedEnergyMwh\"");
         json.Should().Contain("\"sha256\"");
         json.Should().Contain("\"weatherBasis\"");
         json.Should().Contain("\"kind\":\"typicalMeteorologicalYear\"");
@@ -286,7 +305,7 @@ public sealed class DispatchResultsContractTests
             "NEM reliability standard",
             PowerSystemCostCalculator.Calculate(scenario, powerSystem, [outcome])));
 
-        result.SchemaVersion.Should().Be(7);
+        result.SchemaVersion.Should().Be(ArtifactSchemaVersions.DispatchResults);
         result.DataSeries.DeliveredGenerationByTechnologyMw["Coal"].Take(2)
             .Should().Equal(120 - generationSourcedChargeMwh, 50);
         result.DataSeries.DeliveredGenerationByTechnologyMw["Gas"].Take(2)

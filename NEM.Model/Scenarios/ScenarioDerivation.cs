@@ -99,6 +99,9 @@ public static class ScenarioDerivation
         return new PowerSystem(
             new PowerSystemId($"{scenario.Id.Value}-system"),
             scenario.Id,
-            regions);
+            regions,
+            scenario.Interconnectors
+                .Select(interconnector => interconnector.ToInterconnector())
+                .ToArray());
     }
 }

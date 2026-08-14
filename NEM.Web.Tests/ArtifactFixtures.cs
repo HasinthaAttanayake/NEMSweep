@@ -42,7 +42,9 @@ public static class ArtifactFixtures
         UnservedHours: 0,
         HoursServedFraction: 1,
         PeakUnservedPowerMw: 0,
-        CurtailedEnergyMwh: 0);
+        CurtailedEnergyMwh: 0,
+        TransmissionSlcotAudPerMwh: 0m,
+        NetImportedEnergyMwh: 0);
 
     public static ReliabilityBasisDTO Reliability(bool withinTarget = true) =>
         new(0.002, withinTarget ? 0 : 0.01, withinTarget, "NEM reliability standard");
@@ -111,7 +113,10 @@ public static class ArtifactFixtures
         unserved,
         new double[unserved.Length],
         new double[unserved.Length],
-        stateOfCharge);
+        stateOfCharge,
+        new double[unserved.Length],
+        new double[unserved.Length],
+        new double[unserved.Length]);
 
     public static DispatchResultsDTO Results(
         int intervals = 3,
@@ -131,7 +136,57 @@ public static class ArtifactFixtures
         new DispatchMetricsDTO(0, 0, 0, 0, 0, 0, 1, 0, pointers ?? new IntervalPointersDTO(null, null, null)),
         Reliability(),
         Sizing(),
-        new DispatchCostDTO("calculated", 0, 0, 0, 0, 0, 0));
+        new DispatchCostDTO("calculated", 0, 0, 0, 0, 0, 0, 0, 0, 0));
+
+    public static SystemDispatchResultsDTO SystemResults(
+        int intervals = 3,
+        string runId = "run-1",
+        DispatchInterconnectorDTO[]? interconnectors = null)
+    {
+        DispatchResultsDTO regional = Results(intervals);
+        return new SystemDispatchResultsDTO(
+            ArtifactSchemaVersions.SystemDispatchResults,
+            runId,
+            regional.Scenario.PeriodStart,
+            regional.Scenario.PeriodEnd,
+            regional.Scenario.Resolution,
+            ["NSW1"],
+            new Dictionary<string, DispatchSourcesDTO> { ["NSW1"] = regional.DataSources },
+            new Dictionary<string, RegionDispatchSummaryDTO>
+            {
+                ["NSW1"] = new RegionDispatchSummaryDTO(
+                    regional.Metrics,
+                    regional.Reliability,
+                    regional.StorageSizing,
+                    regional.Cost,
+                    "results-nsw1.json"),
+            },
+            regional.DataSeries,
+            regional.Metrics,
+            regional.Reliability,
+            regional.StorageSizing,
+            regional.Cost,
+            interconnectors ?? []);
+    }
+
+    public static RegionDispatchResultsDTO RegionResults(int intervals = 3, string runId = "run-1")
+    {
+        DispatchResultsDTO regional = Results(intervals);
+        return new RegionDispatchResultsDTO(
+            ArtifactSchemaVersions.RegionDispatchResults,
+            runId,
+            "NSW1",
+            regional.Scenario.PeriodStart,
+            regional.Scenario.PeriodEnd,
+            regional.Scenario.Resolution,
+            regional.DataSources,
+            regional.PowerSystem,
+            regional.DataSeries,
+            regional.Metrics,
+            regional.Reliability,
+            regional.StorageSizing,
+            regional.Cost);
+    }
 
     public static DispatchScenarioDTO Scenario(int intervals = 3) => new(
         "scenario",

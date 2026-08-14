@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using NEM.Model.Grid;
+using NEM.Model.Series;
 using NEM.Model.Simulation;
 
 namespace NEM.Model.StorageSizing;
@@ -10,6 +11,8 @@ namespace NEM.Model.StorageSizing;
 /// </summary>
 public sealed class StorageSizingRunResult
 {
+    private const double FlowTolerance = 1e-9;
+
     public StorageSizingRunResult(
         PowerSystem powerSystem,
         IReadOnlyList<RegionalSizingResult> regions,
@@ -17,7 +20,8 @@ public sealed class StorageSizingRunResult
         int dispatchPassCount,
         StorageSizingStatus status,
         string terminationEvidence,
-        EnergyLimitedAssessment? energyLimitedAssessment = null)
+        EnergyLimitedAssessment? energyLimitedAssessment = null,
+        IReadOnlyList<InterconnectorFlow>? interconnectorFlows = null)
     {
         ArgumentNullException.ThrowIfNull(powerSystem);
         ArgumentNullException.ThrowIfNull(regions);
@@ -97,6 +101,9 @@ public sealed class StorageSizingRunResult
             }
         }
 
+        InterconnectorFlow[] resolvedInterconnectorFlows = interconnectorFlows?.ToArray() ?? [];
+        ValidateInterconnectorFlows(powerSystem, regions, resolvedInterconnectorFlows);
+
         PowerSystem = powerSystem;
         Regions = new ReadOnlyCollection<RegionalSizingResult>(regions.ToArray());
         InstalledBatteryAssessments = new ReadOnlyCollection<InstalledBatteryAssessment>(
@@ -105,6 +112,8 @@ public sealed class StorageSizingRunResult
         Status = status;
         TerminationEvidence = terminationEvidence;
         EnergyLimitedAssessment = energyLimitedAssessment;
+        InterconnectorFlows = new ReadOnlyCollection<InterconnectorFlow>(
+            resolvedInterconnectorFlows);
     }
 
     /// <summary>Final candidate power system evaluated by the search.</summary>
@@ -124,4 +133,70 @@ public sealed class StorageSizingRunResult
     /// null.
     /// </summary>
     public EnergyLimitedAssessment? EnergyLimitedAssessment { get; }
+    /// <summary>Final solver evidence for each interconnector in the result power system.</summary>
+    public IReadOnlyList<InterconnectorFlow> InterconnectorFlows { get; }
+
+    private static void ValidateInterconnectorFlows(
+        PowerSystem powerSystem,
+        IReadOnlyList<RegionalSizingResult> regions,
+        IReadOnlyList<InterconnectorFlow> flows)
+    {
+        if (flows.Count != powerSystem.Interconnectors.Count)
+        {
+            throw new ArgumentException(
+                "Interconnector flows must contain one entry for every final system interconnector.",
+                nameof(flows));
+        }
+
+        if (flows.Any(flow => flow is null))
+        {
+            throw new ArgumentException("Interconnector flows cannot contain null.", nameof(flows));
+        }
+
+        FlowSeries timeline = regions[0].DispatchOutcome.Demand;
+        for (int linkIndex = 0; linkIndex < flows.Count; linkIndex++)
+        {
+            InterconnectorFlow flow = flows[linkIndex];
+            Interconnector interconnector = powerSystem.Interconnectors[linkIndex];
+            if (!Matches(interconnector, flow.Interconnector))
+            {
+                throw new ArgumentException(
+                    "Interconnector flows must match the final system topology.",
+                    nameof(flows));
+            }
+
+            try
+            {
+                flow.Flow.RequireAligned(timeline);
+                flow.Losses.RequireAligned(timeline);
+            }
+            catch (ArgumentException exception)
+            {
+                throw new ArgumentException(
+                    "Interconnector flow timelines must match the final dispatch outcomes.",
+                    nameof(flows),
+                    exception);
+            }
+
+            for (int index = 0; index < timeline.Length; index++)
+            {
+                if (flow.Flow[index].Megawatts < -FlowTolerance
+                    || flow.Losses[index].Megawatts < -FlowTolerance
+                    || flow.Flow[index].Megawatts
+                        > interconnector.Capacity.Megawatts + FlowTolerance
+                    || flow.Losses[index].Megawatts
+                        > flow.Flow[index].Megawatts + FlowTolerance)
+                {
+                    throw new ArgumentException(
+                        $"Interconnector flow exceeds non-negative limits at index {index}.",
+                        nameof(flows));
+                }
+            }
+        }
+    }
+
+    private static bool Matches(Interconnector expected, Interconnector actual) =>
+        string.Equals(expected.FromRegionId, actual.FromRegionId, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(expected.ToRegionId, actual.ToRegionId, StringComparison.OrdinalIgnoreCase)
+        && expected.Capacity == actual.Capacity;
 }
