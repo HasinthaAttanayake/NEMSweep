@@ -31,6 +31,12 @@ public sealed class SystemAndRegionDispatchResultsContractTests
         json.Should().Contain("\"demandMwh\"");
         json.Should().Contain("\"targetUsePercentageOfDemand\"");
         json.Should().Contain("\"totalAnnualisedCostAud\"");
+        json.Should().Contain("\"annualisedTransmissionCostAud\"");
+        json.Should().Contain("\"transmissionSlcotAudPerMwh\"");
+        json.Should().Contain("\"interconnectors\"");
+        json.Should().Contain("\"capacityMw\"");
+        json.Should().Contain("\"flowMw\"");
+        json.Should().Contain("\"lossesMw\"");
         json.Should().Contain("\"finalEnergyMwh\"");
         json.Should().Contain("\"sha256\"");
     }
@@ -89,7 +95,13 @@ public sealed class SystemAndRegionDispatchResultsContractTests
             CreateMetrics(),
             new ReliabilityBasisDTO(0.002, 0, true, "NEM reliability standard"),
             CreateSizing(),
-            CreateCost());
+            CreateCost(),
+            [new DispatchInterconnectorDTO(
+                "NSW1",
+                "VIC1",
+                100,
+                [20, 0],
+                [1, 0.5])]);
     }
 
     private static RegionDispatchResultsDTO CreateRegionResult(DateTimeOffset start, string regionId) =>
@@ -130,7 +142,10 @@ public sealed class SystemAndRegionDispatchResultsContractTests
             [0, 0],
             [10, 0],
             [0, 5],
-            new Dictionary<string, double[]> { ["Battery"] = [0, 8.7] });
+            new Dictionary<string, double[]> { ["Battery"] = [0, 8.7] },
+            [0, 10],
+            [20, 0],
+            [1, 0.5]);
 
     private static DispatchMetricsDTO CreateMetrics() =>
         new(170, 165, 35, 0, 0, 0, 1, 0, new IntervalPointersDTO(null, 0, 0));
@@ -139,7 +154,7 @@ public sealed class SystemAndRegionDispatchResultsContractTests
         new(StorageSizingOutcome.NotRequired, 120, 30, 120, 30, 240, 60, 1);
 
     private static DispatchCostDTO CreateCost() =>
-        new("calculated", 1000m, 200m, 1200m, 10m, 2m, 12m);
+        new("calculated", 1000m, 200m, 1250m, 10m, 2m, 12.5m, 50m, 0.5m, 9.5);
 
     private static JsonSerializerOptions CamelCaseOptions => new()
     {

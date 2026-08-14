@@ -27,12 +27,13 @@ internal static class SchemaDescriptionCommand
           "additionalProperties": false,
           "required": ["schemaVersion", "id", "name", "costBasis", "regions", "storageSizing"],
           "properties": {
-            "schemaVersion": { "const": 1 },
+            "schemaVersion": { "const": 3 },
             "id": { "type": "string", "minLength": 1 },
             "name": { "type": "string", "minLength": 1 },
             "costBasis": { "$ref": "#/$defs/costBasis" },
             "regions": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/region" } },
             "storageSizing": { "$ref": "#/$defs/storageSizing" },
+            "interconnectors": { "type": "array", "items": { "$ref": "#/$defs/interconnector" } },
             "provenance": { "type": "object" }
           },
           "$defs": {
@@ -130,6 +131,18 @@ internal static class SchemaDescriptionCommand
               "properties": {
                 "technicalLifeYears": { "type": "integer", "minimum": 0 },
                 "roundTripEfficiency": { "type": "number", "minimum": 0, "maximum": 1 }
+              }
+            },
+            "interconnector": {
+              "type": "object", "additionalProperties": false,
+              "required": ["fromRegionId", "toRegionId", "capacityMw", "capitalCostAudPerMw", "fixedOperatingCostAudPerMwYear", "technicalLifeYears"],
+              "properties": {
+                "fromRegionId": { "type": "string", "minLength": 1 },
+                "toRegionId": { "type": "string", "minLength": 1 },
+                "capacityMw": { "type": "number", "minimum": 0 },
+                "capitalCostAudPerMw": { "type": "number", "minimum": 0 },
+                "fixedOperatingCostAudPerMwYear": { "type": "number", "minimum": 0 },
+                "technicalLifeYears": { "type": "integer", "minimum": 1 }
               }
             }
           }

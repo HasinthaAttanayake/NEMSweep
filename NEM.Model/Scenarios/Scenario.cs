@@ -25,7 +25,8 @@ public sealed class Scenario
         DateTimeOffset periodStart,
         DateTimeOffset periodEnd,
         IReadOnlyList<ScenarioRegion> regions,
-        CostBasis costBasis)
+        CostBasis costBasis,
+        IReadOnlyList<ScenarioInterconnector>? interconnectors = null)
     {
         ArgumentNullException.ThrowIfNull(id);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -60,12 +61,16 @@ public sealed class Scenario
                 nameof(regions));
         }
 
+        ScenarioInterconnector[] links = interconnectors?.ToArray() ?? [];
+        ValidateInterconnectors(regions, links);
+
         Id = id;
         Name = name;
         PeriodStart = periodStart;
         PeriodEnd = periodEnd;
         Regions = Array.AsReadOnly(regions.ToArray());
         CostBasis = costBasis;
+        Interconnectors = Array.AsReadOnly(links);
     }
 
     public ScenarioId Id { get; }
@@ -74,6 +79,92 @@ public sealed class Scenario
     public DateTimeOffset PeriodEnd { get; }
     public IReadOnlyList<ScenarioRegion> Regions { get; }
     public CostBasis CostBasis { get; }
+
+    /// <summary>
+    /// Directed transfer intent between regions. Cross-regional by nature, so it hangs
+    /// off the scenario alongside <see cref="CostBasis"/> rather than off any single region.
+    /// </summary>
+    public IReadOnlyList<ScenarioInterconnector> Interconnectors { get; }
+
+    private static void ValidateInterconnectors(
+        IReadOnlyList<ScenarioRegion> regions,
+        IReadOnlyList<ScenarioInterconnector> interconnectors)
+    {
+        if (interconnectors.Any(interconnector => interconnector is null))
+        {
+            throw new ArgumentException(
+                "Scenario interconnector plans cannot contain null.",
+                nameof(interconnectors));
+        }
+
+        var regionIds = regions
+            .Select(region => region.RegionId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var directions = new HashSet<(string From, string To)>();
+        foreach (ScenarioInterconnector interconnector in interconnectors)
+        {
+            foreach (string endpoint in
+                new[] { interconnector.FromRegionId, interconnector.ToRegionId })
+            {
+                if (!regionIds.Contains(endpoint))
+                {
+                    throw new ArgumentException(
+                        $"Interconnector endpoint '{endpoint}' is not a region of this scenario.",
+                        nameof(interconnectors));
+                }
+            }
+
+            var direction = (
+                interconnector.FromRegionId.ToUpperInvariant(),
+                interconnector.ToRegionId.ToUpperInvariant());
+            if (!directions.Add(direction))
+            {
+                throw new ArgumentException(
+                    "A scenario cannot contain duplicate interconnectors from "
+                    + $"'{interconnector.FromRegionId}' to '{interconnector.ToRegionId}'.",
+                    nameof(interconnectors));
+            }
+        }
+    }
+}
+
+/// <summary>Scenario intent for one directed transfer path between two regions.</summary>
+public sealed class ScenarioInterconnector
+{
+    public ScenarioInterconnector(
+        string fromRegionId,
+        string toRegionId,
+        Power capacity,
+        TransmissionCostParameters costParameters,
+        uint technicalLifeYears)
+    {
+        ArgumentNullException.ThrowIfNull(costParameters);
+        ArgumentOutOfRangeException.ThrowIfZero(technicalLifeYears);
+
+        // Validated here so endpoint and capacity rules live in exactly one place.
+        Interconnector realised = new(fromRegionId, toRegionId, capacity);
+
+        FromRegionId = realised.FromRegionId;
+        ToRegionId = realised.ToRegionId;
+        Capacity = realised.Capacity;
+        CostParameters = costParameters;
+        TechnicalLifeYears = technicalLifeYears;
+    }
+
+    public string FromRegionId { get; }
+    public string ToRegionId { get; }
+    public Power Capacity { get; }
+    public TransmissionCostParameters CostParameters { get; }
+
+    /// <summary>
+    /// Asset life used to annuitise capital cost. Held directly rather than on a profile
+    /// type, because it is the only technical parameter an interconnector carries.
+    /// </summary>
+    public uint TechnicalLifeYears { get; }
+
+    /// <summary>Realises the scenario intent as a grid asset.</summary>
+    public Interconnector ToInterconnector() =>
+        new(FromRegionId, ToRegionId, Capacity);
 }
 
 /// <summary>Scenario intent for the fleet plan in one NEM region.</summary>

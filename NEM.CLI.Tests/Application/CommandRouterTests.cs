@@ -53,7 +53,7 @@ public sealed class CommandRouterTests
     }
 
     [Theory]
-    [InlineData("scenario", "regionId", "demandFile", "weatherFile", "dataCentreNameplateMw")]
+    [InlineData("scenario", "regionId", "demandFile", "weatherFile", "dataCentreNameplateMw", "fromRegionId", "toRegionId", "capacityMw")]
     [InlineData("sweep", "overrides", "regions", "regionId", "$remove")]
     public void DescribeSchema_WritesDeterministicStrictSchema(
         string format,
@@ -117,7 +117,7 @@ public sealed class CommandRouterTests
                         Path.Combine(fixture.RootPath, "scenarios", "Local scenario.json"),
                         """
                         {
-                            "schemaVersion": 1,
+                            "schemaVersion": 3,
                             "id": "test-scenario",
                             "name": "Test scenario",
                             "costBasis": { "year": 2026, "realDiscountRate": 0.07 },

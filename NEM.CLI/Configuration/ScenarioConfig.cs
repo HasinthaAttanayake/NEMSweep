@@ -35,9 +35,9 @@ internal static class ScenarioConfig
     private static void Validate(ScenarioSettings scenario)
     {
         ArgumentNullException.ThrowIfNull(scenario);
-        if (scenario.SchemaVersion != 1)
+        if (scenario.SchemaVersion != 3)
         {
-            throw new FormatException($"Scenario config schema version found {scenario.SchemaVersion}; expected 1.");
+            throw new FormatException($"Scenario config schema version found {scenario.SchemaVersion}; expected 3.");
         }
 
         ArgumentException.ThrowIfNullOrWhiteSpace(scenario.Id);
@@ -156,6 +156,55 @@ internal static class ScenarioConfig
                 ValidateCosts(region.RegionId, fleet.Technology, fleet.CostParameters);
             }
         }
+
+        ValidateInterconnectors(scenario.Interconnectors, regionIds);
+    }
+
+    private static void ValidateInterconnectors(
+        ScenarioInterconnectorSettings[]? interconnectors,
+        IReadOnlySet<string> regionIds)
+    {
+        if (interconnectors is null)
+        {
+            return;
+        }
+
+        var directions = new HashSet<(string From, string To)>();
+        foreach (ScenarioInterconnectorSettings? interconnector in interconnectors)
+        {
+            if (interconnector is null
+                || string.IsNullOrWhiteSpace(interconnector.FromRegionId)
+                || string.IsNullOrWhiteSpace(interconnector.ToRegionId))
+            {
+                throw new FormatException("scenario.interconnectors fromRegionId and toRegionId must be non-blank.");
+            }
+
+            string from = interconnector.FromRegionId;
+            string to = interconnector.ToRegionId;
+            if (string.Equals(from, to, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new FormatException("scenario.interconnectors fromRegionId and toRegionId must identify different regions.");
+            }
+
+            if (!regionIds.Contains(from) || !regionIds.Contains(to))
+            {
+                throw new FormatException($"scenario.interconnectors regions '{from}' and '{to}' must belong to scenario.regions.");
+            }
+
+            var direction = (from.ToUpperInvariant(), to.ToUpperInvariant());
+            if (!directions.Add(direction))
+            {
+                throw new FormatException($"scenario.interconnectors cannot duplicate direction '{from}' to '{to}'.");
+            }
+
+            ValidateNonNegative(interconnector.CapacityMw, "interconnectors", "capacityMw");
+            ValidateNonNegative(interconnector.CapitalCostAudPerMw, "interconnectors", "capitalCostAudPerMw");
+            ValidateNonNegative(interconnector.FixedOperatingCostAudPerMwYear, "interconnectors", "fixedOperatingCostAudPerMwYear");
+            if (interconnector.TechnicalLifeYears == 0)
+            {
+                throw new FormatException("scenario.interconnectors technicalLifeYears must be nonzero.");
+            }
+        }
     }
 
     private static void ValidateCosts(string regionId, string technology, CostParametersSettings costs)
@@ -204,6 +253,14 @@ internal static class ScenarioConfig
             throw new FormatException($"scenario.regions region '{regionId}' technology '{technology}' field '{field}' must be non-negative.");
         }
     }
+
+    private static void ValidateNonNegative(decimal value, string scope, string field)
+    {
+        if (value < 0)
+        {
+            throw new FormatException($"scenario.{scope} field '{field}' must be non-negative.");
+        }
+    }
 }
 
 internal sealed record ScenarioSettings(
@@ -213,7 +270,8 @@ internal sealed record ScenarioSettings(
     CostBasisSettings CostBasis,
     ScenarioRegionSettings[] Regions,
     StorageSizingSettings StorageSizing,
-    JsonObject? Provenance = null)
+    JsonObject? Provenance = null,
+    ScenarioInterconnectorSettings[]? Interconnectors = null)
 {
     [JsonIgnore]
     public string DemandFile => Regions.Single().DemandFile;
@@ -270,5 +328,13 @@ internal sealed record StorageCostParametersSettings(
     decimal FixedOperatingCostAudPerMwYear);
 
 internal sealed record StorageTechnologyProfileSettings(uint TechnicalLifeYears, double RoundTripEfficiency);
+
+internal sealed record ScenarioInterconnectorSettings(
+    [property: JsonRequired] string FromRegionId,
+    [property: JsonRequired] string ToRegionId,
+    [property: JsonRequired] double CapacityMw,
+    [property: JsonRequired] decimal CapitalCostAudPerMw,
+    [property: JsonRequired] decimal FixedOperatingCostAudPerMwYear,
+    [property: JsonRequired] uint TechnicalLifeYears);
 
 internal sealed record MonthlyCapacityFactorSettings(DateOnly Month, double CapacityFactor);

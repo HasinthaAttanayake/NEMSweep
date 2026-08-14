@@ -213,6 +213,37 @@ public sealed class SweepRunTests
     }
 
     [Fact]
+    public void CreateProvenance_UsesConfiguredOutputRootForScenarioInputs()
+    {
+        using var fixture = new SweepRunFixture();
+        fixture.MoveInputsToConfiguredOutputRoot();
+        fixture.WriteDefinition("""[{ "pointId": "p0", "axisValue": 0, "label": "Base", "overrides": {} }]""");
+        CliContext context = fixture.CreateContext(TextWriter.Null);
+        SweepDefinition definition = SweepFanOutCommand.WriteConfigs(
+            context,
+            "sweeps/test-sweep.json",
+            validateGeneratedConfigs: false);
+        string configPath = Path.Combine(
+            fixture.RootPath,
+            "sweeps",
+            "test-sweep",
+            "configs",
+            "p0.json");
+
+        SweepProvenanceDTO provenance = SweepArtifactExport.CreateProvenance(
+            context,
+            definition,
+            fixture.DefinitionPath,
+            [configPath],
+            new SweepRunMetadata("test", false));
+
+        provenance.InputFiles.Should().Contain(
+            input => input.Purpose == "demand-data" && input.Path == "published-inputs/demand.json");
+        provenance.InputFiles.Should().Contain(
+            input => input.Purpose == "weather-data" && input.Path == "published-inputs/weather.json");
+    }
+
+    [Fact]
     public void CreateProvenance_DistinguishesCloseEconomicValuesInResolvedDefinition()
     {
         using var fixture = new SweepRunFixture();
@@ -275,11 +306,14 @@ public sealed class SweepRunTests
                 [10],
                 [20],
                 [0],
-                new Dictionary<string, double[]> { ["Battery"] = [0] }),
+                new Dictionary<string, double[]> { ["Battery"] = [0] },
+                [0],
+                [0],
+                [0]),
             new DispatchMetricsDTO(150, 120, 0, 10, 10.0 / 150 * 100, 1, 0, 10, new IntervalPointersDTO(0, null, 0)),
             new ReliabilityBasisDTO(0.002, 10, false, "NEM reliability standard"),
             new StorageSizingOutcomeDTO(StorageSizingOutcome.Resized, 10, 10, 20, 20, 400, 100, 2),
-            new DispatchCostDTO("calculated", 0, 0, 0, 0, 0, 0));
+            new DispatchCostDTO("calculated", 0, 0, 0, 0, 0, 0, 0, 0, 0));
 
         SweepPointScalarResultsDTO scalars = SweepArtifactExport.CreateScalars(result);
         RenewableShareMetrics sourceMetrics = RenewableShareMetrics.FromDeliveredEnergy(
@@ -381,7 +415,7 @@ public sealed class SweepRunTests
                         10,
                         zeroes))));
             File.WriteAllText(Path.Combine(RootPath, "scenarios", "baseline.json"), """
-            { "schemaVersion": 1, "id": "baseline", "name": "Baseline", "costBasis": { "year": 2026, "realDiscountRate": 0.07 }, "storageSizing": { "maximumPowerMw": 100, "maximumEnergyMwh": 400 }, "regions": [{ "regionId": "NSW1", "demandFile": "demand.json", "weatherFile": "weather.json", "generatingFleets": [{ "technology": "Gas", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 } }], "storageFleets": [{ "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0, "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 }, "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 } }] }] }
+            { "schemaVersion": 3, "id": "baseline", "name": "Baseline", "costBasis": { "year": 2026, "realDiscountRate": 0.07 }, "storageSizing": { "maximumPowerMw": 100, "maximumEnergyMwh": 400 }, "regions": [{ "regionId": "NSW1", "demandFile": "demand.json", "weatherFile": "weather.json", "generatingFleets": [{ "technology": "Gas", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 } }], "storageFleets": [{ "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0, "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 }, "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 } }] }] }
             """);
             Paths = RepositoryPaths.Discover(RootPath);
         }
@@ -421,6 +455,24 @@ public sealed class SweepRunTests
             $$"""
             { "schemaVersion": 1, "sweepId": "test-sweep", "name": "Test sweep", "axis": { "label": "Capacity", "unit": "MW" }, "baselineConfigPath": "scenarios/baseline.json", "points": {{points}} }
             """);
+
+        public void MoveInputsToConfiguredOutputRoot()
+        {
+            const string outputDirectory = "published-inputs";
+            string fullOutputDirectory = Path.Combine(RootPath, outputDirectory);
+            Directory.CreateDirectory(fullOutputDirectory);
+            File.Move(
+                Path.Combine(RootPath, "demand.json"),
+                Path.Combine(fullOutputDirectory, "demand.json"));
+            File.Move(
+                Path.Combine(RootPath, "weather.json"),
+                Path.Combine(fullOutputDirectory, "weather.json"));
+            string settingsDirectory = Path.Combine(RootPath, "NEM.CLI");
+            Directory.CreateDirectory(settingsDirectory);
+            File.WriteAllText(
+                Path.Combine(settingsDirectory, "appsettings.local.json"),
+                """{ "inputBundleRoot": "unused", "outputRoot": "published-inputs", "defaultScenarioPath": "unused" }""");
+        }
 
         public void Dispose() => Directory.Delete(RootPath, recursive: true);
     }

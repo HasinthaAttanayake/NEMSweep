@@ -116,6 +116,11 @@ public sealed class ArtifactLoader(HttpClient http)
                     null);
             }
 
+            if (validateSchema && DispatchArtifactValidator.Validate(artifact) is { } validationMessage)
+            {
+                return new(ArtifactLoadState.InvalidData(validationMessage), null);
+            }
+
             return new(new(ArtifactLoadStatus.Success, null), artifact);
         }
         catch (JsonException)

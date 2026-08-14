@@ -6,8 +6,13 @@ namespace NEM.Model.Simulation;
 
 /// <summary>
 /// Immutable dispatch evidence aggregated across every region in a <see cref="PowerSystem"/>.
-/// Regional imports and exports must be zero until inter-regional dispatch is modelled.
 /// </summary>
+/// <remarks>
+/// Inter-regional flows net out across the system except for what transmission losses
+/// consume, so the system identity carries a losses term that the regional identity does
+/// not. Nothing enters or leaves the system as a whole: every export is some other
+/// region's import plus the loss on the way.
+/// </remarks>
 public sealed class SystemDispatchOutcome
 {
     private const double BalanceTolerance = 1e-9;
@@ -23,7 +28,10 @@ public sealed class SystemDispatchOutcome
         FlowSeries charge,
         FlowSeries discharge,
         IReadOnlyDictionary<StorageTechnology, StockSeries> stateOfChargeByTechnology,
-        FlowSeries unserved)
+        FlowSeries unserved,
+        FlowSeries imports,
+        FlowSeries exports,
+        IReadOnlyList<InterconnectorFlow> interconnectorFlows)
     {
         PowerSystemId = powerSystem.Id;
         RegionalOutcomes = Array.AsReadOnly(regionalOutcomes.ToArray());
@@ -41,7 +49,16 @@ public sealed class SystemDispatchOutcome
             new Dictionary<StorageTechnology, StockSeries>(stateOfChargeByTechnology));
         Unserved = unserved;
         DeliveredToLoad = demand.Subtract(unserved);
+        Imports = imports;
+        Exports = exports;
+        InterconnectorFlows = Array.AsReadOnly(interconnectorFlows.ToArray());
+        FlowSeries derivedLosses = exports.Subtract(imports);
+        FlowSeries solverLosses = SumFlows(
+            interconnectorFlows.Select(flow => flow.Losses),
+            demand);
+        TransmissionLosses = interconnectorFlows.Count == 0 ? derivedLosses : solverLosses;
 
+        ValidateTransmissionLosses(derivedLosses, solverLosses, interconnectorFlows);
         ValidateEnergyIdentity();
         FlowSeries reliabilityZero = ZeroFlow();
         var reliabilityDelivered = new Dictionary<GenerationTechnology, FlowSeries>
@@ -73,6 +90,33 @@ public sealed class SystemDispatchOutcome
     {
         ArgumentNullException.ThrowIfNull(powerSystem);
         ArgumentNullException.ThrowIfNull(dispatchOutcomes);
+        if (powerSystem.Interconnectors.Count > 0)
+        {
+            throw new ArgumentException(
+                "A linked power system must be created from solver evidence.",
+                nameof(dispatchOutcomes));
+        }
+
+        return CreateCore(powerSystem, dispatchOutcomes, []);
+    }
+
+    /// <summary>Aggregates regional outcomes with the solver evidence that produced them.</summary>
+    public static SystemDispatchOutcome Create(
+        PowerSystem powerSystem,
+        SystemDispatchRunResult dispatch)
+    {
+        ArgumentNullException.ThrowIfNull(dispatch);
+        return CreateCore(powerSystem, dispatch.RegionalOutcomes, dispatch.InterconnectorFlows);
+    }
+
+    private static SystemDispatchOutcome CreateCore(
+        PowerSystem powerSystem,
+        IReadOnlyList<DispatchOutcome> dispatchOutcomes,
+        IReadOnlyList<InterconnectorFlow> interconnectorFlows)
+    {
+        ArgumentNullException.ThrowIfNull(powerSystem);
+        ArgumentNullException.ThrowIfNull(dispatchOutcomes);
+        ArgumentNullException.ThrowIfNull(interconnectorFlows);
 
         var outcomesByRegion = new Dictionary<string, DispatchOutcome>(StringComparer.OrdinalIgnoreCase);
         foreach (DispatchOutcome outcome in dispatchOutcomes)
@@ -103,7 +147,7 @@ public sealed class SystemDispatchOutcome
             }
 
             RequireAligned(region.Demand.TotalDemand, outcome.Demand, regionId, nameof(dispatchOutcomes));
-            RequireZeroBoundaryFlows(outcome, nameof(dispatchOutcomes));
+            RequireNonNegativeBoundaryFlows(outcome, nameof(dispatchOutcomes));
         }
 
         foreach (string regionId in systemRegionsById.Keys)
@@ -132,6 +176,11 @@ public sealed class SystemDispatchOutcome
         DispatchOutcome[] orderedOutcomes = powerSystem.Regions
             .Select(region => outcomesByRegion[region.RegionId])
             .ToArray();
+        RequireNoBoundaryFlowsWithoutInterconnectors(
+            powerSystem,
+            orderedOutcomes,
+            nameof(dispatchOutcomes));
+        ValidateInterconnectorFlows(powerSystem, interconnectorFlows, orderedOutcomes);
         FlowSeries demand = SumFlows(orderedOutcomes.Select(outcome => outcome.Demand), reference.Demand);
         return new SystemDispatchOutcome(
             powerSystem,
@@ -144,7 +193,10 @@ public sealed class SystemDispatchOutcome
             SumFlows(orderedOutcomes.Select(outcome => outcome.Charge), reference.Demand),
             SumFlows(orderedOutcomes.Select(outcome => outcome.Discharge), reference.Demand),
             SumStocksByTechnology(orderedOutcomes, reference.Demand),
-            SumFlows(orderedOutcomes.Select(outcome => outcome.Unserved), reference.Demand));
+            SumFlows(orderedOutcomes.Select(outcome => outcome.Unserved), reference.Demand),
+            SumFlows(orderedOutcomes.Select(outcome => outcome.Imports), reference.Demand),
+            SumFlows(orderedOutcomes.Select(outcome => outcome.Exports), reference.Demand),
+            interconnectorFlows);
     }
 
     public PowerSystemId PowerSystemId { get; }
@@ -162,6 +214,22 @@ public sealed class SystemDispatchOutcome
     public IReadOnlyDictionary<StorageTechnology, StockSeries> StateOfChargeByTechnology { get; }
     public FlowSeries Unserved { get; }
     public FlowSeries DeliveredToLoad { get; }
+
+    /// <summary>Total energy received by regions from other regions, net of losses.</summary>
+    public FlowSeries Imports { get; }
+
+    /// <summary>Total energy sent by regions to other regions, metered at the sending end.</summary>
+    public FlowSeries Exports { get; }
+
+    /// <summary>
+    /// Energy consumed moving power between regions, being the gap between what was sent
+    /// and what arrived. A real sink in the system energy ledger, not a residual.
+    /// </summary>
+    public FlowSeries TransmissionLosses { get; }
+
+    /// <summary>Directional solver evidence for every link in the final power system.</summary>
+    public IReadOnlyList<InterconnectorFlow> InterconnectorFlows { get; }
+
     public ReliabilityMetrics Reliability { get; }
 
     private static IReadOnlyDictionary<GenerationTechnology, FlowSeries> ReadOnly(
@@ -245,18 +313,156 @@ public sealed class SystemDispatchOutcome
         }
     }
 
-    private static void RequireZeroBoundaryFlows(DispatchOutcome outcome, string parameterName)
+    /// <summary>
+    /// Inter-regional flows are directional quantities, so neither side may be negative.
+    /// A region exporting a negative amount would be importing, and booking it in the
+    /// wrong series would still satisfy the regional identity while corrupting the system
+    /// loss reconciliation.
+    /// </summary>
+    private static void RequireNonNegativeBoundaryFlows(
+        DispatchOutcome outcome,
+        string parameterName)
     {
         for (int index = 0; index < outcome.Demand.Length; index++)
         {
-            if (outcome.Imports[index].Megawatts != 0 || outcome.Exports[index].Megawatts != 0)
+            if (outcome.Imports[index].Megawatts < -BalanceTolerance
+                || outcome.Exports[index].Megawatts < -BalanceTolerance)
             {
                 throw new ArgumentException(
-                    $"Dispatch outcome for region '{outcome.RegionId}' has nonzero imports or exports at the system boundary.",
+                    $"Dispatch outcome for region '{outcome.RegionId}' has negative imports or "
+                    + $"exports at index {index}.",
                     parameterName);
             }
         }
     }
+
+    /// <summary>
+    /// Nothing enters or leaves the system as a whole, so every export must be some other
+    /// region's import plus the loss incurred on the way. Losses below zero would mean
+    /// energy was created in transit; losses above what was exported would mean more was
+    /// lost than ever left.
+    /// </summary>
+    private void ValidateTransmissionLosses(
+        FlowSeries derivedLosses,
+        FlowSeries solverLosses,
+        IReadOnlyList<InterconnectorFlow> interconnectorFlows)
+    {
+        for (int index = 0; index < Length; index++)
+        {
+            double losses = TransmissionLosses[index].Megawatts;
+            double exports = Exports[index].Megawatts;
+            double tolerance = BalanceTolerance * Math.Max(1, Math.Abs(exports));
+            if (interconnectorFlows.Count > 0
+                && Math.Abs(derivedLosses[index].Megawatts - solverLosses[index].Megawatts)
+                    > tolerance)
+            {
+                throw new InvalidOperationException(
+                    $"System transmission loss reconciliation failed at index {index} "
+                    + $"({Demand.InstantAt(index):o}): exports minus imports was "
+                    + $"{derivedLosses[index].Megawatts} MW but solver losses were "
+                    + $"{solverLosses[index].Megawatts} MW.");
+            }
+            if (losses < -tolerance)
+            {
+                throw new InvalidOperationException(
+                    $"System imports exceed exports at index {index} "
+                    + $"({Demand.InstantAt(index):o}): {-losses} MW of energy would be created "
+                    + "in transit.");
+            }
+
+            if (losses > exports + tolerance)
+            {
+                throw new InvalidOperationException(
+                    $"System transmission losses exceed exports at index {index} "
+                    + $"({Demand.InstantAt(index):o}): {losses} MW lost against {exports} MW "
+                    + "exported.");
+            }
+        }
+    }
+
+    private static void RequireNoBoundaryFlowsWithoutInterconnectors(
+        PowerSystem powerSystem,
+        IReadOnlyList<DispatchOutcome> outcomes,
+        string parameterName)
+    {
+        if (powerSystem.Interconnectors.Count > 0)
+        {
+            return;
+        }
+
+        foreach (DispatchOutcome outcome in outcomes)
+        {
+            for (int index = 0; index < outcome.Demand.Length; index++)
+            {
+                if (outcome.Imports[index].Megawatts > BalanceTolerance
+                    || outcome.Exports[index].Megawatts > BalanceTolerance)
+                {
+                    throw new ArgumentException(
+                        $"Dispatch outcome for region '{outcome.RegionId}' has a boundary flow at "
+                        + $"index {index}, but the power system has no interconnectors.",
+                        parameterName);
+                }
+            }
+        }
+    }
+
+    private static void ValidateInterconnectorFlows(
+        PowerSystem powerSystem,
+        IReadOnlyList<InterconnectorFlow> flows,
+        IReadOnlyList<DispatchOutcome> outcomes)
+    {
+        if (flows.Count != powerSystem.Interconnectors.Count)
+        {
+            throw new ArgumentException(
+                "Solver evidence must contain one flow per system interconnector.",
+                nameof(flows));
+        }
+
+        if (flows.Any(flow => flow is null))
+        {
+            throw new ArgumentException("Solver evidence cannot contain null flows.", nameof(flows));
+        }
+
+        FlowSeries timeline = outcomes[0].Demand;
+        foreach ((InterconnectorFlow flow, Interconnector link) in
+                 flows.Zip(powerSystem.Interconnectors))
+        {
+            if (!MatchesTopology(flow.Interconnector, link))
+            {
+                throw new ArgumentException(
+                    "Solver evidence interconnectors must match the power system topology.",
+                    nameof(flows));
+            }
+
+            flow.Flow.RequireAligned(timeline);
+            flow.Losses.RequireAligned(timeline);
+            for (int index = 0; index < timeline.Length; index++)
+            {
+                if (flow.Flow[index].Megawatts < -BalanceTolerance
+                    || flow.Losses[index].Megawatts < -BalanceTolerance
+                    || flow.Flow[index] > link.Capacity
+                    || flow.Losses[index].Megawatts
+                        > flow.Flow[index].Megawatts + BalanceTolerance)
+                {
+                    throw new ArgumentException(
+                        $"Solver evidence exceeds non-negative limits for interconnector "
+                        + $"'{link.FromRegionId}-{link.ToRegionId}' at index {index}.",
+                        nameof(flows));
+                }
+            }
+        }
+    }
+
+    private static bool MatchesTopology(Interconnector evidence, Interconnector topology) =>
+        string.Equals(
+            evidence.FromRegionId,
+            topology.FromRegionId,
+            StringComparison.OrdinalIgnoreCase)
+        && string.Equals(
+            evidence.ToRegionId,
+            topology.ToRegionId,
+            StringComparison.OrdinalIgnoreCase)
+        && evidence.Capacity == topology.Capacity;
 
     private FlowSeries ZeroFlow() => new(Start, Resolution, new double[Length]);
 
@@ -267,7 +473,10 @@ public sealed class SystemDispatchOutcome
             double generation = PerFleetGeneration.Values.Sum(flow => flow[index].Megawatts);
             double curtailment = PerFleetCurtailment.Values.Sum(flow => flow[index].Megawatts);
             double inputs = generation + Discharge[index].Megawatts + Unserved[index].Megawatts;
-            double outputs = Demand[index].Megawatts + Charge[index].Megawatts + curtailment;
+            double outputs = Demand[index].Megawatts
+                + Charge[index].Megawatts
+                + curtailment
+                + TransmissionLosses[index].Megawatts;
             double tolerance = BalanceTolerance * Math.Max(1, Math.Max(Math.Abs(inputs), Math.Abs(outputs)));
             if (Math.Abs(inputs - outputs) > tolerance)
             {

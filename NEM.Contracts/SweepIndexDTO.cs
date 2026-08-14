@@ -133,7 +133,9 @@ public sealed record SweepPointScalarResultsDTO(
     int UnservedHours,
     double HoursServedFraction,
     double PeakUnservedPowerMw,
-    double CurtailedEnergyMwh);
+    double CurtailedEnergyMwh,
+    [property: JsonRequired] decimal TransmissionSlcotAudPerMwh,
+    [property: JsonRequired] double NetImportedEnergyMwh);
 
 public sealed record RegularSeriesDTO(
     int SchemaVersion,

@@ -21,6 +21,11 @@ internal sealed class RegionalDispatchRun
     private readonly Dictionary<StorageTechnology, double[]> _stateOfChargeMwhByTechnology;
     private readonly double[] _unservedMw;
     private readonly double[] _dischargeMw;
+    private readonly double[] _importsMw;
+    private readonly double[] _exportsMw;
+    private int _currentIndex = -1;
+    private DateTimeOffset _currentInstant;
+    private Power _intervalDeficit;
 
     public RegionalDispatchRun(
         Region region,
@@ -53,30 +58,222 @@ internal sealed class RegionalDispatchRun
             _ => new double[_demand.Length]);
         _unservedMw = new double[_demand.Length];
         _dischargeMw = new double[_demand.Length];
+        _importsMw = new double[_demand.Length];
+        _exportsMw = new double[_demand.Length];
     }
 
-    public DispatchOutcome Execute()
-    {
-        for (int index = 0; index < _demand.Length; index++)
-        {
-            RecordStateOfCharge(index);
-            DateTimeOffset instant = _demand.InstantAt(index);
-            Power remainingDemand = DispatchGeneration(index, instant);
-            Power surplus = Power.FromMegawatts(
-                _curtailmentMwByTechnology.Values.Sum(values => values[index]));
-            StorageDecision decision = _storagePolicy.Decide(
-                CreateStorageContext(index, instant, remainingDemand, surplus))
-                ?? throw new InvalidOperationException("Storage policy returned no decision.");
+    /// <summary>Quantities below this are treated as zero when reconciling transfers.</summary>
+    private const double Tolerance = 1e-9;
 
-            _unservedMw[index] = ExecuteStorage(
-                index,
-                instant,
-                remainingDemand,
-                surplus,
-                decision).Megawatts;
+    public string RegionId => _region.RegionId;
+
+    public int Length => _demand.Length;
+
+    /// <summary>Deficit still outstanding in the interval being processed.</summary>
+    public Power CurrentDeficit => _intervalDeficit;
+
+    /// <summary>
+    /// Opens an interval. Records the opening state of charge, which is what the outcome
+    /// reports, and must be called before any other step for that interval.
+    /// </summary>
+    public void BeginInterval(int index)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(index);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, _demand.Length);
+        _currentIndex = index;
+        _currentInstant = _demand.InstantAt(index);
+        _intervalDeficit = Power.Zero;
+        RecordStateOfCharge(index);
+    }
+
+    /// <summary>Dispatches generation in merit order and returns the unmet demand.</summary>
+    public Power DispatchGeneration()
+    {
+        RequireOpenInterval();
+        _intervalDeficit = DispatchGeneration(_currentIndex, _currentInstant);
+        return _intervalDeficit;
+    }
+
+    /// <summary>
+    /// Power this region could deliver to another region: renewable output already being
+    /// spilled, plus headroom on dispatchable plant that could be started to serve an
+    /// export. Pumped hydro is excluded because it is storage, and storage is decided
+    /// after transfer.
+    /// </summary>
+    public Power ExportableSurplus()
+    {
+        RequireOpenInterval();
+        if (_intervalDeficit > Power.Zero)
+        {
+            return Power.Zero;
         }
 
-        return BuildOutcome();
+        Power exportable = Power.FromMegawatts(
+            _curtailmentMwByTechnology.Values.Sum(values => values[_currentIndex]));
+        foreach (GeneratingFleet fleet in _generatingFleets)
+        {
+            if (fleet.IsIntermittentRenewable)
+            {
+                continue;
+            }
+
+            exportable += IncrementalHeadroom(fleet.GenerationTechnology);
+        }
+
+        return exportable;
+    }
+
+    /// <summary>Books energy received from another region against this interval's deficit.</summary>
+    public void ApplyImport(Power delivered)
+    {
+        RequireOpenInterval();
+        if (delivered <= Power.Zero)
+        {
+            return;
+        }
+
+        Power remainingDeficit = _intervalDeficit - delivered;
+        if (remainingDeficit.Megawatts < -Tolerance)
+        {
+            throw new InvalidOperationException(
+                $"Region '{_region.RegionId}' was sent more energy than it needed at index "
+                + $"{_currentIndex}.");
+        }
+
+        _importsMw[_currentIndex] += delivered.Megawatts;
+        _intervalDeficit = remainingDeficit < Power.Zero ? Power.Zero : remainingDeficit;
+    }
+
+    /// <summary>
+    /// Books energy sent to another region, drawing first on renewable output that would
+    /// otherwise be spilled and then on dispatchable headroom in merit order.
+    /// </summary>
+    public void ApplyExport(Power sent)
+    {
+        RequireOpenInterval();
+        if (sent <= Power.Zero)
+        {
+            return;
+        }
+
+        Power outstanding = sent - ExportFromCurtailment(sent);
+        if (outstanding > Power.Zero)
+        {
+            outstanding -= ExportFromIncrementalGeneration(outstanding);
+        }
+
+        if (outstanding.Megawatts > Tolerance)
+        {
+            throw new InvalidOperationException(
+                $"Region '{_region.RegionId}' was asked to export {sent.Megawatts} MW at index "
+                + $"{_currentIndex} but could only source {(sent - outstanding).Megawatts} MW.");
+        }
+
+        _exportsMw[_currentIndex] += sent.Megawatts;
+    }
+
+    /// <summary>
+    /// Runs the storage policy against whatever deficit or surplus remains after transfer,
+    /// and books the leftover deficit as unserved energy.
+    /// </summary>
+    public void CompleteInterval()
+    {
+        RequireOpenInterval();
+        Power surplus = Power.FromMegawatts(
+            _curtailmentMwByTechnology.Values.Sum(values => values[_currentIndex]));
+        StorageDecision decision = _storagePolicy.Decide(
+            CreateStorageContext(_currentIndex, _currentInstant, _intervalDeficit, surplus))
+            ?? throw new InvalidOperationException("Storage policy returned no decision.");
+
+        _unservedMw[_currentIndex] = ExecuteStorage(
+            _currentIndex,
+            _currentInstant,
+            _intervalDeficit,
+            surplus,
+            decision).Megawatts;
+        _currentIndex = -1;
+    }
+
+    private void RequireOpenInterval()
+    {
+        if (_currentIndex < 0)
+        {
+            throw new InvalidOperationException(
+                $"No interval is open for region '{_region.RegionId}'.");
+        }
+    }
+
+    private Power IncrementalHeadroom(GenerationTechnology technology) =>
+        _budgetByTechnology[technology].Headroom(
+            _availableByTechnology[technology][_currentIndex],
+            Power.FromMegawatts(_generationMwByTechnology[technology][_currentIndex]),
+            _currentInstant,
+            _resolution);
+
+    /// <summary>
+    /// Moves spilled renewable output into exports, cheapest first. Generation is
+    /// unchanged; the energy simply stops being curtailed, so the derived per-fleet
+    /// delivered figure absorbs it.
+    /// </summary>
+    private Power ExportFromCurtailment(Power request)
+    {
+        double outstandingMw = request.Megawatts;
+        double takenMw = 0;
+        foreach (GeneratingFleet fleet in _generatingFleets)
+        {
+            double[] curtailmentMw = _curtailmentMwByTechnology[fleet.GenerationTechnology];
+            double reductionMw = Math.Min(outstandingMw, curtailmentMw[_currentIndex]);
+            curtailmentMw[_currentIndex] -= reductionMw;
+            outstandingMw -= reductionMw;
+            takenMw += reductionMw;
+            if (outstandingMw <= Tolerance)
+            {
+                break;
+            }
+        }
+
+        return Power.FromMegawatts(takenMw);
+    }
+
+    /// <summary>
+    /// Starts dispatchable plant specifically to serve an export, in ascending short-run
+    /// marginal cost. Generation rises and the energy leaves as an export, so both sides
+    /// of the regional balance move together.
+    /// </summary>
+    private Power ExportFromIncrementalGeneration(Power request)
+    {
+        double outstandingMw = request.Megawatts;
+        double takenMw = 0;
+        foreach (GeneratingFleet fleet in _generatingFleets)
+        {
+            if (fleet.IsIntermittentRenewable)
+            {
+                continue;
+            }
+
+            GenerationTechnology technology = fleet.GenerationTechnology;
+            Power requested = Power.Min(
+                Power.FromMegawatts(outstandingMw),
+                IncrementalHeadroom(technology));
+            if (requested <= Power.Zero)
+            {
+                continue;
+            }
+
+            Power accepted = _budgetByTechnology[technology].Take(
+                requested,
+                _currentInstant,
+                _resolution);
+            _generationMwByTechnology[technology][_currentIndex] += accepted.Megawatts;
+            outstandingMw -= accepted.Megawatts;
+            takenMw += accepted.Megawatts;
+            if (outstandingMw <= Tolerance)
+            {
+                break;
+            }
+        }
+
+        return Power.FromMegawatts(takenMw);
     }
 
     private void RecordStateOfCharge(int index)
@@ -309,7 +506,7 @@ internal sealed class RegionalDispatchRun
         }
     }
 
-    private DispatchOutcome BuildOutcome()
+    public DispatchOutcome BuildOutcome()
     {
         var perFleetGeneration = _generationMwByTechnology.ToDictionary(
             entry => entry.Key,
@@ -336,7 +533,6 @@ internal sealed class RegionalDispatchRun
         var stateOfChargeByTechnology = _stateOfChargeMwhByTechnology.ToDictionary(
             entry => entry.Key,
             entry => new StockSeries(_demand.Start, _resolution, entry.Value));
-        FlowSeries zeroFlow = Flow(new double[_demand.Length]);
         return new DispatchOutcome(
             regionId: _region.RegionId,
             perFleetGeneration,
@@ -347,8 +543,8 @@ internal sealed class RegionalDispatchRun
             unserved: Flow(_unservedMw),
             charge,
             discharge: Flow(_dischargeMw),
-            imports: zeroFlow,
-            exports: zeroFlow,
+            imports: Flow(_importsMw),
+            exports: Flow(_exportsMw),
             stateOfChargeByTechnology,
             demandProfile: _region.Demand);
     }

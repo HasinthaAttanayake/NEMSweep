@@ -7,7 +7,7 @@ namespace NEM.CLI.Tests.Scenarios;
 public sealed class SweepIndexContractTests
 {
     [Fact]
-    public void V4_RoundTripsWithExplicitUnitsAndAchievedShares()
+    public void V5_RoundTripsWithTransmissionScalarsAndExplicitUnits()
     {
         var start = new DateTimeOffset(2025, 7, 1, 0, 0, 0, TimeSpan.FromHours(10));
         var weatherBasis = new WeatherBasisDTO(
@@ -55,7 +55,9 @@ public sealed class SweepIndexContractTests
                     0,
                     1,
                     0,
-                    10),
+                    10,
+                    2m,
+                    -100),
                 new ReliabilityBasisDTO(0.002, 0, true, "NEM reliability standard"),
                 new StorageSizingOutcomeDTO(
                     StorageSizingOutcome.NotRequired,
@@ -86,7 +88,9 @@ public sealed class SweepIndexContractTests
                         0,
                         1,
                         0,
-                        10))],
+                        10,
+                        0m,
+                        100))],
                 [new SweepPointRegionDetailDTO("NSW1", "points/p0-nsw1.json")])]);
 
         string json = JsonSerializer.Serialize(index, new JsonSerializerOptions
@@ -111,6 +115,8 @@ public sealed class SweepIndexContractTests
         json.Should().Contain("\"outcome\":\"notRequired\"");
         json.Should().Contain("\"unservedHours\"");
         json.Should().Contain("\"peakUnservedPowerMw\"");
+        json.Should().Contain("\"transmissionSlcotAudPerMwh\"");
+        json.Should().Contain("\"netImportedEnergyMwh\"");
     }
 
     [Fact]

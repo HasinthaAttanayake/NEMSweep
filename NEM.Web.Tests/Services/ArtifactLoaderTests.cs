@@ -1,5 +1,7 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using AwesomeAssertions;
 using NEM.Contracts;
 using NEM.Web.Services;
@@ -71,7 +73,7 @@ public sealed class ArtifactLoaderTests
     {
         ArtifactLoadResult<SystemDispatchResultsDTO> result = await LoadAsync<SystemDispatchResultsDTO>(
             HttpStatusCode.OK,
-            """{ "schemaVersion": 1, "runId": "run-1" }""");
+            Serialize(ArtifactFixtures.SystemResults()));
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.RunId.Should().Be("run-1");
@@ -82,10 +84,10 @@ public sealed class ArtifactLoaderTests
     {
         ArtifactLoadResult<SystemDispatchResultsDTO> result = await LoadAsync<SystemDispatchResultsDTO>(
             HttpStatusCode.OK,
-            """{ "schemaVersion": 2 }""");
+            Serialize(ArtifactFixtures.SystemResults() with { SchemaVersion = 1 }));
 
         result.State.Status.Should().Be(ArtifactLoadStatus.InvalidData);
-        result.State.Message.Should().Be("Artifact schema 2 is not supported; expected schema 1.");
+        result.State.Message.Should().Be("Artifact schema 1 is not supported; expected schema 3.");
     }
 
     [Fact]
@@ -93,7 +95,7 @@ public sealed class ArtifactLoaderTests
     {
         ArtifactLoadResult<RegionDispatchResultsDTO> result = await LoadAsync<RegionDispatchResultsDTO>(
             HttpStatusCode.OK,
-            """{ "schemaVersion": 1, "runId": "run-1", "regionId": "NSW1" }""");
+            Serialize(ArtifactFixtures.RegionResults()));
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.RegionId.Should().Be("NSW1");
@@ -104,10 +106,10 @@ public sealed class ArtifactLoaderTests
     {
         ArtifactLoadResult<RegionDispatchResultsDTO> result = await LoadAsync<RegionDispatchResultsDTO>(
             HttpStatusCode.OK,
-            """{ "schemaVersion": 2 }""");
+            """{ "schemaVersion": 1 }""");
 
         result.State.Status.Should().Be(ArtifactLoadStatus.InvalidData);
-        result.State.Message.Should().Be("Artifact schema 2 is not supported; expected schema 1.");
+        result.State.Message.Should().Be("Artifact schema 1 is not supported; expected schema 2.");
     }
 
     [Fact]
@@ -128,6 +130,42 @@ public sealed class ArtifactLoaderTests
         result.State.Status.Should().Be(ArtifactLoadStatus.InvalidData);
         result.State.Message.Should().Be("System and regional artifact run IDs do not match.");
         result.Value.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task LoadAsync_RejectsMisalignedSystemInterconnectorEvidence()
+    {
+        SystemDispatchResultsDTO valid = ArtifactFixtures.SystemResults(
+            interconnectors:
+            [new DispatchInterconnectorDTO("NSW1", "VIC1", 100, [1], [0])]);
+        SystemDispatchResultsDTO invalid = valid with
+        {
+            RegionIds = ["NSW1", "VIC1"],
+        };
+
+        ArtifactLoadResult<SystemDispatchResultsDTO> result = await LoadAsync<SystemDispatchResultsDTO>(
+            HttpStatusCode.OK,
+            Serialize(invalid));
+
+        result.State.Status.Should().Be(ArtifactLoadStatus.InvalidData);
+        result.State.Message.Should().Contain("interconnector series must align");
+    }
+
+    [Fact]
+    public async Task LoadAsync_RejectsSystemInterconnectorWithoutRequiredCapacity()
+    {
+        SystemDispatchResultsDTO valid = ArtifactFixtures.SystemResults(
+            interconnectors:
+            [new DispatchInterconnectorDTO("NSW1", "VIC1", 100, [1, 0, 0], [0, 0, 0])]);
+        JsonObject artifact = JsonNode.Parse(Serialize(valid))!.AsObject();
+        artifact["interconnectors"]![0]!.AsObject().Remove("capacityMw");
+
+        ArtifactLoadResult<SystemDispatchResultsDTO> result = await LoadAsync<SystemDispatchResultsDTO>(
+            HttpStatusCode.OK,
+            artifact.ToJsonString());
+
+        result.State.Status.Should().Be(ArtifactLoadStatus.InvalidData);
+        result.State.Message.Should().Be("Artifact is not valid JSON data.");
     }
 
     [Fact]
@@ -205,6 +243,11 @@ public sealed class ArtifactLoaderTests
         return await new ArtifactLoader(http).LoadAsync<T>("data/test.json");
     }
 
+    private static string Serialize<T>(T artifact) => JsonSerializer.Serialize(artifact, new JsonSerializerOptions
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    });
+
     private static async Task<ArtifactLoadResult<SystemRegionArtifactPair>> LoadPairAsync(
         string systemRunId,
         string regionRunId)
@@ -248,8 +291,8 @@ public sealed class ArtifactLoaderTests
                 ? regionRunId
                 : systemRunId;
             string json = request.RequestUri.AbsolutePath.EndsWith("results-nsw1.json", StringComparison.Ordinal)
-                ? $"{{ \"schemaVersion\": 1, \"runId\": \"{runId}\", \"regionId\": \"NSW1\" }}"
-                : $"{{ \"schemaVersion\": 1, \"runId\": \"{runId}\" }}";
+                ? Serialize(ArtifactFixtures.RegionResults(runId: runId))
+                : Serialize(ArtifactFixtures.SystemResults(runId: runId));
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(json, Encoding.UTF8, "application/json"),

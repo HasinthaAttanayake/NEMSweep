@@ -248,6 +248,8 @@ public sealed class SweepIndexLoaderTests
         0,
         1,
         0,
+        0,
+        0m,
         0);
 
     private sealed class StaticJsonHandler(string json) : HttpMessageHandler

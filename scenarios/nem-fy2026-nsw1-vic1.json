@@ -1,9 +1,27 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 3,
   "id": "nem-fy2026-nsw1-vic1",
   "name": "NEM FY2026 NSW1 and VIC1",
   "costBasis": { "year": 2026, "realDiscountRate": 0.07 },
   "storageSizing": { "maximumPowerMw": 10000, "maximumEnergyMwh": 100000, "targetUsePercentage": 0.002, "maximumPasses": 256, "reliabilityStandardName": "NEM reliability standard" },
+  "interconnectors": [
+    {
+      "fromRegionId": "NSW1",
+      "toRegionId": "VIC1",
+      "capacityMw": 1000,
+      "capitalCostAudPerMw": 1000,
+      "fixedOperatingCostAudPerMwYear": 10,
+      "technicalLifeYears": 50
+    },
+    {
+      "fromRegionId": "VIC1",
+      "toRegionId": "NSW1",
+      "capacityMw": 1000,
+      "capitalCostAudPerMw": 1000,
+      "fixedOperatingCostAudPerMwYear": 10,
+      "technicalLifeYears": 50
+    }
+  ],
   "regions": [
     {
       "regionId": "NSW1",

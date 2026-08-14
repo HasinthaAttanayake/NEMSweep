@@ -194,6 +194,119 @@ public sealed class ScenarioDerivationTests
             .WithParameterName("storageFleets");
     }
 
+    [Fact]
+    public void Derive_RealisesScenarioInterconnectorsOntoThePowerSystem()
+    {
+        Scenario scenario = TwoRegionScenario(
+            [new ScenarioInterconnector(
+                "NSW1",
+                "VIC1",
+                Power.FromMegawatts(700),
+                ZeroTransmissionCosts(),
+                technicalLifeYears: 50u)]);
+
+        PowerSystem system = ScenarioDerivation.Derive(scenario, TwoRegionDemand());
+
+        Interconnector realised = system.Interconnectors.Should().ContainSingle().Subject;
+        realised.FromRegionId.Should().Be("NSW1");
+        realised.ToRegionId.Should().Be("VIC1");
+        realised.Capacity.Should().Be(Power.FromMegawatts(700));
+    }
+
+    [Fact]
+    public void Derive_ScenarioWithoutInterconnectors_ProducesAnUnlinkedSystem()
+    {
+        PowerSystem system = ScenarioDerivation.Derive(TwoRegionScenario(), TwoRegionDemand());
+
+        system.Interconnectors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Construction_InterconnectorEndpointOutsideTheScenario_Throws()
+    {
+        var act = () => TwoRegionScenario(
+            [new ScenarioInterconnector(
+                "NSW1",
+                "QLD1",
+                Power.FromMegawatts(700),
+                ZeroTransmissionCosts(),
+                technicalLifeYears: 50u)]);
+
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("*QLD1*is not a region of this scenario*");
+    }
+
+    [Fact]
+    public void Construction_AllowsScenarioInterconnectorsInOppositeDirections()
+    {
+        Scenario scenario = TwoRegionScenario(
+            [
+                Link("NSW1", "VIC1"),
+                Link("VIC1", "NSW1"),
+            ]);
+
+        scenario.Interconnectors.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void Construction_DuplicateScenarioInterconnectorsInTheSameDirection_Throws()
+    {
+        var act = () => TwoRegionScenario(
+            [
+                Link("NSW1", "VIC1"),
+                Link("nsw1", "vic1"),
+            ]);
+
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("*duplicate interconnectors from*");
+    }
+
+    [Fact]
+    public void Construction_InterconnectorWithZeroTechnicalLife_Throws()
+    {
+        var act = () => new ScenarioInterconnector(
+            "NSW1",
+            "VIC1",
+            Power.FromMegawatts(700),
+            ZeroTransmissionCosts(),
+            technicalLifeYears: 0u);
+
+        act.Should().Throw<ArgumentOutOfRangeException>()
+            .WithParameterName("technicalLifeYears");
+    }
+
+    private static Scenario TwoRegionScenario(
+        IReadOnlyList<ScenarioInterconnector>? interconnectors = null) =>
+        new(
+            new ScenarioId("two-region"),
+            "Two region",
+            Start,
+            Start.AddHours(2),
+            [
+                new ScenarioRegion("NSW1", [Fleet(GenerationTechnology.Coal, 100)]),
+                new ScenarioRegion("VIC1", [Fleet(GenerationTechnology.Gas, 100)]),
+            ],
+            CostBasis,
+            interconnectors);
+
+    private static Dictionary<string, FlowSeries> TwoRegionDemand() => new()
+    {
+        ["NSW1"] = new(Start, TimeSpan.FromHours(1), [80, 100]),
+        ["VIC1"] = new(Start, TimeSpan.FromHours(1), [70, 90]),
+    };
+
+    private static ScenarioInterconnector Link(string fromRegionId, string toRegionId) =>
+        new(
+            fromRegionId,
+            toRegionId,
+            Power.FromMegawatts(700),
+            ZeroTransmissionCosts(),
+            technicalLifeYears: 50u);
+
+    private static TransmissionCostParameters ZeroTransmissionCosts() => new(
+        PowerCapacityCost.FromAudPerMwCapacity(0),
+        AnnualPowerCapacityCost.FromAudPerMwYear(0));
+
     private static StorageCostParameters ZeroStorageCosts() => new(
         PowerCapacityCost.FromAudPerMwCapacity(0),
         EnergyCapacityCost.FromAudPerMwhCapacity(0),

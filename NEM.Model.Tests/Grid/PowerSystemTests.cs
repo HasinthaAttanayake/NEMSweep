@@ -29,6 +29,89 @@ public sealed class PowerSystemTests
         system.Regions.Should().ContainSingle().Which.Should().BeSameAs(originalRegion);
     }
 
+    [Fact]
+    public void Construction_DefaultsToNoInterconnectors()
+    {
+        var system = new PowerSystem(
+            new PowerSystemId("test-system"),
+            new ScenarioId("test-scenario"),
+            [Region("NSW1", 100)]);
+
+        system.Interconnectors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void WithRegions_ForwardsInterconnectors()
+    {
+        Interconnector link = Link("NSW1", "VIC1", 700);
+        PowerSystem system = System([Region("NSW1", 100), Region("VIC1", 100)], [link]);
+
+        PowerSystem replaced = system.WithRegions([Region("NSW1", 120), Region("VIC1", 100)]);
+
+        replaced.Interconnectors.Should().ContainSingle().Which.Should().BeSameAs(
+            link,
+            "storage sizing rebuilds regions repeatedly and must not silently drop links");
+    }
+
+    [Fact]
+    public void WithInterconnectors_ReplacesLinksAndLeavesSourceUnchanged()
+    {
+        PowerSystem system = System([Region("NSW1", 100), Region("VIC1", 100)]);
+
+        PowerSystem linked = system.WithInterconnectors([Link("NSW1", "VIC1", 700)]);
+
+        linked.Interconnectors.Should().ContainSingle();
+        system.Interconnectors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Construction_RejectsInterconnectorEndpointThatIsNotARegion()
+    {
+        var act = () => System([Region("NSW1", 100)], [Link("NSW1", "VIC1", 700)]);
+
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("*VIC1*is not a region of this power system*");
+    }
+
+    [Fact]
+    public void Construction_AllowsInterconnectorsInOppositeDirections()
+    {
+        PowerSystem system = System(
+            [Region("NSW1", 100), Region("VIC1", 100)],
+            [Link("NSW1", "VIC1", 700), Link("VIC1", "NSW1", 100)]);
+
+        system.Interconnectors.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void Construction_RejectsDuplicateInterconnectorsInTheSameDirection()
+    {
+        var act = () => System(
+            [Region("NSW1", 100), Region("VIC1", 100)],
+            [Link("NSW1", "VIC1", 700), Link("nsw1", "vic1", 100)]);
+
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("*duplicate interconnectors from*");
+    }
+
+    private static PowerSystem System(
+        IReadOnlyList<Region> regions,
+        IReadOnlyList<Interconnector>? interconnectors = null) =>
+        new(
+            new PowerSystemId("test-system"),
+            new ScenarioId("test-scenario"),
+            regions,
+            interconnectors);
+
+    private static Interconnector Link(
+        string fromRegionId,
+        string toRegionId,
+        double capacityMw) =>
+        new(
+            fromRegionId,
+            toRegionId,
+            Power.FromMegawatts(capacityMw));
+
     private static Region Region(string regionId, double demandMw) =>
         new(
             regionId,

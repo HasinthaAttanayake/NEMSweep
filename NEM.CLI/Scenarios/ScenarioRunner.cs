@@ -172,6 +172,16 @@ internal static class ScenarioRunner
             : solutionRoot;
     }
 
+    /// <summary>
+    /// Resolves a scenario input using the same configured-output-root fallback as dispatch.
+    /// Provenance callers use this so they hash the exact artifact bytes dispatch consumed.
+    /// </summary>
+    internal static string ResolveScenarioInputPath(RepositoryPaths paths, string configuredPath) =>
+        ResolveConfiguredPath(
+            paths,
+            ResolveOutputRoot(paths, paths.SolutionRoot),
+            configuredPath);
+
     private static string ResolveConfiguredPath(
         RepositoryPaths paths,
         string outputRoot,
@@ -328,7 +338,18 @@ internal static class ScenarioRunner
             timeline.Start,
             timeline.Start.AddTicks(timeline.Resolution.Ticks * timeline.Length),
             regions,
-            new CostBasis(settings.CostBasis.Year, settings.CostBasis.RealDiscountRate));
+            new CostBasis(settings.CostBasis.Year, settings.CostBasis.RealDiscountRate),
+            settings.Interconnectors?.Select(interconnector =>
+                new ScenarioInterconnector(
+                    interconnector.FromRegionId,
+                    interconnector.ToRegionId,
+                    Power.FromMegawatts(interconnector.CapacityMw),
+                    new TransmissionCostParameters(
+                        PowerCapacityCost.FromAudPerMwCapacity(
+                            interconnector.CapitalCostAudPerMw),
+                        AnnualPowerCapacityCost.FromAudPerMwYear(
+                            interconnector.FixedOperatingCostAudPerMwYear)),
+                    interconnector.TechnicalLifeYears)).ToArray());
     }
 
     private static IReadOnlyDictionary<string, IReadOnlyList<DemandComponent>>?

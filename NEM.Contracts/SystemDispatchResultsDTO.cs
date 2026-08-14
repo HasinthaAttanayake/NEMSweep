@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace NEM.Contracts;
 
 /// <summary>
@@ -19,7 +21,8 @@ public sealed record SystemDispatchResultsDTO(
     DispatchMetricsDTO Metrics,
     ReliabilityBasisDTO Reliability,
     StorageSizingOutcomeDTO StorageSizing,
-    DispatchCostDTO Cost);
+    DispatchCostDTO Cost,
+    [property: JsonRequired] DispatchInterconnectorDTO[] Interconnectors);
 
 /// <summary>Summary evidence for one region within a system dispatch run.</summary>
 public sealed record RegionDispatchSummaryDTO(
