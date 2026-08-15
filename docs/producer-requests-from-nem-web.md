@@ -8,6 +8,12 @@ not reconstruct evidence a result is supposed to carry, and every workaround the
 site holds is a place it says less than it could, or says something looser than
 it should.
 
+> **Superseded for new work.** The remaining items are restated with current
+> measurements, file lists and acceptance criteria in
+> [`producer-requests-round-2.md`](producer-requests-round-2.md). Start there.
+> This document is kept as the record of what round one asked for and what it
+> changed.
+
 **Status.** Items 1 to 6 and P1 were delivered by pull request #103 and are
 consumed on `nem-075`. What each one unblocked is recorded under
 [Delivered](#delivered) so the next reader can see which views exist because of
