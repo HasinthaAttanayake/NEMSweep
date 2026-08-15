@@ -15,6 +15,7 @@
             @if (_weather is not null)
             {
                 <p class="location-line">
+                    @RegionNames.Full(_weather.RegionId) ·
                     @_weather.Solar.Location.City ·
                     @_weather.Solar.Location.Latitude.ToString("0.0000"), @_weather.Solar.Location.Longitude.ToString("0.0000")
                 </p>
@@ -84,8 +85,10 @@
     {
         try
         {
+            // The per-region weather artifacts superseded the single weather-data.json, which is
+            // still on disk at the previous schema version and no longer loads.
             ArtifactLoadResult<WeatherDataDTO> loadResult =
-                await ArtifactLoader.LoadAsync<WeatherDataDTO>("data/weather-data.json");
+                await ArtifactLoader.LoadAsync<WeatherDataDTO>("data/weather-nsw1.json");
             if (!loadResult.IsSuccess)
             {
                 _loadState = loadResult.State;

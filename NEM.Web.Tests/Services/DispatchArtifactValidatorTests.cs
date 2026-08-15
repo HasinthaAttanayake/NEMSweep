@@ -157,6 +157,54 @@ public sealed class DispatchArtifactValidatorTests
             .Should().Be("System dispatch topology links are invalid.");
     }
 
+    [Fact]
+    public void Validate_RegionOverviewMatchingRegionEvidence_Accepts()
+    {
+        RegionDispatchOverviewDTO overview = OverviewFor(ArtifactFixtures.RegionResults());
+
+        DispatchArtifactValidator.Validate((object)overview).Should().BeNull();
+    }
+
+    [Fact]
+    public void Validate_RegionOverviewWithNonReconcilingGenerationTotals_RejectsEvidence()
+    {
+        RegionDispatchOverviewDTO overview = OverviewFor(ArtifactFixtures.RegionResults()) with
+        {
+            DeliveredGenerationByTechnologyMwh = new Dictionary<string, double> { ["Solar"] = 5 },
+        };
+
+        DispatchArtifactValidator.Validate(overview)
+            .Should().Be("Region dispatch overview generation totals are invalid.");
+    }
+
+    [Fact]
+    public void Validate_RegionOverviewWithNegativeTransmissionLosses_RejectsEvidence()
+    {
+        RegionDispatchOverviewDTO overview = OverviewFor(ArtifactFixtures.RegionResults()) with
+        {
+            TransmissionLossesMwh = -1,
+        };
+
+        DispatchArtifactValidator.Validate(overview)
+            .Should().Be("Region dispatch overview transmission losses are invalid.");
+    }
+
+    private static RegionDispatchOverviewDTO OverviewFor(RegionDispatchResultsDTO region) => new(
+        region.SchemaVersion,
+        region.RunId,
+        region.RegionId,
+        region.PeriodStart,
+        region.PeriodEnd,
+        region.Resolution,
+        region.DataSources,
+        region.PowerSystem,
+        region.Metrics,
+        region.Reliability,
+        region.StorageSizing,
+        region.Cost,
+        [],
+        0);
+
     private static SystemDispatchOverviewDTO OverviewFor(SystemDispatchResultsDTO system) => new(
         system.SchemaVersion,
         system.RunId,

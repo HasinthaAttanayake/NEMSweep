@@ -20,16 +20,19 @@ public static class ArtifactSchemaVersions
     public const int DispatchResults = 12;
 
     /// <summary>Whole-system dispatch results artifact.</summary>
-    public const int SystemDispatchResults = 9;
+    public const int SystemDispatchResults = 10;
 
     /// <summary>Compact whole-system dispatch overview (<c>results-overview.json</c>).</summary>
-    public const int SystemDispatchOverview = 1;
+    public const int SystemDispatchOverview = 2;
 
     /// <summary>Per-region dispatch results detail artifact.</summary>
-    public const int RegionDispatchResults = 7;
+    public const int RegionDispatchResults = 8;
+
+    /// <summary>Compact per-region dispatch overview (<c>results-{regionId}-overview.json</c>).</summary>
+    public const int RegionDispatchOverview = 1;
 
     /// <summary>Sweep index (<c>sweeps/{sweepId}/index.json</c>).</summary>
-    public const int SweepIndex = 7;
+    public const int SweepIndex = 8;
 
     /// <summary>Sweep manifest (<c>sweeps/index.json</c>).</summary>
     public const int SweepManifest = 1;

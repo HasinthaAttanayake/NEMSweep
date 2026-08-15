@@ -73,7 +73,9 @@ public sealed class SweepRunTests
         new FileInfo(fixture.IndexPath).Length.Should().BeLessThan(10_000);
         File.Exists(fixture.SharedBaseSeriesPath).Should().BeTrue();
         JsonObject pointResult = JsonNode.Parse(File.ReadAllText(fixture.PointResultPath("p0")))!.AsObject();
-        pointResult["dataSeries"]!["demand"]!["baseDemandMw"]!.AsArray().Should().HaveCount(8_760);
+        pointResult["dataSeries"]!["demand"]!["baseDemandMw"].Should().BeNull();
+        pointResult["dataSeries"]!["demand"]!["baseDemandSeriesPath"]!.GetValue<string>()
+            .Should().StartWith("../series/base-demand-");
         JsonObject regionResult = JsonNode.Parse(File.ReadAllText(
             fixture.RegionResultPath("p0", "NSW1")))!.AsObject();
         regionResult["dataSeries"]!["demand"]!["baseDemandMw"].Should().BeNull();
@@ -132,7 +134,7 @@ public sealed class SweepRunTests
     }
 
     [Fact]
-    public void Run_ExternalizesRegionalDemandWhileKeepingSystemDemandInline()
+    public void Run_ExternalizesBothSystemAndRegionalDemandToTheSameSharedSeriesFile()
     {
         using var fixture = new SweepRunFixture();
         fixture.WriteDefinition("""
@@ -144,13 +146,17 @@ public sealed class SweepRunTests
         SweepRunCommand.Run(context, "sweeps/test-sweep.json").Should().Be(0);
 
         JsonObject pointResult = JsonNode.Parse(File.ReadAllText(fixture.PointResultPath("p1")))!.AsObject();
-        pointResult["dataSeries"]!["demand"]!["baseDemandMw"]!.AsArray()
-            .Should().HaveCount(8_760);
+        pointResult["dataSeries"]!["demand"]!["baseDemandMw"].Should().BeNull();
+        string pointSeriesPath = pointResult["dataSeries"]!["demand"]!["baseDemandSeriesPath"]!.GetValue<string>();
+        pointSeriesPath.Should().StartWith("../series/base-demand-");
         JsonObject regionResult = JsonNode.Parse(File.ReadAllText(
             fixture.RegionResultPath("p1", "NSW1")))!.AsObject();
         regionResult["dataSeries"]!["demand"]!["baseDemandMw"].Should().BeNull();
-        regionResult["dataSeries"]!["demand"]!["baseDemandSeriesPath"]!.GetValue<string>()
-            .Should().StartWith("../series/base-demand-");
+        string regionSeriesPath = regionResult["dataSeries"]!["demand"]!["baseDemandSeriesPath"]!.GetValue<string>();
+        regionSeriesPath.Should().StartWith("../series/base-demand-");
+        // A single-region sweep's system-wide demand equals its one region's demand, so both
+        // point and regional results should reference the same content-addressed series file.
+        regionSeriesPath.Should().Be(pointSeriesPath);
     }
 
     [Fact]

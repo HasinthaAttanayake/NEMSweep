@@ -1,4 +1,5 @@
 @using NEM.Contracts
+@using NEM.Web.Components.Viz
 @inject NavigationManager Navigation
 
 <ChartFrame Heading="@Heading" Description="@Description" Unit="@YAxis.Unit">
@@ -9,14 +10,14 @@
         }
         else
         {
-            <MudChart ChartType="ChartType.Line"
-                      ChartSeries="_series"
-                      ChartLabels="_chart.Labels"
-                      ChartOptions="_options"
-                      SelectedIndexChanged="OnSelectedIndexChanged"
-                      Width="100%"
-                      Height="420px" />
-            <p class="sweep-chart-note">Points are drawn at equal spacing in sweep index order; read the @Index.Axis.Label value from the label under each point.</p>
+            <LinePlot Series="@_series"
+                      XLabels="@_labels"
+                      AriaLabel="@($"{YAxis.Label} by {Index.Axis.Label}")"
+                      YPrefix="@YAxis.ValuePrefix"
+                      XAxisTitle="@($"{Index.Axis.Label} ({Index.Axis.Unit})")"
+                      Height="380"
+                      ReadoutFor="Readout"
+                      OnSelect="OpenRun" />
         }
     </div>
 
@@ -47,47 +48,45 @@
 
     private SweepChartData _chart = new([], [], [], []);
     private string _axisFormat = "N0";
-    private List<ChartSeries<double>> _series = [];
-    private LineChartOptions _options = new();
+    private List<PlotSeries> _series = [];
+    private List<string> _labels = [];
 
     protected override void OnParametersSet()
     {
         _chart = SweepChartData.Build(Index, YAxis, RegionId);
         // A fractional axis such as 0.1-0.4 rounds to "0" under a whole-number format.
         _axisFormat = SweepValueFormat.ColumnFormat(Index.Points.Select(point => (double?)point.AxisValue));
+        _labels = [.. _chart.Points.Select(point => point.Point.Label)];
         _series =
         [
-            new ChartSeries<double>
-            {
-                Name = $"{YAxis.Label} ({YAxis.Unit})",
-                Data = _chart.Values,
-            },
+            PlotSeries.From(
+                $"{YAxis.Label} ({YAxis.Unit})",
+                "var(--color-demand)",
+                _chart.Values,
+                filled: true),
         ];
-
-        double maximum = _chart.Values.Length == 0 ? 0 : _chart.Values.Max();
-        _options = new LineChartOptions
-        {
-            YAxisTicks = SweepChartScale.TickInterval(maximum),
-            MaxNumYAxisTicks = 8,
-            YAxisToStringFunc = value => SweepValueFormat.Short(value, YAxis.ValuePrefix),
-            YAxisTitle = $"{YAxis.Label} ({YAxis.Unit})",
-            XAxisTitle = $"{Index.Axis.Label} ({Index.Axis.Unit})",
-            // A sweep has a handful of points, and each one is a run the reader can open.
-            ShowDataMarkers = true,
-            YAxisLines = true,
-            // Anchored at zero so a small absolute movement is not drawn as a steep decline.
-            YAxisRequireZeroPoint = true,
-        };
     }
 
-    private void OnSelectedIndexChanged(int selectedIndex)
+    private string Readout(int index)
     {
-        if (selectedIndex < 0 || selectedIndex >= _chart.Points.Count || DrillDownTarget is null)
+        if (index < 0 || index >= _chart.Points.Count)
+        {
+            return string.Empty;
+        }
+
+        SweepChartPoint point = _chart.Points[index];
+        return $"{point.Point.Label} ({point.Point.AxisValue.ToString(_axisFormat)} {Index.Axis.Unit})"
+            + $"\n{YAxis.Label}: {SweepValueFormat.Short(point.Value, YAxis.ValuePrefix)} {YAxis.Unit}";
+    }
+
+    private void OpenRun(int index)
+    {
+        if (index < 0 || index >= _chart.Points.Count || DrillDownTarget is null)
         {
             return;
         }
 
-        string? target = DrillDownTarget(_chart.Points[selectedIndex].Point);
+        string? target = DrillDownTarget(_chart.Points[index].Point);
         if (!string.IsNullOrWhiteSpace(target))
         {
             Navigation.NavigateTo(target);

@@ -1,0 +1,166 @@
+@namespace NEM.Web.Components.Viz
+
+@*
+    Two measured quantities against each other, one marker per run. This is the shape that shows a
+    trade-off: a sweep drawn against its own axis says what happened as the input moved, but a
+    sweep drawn as cost against renewable share says what it cost to buy the share — and whether
+    the runs form a frontier or double back on themselves.
+*@
+<figure class="scatter-plot @Class">
+    <div class="plot-scroll">
+        @* A group rather than an image, so the linked run markers inside stay reachable. *@
+        <svg viewBox="@($"0 0 1000 {Height}")" role="group" aria-label="@AriaLabel"
+             style="@($"aspect-ratio: 1000 / {Height};")">
+            @foreach (double tick in _yAxis.Ticks)
+            {
+                double y = PlotPath.Y(tick, _box, _yAxis);
+                <line class="plot-grid" x1="@Fmt(_box.Left)" y1="@Fmt(y)" x2="@Fmt(_box.Right)" y2="@Fmt(y)" />
+                <SvgText Class="plot-tick" X="_box.Left - 10" Y="y + 4" Anchor="end"
+                         Value="@PlotFormat.Tick(tick, _yAxis, YPrefix)" />
+            }
+            @foreach (double tick in _xAxis.Ticks)
+            {
+                double x = PlotPath.XValue(tick, _box, _xAxis);
+                <line class="plot-grid plot-grid-vertical" x1="@Fmt(x)" y1="@Fmt(_box.Top)"
+                      x2="@Fmt(x)" y2="@Fmt(_box.Bottom)" />
+                <SvgText Class="plot-tick" X="x" Y="_box.Bottom + 22" Anchor="middle"
+                         Value="@PlotFormat.Tick(tick, _xAxis, XPrefix)" />
+            }
+
+            @if (Connected && _path.Length > 0)
+            {
+                <polyline class="scatter-path" points="@_path" fill="none" vector-effect="non-scaling-stroke" />
+            }
+
+            @foreach (MarkerGeometry marker in _markers)
+            {
+                <g class="scatter-marker @(marker.Source.IsHighlighted ? "is-highlighted" : null)">
+                    <title>@Readout(marker.Source)</title>
+                    @if (marker.Source.Href is { Length: > 0 } href)
+                    {
+                        <a href="@href" aria-label="@Readout(marker.Source)">
+                            <circle cx="@Fmt(marker.X)" cy="@Fmt(marker.Y)"
+                                    r="@(marker.Source.IsHighlighted ? "9" : "7")" />
+                        </a>
+                    }
+                    else
+                    {
+                        <circle cx="@Fmt(marker.X)" cy="@Fmt(marker.Y)"
+                                r="@(marker.Source.IsHighlighted ? "9" : "7")" />
+                    }
+                </g>
+            }
+
+            @* Labels are shortened to what the spacing allows; each marker keeps its full name in
+               the readout, so nothing is lost by trimming the drawn text. *@
+            @foreach (MarkerGeometry marker in _labelled)
+            {
+                <SvgText Class="scatter-label" X="marker.X" Y="marker.Y - 14" Anchor="middle"
+                         Value="@Shorten(marker.Source.Label)" />
+            }
+
+            <line class="plot-baseline" x1="@Fmt(_box.Left)" y1="@Fmt(_box.Bottom)"
+                  x2="@Fmt(_box.Right)" y2="@Fmt(_box.Bottom)" />
+            <SvgText Class="plot-axis-title" X="_box.Left + (_box.Width / 2)" Y="Height - 6"
+                     Anchor="middle" Value="@XAxisTitle" />
+            <SvgText Class="plot-axis-title" X="-(_box.Top + (_box.Height / 2))" Y="16"
+                     Anchor="middle" Transform="rotate(-90)" Value="@YAxisTitle" />
+        </svg>
+    </div>
+    @if (Caption is not null)
+    {
+        <figcaption class="scatter-caption">@Caption</figcaption>
+    }
+</figure>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<PlotMarker> Markers { get; set; } = [];
+    [Parameter, EditorRequired] public string AriaLabel { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string XAxisTitle { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string YAxisTitle { get; set; } = string.Empty;
+    [Parameter] public string? XPrefix { get; set; }
+    [Parameter] public string? YPrefix { get; set; }
+    [Parameter] public double Height { get; set; } = 400;
+    [Parameter] public bool Connected { get; set; } = true;
+    [Parameter] public bool IncludeZero { get; set; }
+    [Parameter] public RenderFragment? Caption { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    private PlotBox _box = new(84, 30, 976, 340);
+    private PlotAxis _xAxis = PlotAxis.Nice(0, 1);
+    private PlotAxis _yAxis = PlotAxis.Nice(0, 1);
+    private List<MarkerGeometry> _markers = [];
+    private List<MarkerGeometry> _labelled = [];
+    private string _path = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        _box = new PlotBox(84, 30, 976, Height - 52);
+        _xAxis = Axis(Markers.Select(marker => marker.X));
+        _yAxis = Axis(Markers.Select(marker => marker.Y));
+        _markers = [.. Markers.Select(marker => new MarkerGeometry(
+            marker,
+            PlotPath.XValue(marker.X, _box, _xAxis),
+            PlotPath.Y(marker.Y, _box, _yAxis)))];
+        _path = string.Join(" ", _markers.Select(marker => PlotFormat.Coordinate(marker.X, marker.Y)));
+        _labelled = SelectLabels();
+    }
+
+    /// <summary>
+    /// A trade-off is read from the shape of the cloud, and zero is rarely inside it, so these axes
+    /// frame the data rather than the origin. A pad keeps markers off the frame.
+    /// </summary>
+    private PlotAxis Axis(IEnumerable<double> values)
+    {
+        double[] present = [.. values.Where(value => !double.IsNaN(value) && !double.IsInfinity(value))];
+        if (present.Length == 0)
+        {
+            return PlotAxis.Nice(0, 1);
+        }
+
+        double minimum = present.Min();
+        double maximum = present.Max();
+        double pad = (maximum - minimum) * 0.08;
+        return PlotAxis.Nice(minimum - pad, maximum + pad, includeZero: IncludeZero);
+    }
+
+    /// <summary>
+    /// Labels the ends, the highlighted runs, and as many others as fit without collision. Every
+    /// marker still carries its full readout, so thinning the labels loses nothing but clutter.
+    /// </summary>
+    private List<MarkerGeometry> SelectLabels()
+    {
+        var chosen = new List<MarkerGeometry>();
+        for (int index = 0; index < _markers.Count; index++)
+        {
+            MarkerGeometry candidate = _markers[index];
+            bool required = candidate.Source.IsHighlighted || index == 0 || index == _markers.Count - 1;
+            bool collides = chosen.Any(placed =>
+                Math.Abs(placed.X - candidate.X) < 74 && Math.Abs(placed.Y - candidate.Y) < 22);
+            if (required || !collides)
+            {
+                chosen.Add(candidate);
+            }
+        }
+
+        return chosen;
+    }
+
+    private string Readout(PlotMarker marker)
+    {
+        string x = PlotFormat.Tick(marker.X, _xAxis, XPrefix, compact: false);
+        string y = PlotFormat.Tick(marker.Y, _yAxis, YPrefix, compact: false);
+        string readout = $"{marker.Label}\n{XAxisTitle}: {x}\n{YAxisTitle}: {y}";
+        return marker.Detail is { Length: > 0 } detail ? $"{readout}\n{detail}" : readout;
+    }
+
+    private static string Shorten(string text) =>
+        text.Length <= MaximumLabelLength ? text : text[..(MaximumLabelLength - 1)].TrimEnd() + "…";
+
+    private static string Fmt(double value) => PlotFormat.Length(value);
+
+    /// <summary>Matches the horizontal collision window used when choosing which markers to label.</summary>
+    private const int MaximumLabelLength = 14;
+
+    private readonly record struct MarkerGeometry(PlotMarker Source, double X, double Y);
+}

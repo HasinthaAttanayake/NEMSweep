@@ -1,4 +1,6 @@
 @using NEM.Contracts
+@using System.Globalization
+@using NEM.Web.Components.Viz
 @using NEM.Web.Services
 
 @* Every headline figure for every run. The index now carries the reliability metrics that used to
@@ -7,8 +9,12 @@
     <div class="run-table-heading">
         <div>
             <h2>All runs</h2>
-            <p>Every figure the sweep index records, per run. Each run opens in the same viewer as the baseline dispatch.</p>
+            <p>Every figure the sweep index records, per run, with the annual cost each one implies. Each run opens in the same viewer as the baseline dispatch.</p>
         </div>
+        <CsvDownload Headers="@CsvHeaders"
+                     Rows="@CsvRows"
+                     FileName="@CsvWriter.FileName(Index.SweepId, RegionId ?? "system", "runs")"
+                     Label="Download runs" />
     </div>
 
     <div class="run-table-scroll">
@@ -20,6 +26,7 @@
                     <th scope="col">Outcome</th>
                     <th scope="col">Reliability<small>vs target</small></th>
                     <th scope="col">Storage sizing</th>
+                    <th scope="col">@AnnualCostLabel<small>AUD, derived</small></th>
                     @foreach (SweepChartYAxis column in SweepSeriesCatalogue.All)
                     {
                         <th scope="col">@column.Label<small>@column.Unit</small></th>
@@ -30,7 +37,7 @@
             <tbody>
                 @foreach (SweepIndexPointDTO point in Index.Points)
                 {
-                    <tr>
+                    <tr class="@(point.PointId == HighlightPointId ? "run-highlighted" : null)">
                         <th scope="row" class="sticky-column">@point.Label</th>
                         <td>@point.AxisValue.ToString(_axisFormat)</td>
                         <td>
@@ -58,6 +65,7 @@
                             }
                         </td>
                         <td>@SizingLabel(point.StorageSizing)</td>
+                        <td class="cell-derived">@AnnualCost(point)</td>
                         @foreach (SweepChartYAxis column in SweepSeriesCatalogue.All)
                         {
                             <td>@Scalar(point, column)</td>
@@ -82,6 +90,15 @@
 @code {
     [Parameter, EditorRequired] public SweepIndexDTO Index { get; set; } = default!;
     [Parameter] public string? RegionId { get; set; }
+
+    /// <summary>
+    /// What the derived cost column is of. Selecting a region makes every scalar that region's, so
+    /// a fixed "Annual system cost" would report one region's bill as the market's.
+    /// </summary>
+    [Parameter] public string AnnualCostLabel { get; set; } = "Annual system cost";
+
+    /// <summary>The run to mark as the reference in the table, usually the cheapest per MWh.</summary>
+    [Parameter] public string? HighlightPointId { get; set; }
 
     private readonly Dictionary<string, string> _columnFormats = new(StringComparer.Ordinal);
     private string _axisFormat = "N0";
@@ -109,6 +126,67 @@
         return value is null
             ? "—"
             : SweepValueFormat.WithPrefix(column.ValuePrefix, value.Value, value.Value.ToString(_columnFormats[column.Key]));
+    }
+
+    /// <summary>
+    /// Every column the table shows, as machine-readable values. A spreadsheet is where someone
+    /// goes to do arithmetic on these, so the figures are written unformatted and invariant —
+    /// "$11.06b" and "66,275,989" read well on screen and cannot be summed anywhere else.
+    /// </summary>
+    private IReadOnlyList<string> CsvHeaders =>
+    [
+        "Run",
+        $"{Index.Axis.Label} ({Index.Axis.Unit})",
+        "Outcome",
+        "Reliability",
+        "Storage sizing",
+        $"{AnnualCostLabel} (AUD, derived)",
+        .. SweepSeriesCatalogue.All.Select(column => $"{column.Label} ({column.Unit})"),
+    ];
+
+    private IReadOnlyList<IReadOnlyList<string>> CsvRows =>
+    [
+        .. Index.Points.Select(point =>
+        {
+            SweepPointScalarResultsDTO? scalars = SweepChartData.SelectScalars(point, RegionId);
+            return (IReadOnlyList<string>)
+            [
+                point.Label,
+                Number(point.AxisValue),
+                point.Status == SweepPointStatus.Succeeded
+                    ? "Completed"
+                    : $"{StageLabel(point.Failure?.Stage)} constraint: {point.Failure?.Message}",
+                point.Reliability is null ? string.Empty : point.Reliability.WithinTarget ? "Within" : "Outside",
+                point.StorageSizing is null ? string.Empty : SizingLabel(point.StorageSizing),
+                scalars is null
+                    ? string.Empty
+                    : Number((double)scalars.SlcoeAudPerMwh * scalars.EnergyServedMwh),
+                .. SweepSeriesCatalogue.All.Select(column =>
+                {
+                    double? value = scalars is null ? null : column.SelectValue(scalars);
+                    return value is null ? string.Empty : Number(value.Value);
+                }),
+            ];
+        }),
+    ];
+
+    /// <summary>
+    /// The shortest form that round-trips back to the same double, which is what a bare invariant
+    /// ToString gives. A fixed 17 significant digits is equally exact and prints 166.9 as
+    /// 166.90000000000001, which reads as a defect rather than as precision.
+    /// </summary>
+    private static string Number(double value) => value.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// What the run's whole year costs, from the levelised cost and the energy it served. Marked as
+    /// derived in the header because the artifact publishes the two factors, not the product.
+    /// </summary>
+    private string AnnualCost(SweepIndexPointDTO point)
+    {
+        SweepPointScalarResultsDTO? scalars = SweepChartData.SelectScalars(point, RegionId);
+        return scalars is null
+            ? "—"
+            : PlotFormat.MoneyTotal(scalars.SlcoeAudPerMwh * (decimal)scalars.EnergyServedMwh);
     }
 
     private static string SizingLabel(StorageSizingOutcomeDTO? sizing) => sizing?.Outcome switch

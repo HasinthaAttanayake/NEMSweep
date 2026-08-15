@@ -63,6 +63,9 @@ internal static class SweepRunCommand
                     string detailPath = summary.DetailPath
                         ?? throw new FormatException(
                             $"Sweep point '{point.PointId}' has no detail path for region '{regionId}'.");
+                    string overviewPath = summary.OverviewPath
+                        ?? throw new FormatException(
+                            $"Sweep point '{point.PointId}' has no overview path for region '{regionId}'.");
                     string regionalResultPath = Path.Combine(pointsDirectory, detailPath);
                     RegionDispatchResultsDTO regionalResult = JsonSerializer.Deserialize<RegionDispatchResultsDTO>(
                         File.ReadAllBytes(regionalResultPath),
@@ -88,9 +91,11 @@ internal static class SweepRunCommand
                         regionalScalars));
                     regionDetails.Add(new SweepPointRegionDetailDTO(
                         regionId,
-                        $"points/{detailPath}"));
+                        $"points/{detailPath}",
+                        $"points/{overviewPath}"));
                 }
 
+                referencedSeriesPaths.Add(ExternalizeBaseDemand(point.PointId, resultPath, sweepDirectory));
                 succeededResults.Add(systemResult);
                 JsonFile.Write(
                     new SweepPointStatusFile(
@@ -112,7 +117,8 @@ internal static class SweepRunCommand
                     systemResult.Metrics.IntervalPointers,
                     null,
                     regionScalars.ToArray(),
-                    regionDetails.ToArray()));
+                    regionDetails.ToArray(),
+                    $"points/{point.PointId}-overview.json"));
                 context.Output.WriteLine($"Sweep point {point.PointId}: succeeded.");
             }
             catch (Exception exception)

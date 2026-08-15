@@ -12,6 +12,7 @@ builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.
 builder.Services.AddScoped<ArtifactLoader>();
 builder.Services.AddScoped<SweepManifestLoader>();
 builder.Services.AddScoped<SweepIndexLoader>();
+builder.Services.AddScoped<ViewportScroller>();
 builder.Services.AddMudServices();
 
 await builder.Build().RunAsync();

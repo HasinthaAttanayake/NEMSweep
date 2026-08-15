@@ -206,6 +206,7 @@
         "unservedEnergyPercentageOfDemand": 0.001999214399252,
         "unservedHours": 11
       },
+      "overviewPath": "p11-nsw1-overview.json",
       "reliability": {
         "achievedUsePercentageOfDemand": 0.001999214399252,
         "standardName": "NEM reliability standard",
@@ -479,8 +480,8 @@
     "withinTarget": true
   },
   "resolution": "01:00:00",
-  "runId": "1d6622ab1cfd47a3937c2b602172da90",
-  "schemaVersion": 1,
+  "runId": "562e1baa89a64b05bf142bd43e28801c",
+  "schemaVersion": 2,
   "storageSizing": {
     "energyLimitedEvidence": null,
     "finalEnergyMwh": 15456,

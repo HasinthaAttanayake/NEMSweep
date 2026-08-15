@@ -67,6 +67,58 @@ public sealed class SystemAndRegionDispatchResultsContractTests
         json.Should().Contain("\"outcome\"");
     }
 
+    [Fact]
+    public void RegionDispatchOverview_RoundTripsPopulatedFactsWithNoIntervalSeries()
+    {
+        DateTimeOffset start = new(2026, 7, 1, 0, 0, 0, TimeSpan.FromHours(10));
+        RegionDispatchOverviewDTO overview = new(
+            ArtifactSchemaVersions.RegionDispatchOverview,
+            "run-2026-07-01",
+            "NSW1",
+            start,
+            start.AddHours(2),
+            TimeSpan.FromHours(1),
+            CreateSources("nsw-demand.json"),
+            new DispatchPowerSystemDTO(
+                "system-2026",
+                [new DispatchFleetDTO("Solar", 100)],
+                [new DispatchStorageFleetDTO("Battery", 120, 30)]),
+            CreateMetrics(),
+            new ReliabilityBasisDTO(0.002, 0, true, "NEM reliability standard"),
+            CreateSizing(),
+            CreateCost(),
+            new Dictionary<string, double> { ["Solar"] = 165 },
+            1.5);
+
+        string json = JsonSerializer.Serialize(overview, CamelCaseOptions);
+        RegionDispatchOverviewDTO? roundTripped = JsonSerializer.Deserialize<RegionDispatchOverviewDTO>(
+            json,
+            CaseInsensitiveOptions);
+
+        roundTripped.Should().BeEquivalentTo(overview);
+        roundTripped!.SchemaVersion.Should().Be(ArtifactSchemaVersions.RegionDispatchOverview);
+        json.Should().Contain("\"regionId\"");
+        json.Should().Contain("\"deliveredGenerationByTechnologyMwh\"");
+        json.Should().Contain("\"transmissionLossesMwh\"");
+        json.Should().NotContain("\"dataSeries\"");
+    }
+
+    [Fact]
+    public void RegionDispatchSummary_CarriesAnOverviewPathBesideItsDetailPath()
+    {
+        DateTimeOffset start = new(2026, 7, 1, 0, 0, 0, TimeSpan.FromHours(10));
+        SystemDispatchResultsDTO result = CreateSystemResult(start);
+
+        string json = JsonSerializer.Serialize(result, CamelCaseOptions);
+        SystemDispatchResultsDTO? roundTripped = JsonSerializer.Deserialize<SystemDispatchResultsDTO>(
+            json,
+            CaseInsensitiveOptions);
+
+        roundTripped.Should().BeEquivalentTo(result);
+        roundTripped!.RegionSummariesById["NSW1"].OverviewPath.Should().Be("results-nsw1-overview.json");
+        json.Should().Contain("\"overviewPath\"");
+    }
+
     private static SystemDispatchResultsDTO CreateSystemResult(DateTimeOffset start)
     {
         RegionDispatchSummaryDTO summary = new(
@@ -74,7 +126,9 @@ public sealed class SystemAndRegionDispatchResultsContractTests
             new ReliabilityBasisDTO(0.002, 0, true, "NEM reliability standard"),
             CreateSizing(),
             CreateCost(),
-            new Dictionary<string, double> { ["Solar"] = 165 });
+            new Dictionary<string, double> { ["Solar"] = 165 },
+            "results-nsw1.json",
+            "results-nsw1-overview.json");
 
         return new SystemDispatchResultsDTO(
             ArtifactSchemaVersions.SystemDispatchResults,

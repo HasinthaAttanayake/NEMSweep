@@ -14,6 +14,7 @@ public static class DispatchArtifactValidator
         SystemDispatchResultsDTO result => Validate(result),
         SystemDispatchOverviewDTO result => Validate(result),
         RegionDispatchResultsDTO result => Validate(result),
+        RegionDispatchOverviewDTO result => Validate(result),
         _ => null,
     };
 
@@ -27,6 +28,29 @@ public static class DispatchArtifactValidator
     {
         ArgumentNullException.ThrowIfNull(result);
         return ValidateSeriesAndCost(result.DataSeries, result.Cost);
+    }
+
+    public static string? Validate(RegionDispatchOverviewDTO result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        if (result.DeliveredGenerationByTechnologyMwh is null
+            || result.DeliveredGenerationByTechnologyMwh.Any(entry =>
+                string.IsNullOrWhiteSpace(entry.Key)
+                || !double.IsFinite(entry.Value)
+                || entry.Value < 0)
+            || Math.Abs(
+                result.DeliveredGenerationByTechnologyMwh.Values.Sum()
+                - result.Metrics.DeliveredGenerationMwh) > ArtifactEnergyToleranceMwh)
+        {
+            return "Region dispatch overview generation totals are invalid.";
+        }
+
+        if (!double.IsFinite(result.TransmissionLossesMwh) || result.TransmissionLossesMwh < 0)
+        {
+            return "Region dispatch overview transmission losses are invalid.";
+        }
+
+        return ValidateCost(result.Cost);
     }
 
     public static string? Validate(SystemDispatchOverviewDTO result)
