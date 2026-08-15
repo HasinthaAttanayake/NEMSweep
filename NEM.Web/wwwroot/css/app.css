@@ -384,6 +384,51 @@ code {
     pointer-events: none;
 }
 
+.stack-plot {
+    margin: 0;
+    min-width: 0;
+}
+
+.stack-plot-title {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.4rem;
+}
+
+.stack-plot-title strong {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 600;
+}
+
+.stack-plot-title small {
+    color: var(--color-muted);
+    font-size: 0.76rem;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+/* The detail is a sentence of figures and does not fit beside the region name on a phone. */
+@media (max-width: 520px) {
+    .stack-plot-title {
+        display: block;
+    }
+
+    .stack-plot-title small {
+        display: block;
+        margin-top: 0.15rem;
+        text-align: left;
+    }
+}
+
+.stack-demand {
+    stroke: var(--color-demand-line);
+    stroke-width: 2;
+    stroke-linejoin: round;
+}
+
 .scatter-caption {
     padding: 0.85rem 0 0;
     color: var(--color-muted);

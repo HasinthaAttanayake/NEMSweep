@@ -20,9 +20,13 @@
                            Resolution="@ResolutionLabel" />
                 @if (_systemResult is not null && _systemResult.RegionIds.Length > 0)
                 {
-                    <MudSelect T="string" Label="View scope" Value="@(_selectedRegionId ?? string.Empty)"
+                    <MudSelect T="string" Label="View scope" Value="@ScopeValue"
                                ValueChanged="OnRegionChanged" Variant="Variant.Outlined" Class="view-select">
                         <MudSelectItem T="string" Value="@string.Empty">NEM system</MudSelectItem>
+                        @if (_systemResult.RegionIds.Length > 1)
+                        {
+                            <MudSelectItem T="string" Value="@CompareScope">All regions, compared</MudSelectItem>
+                        }
                         @foreach (string regionId in _systemResult.RegionIds)
                         {
                             <MudSelectItem T="string" Value="@regionId">@RegionName(regionId)</MudSelectItem>
@@ -201,7 +205,7 @@
             </div>
         </section>
 
-        @if (_selectedRegionId is null && _systemResult?.Interconnectors is { Length: > 0 } links)
+        @if (!IsCompareScope && _selectedRegionId is null && _systemResult?.Interconnectors is { Length: > 0 } links)
         {
             <section class="transmission-section" aria-labelledby="transmission-heading">
                 <div class="section-heading">
@@ -230,134 +234,159 @@
             </section>
         }
 
-        <ChartFrame Heading="Generation against demand"
-                    Description="Delivered generation is stacked by technology; the demand trace reveals any supply gap."
-                    Unit="MW">
-            <div class="dispatch-chart">
-                <svg viewBox="0 0 1000 440" role="img" aria-label="Stacked generation by technology against operational demand">
-                    @for (int tick = 0; tick <= 4; tick++)
-                    {
-                        double y = ChartY(_chartMaximumMw * tick / 4);
-                        <line class="grid-line" x1="64" y1="@y" x2="984" y2="@y" stroke="#dce1e5" stroke-width="1" />
-                    }
-                    @foreach (AreaLayer area in _areas)
-                    {
-                        <polygon points="@area.Points" fill="@area.Color"><title>@area.Name</title></polygon>
-                    }
-                    @if (_comparisonDemandPoints is not null)
-                    {
-                        <polyline class="demand-line comparison-trace"
-                                  points="@_comparisonDemandPoints"
-                                  fill="none"
-                                  stroke="var(--color-demand-line)"
-                                  stroke-width="2"
-                                  stroke-dasharray="6 4"
-                                  stroke-linejoin="round"
-                                  vector-effect="non-scaling-stroke" />
-                    }
-                    <polyline class="demand-line"
-                              points="@_demandPoints"
-                              fill="none"
-                              stroke="var(--color-demand-line)"
-                              stroke-width="2.5"
-                              stroke-linejoin="round"
-                              vector-effect="non-scaling-stroke" />
-                </svg>
-                <div class="chart-axis-labels"><span>@_firstLabel</span><span>@_middleLabel</span><span>@_lastLabel</span></div>
-            </div>
-            <div class="chart-legend" aria-label="Chart series">
-                @foreach (AreaLayer area in _areas)
-                {
-                    <span><i style="background-color: @area.Color"></i>@area.Name</span>
-                }
-                <span><i class="demand-key"></i>Demand</span>
-            </div>
-        </ChartFrame>
-
-        <ChartFrame Heading="Storage state of charge"
-                    Description="Stored energy at the beginning of each interval for the selected period."
-                    Unit="MWh"
-                    Class="storage-section">
-            @if (_storageTraces.Count == 0)
-            {
-                <div class="empty-storage" role="status">
-                    <MudIcon Icon="@Icons.Material.Filled.BatteryStd" Size="Size.Large" />
-                    <div><strong>No storage installed</strong><span>This scenario meets its reliability target without a storage fleet.</span></div>
+        @if (IsCompareScope && _regionsLoading)
+        {
+            <section class="region-loading" role="status">
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Small" />
+                <div>
+                    <strong>Reading each region's dispatch series</strong>
+                    <span>
+                        One artifact per region, several megabytes each. They are kept for the rest
+                        of the session, so this happens once.
+                    </span>
                 </div>
-            }
-            else
-            {
-                <div class="dispatch-chart storage-chart">
-                    <svg viewBox="0 0 1000 300" role="img" aria-label="Storage state of charge by technology">
+            </section>
+        }
+        else if (IsCompareScope && _window is not null)
+        {
+            <RegionCompareGrid Regions="@_regionEvidence"
+                               Window="@_window"
+                               Resolution="@_result.Scenario.Resolution"
+                               PeriodLabel="@_periodLabel"
+                               Interconnectors="@(_systemResult?.Interconnectors ?? [])" />
+        }
+        else
+        {
+            <ChartFrame Heading="Generation against demand"
+                        Description="Delivered generation is stacked by technology; the demand trace reveals any supply gap."
+                        Unit="MW">
+                <div class="dispatch-chart">
+                    <svg viewBox="0 0 1000 440" role="img" aria-label="Stacked generation by technology against operational demand">
                         @for (int tick = 0; tick <= 4; tick++)
                         {
-                            double y = StorageChartY(_storageChartMaximumMwh * tick / 4);
+                            double y = ChartY(_chartMaximumMw * tick / 4);
                             <line class="grid-line" x1="64" y1="@y" x2="984" y2="@y" stroke="#dce1e5" stroke-width="1" />
                         }
-                        @foreach (StorageTrace trace in _comparisonStorageTraces)
+                        @foreach (AreaLayer area in _areas)
                         {
-                            <polyline class="comparison-trace" points="@trace.Points" fill="none" stroke="@trace.Color"
-                                      stroke-width="2" stroke-dasharray="6 4" stroke-linejoin="round"
-                                      vector-effect="non-scaling-stroke">
-                                <title>@trace.Technology state of charge, @(_comparison?.Point.Label)</title>
-                            </polyline>
+                            <polygon points="@area.Points" fill="@area.Color"><title>@area.Name</title></polygon>
                         }
+                        @if (_comparisonDemandPoints is not null)
+                        {
+                            <polyline class="demand-line comparison-trace"
+                                      points="@_comparisonDemandPoints"
+                                      fill="none"
+                                      stroke="var(--color-demand-line)"
+                                      stroke-width="2"
+                                      stroke-dasharray="6 4"
+                                      stroke-linejoin="round"
+                                      vector-effect="non-scaling-stroke" />
+                        }
+                        <polyline class="demand-line"
+                                  points="@_demandPoints"
+                                  fill="none"
+                                  stroke="var(--color-demand-line)"
+                                  stroke-width="2.5"
+                                  stroke-linejoin="round"
+                                  vector-effect="non-scaling-stroke" />
+                    </svg>
+                    <div class="chart-axis-labels"><span>@_firstLabel</span><span>@_middleLabel</span><span>@_lastLabel</span></div>
+                </div>
+                <div class="chart-legend" aria-label="Chart series">
+                    @foreach (AreaLayer area in _areas)
+                    {
+                        <span><i style="background-color: @area.Color"></i>@area.Name</span>
+                    }
+                    <span><i class="demand-key"></i>Demand</span>
+                </div>
+            </ChartFrame>
+
+            <ChartFrame Heading="Storage state of charge"
+                        Description="Stored energy at the beginning of each interval for the selected period."
+                        Unit="MWh"
+                        Class="storage-section">
+                @if (_storageTraces.Count == 0)
+                {
+                    <div class="empty-storage" role="status">
+                        <MudIcon Icon="@Icons.Material.Filled.BatteryStd" Size="Size.Large" />
+                        <div><strong>No storage installed</strong><span>This scenario meets its reliability target without a storage fleet.</span></div>
+                    </div>
+                }
+                else
+                {
+                    <div class="dispatch-chart storage-chart">
+                        <svg viewBox="0 0 1000 300" role="img" aria-label="Storage state of charge by technology">
+                            @for (int tick = 0; tick <= 4; tick++)
+                            {
+                                double y = StorageChartY(_storageChartMaximumMwh * tick / 4);
+                                <line class="grid-line" x1="64" y1="@y" x2="984" y2="@y" stroke="#dce1e5" stroke-width="1" />
+                            }
+                            @foreach (StorageTrace trace in _comparisonStorageTraces)
+                            {
+                                <polyline class="comparison-trace" points="@trace.Points" fill="none" stroke="@trace.Color"
+                                          stroke-width="2" stroke-dasharray="6 4" stroke-linejoin="round"
+                                          vector-effect="non-scaling-stroke">
+                                    <title>@trace.Technology state of charge, @(_comparison?.Point.Label)</title>
+                                </polyline>
+                            }
+                            @foreach (StorageTrace trace in _storageTraces)
+                            {
+                                <polyline points="@trace.Points" fill="none" stroke="@trace.Color"
+                                          stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke">
+                                    <title>@trace.Technology state of charge</title>
+                                </polyline>
+                            }
+                        </svg>
+                        <div class="chart-axis-labels"><span>@_firstLabel</span><span>@_middleLabel</span><span>@_lastLabel</span></div>
+                    </div>
+                    <div class="chart-legend" aria-label="Storage chart series">
                         @foreach (StorageTrace trace in _storageTraces)
                         {
+                            <span><i style="background-color: @trace.Color"></i>@trace.LegendText</span>
+                        }
+                    </div>
+                }
+            </ChartFrame>
+
+            <ChartFrame Heading="Unserved demand and curtailment"
+                        Description="Demand the fleet could not meet, and available generation it could not use, over the selected period."
+                        Unit="MW"
+                        Class="headroom-section">
+                <div class="dispatch-chart headroom-chart">
+                    <svg viewBox="0 0 1000 300" role="img" aria-label="Unserved demand and curtailment">
+                        @for (int tick = 0; tick <= 4; tick++)
+                        {
+                            double y = HeadroomChartY(_headroomChartMaximumMw * tick / 4);
+                            <line class="grid-line" x1="64" y1="@y" x2="984" y2="@y"
+                                  stroke="var(--color-border)" stroke-width="1" />
+                        }
+                        @foreach (HeadroomTrace trace in _comparisonHeadroomTraces)
+                        {
+                            <polyline class="comparison-trace" points="@trace.Points" fill="none" stroke="@trace.Color"
+                                      stroke-width="2" stroke-dasharray="6 4" vector-effect="non-scaling-stroke">
+                                <title>@trace.Name, @(_comparison?.Point.Label)</title>
+                            </polyline>
+                        }
+                        @foreach (HeadroomTrace trace in _headroomTraces)
+                        {
                             <polyline points="@trace.Points" fill="none" stroke="@trace.Color"
-                                      stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke">
-                                <title>@trace.Technology state of charge</title>
+                                      stroke-width="2.5" vector-effect="non-scaling-stroke">
+                                <title>@trace.Name</title>
                             </polyline>
                         }
                     </svg>
                     <div class="chart-axis-labels"><span>@_firstLabel</span><span>@_middleLabel</span><span>@_lastLabel</span></div>
                 </div>
-                <div class="chart-legend" aria-label="Storage chart series">
-                    @foreach (StorageTrace trace in _storageTraces)
-                    {
-                        <span><i style="background-color: @trace.Color"></i>@trace.LegendText</span>
-                    }
-                </div>
-            }
-        </ChartFrame>
-
-        <ChartFrame Heading="Unserved demand and curtailment"
-                    Description="Demand the fleet could not meet, and available generation it could not use, over the selected period."
-                    Unit="MW"
-                    Class="headroom-section">
-            <div class="dispatch-chart headroom-chart">
-                <svg viewBox="0 0 1000 300" role="img" aria-label="Unserved demand and curtailment">
-                    @for (int tick = 0; tick <= 4; tick++)
-                    {
-                        double y = HeadroomChartY(_headroomChartMaximumMw * tick / 4);
-                        <line class="grid-line" x1="64" y1="@y" x2="984" y2="@y"
-                              stroke="var(--color-border)" stroke-width="1" />
-                    }
-                    @foreach (HeadroomTrace trace in _comparisonHeadroomTraces)
-                    {
-                        <polyline class="comparison-trace" points="@trace.Points" fill="none" stroke="@trace.Color"
-                                  stroke-width="2" stroke-dasharray="6 4" vector-effect="non-scaling-stroke">
-                            <title>@trace.Name, @(_comparison?.Point.Label)</title>
-                        </polyline>
-                    }
+                <div class="chart-legend" aria-label="Headroom chart series">
                     @foreach (HeadroomTrace trace in _headroomTraces)
                     {
-                        <polyline points="@trace.Points" fill="none" stroke="@trace.Color"
-                                  stroke-width="2.5" vector-effect="non-scaling-stroke">
-                            <title>@trace.Name</title>
-                        </polyline>
+                        <span><i style="background-color: @trace.Color"></i>@trace.Name</span>
                     }
-                </svg>
-                <div class="chart-axis-labels"><span>@_firstLabel</span><span>@_middleLabel</span><span>@_lastLabel</span></div>
-            </div>
-            <div class="chart-legend" aria-label="Headroom chart series">
-                @foreach (HeadroomTrace trace in _headroomTraces)
-                {
-                    <span><i style="background-color: @trace.Color"></i>@trace.Name</span>
-                }
-                <span class="headroom-peak">Peak in view: @_peakUnservedPowerMw.ToString("N0") MW unserved, @_peakCurtailmentMw.ToString("N0") MW curtailed</span>
-            </div>
-        </ChartFrame>
+                    <span class="headroom-peak">Peak in view: @_peakUnservedPowerMw.ToString("N0") MW unserved, @_peakCurtailmentMw.ToString("N0") MW curtailed</span>
+                </div>
+            </ChartFrame>
+
+        }
 
         <section class="reliability-band" aria-label="Reliability and storage sizing">
             <div>
@@ -473,7 +502,13 @@
 
     private static readonly string[] HeadroomColors = ["#b3341f", "#7a6bbd"];
 
+    private const string CompareScope = "*";
+
     private ArtifactLoadState _loadState = ArtifactLoadState.Loading();
+    private DispatchWindow? _window;
+    private bool _compareRegions;
+    private bool _regionsLoading;
+    private List<RegionCompareGrid.RegionEvidence> _regionEvidence = [];
     private DispatchResultsDTO? _result;
     private SystemDispatchResultsDTO? _systemResult;
     private string? _selectedRegionId;
@@ -595,6 +630,11 @@
     private static string FormatUsePercentage(double value) => value == 0
         ? "0%"
         : $"{value.ToString(value >= 0.01 ? "N2" : "G3", CultureInfo.CurrentCulture)}%";
+
+    private bool IsCompareScope => _compareRegions;
+
+    /// <summary>The scope selector's value: the compare sentinel, a region id, or empty for system.</summary>
+    private string ScopeValue => _compareRegions ? CompareScope : _selectedRegionId ?? string.Empty;
 
     private bool IsSystemScope => _selectedRegionId is null;
     private string ScopeLabel => IsSystemScope ? "NEM system" : RegionName(_selectedRegionId!);
@@ -914,12 +954,25 @@
 
     private async Task OnRegionChanged(string regionId)
     {
-        string? selectedRegionId = string.IsNullOrEmpty(regionId) ? null : regionId;
-        if (_systemResult is null || string.Equals(_selectedRegionId, selectedRegionId, StringComparison.Ordinal))
+        if (_systemResult is null)
         {
             return;
         }
 
+        if (string.Equals(regionId, CompareScope, StringComparison.Ordinal))
+        {
+            await ShowAllRegionsAsync();
+            return;
+        }
+
+        string? selectedRegionId = string.IsNullOrEmpty(regionId) ? null : regionId;
+        if (!_compareRegions && string.Equals(_selectedRegionId, selectedRegionId, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _compareRegions = false;
+        _regionEvidence = [];
         _selectedRegionId = selectedRegionId;
         _selectedRegionDetailPath = selectedRegionId is null
             ? null
@@ -985,6 +1038,66 @@
             regional,
             context,
             $"{context.SweepRootPath}/{regionDetailPath}");
+    }
+
+    /// <summary>
+    /// Switches to the all-regions comparison. The charts stay on the system result — the system
+    /// cost and reliability are still what the page is reporting — and every region's own series is
+    /// fetched alongside so the panels can be drawn. The loader caches parsed artifacts, so
+    /// returning to this view after visiting a region costs nothing.
+    /// </summary>
+    private async Task ShowAllRegionsAsync()
+    {
+        if (_systemResult is null || _compareRegions)
+        {
+            return;
+        }
+
+        // Every region's series has to arrive before any panel can be drawn, and on a cold cache
+        // that is several megabytes to read and parse. The switch is acknowledged first and the
+        // renderer given a turn, so the reader sees the view change rather than a frozen page.
+        _compareRegions = true;
+        _selectedRegionId = null;
+        _selectedRegionDetailPath = null;
+        _regionsLoading = true;
+        _regionEvidence = [];
+        StateHasChanged();
+        await Task.Yield();
+
+        var evidence = new List<RegionCompareGrid.RegionEvidence>();
+        foreach (string regionId in _systemResult.RegionIds)
+        {
+            string? detailPath = _runContext is null
+                ? _systemResult.RegionSummariesById.GetValueOrDefault(regionId)?.DetailPath
+                : RegionDetailPath(_runContext.Point, regionId);
+            if (string.IsNullOrWhiteSpace(detailPath))
+            {
+                _regionsLoading = false;
+                _loadState = ArtifactLoadState.InvalidData($"Regional detail for {regionId} is missing.");
+                return;
+            }
+
+            string path = _runContext is null
+                ? $"data/{detailPath}"
+                : $"{_runContext.SweepRootPath}/{detailPath}";
+            ArtifactLoadResult<RegionDispatchResultsDTO> region =
+                await ArtifactLoader.LoadRegionForAsync(_systemResult, path);
+            if (!region.IsSuccess)
+            {
+                _regionsLoading = false;
+                _loadState = region.State;
+                return;
+            }
+
+            evidence.Add(new RegionCompareGrid.RegionEvidence(regionId, ToEvidence(region.Value!)));
+        }
+
+        _regionEvidence = evidence;
+        _regionsLoading = false;
+        await InitialiseResultAsync(
+            ToEvidence(_systemResult),
+            _runContext,
+            new(ArtifactLoadStatus.Success, null));
     }
 
     /// <summary>
@@ -1112,8 +1225,20 @@
         double[] totalDemandMw = series.Demand.TotalDemandMw;
         double intervalHours = result.Scenario.Resolution.TotalHours;
 
-        int[] selectedIndexes = SelectedIndexes(totalDemandMw.Length);
+        // One window drives every trace on the page and every regional panel beside it, so the
+        // single-scope charts and the comparison grid cannot disagree about which hours are in view.
+        _window = DispatchWindow.Create(
+            result.Scenario.PeriodStart,
+            result.Scenario.Resolution,
+            totalDemandMw.Length,
+            IsSelectedInstant,
+            _selectedView == -1 ? int.MaxValue : 480);
+        int[] selectedIndexes = _window.Indexes;
         _rawPointCount = selectedIndexes.Length;
+        if (selectedIndexes.Length == 0)
+        {
+            return;
+        }
 
         string[] technologies = OrderedTechnologies(series);
         double[][] generationSeries = new double[technologies.Length][];
@@ -1185,11 +1310,10 @@
         // share instead, so the same run read differently on two pages of this site.
         _renewableSharePercent = deliveredTotalMw == 0 ? 0 : 100 * renewableTotalMw / deliveredTotalMw;
 
-        int targetPoints = _selectedView == -1 ? selectedIndexes.Length : 480;
-        int bucketSize = Math.Max(1, (int)Math.Ceiling((double)selectedIndexes.Length / targetPoints));
-        int bucketCount = (selectedIndexes.Length + bucketSize - 1) / bucketSize;
+        int bucketSize = _window.BucketSize;
+        int bucketCount = _window.PointCount;
 
-        var timestamps = new DateTimeOffset[bucketCount];
+        DateTimeOffset[] timestamps = _window.Timestamps;
         double[] demand = new double[bucketCount];
         double[][] generation = new double[technologies.Length][];
         for (int technology = 0; technology < technologies.Length; technology++)
@@ -1201,7 +1325,6 @@
         {
             int start = bucket * bucketSize;
             int end = Math.Min(start + bucketSize, selectedIndexes.Length);
-            timestamps[bucket] = InstantAt(selectedIndexes[start]);
 
             double bucketDemand = 0;
             for (int offset = start; offset < end; offset++)
@@ -1255,9 +1378,9 @@
         }
 
         _demandPoints = LinePoints(demand);
-        BuildStorageChart(result, selectedIndexes, bucketSize);
-        BuildHeadroomChart(result, selectedIndexes, bucketSize);
-        BuildComparisonTraces(selectedIndexes, bucketSize);
+        BuildStorageChart(result);
+        BuildHeadroomChart(result);
+        BuildComparisonTraces();
 
         DateTimeOffset selectedStart = InstantAt(selectedIndexes[0]);
         DateTimeOffset selectedEnd = InstantAt(selectedIndexes[^1]) + result.Scenario.Resolution;
@@ -1275,13 +1398,10 @@
     /// the load fail to meet: both are peaks within the bucket, never averages, so a three-hour
     /// event in a year view is still visible.
     /// </summary>
-    private void BuildHeadroomChart(
-        DispatchResultsDTO result,
-        int[] selectedIndexes,
-        int bucketSize)
+    private void BuildHeadroomChart(DispatchResultsDTO result)
     {
-        double[] unserved = BucketPeaks(result.DataSeries.UnservedDemandMw, selectedIndexes, bucketSize);
-        double[] curtailment = BucketPeaks(result.DataSeries.CurtailmentMw, selectedIndexes, bucketSize);
+        double[] unserved = BucketPeaks(result.DataSeries.UnservedDemandMw);
+        double[] curtailment = BucketPeaks(result.DataSeries.CurtailmentMw);
         _headroomChartMaximumMw = Math.Max(1, Math.Max(
             unserved.DefaultIfEmpty(0).Max(),
             curtailment.DefaultIfEmpty(0).Max()));
@@ -1292,7 +1412,7 @@
         ];
     }
 
-    private void BuildComparisonTraces(int[] selectedIndexes, int bucketSize)
+    private void BuildComparisonTraces()
     {
         _comparisonDemandPoints = null;
         _comparisonStorageTraces = [];
@@ -1303,7 +1423,7 @@
         }
 
         DispatchResultsDTO comparison = _comparison.Result;
-        double[] demand = BucketAverages(comparison.DataSeries.Demand.TotalDemandMw, selectedIndexes, bucketSize);
+        double[] demand = BucketAverages(comparison.DataSeries.Demand.TotalDemandMw);
         _comparisonDemandPoints = LinePoints(demand);
 
         // The comparison is drawn as a dashed trace with no legend entry of its own, so it needs
@@ -1316,7 +1436,7 @@
                 null,
                 null,
                 [],
-                StorageLinePoints(BucketFirsts(stateOfCharge, selectedIndexes, bucketSize))));
+                StorageLinePoints(BucketFirsts(stateOfCharge))));
         }
 
         _comparisonHeadroomTraces =
@@ -1324,94 +1444,19 @@
             new HeadroomTrace(
                 "Unserved demand",
                 HeadroomColors[0],
-                HeadroomLinePoints(BucketPeaks(comparison.DataSeries.UnservedDemandMw, selectedIndexes, bucketSize))),
+                HeadroomLinePoints(BucketPeaks(comparison.DataSeries.UnservedDemandMw))),
             new HeadroomTrace(
                 "Curtailment",
                 HeadroomColors[1],
-                HeadroomLinePoints(BucketPeaks(comparison.DataSeries.CurtailmentMw, selectedIndexes, bucketSize))),
+                HeadroomLinePoints(BucketPeaks(comparison.DataSeries.CurtailmentMw))),
         ];
     }
 
-    /// <summary>How a bucket of intervals is reduced to the one value drawn for it.</summary>
-    private enum BucketReduction
-    {
-        /// <summary>The largest value in the bucket, so a short event survives a year view.</summary>
-        Peak,
+    private double[] BucketPeaks(double[] series) => _window!.Peak(series);
 
-        /// <summary>The mean of the bucket, for a series read as a level.</summary>
-        Average,
+    private double[] BucketAverages(double[] series) => _window!.Average(series);
 
-        /// <summary>The value at the start of the bucket, for a state such as stored energy.</summary>
-        First,
-    }
-
-    private static double[] BucketPeaks(double[] series, int[] selectedIndexes, int bucketSize) =>
-        Bucket(series, selectedIndexes, bucketSize, BucketReduction.Peak);
-
-    private static double[] BucketAverages(double[] series, int[] selectedIndexes, int bucketSize) =>
-        Bucket(series, selectedIndexes, bucketSize, BucketReduction.Average);
-
-    private static double[] BucketFirsts(double[] series, int[] selectedIndexes, int bucketSize) =>
-        Bucket(series, selectedIndexes, bucketSize, BucketReduction.First);
-
-    /// <summary>
-    /// Reduces the selected intervals into one value per drawn point. Written as a loop over the
-    /// index array because the earlier form sliced a fresh sub-array for every bucket, which for a
-    /// year view meant hundreds of allocations per series on every redraw.
-    /// </summary>
-    private static double[] Bucket(
-        double[] series,
-        int[] selectedIndexes,
-        int bucketSize,
-        BucketReduction reduction)
-    {
-        int bucketCount = (selectedIndexes.Length + bucketSize - 1) / bucketSize;
-        double[] values = new double[bucketCount];
-        for (int bucket = 0; bucket < bucketCount; bucket++)
-        {
-            int start = bucket * bucketSize;
-            int end = Math.Min(start + bucketSize, selectedIndexes.Length);
-            if (reduction == BucketReduction.First)
-            {
-                values[bucket] = series[selectedIndexes[start]];
-                continue;
-            }
-
-            double accumulated = reduction == BucketReduction.Peak ? double.NegativeInfinity : 0;
-            for (int offset = start; offset < end; offset++)
-            {
-                double value = series[selectedIndexes[offset]];
-                accumulated = reduction == BucketReduction.Peak
-                    ? Math.Max(accumulated, value)
-                    : accumulated + value;
-            }
-
-            values[bucket] = reduction == BucketReduction.Peak
-                ? accumulated
-                : accumulated / (end - start);
-        }
-
-        return values;
-    }
-
-    /// <summary>
-    /// The intervals the current view covers. The selection is a calendar test, so it is applied
-    /// once here and the resulting indices are reused by every series rather than re-tested per
-    /// series.
-    /// </summary>
-    private int[] SelectedIndexes(int length)
-    {
-        var selected = new List<int>(length);
-        for (int index = 0; index < length; index++)
-        {
-            if (IsSelected(index))
-            {
-                selected.Add(index);
-            }
-        }
-
-        return [.. selected];
-    }
+    private double[] BucketFirsts(double[] series) => _window!.First(series);
 
     /// <summary>Technologies in stack order, keeping any the palette has not met.</summary>
     private static string[] OrderedTechnologies(DispatchSeriesDTO series) =>
@@ -1425,23 +1470,16 @@
     /// list only supplies the capacities for the legend, so a result that reports storage operating
     /// without republishing its fleet is still drawn rather than reported as having no storage.
     /// </summary>
-    private void BuildStorageChart(
-        DispatchResultsDTO result,
-        int[] selectedIndexes,
-        int bucketSize)
+    private void BuildStorageChart(DispatchResultsDTO result)
     {
         _storageTraces = [];
         foreach ((string technology, double[] stateOfCharge) in result.DataSeries.StateOfChargeByTechnologyMwh)
         {
             DispatchStorageFleetDTO? fleet = result.PowerSystem.StorageFleets.FirstOrDefault(candidate =>
                 string.Equals(candidate.Technology, technology, StringComparison.OrdinalIgnoreCase));
-            var displayedValues = new List<double>();
-            for (int offset = 0; offset < selectedIndexes.Length; offset += bucketSize)
-            {
-                int[] bucket = selectedIndexes[offset..Math.Min(offset + bucketSize, selectedIndexes.Length)];
-                displayedValues.Add(stateOfCharge[bucket[0]]);
-            }
-
+            // Stored energy is a state rather than a rate, so a bucket takes the value it started
+            // at rather than an average across it.
+            double[] displayedValues = BucketFirsts(stateOfCharge);
             _storageTraces.Add(new StorageTrace(
                 technology,
                 StorageColors.GetValueOrDefault(technology, "#8a7d72"),
@@ -1561,11 +1599,12 @@
     private double AnnualServedEnergyMwh() =>
         _result!.Metrics.DemandMwh - _result.Metrics.UnservedEnergyMwh;
 
-    private bool IsSelected(int index)
+    private bool IsSelectedInstant(DateTimeOffset instant) => _selectedView switch
     {
-        DateTimeOffset instant = InstantAt(index);
-        return _selectedView switch { -1 => instant.Date == _selectedDate.Date, 0 => true, _ => instant.Month == _selectedView };
-    }
+        -1 => instant.Date == _selectedDate.Date,
+        0 => true,
+        _ => instant.Month == _selectedView,
+    };
 
     private DateTimeOffset InstantAt(int index) =>
         _result!.Scenario.PeriodStart.AddTicks(_result.Scenario.Resolution.Ticks * index);

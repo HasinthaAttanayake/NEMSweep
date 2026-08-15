@@ -65,6 +65,9 @@
 .empty-storage { display: flex; align-items: center; gap: 1rem; min-height: 110px; padding: 1.25rem; border-block: 1px solid var(--color-border); background: var(--color-empty-storage); color: var(--accent); }
 .empty-storage strong, .empty-storage span { display: block; }
 .empty-storage span { margin-top: .2rem; color: var(--color-muted); font-size: .88rem; }
+.region-loading { display: flex; align-items: center; gap: 1rem; margin-top: 1.5rem; padding: 1.5rem; border-block: 1px solid var(--color-border); background: var(--color-surface-muted); }
+.region-loading strong, .region-loading span { display: block; }
+.region-loading span { max-width: 60ch; margin-top: .2rem; color: var(--color-muted); font-size: .84rem; line-height: 1.5; }
 .weather-bases { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--color-border); }
 .weather-bases h2 { margin: 0; font-family: var(--font-display); font-size: 1.35rem; font-weight: 600; }
 .weather-bases-note { max-width: 640px; margin: .35rem 0 0; color: var(--color-muted); font-size: .85rem; line-height: 1.55; }
