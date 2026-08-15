@@ -163,12 +163,14 @@ public sealed class SystemAnalysisTests
             new ReliabilityBasisDTO(0.002, 0, true, "NEM reliability standard"),
             Sizing(5515, nswResized ? 9000 : 5515, StorageOutcome(nswResized)),
             Cost(slcoe: 167.27m, generation: 164.08m, storage: 3.19m, total: 11_085_977_181m, netImported: -266_101),
+            Mix(coal: 41_275_989, solar: 15_000_000, wind: 7_500_000, hydro: 2_766_101),
             "results-nsw1.json");
         RegionDispatchSummaryDTO vic = new(
             Metrics(demandMwh: 44_977_270, deliveredMwh: 44_665_751, curtailedMwh: 2_891_385, unservedMwh: vicUnservedMwh),
             new ReliabilityBasisDTO(0.002, vicUnservedMwh > 0 ? 0.00164 : 0, true, "NEM reliability standard"),
             Sizing(3243.4, 6772, StorageSizingOutcome.Resized),
             Cost(slcoe: 145.47m, generation: 138.90m, storage: 6.57m, total: 6_542_903_141m, netImported: 252_796),
+            Mix(coal: 18_577_270, solar: 14_000_000, wind: 11_000_000, hydro: 1_088_481),
             "results-vic1.json");
 
         return new SystemDispatchResultsDTO(
@@ -193,9 +195,15 @@ public sealed class SystemAnalysisTests
             new ReliabilityBasisDTO(0.002, systemUnservedMwh > 0 ? 0.00066 : 0, true, "NEM reliability standard"),
             Sizing(8758.4, 12287, StorageSizingOutcome.Resized),
             Cost(slcoe: 158.46m, generation: 153.90m, storage: 4.56m, total: 17_629_045_242m, netImported: 0),
+            new DispatchTopologyDTO(
+                ["NSW1", "VIC1"],
+                [
+                    new DispatchTopologyLinkDTO("NSW1->VIC1", "NSW1", "VIC1", 1000),
+                    new DispatchTopologyLinkDTO("VIC1->NSW1", "VIC1", "NSW1", 1000),
+                ]),
             [
-                new DispatchInterconnectorDTO("NSW1", "VIC1", 1000, [1000, 0, 0], [50, 0, 0]),
-                new DispatchInterconnectorDTO("VIC1", "NSW1", 1000, [0, 0, 0], [0, 0, 0]),
+                new DispatchInterconnectorDTO("NSW1->VIC1", "NSW1", "VIC1", 1000, [1000, 0, 0], [50, 0, 0]),
+                new DispatchInterconnectorDTO("VIC1->NSW1", "VIC1", "NSW1", 1000, [0, 0, 0], [0, 0, 0]),
             ]);
     }
 
@@ -229,5 +237,19 @@ public sealed class SystemAnalysisTests
         decimal storage,
         decimal total,
         double netImported) =>
-        new("calculated", 0, 0, total, generation, storage, slcoe, 0, 0, netImported);
+        new(
+            "calculated", 0, 0, total, generation, storage, slcoe, 0, 0,
+            TransmissionCostStatus.NotModelled, netImported, []);
+
+    private static Dictionary<string, double> Mix(
+        double coal,
+        double solar,
+        double wind,
+        double hydro) => new()
+    {
+        ["Coal"] = coal,
+        ["Solar"] = solar,
+        ["Wind"] = wind,
+        ["Hydro"] = hydro,
+    };
 }

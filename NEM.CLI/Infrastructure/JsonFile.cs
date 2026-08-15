@@ -135,7 +135,8 @@ internal static class JsonFile
     }
 
     private static int DecimalPlaces(string propertyName) =>
-        propertyName.Contains("Aud", StringComparison.OrdinalIgnoreCase) ? 2
+        propertyName.Equals("TransmissionSlcotAudPerMwh", StringComparison.OrdinalIgnoreCase) ? 4
+        : propertyName.Contains("Aud", StringComparison.OrdinalIgnoreCase) ? 2
         : propertyName.EndsWith("Mw", StringComparison.OrdinalIgnoreCase)
             || propertyName.EndsWith("Mwh", StringComparison.OrdinalIgnoreCase) ? 1
         : propertyName.Contains("share", StringComparison.OrdinalIgnoreCase) ? 4

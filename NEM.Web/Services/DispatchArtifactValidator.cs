@@ -6,11 +6,13 @@ namespace NEM.Web.Services;
 public static class DispatchArtifactValidator
 {
     private const double FlowToleranceMw = 1e-9;
+    private const double ArtifactEnergyToleranceMwh = 0.100001;
 
     public static string? Validate(object artifact) => artifact switch
     {
         DispatchResultsDTO result => Validate(result),
         SystemDispatchResultsDTO result => Validate(result),
+        SystemDispatchOverviewDTO result => Validate(result),
         RegionDispatchResultsDTO result => Validate(result),
         _ => null,
     };
@@ -27,21 +29,22 @@ public static class DispatchArtifactValidator
         return ValidateSeriesAndCost(result.DataSeries, result.Cost);
     }
 
+    public static string? Validate(SystemDispatchOverviewDTO result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        string? costValidation = ValidateCost(result.Cost);
+        return costValidation
+            ?? ValidateRegionsAndTopology(result.RegionIds, result.RegionSummariesById, result.Topology);
+    }
+
     public static string? Validate(SystemDispatchResultsDTO result)
     {
         ArgumentNullException.ThrowIfNull(result);
-        string? commonValidation = ValidateSeriesAndCost(result.DataSeries, result.Cost);
+        string? commonValidation = ValidateSeriesAndCost(result.DataSeries, result.Cost)
+            ?? ValidateRegionsAndTopology(result.RegionIds, result.RegionSummariesById, result.Topology);
         if (commonValidation is not null)
         {
             return commonValidation;
-        }
-
-        if (result.RegionIds is null
-            || result.RegionIds.Length == 0
-            || result.RegionIds.Any(string.IsNullOrWhiteSpace)
-            || result.RegionIds.Distinct(StringComparer.OrdinalIgnoreCase).Count() != result.RegionIds.Length)
-        {
-            return "System dispatch region IDs are missing or duplicated.";
         }
 
         if (result.Interconnectors is null)
@@ -51,11 +54,13 @@ public static class DispatchArtifactValidator
 
         int intervalCount = result.DataSeries.Demand.TotalDemandMw.Length;
         var regionIds = new HashSet<string>(result.RegionIds, StringComparer.OrdinalIgnoreCase);
+        var topologyById = result.Topology.Links.ToDictionary(link => link.Id, StringComparer.Ordinal);
         var directions = new HashSet<(string From, string To)>();
         for (int linkIndex = 0; linkIndex < result.Interconnectors.Length; linkIndex++)
         {
             DispatchInterconnectorDTO? link = result.Interconnectors[linkIndex];
             if (link is null
+                || string.IsNullOrWhiteSpace(link.Id)
                 || string.IsNullOrWhiteSpace(link.FromRegionId)
                 || string.IsNullOrWhiteSpace(link.ToRegionId)
                 || string.Equals(link.FromRegionId, link.ToRegionId, StringComparison.OrdinalIgnoreCase)
@@ -63,6 +68,14 @@ public static class DispatchArtifactValidator
                 || !regionIds.Contains(link.ToRegionId))
             {
                 return "System dispatch interconnector endpoints do not match its regions.";
+            }
+
+            if (!topologyById.TryGetValue(link.Id, out DispatchTopologyLinkDTO? topologyLink)
+                || !string.Equals(link.FromRegionId, topologyLink.FromRegionId, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(link.ToRegionId, topologyLink.ToRegionId, StringComparison.OrdinalIgnoreCase)
+                || link.CapacityMw != topologyLink.CapacityMw)
+            {
+                return "System dispatch interconnector evidence does not match declared topology.";
             }
 
             var direction = (link.FromRegionId.ToUpperInvariant(), link.ToRegionId.ToUpperInvariant());
@@ -117,6 +130,75 @@ public static class DispatchArtifactValidator
         return null;
     }
 
+    private static string? ValidateRegionsAndTopology(
+        string[]? regionIds,
+        Dictionary<string, RegionDispatchSummaryDTO>? regionSummariesById,
+        DispatchTopologyDTO? topology)
+    {
+        if (regionIds is null
+            || regionIds.Length == 0
+            || regionIds.Any(string.IsNullOrWhiteSpace)
+            || regionIds.Distinct(StringComparer.OrdinalIgnoreCase).Count() != regionIds.Length)
+        {
+            return "System dispatch region IDs are missing or duplicated.";
+        }
+
+        if (regionSummariesById is null
+            || !regionIds.ToHashSet(StringComparer.OrdinalIgnoreCase)
+                .SetEquals(regionSummariesById.Keys)
+            || regionSummariesById.Values.Any(summary =>
+                summary is null
+                || summary.DeliveredGenerationByTechnologyMwh is null
+                || summary.DeliveredGenerationByTechnologyMwh.Any(entry =>
+                    string.IsNullOrWhiteSpace(entry.Key)
+                    || !double.IsFinite(entry.Value)
+                    || entry.Value < 0)
+                || Math.Abs(
+                    summary.DeliveredGenerationByTechnologyMwh.Values.Sum()
+                    - summary.Metrics.DeliveredGenerationMwh) > ArtifactEnergyToleranceMwh))
+        {
+            return "System dispatch regional generation totals are invalid.";
+        }
+
+        return ValidateTopology(topology, new HashSet<string>(regionIds, StringComparer.OrdinalIgnoreCase));
+    }
+
+    private static string? ValidateTopology(
+        DispatchTopologyDTO? topology,
+        HashSet<string> systemRegionIds)
+    {
+        if (topology?.RegionIds is null
+            || topology.Links is null
+            || topology.RegionIds.Length != systemRegionIds.Count
+            || topology.RegionIds.Any(string.IsNullOrWhiteSpace)
+            || !topology.RegionIds.All(systemRegionIds.Contains))
+        {
+            return "System dispatch topology regions do not match its regions.";
+        }
+
+        var linkIds = new HashSet<string>(StringComparer.Ordinal);
+        var directions = new HashSet<(string From, string To)>();
+        foreach (DispatchTopologyLinkDTO? link in topology.Links)
+        {
+            if (link is null
+                || string.IsNullOrWhiteSpace(link.Id)
+                || string.IsNullOrWhiteSpace(link.FromRegionId)
+                || string.IsNullOrWhiteSpace(link.ToRegionId)
+                || string.Equals(link.FromRegionId, link.ToRegionId, StringComparison.OrdinalIgnoreCase)
+                || !systemRegionIds.Contains(link.FromRegionId)
+                || !systemRegionIds.Contains(link.ToRegionId)
+                || !double.IsFinite(link.CapacityMw)
+                || link.CapacityMw < 0
+                || !linkIds.Add(link.Id)
+                || !directions.Add((link.FromRegionId.ToUpperInvariant(), link.ToRegionId.ToUpperInvariant())))
+            {
+                return "System dispatch topology links are invalid.";
+            }
+        }
+
+        return null;
+    }
+
     private static string? ValidateSeriesAndCost(DispatchSeriesDTO? series, DispatchCostDTO? cost)
     {
         if (series?.Demand?.TotalDemandMw is null
@@ -142,12 +224,41 @@ public static class DispatchArtifactValidator
             return "Dispatch transmission series must be finite and non-negative.";
         }
 
+        return ValidateCost(cost);
+    }
+
+    private static string? ValidateCost(DispatchCostDTO? cost)
+    {
         if (cost is null
             || cost.AnnualisedTransmissionCostAud < 0
             || cost.TransmissionSlcotAudPerMwh < 0
+            || !Enum.IsDefined(cost.TransmissionCostStatus)
+            || (cost.TransmissionCostStatus == TransmissionCostStatus.NotModelled
+                && (cost.AnnualisedTransmissionCostAud != 0
+                    || cost.TransmissionSlcotAudPerMwh != 0))
             || !double.IsFinite(cost.NetImportedEnergyMwh))
         {
             return "Dispatch transmission cost evidence is invalid.";
+        }
+
+        if (cost.GenerationCostContributions is null
+            || cost.GenerationCostContributions.Any(contribution => contribution is null
+                || string.IsNullOrWhiteSpace(contribution.Technology)
+                || contribution.AnnualisedCostAud < 0
+                || contribution.LevelisedContributionAudPerMwh < 0)
+            || cost.GenerationCostContributions
+                .Select(contribution => contribution.Technology)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count() != cost.GenerationCostContributions.Length)
+        {
+            return "Dispatch generation cost contributions are invalid.";
+        }
+
+        decimal annualisedContributionCost = cost.GenerationCostContributions
+            .Sum(contribution => contribution.AnnualisedCostAud);
+        if (annualisedContributionCost != cost.AnnualisedGenerationCostAud)
+        {
+            return "Dispatch generation cost contributions do not reconcile to annualised generation cost.";
         }
 
         return null;

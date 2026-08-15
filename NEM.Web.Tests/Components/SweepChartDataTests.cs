@@ -99,13 +99,13 @@ public sealed class SweepChartDataTests
     {
         SweepSeriesCatalogue.UnmappedScalarNames.Should().BeEmpty(
             "every scalar in the contract needs an accessor before it can be charted");
-        SweepSeriesCatalogue.All.Should().HaveCount(SweepScalarCatalog.Descriptors.Count);
+        SweepSeriesCatalogue.All.Should().HaveCount(SweepScalarCatalog.Descriptors.Count(descriptor => descriptor.Chartable));
     }
 
     [Fact]
     public void SweepSeriesCatalogue_TakesItsLabelsAndUnitsFromTheContract()
     {
-        foreach (SweepScalarDescriptor descriptor in SweepScalarCatalog.Descriptors)
+        foreach (SweepScalarDescriptor descriptor in SweepScalarCatalog.Descriptors.Where(descriptor => descriptor.Chartable))
         {
             SweepChartYAxis axis = SweepSeriesCatalogue.Resolve(descriptor.Name)!;
 

@@ -87,7 +87,7 @@ public sealed class ArtifactLoaderTests
             Serialize(ArtifactFixtures.SystemResults() with { SchemaVersion = 1 }));
 
         result.State.Status.Should().Be(ArtifactLoadStatus.InvalidData);
-        result.State.Message.Should().Be("Artifact schema 1 is not supported; expected schema 3.");
+            result.State.Message.Should().Be("Artifact schema 1 is not supported; expected schema 9.");
     }
 
     [Fact]
@@ -109,7 +109,7 @@ public sealed class ArtifactLoaderTests
             """{ "schemaVersion": 1 }""");
 
         result.State.Status.Should().Be(ArtifactLoadStatus.InvalidData);
-        result.State.Message.Should().Be("Artifact schema 1 is not supported; expected schema 2.");
+        result.State.Message.Should().Be("Artifact schema 1 is not supported; expected schema 7.");
     }
 
     [Fact]
@@ -213,10 +213,18 @@ public sealed class ArtifactLoaderTests
     {
         SystemDispatchResultsDTO valid = ArtifactFixtures.SystemResults(
             interconnectors:
-            [new DispatchInterconnectorDTO("NSW1", "VIC1", 100, [1], [0])]);
+            [new DispatchInterconnectorDTO("NSW1->VIC1", "NSW1", "VIC1", 100, [1], [0])]);
         SystemDispatchResultsDTO invalid = valid with
         {
             RegionIds = ["NSW1", "VIC1"],
+            RegionSummariesById = new Dictionary<string, RegionDispatchSummaryDTO>
+            {
+                ["NSW1"] = valid.RegionSummariesById["NSW1"],
+                ["VIC1"] = valid.RegionSummariesById["NSW1"],
+            },
+            Topology = new DispatchTopologyDTO(
+                ["NSW1", "VIC1"],
+                [new DispatchTopologyLinkDTO("NSW1->VIC1", "NSW1", "VIC1", 100)]),
         };
 
         ArtifactLoadResult<SystemDispatchResultsDTO> result = await LoadAsync<SystemDispatchResultsDTO>(
@@ -232,7 +240,7 @@ public sealed class ArtifactLoaderTests
     {
         SystemDispatchResultsDTO valid = ArtifactFixtures.SystemResults(
             interconnectors:
-            [new DispatchInterconnectorDTO("NSW1", "VIC1", 100, [1, 0, 0], [0, 0, 0])]);
+            [new DispatchInterconnectorDTO("NSW1->VIC1", "NSW1", "VIC1", 100, [1, 0, 0], [0, 0, 0])]);
         JsonObject artifact = JsonNode.Parse(Serialize(valid))!.AsObject();
         artifact["interconnectors"]![0]!.AsObject().Remove("capacityMw");
 

@@ -140,6 +140,20 @@ public sealed class PowerSystemCostBreakdownTests
         breakdown.Regions.Should().HaveCount(2);
         breakdown.TotalAnnualisedGenerationCost.Should().Be(
             nsw.AnnualisedGenerationCost + vic.AnnualisedGenerationCost);
+        nsw.GenerationCostContributions.Aggregate(
+                Money.Zero,
+                (total, contribution) => total + contribution.AnnualisedCost)
+            .Should().Be(nsw.AnnualisedGenerationCost);
+        vic.GenerationCostContributions.Aggregate(
+                Money.Zero,
+                (total, contribution) => total + contribution.AnnualisedCost)
+            .Should().Be(vic.AnnualisedGenerationCost);
+        breakdown.GenerationCostContributions.Aggregate(
+                Money.Zero,
+                (total, contribution) => total + contribution.AnnualisedCost)
+            .Should().Be(breakdown.TotalAnnualisedGenerationCost);
+        breakdown.GenerationCostContributions.Select(contribution => contribution.Technology)
+            .Should().Equal(GenerationTechnology.Gas);
         breakdown.TotalAnnualisedStorageCost.Should().Be(
             nsw.AnnualisedStorageCost + vic.AnnualisedStorageCost);
         breakdown.TotalAnnualisedCost.Should().Be(

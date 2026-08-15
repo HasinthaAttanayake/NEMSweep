@@ -7,14 +7,20 @@ namespace NEM.Web.Tests.Services;
 public sealed class SweepMeasuresTests
 {
     [Fact]
-    public void For_OffersTheSweepsOwnInputAlongsideEveryPublishedScalar()
+    public void For_OffersTheSweepsOwnInputAlongsideEveryChartablePublishedScalar()
     {
         IReadOnlyList<SweepMeasure> measures = SweepMeasures.For(Index());
 
         measures[0].Key.Should().Be(SweepMeasures.AxisKey);
         measures[0].Label.Should().Be("Added demand");
         measures[0].Unit.Should().Be("MW");
+        // A non-chartable scalar such as the transmission cost status is a label, not a quantity,
+        // so it has no place on an axis and is deliberately absent from the measures.
         measures.Select(measure => measure.Key).Should().Contain(SweepScalarCatalog.Descriptors
+            .Where(descriptor => descriptor.Chartable)
+            .Select(descriptor => descriptor.Name));
+        measures.Select(measure => measure.Key).Should().NotContain(SweepScalarCatalog.Descriptors
+            .Where(descriptor => !descriptor.Chartable)
             .Select(descriptor => descriptor.Name));
     }
 

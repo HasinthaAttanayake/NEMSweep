@@ -263,12 +263,16 @@ classDiagram
   scenario assumptions. It produces one `RegionCostBreakdown` per region with
   annualised generation, storage, and total costs and each of their levelised
   costs divided by that region's `DispatchOutcome.DeliveredToLoad`. It derives
-  system annual costs and served energy by exactly summing these regional values,
-  then divides the reconciled system components once by total served energy.
+  system annual costs and served energy from those regional values. System generation
+  cost is deterministically re-aggregated by technology so the published technology
+  contributions exactly reconcile to the published generation total, then the system
+  components are divided once by total served energy.
   `PowerSystemCostBreakdown` and `RegionCostBreakdown` are value-only results,
   not calculation services. Transmission is annuitised from scenario
   directed interconnector capacity assumptions and charged once at system level, so
-  regional costs do not sum to the system total.
+  regional costs do not sum to the system total. A system result states whether
+  transmission economics were calculated; regional results state that transmission is
+  not modelled in their cost scope, even though they disclose incoming-link loss allocation.
 - Exported run results cite scenario and power-system identities rather than
   serialising the domain object graph.
 
@@ -377,9 +381,12 @@ are not current-interval generation by any generating fleet.
 
 An unlinked `PowerSystem` sets imports, exports, and transmission losses to zero.
 Regional artifacts retain non-negative imports and exports plus annual net imported
-energy; their required transmission-loss series is zero because loss is system-level
-link evidence, not a regional attribution. Only a system artifact publishes directional
-forward/reverse link series and the reconciled total transmission-loss series.
+energy. Their transmission-loss series is an incoming-link accounting attribution:
+each directed link's loss is assigned to its receiving region, and the regional sums
+reconcile to the system total. It is not a physical measurement of where loss occurred
+along a link or a regional transmission charge. Only a system artifact publishes
+directional forward/reverse link series and the canonical reconciled total
+transmission-loss series.
 
 A region without storage also sets charge and discharge to zero. For such a regional
 outcome, `generation - curtailment` is generation delivered to load and uses the reduced

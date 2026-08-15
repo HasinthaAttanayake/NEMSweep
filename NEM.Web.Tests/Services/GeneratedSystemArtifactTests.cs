@@ -29,10 +29,12 @@ public sealed class GeneratedSystemArtifactTests
 
         artifact.Should().NotBeNull();
         artifact!.SchemaVersion.Should().Be(ArtifactSchemaVersions.SystemDispatchResults);
+        artifact.Topology.RegionIds.Should().Equal("NSW1", "VIC1");
+        artifact.Topology.Links.Select(link => link.Id).Should().Equal("NSW1->VIC1", "VIC1->NSW1");
         artifact.Interconnectors
-            .Select(link => $"{link.FromRegionId}|{link.ToRegionId}")
+            .Select(link => link.Id)
             .Should()
-            .Equal("NSW1|VIC1", "VIC1|NSW1");
+            .Equal("NSW1->VIC1", "VIC1->NSW1");
         DispatchArtifactValidator.Validate(artifact).Should().BeNull();
     }
 

@@ -18,7 +18,7 @@ namespace NEM.CLI.Tests.Scenarios;
 public sealed class DispatchResultsContractTests
 {
     [Fact]
-    public void V8_RoundTripsWithTransmissionEvidenceAndExplicitUnits()
+    public void V9_RoundTripsWithTransmissionEvidenceAndExplicitUnits()
     {
         var start = new DateTimeOffset(2025, 7, 1, 0, 0, 0, TimeSpan.FromHours(10));
         var result = new DispatchResultsDTO(
@@ -36,8 +36,8 @@ public sealed class DispatchResultsContractTests
                 new DispatchInputArtifactDTO("weather-data.json", 5, new string('b', 64)),
                 new WeatherBasisDTO(
                     WeatherBasisKind.TypicalMeteorologicalYear,
-                    "sydney.epw",
-                    "Sydney (WMO 947680)",
+                    new WeatherSiteDTO("sydney-solar.epw", "Sydney (WMO 947680)"),
+                    new WeatherSiteDTO("sydney-wind.epw", "Sydney (WMO 947680)"),
                     "Typical meteorological year from sydney.epw."),
                 ["demand.zip"]),
             new DispatchPowerSystemDTO(
@@ -89,7 +89,13 @@ public sealed class DispatchResultsContractTests
                 12.5m,
                 AnnualisedTransmissionCostAud: 50m,
                 TransmissionSlcotAudPerMwh: 0.5m,
-                NetImportedEnergyMwh: 12));
+                TransmissionCostStatus: TransmissionCostStatus.Calculated,
+                NetImportedEnergyMwh: 12,
+                GenerationCostContributions:
+                [
+                    new DispatchGenerationCostContributionDTO("Solar", 600m, 6m),
+                    new DispatchGenerationCostContributionDTO("Coal", 400m, 4m),
+                ]));
 
         string json = JsonSerializer.Serialize(result, new JsonSerializerOptions
         {
@@ -121,10 +127,17 @@ public sealed class DispatchResultsContractTests
         json.Should().Contain("\"slcoeAudPerMwh\"");
         json.Should().Contain("\"annualisedTransmissionCostAud\"");
         json.Should().Contain("\"transmissionSlcotAudPerMwh\"");
+        json.Should().Contain("\"transmissionCostStatus\":\"calculated\"");
         json.Should().Contain("\"netImportedEnergyMwh\"");
+        json.Should().Contain("\"generationCostContributions\"");
+        json.Should().Contain("\"technology\"");
+        json.Should().Contain("\"annualisedCostAud\"");
+        json.Should().Contain("\"levelisedContributionAudPerMwh\"");
         json.Should().Contain("\"sha256\"");
         json.Should().Contain("\"weatherBasis\"");
         json.Should().Contain("\"kind\":\"typicalMeteorologicalYear\"");
+        json.Should().Contain("\"solar\"");
+        json.Should().Contain("\"wind\"");
         json.Should().Contain("\"targetUsePercentageOfDemand\"");
         json.Should().Contain("\"achievedUsePercentageOfDemand\"");
         json.Should().Contain("\"withinTarget\"");
@@ -294,8 +307,8 @@ public sealed class DispatchResultsContractTests
             new DispatchInputArtifactDTO("weather.json", 5, new string('b', 64)),
             new WeatherBasisDTO(
                 WeatherBasisKind.TypicalMeteorologicalYear,
-                "sydney.epw",
-                "Sydney (WMO 947680)",
+                new WeatherSiteDTO("sydney-solar.epw", "Sydney (WMO 947680)"),
+                new WeatherSiteDTO("sydney-wind.epw", "Sydney (WMO 947680)"),
                 "Typical meteorological year from sydney.epw."),
             scenario,
             sizingResult,
@@ -361,7 +374,9 @@ public sealed class DispatchResultsContractTests
             includesStorage ? 30 : 0,
             100_000,
             10_000,
-            1));
+            1,
+            null,
+            []));
         result.DataSources.WeatherBasis.Kind.Should().Be(WeatherBasisKind.TypicalMeteorologicalYear);
         result.Cost.AnnualisedGenerationCostAud.Should().Be(0);
         result.Cost.AnnualisedStorageCostAud.Should().Be(0);

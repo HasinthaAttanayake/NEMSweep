@@ -307,5 +307,6 @@ public sealed class SweepAnalysisTests
         PeakUnservedPowerMw: 0,
         CurtailedEnergyMwh: curtailed,
         TransmissionSlcotAudPerMwh: 0m,
+        TransmissionCostStatus: TransmissionCostStatus.NotModelled,
         NetImportedEnergyMwh: 0);
 }

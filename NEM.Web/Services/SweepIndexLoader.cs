@@ -81,9 +81,14 @@ public static class SweepIndexValidator
         && scope.PeriodEnd > scope.PeriodStart
         && scope.Resolution > TimeSpan.Zero
         && scope.WeatherBasis is not null
-        && !string.IsNullOrWhiteSpace(scope.WeatherBasis.SourceFile)
-        && !string.IsNullOrWhiteSpace(scope.WeatherBasis.LocationName)
+        && IsUsableWeatherSite(scope.WeatherBasis.Solar)
+        && IsUsableWeatherSite(scope.WeatherBasis.Wind)
         && !string.IsNullOrWhiteSpace(scope.WeatherBasis.Description);
+
+    private static bool IsUsableWeatherSite(WeatherSiteDTO? site) =>
+        site is not null
+        && !string.IsNullOrWhiteSpace(site.SourceFile)
+        && !string.IsNullOrWhiteSpace(site.LocationName);
 
     private static string? ValidateProvenance(SweepProvenanceDTO? provenance)
     {

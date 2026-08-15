@@ -3,12 +3,40 @@
     "annualisedGenerationCostAud": 13172571331.92,
     "annualisedStorageCostAud": 263533848.93,
     "annualisedTransmissionCostAud": 0,
+    "generationCostContributions": [
+      {
+        "annualisedCostAud": 885515318.97,
+        "levelisedContributionAudPerMwh": 8.74,
+        "technology": "Solar"
+      },
+      {
+        "annualisedCostAud": 769281399.83,
+        "levelisedContributionAudPerMwh": 7.59,
+        "technology": "Wind"
+      },
+      {
+        "annualisedCostAud": 768959404.57,
+        "levelisedContributionAudPerMwh": 7.59,
+        "technology": "Hydro"
+      },
+      {
+        "annualisedCostAud": 7540546322.54,
+        "levelisedContributionAudPerMwh": 74.43,
+        "technology": "Coal"
+      },
+      {
+        "annualisedCostAud": 3208268886.01,
+        "levelisedContributionAudPerMwh": 31.67,
+        "technology": "Gas"
+      }
+    ],
     "generationSlcoeAudPerMwh": 130.02,
     "netImportedEnergyMwh": 0,
     "slcoeAudPerMwh": 132.62,
     "status": "calculated",
     "storageSlcoeAudPerMwh": 2.6,
     "totalAnnualisedCostAud": 13436105180.85,
+    "transmissionCostStatus": "notModelled",
     "transmissionSlcotAudPerMwh": 0
   },
   "dataSeries": {
@@ -131515,10 +131543,16 @@
       "PUBLIC_ARCHIVE#DEMANDOPERATIONALACTUAL#FILE01#202507010000.zip"
     ],
     "weatherBasis": {
-      "description": "Typical meteorological year from AUS_NSW_Dubbo.City.Rgnl.AP.957190_TMYx.2011-2025.epw for Dubbo.City.Rgnl.AP (WMO 957190), applied to the dispatch period by calendar hour. It represents typical rather than extreme years, so it does not contain the tail weather events that drive storage and reliability outcomes.",
+      "description": "Typical meteorological year using solar data from AUS_NSW_Dubbo.City.Rgnl.AP.957190_TMYx.2011-2025.epw at Dubbo.City.Rgnl.AP (WMO 957190) and wind data from AUS_NSW_Armidale.AP.957730_TMYx.2011-2025.epw at Armidale.AP (WMO 957730), applied to the dispatch period by calendar hour. It represents typical rather than extreme years, so it does not contain the tail weather events that drive storage and reliability outcomes.",
       "kind": "typicalMeteorologicalYear",
-      "locationName": "Dubbo.City.Rgnl.AP (WMO 957190)",
-      "sourceFile": "AUS_NSW_Dubbo.City.Rgnl.AP.957190_TMYx.2011-2025.epw"
+      "solar": {
+        "locationName": "Dubbo.City.Rgnl.AP (WMO 957190)",
+        "sourceFile": "AUS_NSW_Dubbo.City.Rgnl.AP.957190_TMYx.2011-2025.epw"
+      },
+      "wind": {
+        "locationName": "Armidale.AP (WMO 957730)",
+        "sourceFile": "AUS_NSW_Armidale.AP.957730_TMYx.2011-2025.epw"
+      }
     },
     "weatherInput": {
       "fileName": "weather-nsw1.json",
@@ -131583,8 +131617,8 @@
     "withinTarget": true
   },
   "resolution": "01:00:00",
-  "runId": "2e93a77ba396426a8b819600a305a8b2",
-  "schemaVersion": 2,
+  "runId": "1b56c75ad6b04f0f95e43dc025088e9b",
+  "schemaVersion": 7,
   "storageSizing": {
     "energyLimitedEvidence": null,
     "finalEnergyMwh": 6036,
@@ -131594,6 +131628,183 @@
     "maximumEnergyMwh": 100000,
     "maximumPowerMw": 10000,
     "outcome": "resized",
-    "passesUsed": 25
+    "passesUsed": 25,
+    "trajectory": [
+      {
+        "energyCapacityMwh": 5515,
+        "pass": 1,
+        "powerCapacityMw": 940,
+        "unservedEnergyMwh": 12818.8,
+        "unservedHours": 33
+      },
+      {
+        "energyCapacityMwh": 11030,
+        "pass": 2,
+        "powerCapacityMw": 940,
+        "unservedEnergyMwh": 12818.8,
+        "unservedHours": 33
+      },
+      {
+        "energyCapacityMwh": 7520,
+        "pass": 3,
+        "powerCapacityMw": 1880,
+        "unservedEnergyMwh": 544.9,
+        "unservedHours": 2
+      },
+      {
+        "energyCapacityMwh": 11030,
+        "pass": 4,
+        "powerCapacityMw": 1880,
+        "unservedEnergyMwh": 544.9,
+        "unservedHours": 2
+      },
+      {
+        "energyCapacityMwh": 7520,
+        "pass": 5,
+        "powerCapacityMw": 1880,
+        "unservedEnergyMwh": 544.9,
+        "unservedHours": 2
+      },
+      {
+        "energyCapacityMwh": 7520,
+        "pass": 6,
+        "powerCapacityMw": 1409,
+        "unservedEnergyMwh": 2966.1,
+        "unservedHours": 11
+      },
+      {
+        "energyCapacityMwh": 7520,
+        "pass": 7,
+        "powerCapacityMw": 1644,
+        "unservedEnergyMwh": 1317.2,
+        "unservedHours": 4
+      },
+      {
+        "energyCapacityMwh": 7520,
+        "pass": 8,
+        "powerCapacityMw": 1526,
+        "unservedEnergyMwh": 1924.3,
+        "unservedHours": 6
+      },
+      {
+        "energyCapacityMwh": 7520,
+        "pass": 9,
+        "powerCapacityMw": 1467,
+        "unservedEnergyMwh": 2375.9,
+        "unservedHours": 10
+      },
+      {
+        "energyCapacityMwh": 7520,
+        "pass": 10,
+        "powerCapacityMw": 1496,
+        "unservedEnergyMwh": 2109.9,
+        "unservedHours": 7
+      },
+      {
+        "energyCapacityMwh": 7520,
+        "pass": 11,
+        "powerCapacityMw": 1511,
+        "unservedEnergyMwh": 2014.3,
+        "unservedHours": 6
+      },
+      {
+        "energyCapacityMwh": 7520,
+        "pass": 12,
+        "powerCapacityMw": 1503,
+        "unservedEnergyMwh": 2062.3,
+        "unservedHours": 6
+      },
+      {
+        "energyCapacityMwh": 7520,
+        "pass": 13,
+        "powerCapacityMw": 1507,
+        "unservedEnergyMwh": 2038.3,
+        "unservedHours": 6
+      },
+      {
+        "energyCapacityMwh": 7520,
+        "pass": 14,
+        "powerCapacityMw": 1509,
+        "unservedEnergyMwh": 2026.3,
+        "unservedHours": 6
+      },
+      {
+        "energyCapacityMwh": 7520,
+        "pass": 15,
+        "powerCapacityMw": 1508,
+        "unservedEnergyMwh": 2032.3,
+        "unservedHours": 6
+      },
+      {
+        "energyCapacityMwh": 6777,
+        "pass": 16,
+        "powerCapacityMw": 1509,
+        "unservedEnergyMwh": 2026.3,
+        "unservedHours": 6
+      },
+      {
+        "energyCapacityMwh": 6406,
+        "pass": 17,
+        "powerCapacityMw": 1509,
+        "unservedEnergyMwh": 2026.3,
+        "unservedHours": 6
+      },
+      {
+        "energyCapacityMwh": 6220,
+        "pass": 18,
+        "powerCapacityMw": 1509,
+        "unservedEnergyMwh": 2026.3,
+        "unservedHours": 6
+      },
+      {
+        "energyCapacityMwh": 6127,
+        "pass": 19,
+        "powerCapacityMw": 1509,
+        "unservedEnergyMwh": 2026.3,
+        "unservedHours": 6
+      },
+      {
+        "energyCapacityMwh": 6081,
+        "pass": 20,
+        "powerCapacityMw": 1509,
+        "unservedEnergyMwh": 2026.3,
+        "unservedHours": 6
+      },
+      {
+        "energyCapacityMwh": 6058,
+        "pass": 21,
+        "powerCapacityMw": 1509,
+        "unservedEnergyMwh": 2026.3,
+        "unservedHours": 6
+      },
+      {
+        "energyCapacityMwh": 6046,
+        "pass": 22,
+        "powerCapacityMw": 1509,
+        "unservedEnergyMwh": 2026.3,
+        "unservedHours": 6
+      },
+      {
+        "energyCapacityMwh": 6040,
+        "pass": 23,
+        "powerCapacityMw": 1509,
+        "unservedEnergyMwh": 2026.3,
+        "unservedHours": 6
+      },
+      {
+        "energyCapacityMwh": 6037,
+        "pass": 24,
+        "powerCapacityMw": 1509,
+        "unservedEnergyMwh": 2026.3,
+        "unservedHours": 6
+      },
+      {
+        "energyCapacityMwh": 6036,
+        "pass": 25,
+        "powerCapacityMw": 1509,
+        "unservedEnergyMwh": 2026.3,
+        "unservedHours": 6
+      }
+    ]
   }
 }

@@ -41,6 +41,7 @@
             "storageEnergyMwh": 5515,
             "storagePowerMw": 940,
             "storageSlcoeAudPerMwh": 3.19,
+            "transmissionCostStatus": "notModelled",
             "transmissionSlcotAudPerMwh": 0,
             "unservedEnergyMwh": 0,
             "unservedEnergyPercentageOfDemand": 0,
@@ -69,6 +70,7 @@
         "storageEnergyMwh": 5515,
         "storagePowerMw": 940,
         "storageSlcoeAudPerMwh": 3.19,
+        "transmissionCostStatus": "notModelled",
         "transmissionSlcotAudPerMwh": 0,
         "unservedEnergyMwh": 0,
         "unservedEnergyPercentageOfDemand": 0,
@@ -84,7 +86,16 @@
         "maximumEnergyMwh": 100000,
         "maximumPowerMw": 10000,
         "outcome": "notRequired",
-        "passesUsed": 1
+        "passesUsed": 1,
+        "trajectory": [
+          {
+            "energyCapacityMwh": 5515,
+            "pass": 1,
+            "powerCapacityMw": 940,
+            "unservedEnergyMwh": 0,
+            "unservedHours": 0
+          }
+        ]
       }
     },
     {
@@ -123,6 +134,7 @@
             "storageEnergyMwh": 5515,
             "storagePowerMw": 940,
             "storageSlcoeAudPerMwh": 3.19,
+            "transmissionCostStatus": "notModelled",
             "transmissionSlcotAudPerMwh": 0,
             "unservedEnergyMwh": 0,
             "unservedEnergyPercentageOfDemand": 0,
@@ -151,6 +163,7 @@
         "storageEnergyMwh": 5515,
         "storagePowerMw": 940,
         "storageSlcoeAudPerMwh": 3.19,
+        "transmissionCostStatus": "notModelled",
         "transmissionSlcotAudPerMwh": 0,
         "unservedEnergyMwh": 0,
         "unservedEnergyPercentageOfDemand": 0,
@@ -166,7 +179,16 @@
         "maximumEnergyMwh": 100000,
         "maximumPowerMw": 10000,
         "outcome": "notRequired",
-        "passesUsed": 1
+        "passesUsed": 1,
+        "trajectory": [
+          {
+            "energyCapacityMwh": 5515,
+            "pass": 1,
+            "powerCapacityMw": 940,
+            "unservedEnergyMwh": 0,
+            "unservedHours": 0
+          }
+        ]
       }
     },
     {
@@ -205,6 +227,7 @@
             "storageEnergyMwh": 5515,
             "storagePowerMw": 940,
             "storageSlcoeAudPerMwh": 3.19,
+            "transmissionCostStatus": "notModelled",
             "transmissionSlcotAudPerMwh": 0,
             "unservedEnergyMwh": 0,
             "unservedEnergyPercentageOfDemand": 0,
@@ -233,6 +256,7 @@
         "storageEnergyMwh": 5515,
         "storagePowerMw": 940,
         "storageSlcoeAudPerMwh": 3.19,
+        "transmissionCostStatus": "notModelled",
         "transmissionSlcotAudPerMwh": 0,
         "unservedEnergyMwh": 0,
         "unservedEnergyPercentageOfDemand": 0,
@@ -248,7 +272,16 @@
         "maximumEnergyMwh": 100000,
         "maximumPowerMw": 10000,
         "outcome": "notRequired",
-        "passesUsed": 1
+        "passesUsed": 1,
+        "trajectory": [
+          {
+            "energyCapacityMwh": 5515,
+            "pass": 1,
+            "powerCapacityMw": 940,
+            "unservedEnergyMwh": 0,
+            "unservedHours": 0
+          }
+        ]
       }
     },
     {
@@ -287,6 +320,7 @@
             "storageEnergyMwh": 5515,
             "storagePowerMw": 940,
             "storageSlcoeAudPerMwh": 3.19,
+            "transmissionCostStatus": "notModelled",
             "transmissionSlcotAudPerMwh": 0,
             "unservedEnergyMwh": 0,
             "unservedEnergyPercentageOfDemand": 0,
@@ -315,6 +349,7 @@
         "storageEnergyMwh": 5515,
         "storagePowerMw": 940,
         "storageSlcoeAudPerMwh": 3.19,
+        "transmissionCostStatus": "notModelled",
         "transmissionSlcotAudPerMwh": 0,
         "unservedEnergyMwh": 0,
         "unservedEnergyPercentageOfDemand": 0,
@@ -330,7 +365,16 @@
         "maximumEnergyMwh": 100000,
         "maximumPowerMw": 10000,
         "outcome": "notRequired",
-        "passesUsed": 1
+        "passesUsed": 1,
+        "trajectory": [
+          {
+            "energyCapacityMwh": 5515,
+            "pass": 1,
+            "powerCapacityMw": 940,
+            "unservedEnergyMwh": 0,
+            "unservedHours": 0
+          }
+        ]
       }
     },
     {
@@ -369,6 +413,7 @@
             "storageEnergyMwh": 5515,
             "storagePowerMw": 940,
             "storageSlcoeAudPerMwh": 3.19,
+            "transmissionCostStatus": "notModelled",
             "transmissionSlcotAudPerMwh": 0,
             "unservedEnergyMwh": 0,
             "unservedEnergyPercentageOfDemand": 0,
@@ -397,6 +442,7 @@
         "storageEnergyMwh": 5515,
         "storagePowerMw": 940,
         "storageSlcoeAudPerMwh": 3.19,
+        "transmissionCostStatus": "notModelled",
         "transmissionSlcotAudPerMwh": 0,
         "unservedEnergyMwh": 0,
         "unservedEnergyPercentageOfDemand": 0,
@@ -412,12 +458,21 @@
         "maximumEnergyMwh": 100000,
         "maximumPowerMw": 10000,
         "outcome": "notRequired",
-        "passesUsed": 1
+        "passesUsed": 1,
+        "trajectory": [
+          {
+            "energyCapacityMwh": 5515,
+            "pass": 1,
+            "powerCapacityMw": 940,
+            "unservedEnergyMwh": 0,
+            "unservedHours": 0
+          }
+        ]
       }
     }
   ],
   "provenance": {
-    "gitCommitSha": "60283813e1a7a6f7b89fd2f8042f9fe5b5ac2bbe",
+    "gitCommitSha": "69434b48fb5cf1deb5977ffe629e22b8bd4b46da",
     "inputFiles": [
       {
         "path": "NEM.Web/wwwroot/data/demand-nsw1.json",
@@ -442,16 +497,16 @@
     ],
     "resolvedDefinitionSha256": "c2dc4fdb616c6c485a90926977514e7acdd69b8009fe64f82ea208cbfa475505",
     "schemaVersions": {
-      "dispatchResults": 8,
+      "dispatchResults": 12,
       "operationalDemand": 2,
       "regularSeries": 1,
       "sweepDefinition": 1,
-      "sweepIndex": 5,
+      "sweepIndex": 7,
       "weather": 6
     },
     "workingTreeDirty": true
   },
-  "schemaVersion": 5,
+  "schemaVersion": 7,
   "scope": {
     "periodEnd": "2026-07-01T00:00:00\u002B10:00",
     "periodStart": "2025-07-01T00:00:00\u002B10:00",
@@ -460,10 +515,16 @@
     ],
     "resolution": "01:00:00",
     "weatherBasis": {
-      "description": "Typical meteorological year from AUS_NSW_Dubbo.City.Rgnl.AP.957190_TMYx.2011-2025.epw for Dubbo.City.Rgnl.AP (WMO 957190), applied to the dispatch period by calendar hour. It represents typical rather than extreme years, so it does not contain the tail weather events that drive storage and reliability outcomes.",
+      "description": "Typical meteorological year using solar data from AUS_NSW_Dubbo.City.Rgnl.AP.957190_TMYx.2011-2025.epw at Dubbo.City.Rgnl.AP (WMO 957190) and wind data from AUS_NSW_Armidale.AP.957730_TMYx.2011-2025.epw at Armidale.AP (WMO 957730), applied to the dispatch period by calendar hour. It represents typical rather than extreme years, so it does not contain the tail weather events that drive storage and reliability outcomes.",
       "kind": "typicalMeteorologicalYear",
-      "locationName": "Dubbo.City.Rgnl.AP (WMO 957190)",
-      "sourceFile": "AUS_NSW_Dubbo.City.Rgnl.AP.957190_TMYx.2011-2025.epw"
+      "solar": {
+        "locationName": "Dubbo.City.Rgnl.AP (WMO 957190)",
+        "sourceFile": "AUS_NSW_Dubbo.City.Rgnl.AP.957190_TMYx.2011-2025.epw"
+      },
+      "wind": {
+        "locationName": "Armidale.AP (WMO 957730)",
+        "sourceFile": "AUS_NSW_Armidale.AP.957730_TMYx.2011-2025.epw"
+      }
     }
   },
   "sweepId": "renewable-penetration-nsw1-fy2026"

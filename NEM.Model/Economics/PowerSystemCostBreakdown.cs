@@ -1,6 +1,12 @@
 using NEM.Model.Units;
+using NEM.Model.Grid;
 
 namespace NEM.Model.Economics;
+
+/// <summary>Annualised generation cost attributable to one generation technology.</summary>
+public sealed record GenerationCostContribution(
+    GenerationTechnology Technology,
+    Money AnnualisedCost);
 
 /// <summary>
 /// Annual generation and storage cost contributions for one region, using that
@@ -13,7 +19,8 @@ public sealed record RegionCostBreakdown
         Money annualisedGenerationCost,
         Money annualisedStorageCost,
         Energy deliveredEnergy,
-        Energy netImportedEnergy)
+        Energy netImportedEnergy,
+        IReadOnlyList<GenerationCostContribution> generationCostContributions)
     {
         RegionId = regionId;
         AnnualisedGenerationCost = annualisedGenerationCost;
@@ -21,6 +28,15 @@ public sealed record RegionCostBreakdown
         TotalAnnualisedCost = annualisedGenerationCost + annualisedStorageCost;
         DeliveredEnergy = deliveredEnergy;
         NetImportedEnergy = netImportedEnergy;
+        GenerationCostContributions = generationCostContributions.ToArray();
+        decimal contributionTotalAud = GenerationCostContributions.Sum(
+            contribution => contribution.AnnualisedCost.Aud);
+        if (contributionTotalAud != annualisedGenerationCost.Aud)
+        {
+            throw new ArgumentException(
+                "Generation cost contributions must sum to annualised generation cost.",
+                nameof(generationCostContributions));
+        }
         if (!double.IsFinite(deliveredEnergy.MegawattHours) || deliveredEnergy.MegawattHours <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -38,6 +54,8 @@ public sealed record RegionCostBreakdown
     public string RegionId { get; }
     /// <summary>Annualised generation cost, in AUD.</summary>
     public Money AnnualisedGenerationCost { get; }
+    /// <summary>Annualised generation cost by technology, in AUD.</summary>
+    public IReadOnlyList<GenerationCostContribution> GenerationCostContributions { get; }
     /// <summary>Annualised storage cost, in AUD.</summary>
     public Money AnnualisedStorageCost { get; }
     /// <summary>Annualised generation and storage cost, in AUD.</summary>
@@ -83,9 +101,20 @@ public sealed record PowerSystemCostBreakdown
         Money totalAnnualisedStorageCost,
         Money totalAnnualisedTransmissionCost,
         Energy deliveredEnergy,
-        IReadOnlyList<RegionCostBreakdown> regions)
+        IReadOnlyList<RegionCostBreakdown> regions,
+        IReadOnlyList<GenerationCostContribution> generationCostContributions,
+        bool transmissionCostModelled)
     {
         Regions = regions.ToArray();
+        GenerationCostContributions = generationCostContributions.ToArray();
+        decimal contributionTotalAud = GenerationCostContributions.Sum(
+            contribution => contribution.AnnualisedCost.Aud);
+        if (contributionTotalAud != totalAnnualisedGenerationCost.Aud)
+        {
+            throw new ArgumentException(
+                "Generation cost contributions must sum to total annualised generation cost.",
+                nameof(generationCostContributions));
+        }
         SystemLevelisedCostOfGeneration = totalAnnualisedGenerationCost.Per(deliveredEnergy);
         SystemLevelisedCostOfStorage = totalAnnualisedStorageCost.Per(deliveredEnergy);
         SystemLevelisedCostOfTransmission =
@@ -93,6 +122,7 @@ public sealed record PowerSystemCostBreakdown
         TotalAnnualisedGenerationCost = totalAnnualisedGenerationCost;
         TotalAnnualisedStorageCost = totalAnnualisedStorageCost;
         TotalAnnualisedTransmissionCost = totalAnnualisedTransmissionCost;
+        TransmissionCostModelled = transmissionCostModelled;
         TotalAnnualisedCost = totalAnnualisedGenerationCost
             + totalAnnualisedStorageCost
             + totalAnnualisedTransmissionCost;
@@ -115,11 +145,16 @@ public sealed record PowerSystemCostBreakdown
     /// served to load as its denominator. These exclude transmission.
     /// </summary>
     public IReadOnlyList<RegionCostBreakdown> Regions { get; }
+    /// <summary>System annualised generation cost aggregated by technology, in AUD.</summary>
+    public IReadOnlyList<GenerationCostContribution> GenerationCostContributions { get; }
     public Money TotalAnnualisedGenerationCost { get; }
     public Money TotalAnnualisedStorageCost { get; }
 
     /// <summary>Annualised interconnector capital and fixed operating cost, in AUD.</summary>
     public Money TotalAnnualisedTransmissionCost { get; }
+
+    /// <summary>Whether declared interconnector economics were evaluated for this system.</summary>
+    public bool TransmissionCostModelled { get; }
 
     /// <summary>Annualised generation, storage and transmission cost, in AUD.</summary>
     public Money TotalAnnualisedCost { get; }
