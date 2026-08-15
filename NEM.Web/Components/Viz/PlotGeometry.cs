@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 
 namespace NEM.Web.Components.Viz;
 
@@ -193,6 +194,38 @@ public static class PlotFormat
     public static string Coordinate(double x, double y) =>
         FormattableString.Invariant($"{x:F2},{y:F2}");
 
+    /// <summary>
+    /// Appends one coordinate pair to a points attribute under construction, separating it from any
+    /// already there. A full-year dispatch view writes several thousand of these per redraw, and
+    /// formatting each through an interpolated string allocated two objects per point; writing the
+    /// digits straight into the builder allocates none.
+    /// </summary>
+    public static void AppendCoordinate(StringBuilder builder, double x, double y)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        if (builder.Length > 0)
+        {
+            builder.Append(' ');
+        }
+
+        AppendFixed(builder, x);
+        builder.Append(',');
+        AppendFixed(builder, y);
+    }
+
+    private static void AppendFixed(StringBuilder builder, double value)
+    {
+        Span<char> buffer = stackalloc char[32];
+        if (value.TryFormat(buffer, out int written, "F2", CultureInfo.InvariantCulture))
+        {
+            builder.Append(buffer[..written]);
+            return;
+        }
+
+        builder.Append(value.ToString("F2", CultureInfo.InvariantCulture));
+    }
+
     /// <summary>An SVG length, always invariant.</summary>
     public static string Length(double value) => value.ToString("F2", CultureInfo.InvariantCulture);
 }
@@ -268,7 +301,7 @@ public static class PlotPath
         ArgumentNullException.ThrowIfNull(values);
 
         var segments = new List<string>();
-        var current = new List<string>();
+        var current = new StringBuilder();
         for (int index = 0; index < values.Count; index++)
         {
             if (values[index] is not { } value)
@@ -277,7 +310,7 @@ public static class PlotPath
                 continue;
             }
 
-            current.Add(PlotFormat.Coordinate(X(index, values.Count, box), Y(value, box, axis)));
+            PlotFormat.AppendCoordinate(current, X(index, values.Count, box), Y(value, box, axis));
         }
 
         Flush(segments, current);
@@ -298,18 +331,18 @@ public static class PlotPath
         ArgumentNullException.ThrowIfNull(upper);
 
         int count = Math.Min(lower.Count, upper.Count);
-        var points = new List<string>(count * 2);
+        var points = new StringBuilder(count * 16);
         for (int index = 0; index < count; index++)
         {
-            points.Add(PlotFormat.Coordinate(X(index, count, box), Y(upper[index], box, axis)));
+            PlotFormat.AppendCoordinate(points, X(index, count, box), Y(upper[index], box, axis));
         }
 
         for (int index = count - 1; index >= 0; index--)
         {
-            points.Add(PlotFormat.Coordinate(X(index, count, box), Y(lower[index], box, axis)));
+            PlotFormat.AppendCoordinate(points, X(index, count, box), Y(lower[index], box, axis));
         }
 
-        return string.Join(" ", points);
+        return points.ToString();
     }
 
     /// <summary>The horizontal position of the <paramref name="index"/>th of <paramref name="count"/> evenly spaced points.</summary>
@@ -325,11 +358,11 @@ public static class PlotPath
     public static double XValue(double value, PlotBox box, PlotAxis axis) =>
         box.Left + (box.Width * Math.Clamp(axis.Fraction(value), 0, 1));
 
-    private static void Flush(List<string> segments, List<string> current)
+    private static void Flush(List<string> segments, StringBuilder current)
     {
-        if (current.Count > 0)
+        if (current.Length > 0)
         {
-            segments.Add(string.Join(" ", current));
+            segments.Add(current.ToString());
             current.Clear();
         }
     }

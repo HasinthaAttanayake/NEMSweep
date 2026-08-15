@@ -3,6 +3,7 @@
 @using NEM.Contracts
 @using NEM.Web.Services
 @using System.Globalization
+@using System.Text
 @inject ArtifactLoader ArtifactLoader
 @inject SweepIndexLoader SweepIndexLoader
 @inject NavigationManager Navigation
@@ -1097,77 +1098,163 @@
         }
     }
 
+    /// <summary>
+    /// Rebuilds every trace on the page for the selected period. A full financial year is 8,760
+    /// intervals across a dozen series, and this runs on every view change, so it is written as
+    /// explicit passes over arrays rather than as query expressions: the aggregates below were
+    /// eleven separate traversals, each calling a delegate per interval, and the bucketing
+    /// allocated a sub-array per drawn point.
+    /// </summary>
     private void BuildChart()
     {
         DispatchResultsDTO result = _result!;
-        double[] totalDemandMw = result.DataSeries.Demand.TotalDemandMw;
-        int[] selectedIndexes = Enumerable.Range(0, totalDemandMw.Length)
-            .Where(IsSelected).ToArray();
+        DispatchSeriesDTO series = result.DataSeries;
+        double[] totalDemandMw = series.Demand.TotalDemandMw;
+        double intervalHours = result.Scenario.Resolution.TotalHours;
+
+        int[] selectedIndexes = SelectedIndexes(totalDemandMw.Length);
         _rawPointCount = selectedIndexes.Length;
-        _peakDemandMw = selectedIndexes.Max(index => totalDemandMw[index]);
-        _unservedEnergyMwh = selectedIndexes.Sum(index => result.DataSeries.UnservedDemandMw[index])
-            * result.Scenario.Resolution.TotalHours;
-        double demandEnergyMwh = selectedIndexes.Sum(index => totalDemandMw[index])
-            * result.Scenario.Resolution.TotalHours;
+
+        string[] technologies = OrderedTechnologies(series);
+        double[][] generationSeries = new double[technologies.Length][];
+        bool[] isRenewable = new bool[technologies.Length];
+        for (int technology = 0; technology < technologies.Length; technology++)
+        {
+            generationSeries[technology] = series.DeliveredGenerationByTechnologyMw[technologies[technology]];
+            isRenewable[technology] = TechnologyPalette.Renewable.Contains(technologies[technology]);
+        }
+
+        // One traversal for every integrated figure and peak the page states.
+        double peakDemandMw = 0;
+        double demandTotalMw = 0;
+        double unservedTotalMw = 0;
+        double peakUnservedMw = 0;
+        double peakCurtailmentMw = 0;
+        double[] technologyTotalsMw = new double[technologies.Length];
+        foreach (int index in selectedIndexes)
+        {
+            double demandValue = totalDemandMw[index];
+            demandTotalMw += demandValue;
+            if (demandValue > peakDemandMw)
+            {
+                peakDemandMw = demandValue;
+            }
+
+            double unservedValue = series.UnservedDemandMw[index];
+            unservedTotalMw += unservedValue;
+            if (unservedValue > peakUnservedMw)
+            {
+                peakUnservedMw = unservedValue;
+            }
+
+            double curtailmentValue = series.CurtailmentMw[index];
+            if (curtailmentValue > peakCurtailmentMw)
+            {
+                peakCurtailmentMw = curtailmentValue;
+            }
+
+            for (int technology = 0; technology < generationSeries.Length; technology++)
+            {
+                technologyTotalsMw[technology] += generationSeries[technology][index];
+            }
+        }
+
+        _peakDemandMw = peakDemandMw;
+        _peakUnservedPowerMw = peakUnservedMw;
+        _peakCurtailmentMw = peakCurtailmentMw;
+        _unservedEnergyMwh = unservedTotalMw * intervalHours;
+        double demandEnergyMwh = demandTotalMw * intervalHours;
         _unservedEnergyPercent = demandEnergyMwh == 0
             ? 0
             : 100.0 * _unservedEnergyMwh / demandEnergyMwh;
-        _peakUnservedPowerMw = selectedIndexes.Max(index => result.DataSeries.UnservedDemandMw[index]);
 
-        string[] technologies = PreferredTechnologyOrder
-            .Where(result.DataSeries.DeliveredGenerationByTechnologyMw.ContainsKey)
-            .Concat(result.DataSeries.DeliveredGenerationByTechnologyMw.Keys.Except(PreferredTechnologyOrder))
-            .ToArray();
-        _deliveredEnergyMwh = technologies.Sum(technology => selectedIndexes.Sum(
-            index => result.DataSeries.DeliveredGenerationByTechnologyMw[technology][index]))
-            * result.Scenario.Resolution.TotalHours;
+        double deliveredTotalMw = 0;
+        double renewableTotalMw = 0;
+        for (int technology = 0; technology < technologyTotalsMw.Length; technology++)
+        {
+            deliveredTotalMw += technologyTotalsMw[technology];
+            if (isRenewable[technology])
+            {
+                renewableTotalMw += technologyTotalsMw[technology];
+            }
+        }
+
+        _deliveredEnergyMwh = deliveredTotalMw * intervalHours;
         // Solar, wind and hydro, matching the model's own grid-scale renewable share and the figure
         // the comparison pages state. Counting solar and wind alone reproduced the separate native
         // share instead, so the same run read differently on two pages of this site.
-        double renewableEnergyMwh = technologies
-            .Where(TechnologyPalette.Renewable.Contains)
-            .Sum(technology => selectedIndexes.Sum(
-                index => result.DataSeries.DeliveredGenerationByTechnologyMw[technology][index]))
-            * result.Scenario.Resolution.TotalHours;
-        _renewableSharePercent = _deliveredEnergyMwh == 0 ? 0 : 100 * renewableEnergyMwh / _deliveredEnergyMwh;
+        _renewableSharePercent = deliveredTotalMw == 0 ? 0 : 100 * renewableTotalMw / deliveredTotalMw;
 
         int targetPoints = _selectedView == -1 ? selectedIndexes.Length : 480;
         int bucketSize = Math.Max(1, (int)Math.Ceiling((double)selectedIndexes.Length / targetPoints));
-        var timestamps = new List<DateTimeOffset>();
-        var demand = new List<double>();
-        var generation = technologies.ToDictionary(technology => technology, _ => new List<double>());
-        for (int offset = 0; offset < selectedIndexes.Length; offset += bucketSize)
+        int bucketCount = (selectedIndexes.Length + bucketSize - 1) / bucketSize;
+
+        var timestamps = new DateTimeOffset[bucketCount];
+        double[] demand = new double[bucketCount];
+        double[][] generation = new double[technologies.Length][];
+        for (int technology = 0; technology < technologies.Length; technology++)
         {
-            int[] bucket = selectedIndexes[offset..Math.Min(offset + bucketSize, selectedIndexes.Length)];
-            timestamps.Add(InstantAt(bucket[0]));
-            demand.Add(bucket.Average(index => totalDemandMw[index]));
-            foreach (string technology in technologies)
+            generation[technology] = new double[bucketCount];
+        }
+
+        for (int bucket = 0; bucket < bucketCount; bucket++)
+        {
+            int start = bucket * bucketSize;
+            int end = Math.Min(start + bucketSize, selectedIndexes.Length);
+            timestamps[bucket] = InstantAt(selectedIndexes[start]);
+
+            double bucketDemand = 0;
+            for (int offset = start; offset < end; offset++)
             {
-                generation[technology].Add(bucket.Average(
-                    index => result.DataSeries.DeliveredGenerationByTechnologyMw[technology][index]));
+                bucketDemand += totalDemandMw[selectedIndexes[offset]];
+            }
+
+            demand[bucket] = bucketDemand / (end - start);
+            for (int technology = 0; technology < generationSeries.Length; technology++)
+            {
+                double bucketTotal = 0;
+                double[] source = generationSeries[technology];
+                for (int offset = start; offset < end; offset++)
+                {
+                    bucketTotal += source[selectedIndexes[offset]];
+                }
+
+                generation[technology][bucket] = bucketTotal / (end - start);
             }
         }
 
-        _displayPointCount = demand.Count;
-        double[] cumulative = new double[demand.Count];
-        _chartMaximumMw = Math.Max(demand.Max(), Enumerable.Range(0, demand.Count)
-            .Max(index => technologies.Sum(technology => generation[technology][index])));
-        _chartMaximumMw = Math.Ceiling(_chartMaximumMw / 1000) * 1000;
-        _areas = [];
-        foreach (string technology in technologies)
+        _displayPointCount = bucketCount;
+        double chartMaximumMw = 0;
+        for (int bucket = 0; bucket < bucketCount; bucket++)
         {
-            double[] baseline = cumulative.ToArray();
-            for (int index = 0; index < cumulative.Length; index++)
+            double stacked = 0;
+            for (int technology = 0; technology < generation.Length; technology++)
             {
-                cumulative[index] += generation[technology][index];
+                stacked += generation[technology][bucket];
             }
+
+            chartMaximumMw = Math.Max(chartMaximumMw, Math.Max(stacked, demand[bucket]));
+        }
+
+        _chartMaximumMw = Math.Ceiling(chartMaximumMw / 1000) * 1000;
+        double[] cumulative = new double[bucketCount];
+        double[] baseline = new double[bucketCount];
+        _areas = [];
+        for (int technology = 0; technology < technologies.Length; technology++)
+        {
+            cumulative.CopyTo(baseline, 0);
+            for (int bucket = 0; bucket < bucketCount; bucket++)
+            {
+                cumulative[bucket] += generation[technology][bucket];
+            }
+
             _areas.Add(new AreaLayer(
-                technology,
-                TechnologyColors.GetValueOrDefault(technology, "#8a7d72"),
+                technologies[technology],
+                TechnologyColors.GetValueOrDefault(technologies[technology], "#8a7d72"),
                 AreaPoints(baseline, cumulative)));
         }
+
         _demandPoints = LinePoints(demand);
-        _peakCurtailmentMw = selectedIndexes.Max(index => result.DataSeries.CurtailmentMw[index]);
         BuildStorageChart(result, selectedIndexes, bucketSize);
         BuildHeadroomChart(result, selectedIndexes, bucketSize);
         BuildComparisonTraces(selectedIndexes, bucketSize);
@@ -1179,7 +1266,7 @@
             : $"{selectedStart:dd MMM yyyy} to {selectedEnd.AddTicks(-1):dd MMM yyyy}";
         string labelFormat = _selectedView == -1 ? "HH:mm" : _selectedView == 0 ? "MMM yyyy" : "dd MMM";
         _firstLabel = timestamps[0].ToString(labelFormat);
-        _middleLabel = timestamps[timestamps.Count / 2].ToString(labelFormat);
+        _middleLabel = timestamps[timestamps.Length / 2].ToString(labelFormat);
         _lastLabel = timestamps[^1].ToString(labelFormat);
     }
 
@@ -1193,8 +1280,8 @@
         int[] selectedIndexes,
         int bucketSize)
     {
-        List<double> unserved = BucketPeaks(result.DataSeries.UnservedDemandMw, selectedIndexes, bucketSize);
-        List<double> curtailment = BucketPeaks(result.DataSeries.CurtailmentMw, selectedIndexes, bucketSize);
+        double[] unserved = BucketPeaks(result.DataSeries.UnservedDemandMw, selectedIndexes, bucketSize);
+        double[] curtailment = BucketPeaks(result.DataSeries.CurtailmentMw, selectedIndexes, bucketSize);
         _headroomChartMaximumMw = Math.Max(1, Math.Max(
             unserved.DefaultIfEmpty(0).Max(),
             curtailment.DefaultIfEmpty(0).Max()));
@@ -1216,7 +1303,7 @@
         }
 
         DispatchResultsDTO comparison = _comparison.Result;
-        List<double> demand = BucketAverages(comparison.DataSeries.Demand.TotalDemandMw, selectedIndexes, bucketSize);
+        double[] demand = BucketAverages(comparison.DataSeries.Demand.TotalDemandMw, selectedIndexes, bucketSize);
         _comparisonDemandPoints = LinePoints(demand);
 
         // The comparison is drawn as a dashed trace with no legend entry of its own, so it needs
@@ -1245,25 +1332,93 @@
         ];
     }
 
-    private static List<double> BucketPeaks(double[] series, int[] selectedIndexes, int bucketSize) =>
-        Bucket(selectedIndexes, bucketSize, bucket => bucket.Max(index => series[index]));
-
-    private static List<double> BucketAverages(double[] series, int[] selectedIndexes, int bucketSize) =>
-        Bucket(selectedIndexes, bucketSize, bucket => bucket.Average(index => series[index]));
-
-    private static List<double> BucketFirsts(double[] series, int[] selectedIndexes, int bucketSize) =>
-        Bucket(selectedIndexes, bucketSize, bucket => series[bucket[0]]);
-
-    private static List<double> Bucket(int[] selectedIndexes, int bucketSize, Func<int[], double> reduce)
+    /// <summary>How a bucket of intervals is reduced to the one value drawn for it.</summary>
+    private enum BucketReduction
     {
-        var values = new List<double>();
-        for (int offset = 0; offset < selectedIndexes.Length; offset += bucketSize)
+        /// <summary>The largest value in the bucket, so a short event survives a year view.</summary>
+        Peak,
+
+        /// <summary>The mean of the bucket, for a series read as a level.</summary>
+        Average,
+
+        /// <summary>The value at the start of the bucket, for a state such as stored energy.</summary>
+        First,
+    }
+
+    private static double[] BucketPeaks(double[] series, int[] selectedIndexes, int bucketSize) =>
+        Bucket(series, selectedIndexes, bucketSize, BucketReduction.Peak);
+
+    private static double[] BucketAverages(double[] series, int[] selectedIndexes, int bucketSize) =>
+        Bucket(series, selectedIndexes, bucketSize, BucketReduction.Average);
+
+    private static double[] BucketFirsts(double[] series, int[] selectedIndexes, int bucketSize) =>
+        Bucket(series, selectedIndexes, bucketSize, BucketReduction.First);
+
+    /// <summary>
+    /// Reduces the selected intervals into one value per drawn point. Written as a loop over the
+    /// index array because the earlier form sliced a fresh sub-array for every bucket, which for a
+    /// year view meant hundreds of allocations per series on every redraw.
+    /// </summary>
+    private static double[] Bucket(
+        double[] series,
+        int[] selectedIndexes,
+        int bucketSize,
+        BucketReduction reduction)
+    {
+        int bucketCount = (selectedIndexes.Length + bucketSize - 1) / bucketSize;
+        double[] values = new double[bucketCount];
+        for (int bucket = 0; bucket < bucketCount; bucket++)
         {
-            values.Add(reduce(selectedIndexes[offset..Math.Min(offset + bucketSize, selectedIndexes.Length)]));
+            int start = bucket * bucketSize;
+            int end = Math.Min(start + bucketSize, selectedIndexes.Length);
+            if (reduction == BucketReduction.First)
+            {
+                values[bucket] = series[selectedIndexes[start]];
+                continue;
+            }
+
+            double accumulated = reduction == BucketReduction.Peak ? double.NegativeInfinity : 0;
+            for (int offset = start; offset < end; offset++)
+            {
+                double value = series[selectedIndexes[offset]];
+                accumulated = reduction == BucketReduction.Peak
+                    ? Math.Max(accumulated, value)
+                    : accumulated + value;
+            }
+
+            values[bucket] = reduction == BucketReduction.Peak
+                ? accumulated
+                : accumulated / (end - start);
         }
 
         return values;
     }
+
+    /// <summary>
+    /// The intervals the current view covers. The selection is a calendar test, so it is applied
+    /// once here and the resulting indices are reused by every series rather than re-tested per
+    /// series.
+    /// </summary>
+    private int[] SelectedIndexes(int length)
+    {
+        var selected = new List<int>(length);
+        for (int index = 0; index < length; index++)
+        {
+            if (IsSelected(index))
+            {
+                selected.Add(index);
+            }
+        }
+
+        return [.. selected];
+    }
+
+    /// <summary>Technologies in stack order, keeping any the palette has not met.</summary>
+    private static string[] OrderedTechnologies(DispatchSeriesDTO series) =>
+    [
+        .. PreferredTechnologyOrder.Where(series.DeliveredGenerationByTechnologyMw.ContainsKey),
+        .. series.DeliveredGenerationByTechnologyMw.Keys.Except(PreferredTechnologyOrder),
+    ];
 
     /// <summary>
     /// Draws every state-of-charge series the run carries. The series is the evidence; the fleet
@@ -1307,25 +1462,48 @@
         }).ToList();
     }
 
-    private string AreaPoints(double[] baseline, double[] top) => string.Join(" ",
-        top.Select((value, index) => Point(index, value, top.Length))
-            .Concat(baseline.Select((value, index) => Point(index, value, baseline.Length)).Reverse()));
+    /// <summary>
+    /// The stacked band between two boundaries: along the top left to right, back along the
+    /// baseline. Written into one builder because a year view produces thousands of coordinates per
+    /// redraw and formatting each through an interpolated string allocated twice per point.
+    /// </summary>
+    private string AreaPoints(double[] baseline, double[] top)
+    {
+        var points = new StringBuilder(top.Length * 32);
+        for (int index = 0; index < top.Length; index++)
+        {
+            PlotFormat.AppendCoordinate(points, PointX(index, top.Length), ChartY(top[index]));
+        }
 
-    private string LinePoints(IReadOnlyList<double> values) => string.Join(" ",
-        values.Select((value, index) => Point(index, value, values.Count)));
+        for (int index = baseline.Length - 1; index >= 0; index--)
+        {
+            PlotFormat.AppendCoordinate(points, PointX(index, baseline.Length), ChartY(baseline[index]));
+        }
 
-    private string StorageLinePoints(IReadOnlyList<double> values) => string.Join(" ",
-        values.Select((value, index) => FormattableString.Invariant(
-            $"{ChartLeft + ((ChartRight - ChartLeft) * index / Math.Max(1, values.Count - 1)):F2},{StorageChartY(value):F2}")));
+        return points.ToString();
+    }
 
-    private string Point(int index, double value, int count) => FormattableString.Invariant(
-        $"{ChartLeft + ((ChartRight - ChartLeft) * index / Math.Max(1, count - 1)):F2},{ChartY(value):F2}");
+    private string LinePoints(IReadOnlyList<double> values) => TracePoints(values, ChartY);
+
+    private string StorageLinePoints(IReadOnlyList<double> values) => TracePoints(values, StorageChartY);
+
+    private string HeadroomLinePoints(IReadOnlyList<double> values) => TracePoints(values, HeadroomChartY);
+
+    private string TracePoints(IReadOnlyList<double> values, Func<double, double> toY)
+    {
+        var points = new StringBuilder(values.Count * 16);
+        for (int index = 0; index < values.Count; index++)
+        {
+            PlotFormat.AppendCoordinate(points, PointX(index, values.Count), toY(values[index]));
+        }
+
+        return points.ToString();
+    }
+
+    private static double PointX(int index, int count) =>
+        ChartLeft + ((ChartRight - ChartLeft) * index / Math.Max(1, count - 1));
 
     private double ChartY(double value) => ChartBottom - ((ChartBottom - ChartTop) * value / _chartMaximumMw);
-
-    private string HeadroomLinePoints(IReadOnlyList<double> values) => string.Join(" ",
-        values.Select((value, index) => FormattableString.Invariant(
-            $"{ChartLeft + ((ChartRight - ChartLeft) * index / Math.Max(1, values.Count - 1)):F2},{HeadroomChartY(value):F2}")));
 
     private double HeadroomChartY(double value) =>
         StorageChartBottom
