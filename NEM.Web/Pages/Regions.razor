@@ -179,7 +179,7 @@
                                 <th scope="row">NEM system</th>
                                 <td>@PlotFormat.Money(_analysis.Result.Cost.GenerationSlcoeAudPerMwh)</td>
                                 <td>@PlotFormat.Money(_analysis.Result.Cost.StorageSlcoeAudPerMwh)</td>
-                                <td>@TransmissionText(_analysis.Result.Cost)</td>
+                                <td>@TransmissionText(_analysis.Result.Cost, withUnit: false)</td>
                                 <td class="cell-emphasis">@PlotFormat.Money(_analysis.Result.Cost.SlcoeAudPerMwh)</td>
                                 <td>@PlotFormat.MoneyTotal(_analysis.Result.Cost.TotalAnnualisedCostAud)</td>
                                 <td>@PlotFormat.Compact(_analysis.ServedEnergyMwh) MWh</td>
@@ -191,7 +191,7 @@
                                     <td>@PlotFormat.Money(region.Cost.GenerationSlcoeAudPerMwh)</td>
                                     <td>@PlotFormat.Money(region.Cost.StorageSlcoeAudPerMwh)</td>
                                     <td class="@(region.Cost.TransmissionCostStatus == TransmissionCostStatus.Calculated ? null : "cell-absent")">
-                                        @TransmissionText(region.Cost)
+                                        @TransmissionText(region.Cost, withUnit: false)
                                     </td>
                                     <td class="cell-emphasis">@PlotFormat.Money(region.Cost.SlcoeAudPerMwh)</td>
                                     <td>@PlotFormat.MoneyTotal(region.Cost.TotalAnnualisedCostAud)</td>
@@ -236,7 +236,7 @@
                                 <h3>@region.Name</h3>
                                 @* The bars alone here: a table per region beside the system's own
                                    would be three tables saying the same thing three ways. *@
-                                <CostByFleet Cost="CostByTechnology.From(region.Cost, region.Mix)"
+                                <CostByFleet Cost="_regionCosts.GetValueOrDefault(region.RegionId, CostByTechnology.Empty)"
                                              Mix="region.Mix"
                                              Scope="@region.Name"
                                              GenerationSlcoeAudPerMwh="region.Cost.GenerationSlcoeAudPerMwh"
@@ -403,6 +403,7 @@
     private SystemFacts? _result;
     private SystemAnalysis? _analysis;
     private CostByTechnology _systemCost = CostByTechnology.Empty;
+    private Dictionary<string, CostByTechnology> _regionCosts = [];
     private SeriesState _seriesState = SeriesState.Loading;
     private string _selectedMeasureKey = "slcoe";
     private List<PlotMarker> _costAgainstShare = [];
@@ -467,7 +468,13 @@
 
         _result = SystemFacts.From(load.Value!);
         _analysis = SystemAnalysis.Build(_result);
+        // Derived once rather than per render: the measure selector re-renders this page, and a
+        // decomposition per region per keystroke is work nothing asked for.
         _systemCost = CostByTechnology.From(_result.Cost, _analysis.SystemMix);
+        _regionCosts = _analysis.Regions.ToDictionary(
+            region => region.RegionId,
+            region => CostByTechnology.From(region.Cost, region.Mix),
+            StringComparer.OrdinalIgnoreCase);
         BuildCostAgainstShare();
         BuildNetwork();
 
@@ -812,9 +819,13 @@
     /// result declares transmission not modelled rather than publishing a zero, and the two are
     /// different claims: one is "not in scope", the other is "in scope and free".
     /// </summary>
-    private static string TransmissionText(DispatchCostDTO cost) =>
+    /// <param name="withUnit">
+    /// False inside the cost table, whose other cells are bare figures under a column that already
+    /// states the unit; true where the figure stands alone.
+    /// </param>
+    private static string TransmissionText(DispatchCostDTO cost, bool withUnit = true) =>
         cost.TransmissionCostStatus == TransmissionCostStatus.Calculated
-            ? $"{PlotFormat.MoneyPrecise(cost.TransmissionSlcotAudPerMwh)}/MWh"
+            ? PlotFormat.MoneyPrecise(cost.TransmissionSlcotAudPerMwh) + (withUnit ? "/MWh" : string.Empty)
             : "not modelled";
 
     private enum SeriesState

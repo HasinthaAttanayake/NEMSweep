@@ -107,6 +107,22 @@ public sealed class EnergyMixTests
     }
 
     [Fact]
+    public void FromTotals_ReadsATechnologyTheArtifactSpelledInAnotherCase()
+    {
+        // Order matches case-insensitively and answers in the palette's spelling, so a lowercase
+        // key would miss an ordinal lookup on the artifact's own dictionary.
+        EnergyMix mix = EnergyMix.FromTotals(new Dictionary<string, double>(StringComparer.Ordinal)
+        {
+            ["solar"] = 100,
+            ["COAL"] = 300,
+        });
+
+        mix.TotalMwh.Should().Be(400);
+        mix.ByTechnology.Select(entry => entry.Technology).Should().Equal("Solar", "Coal");
+        mix.RenewableShare.Should().Be(0.25);
+    }
+
+    [Fact]
     public void FromTotals_IsEmptyForAMixTheArtifactDoesNotCarry()
     {
         EnergyMix.FromTotals(null).Should().BeSameAs(EnergyMix.Empty);

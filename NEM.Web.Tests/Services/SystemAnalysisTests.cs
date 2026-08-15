@@ -97,6 +97,23 @@ public sealed class SystemAnalysisTests
     }
 
     [Fact]
+    public void WithLinkEvidence_MeasuresUtilisationAgainstTheCapacityTheTopologyDeclares()
+    {
+        SystemDispatchResultsDTO system = TwoRegionSystem();
+        // An evidence block disagreeing with the topology about capacity: the row displays the
+        // declared 1,000 MW, so the share it reports has to divide by that one.
+        DispatchInterconnectorDTO mismatched = system.Interconnectors[0] with { CapacityMw = 500 };
+
+        LinkFlowEvidence flow = SystemAnalysis.Build(SystemFacts.From(system))
+            .WithLinkEvidence([mismatched], system.Resolution)
+            .Links[0].Flow!;
+
+        flow.CapacityMw.Should().Be(1000);
+        // 1,000 MWh carried against 1,000 MW over three one-hour intervals.
+        flow.CapacityFactor.Should().BeApproximately(1.0 / 3, 0.0001);
+    }
+
+    [Fact]
     public void WithLinkEvidence_LeavesADeclaredLinkTheEvidenceOmitsWithoutAFlow()
     {
         SystemDispatchResultsDTO system = TwoRegionSystem();

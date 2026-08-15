@@ -42,10 +42,20 @@ public sealed record EnergyMix(IReadOnlyList<TechnologyEnergy> ByTechnology, dou
             return Empty;
         }
 
+        // Order matches case-insensitively and answers in the palette's own spelling, so a key the
+        // artifact wrote as "solar" comes back as "Solar" and would miss an ordinal lookup. Read
+        // through a case-insensitive view rather than indexing, as From does for the series.
+        var source = byTechnologyMwh.ToDictionary(
+            entry => entry.Key,
+            entry => entry.Value,
+            StringComparer.OrdinalIgnoreCase);
         var entries = new List<TechnologyEnergy>();
-        foreach (string technology in TechnologyPalette.Order(byTechnologyMwh.Keys))
+        foreach (string technology in TechnologyPalette.Order(source.Keys))
         {
-            entries.Add(new TechnologyEnergy(technology, byTechnologyMwh[technology]));
+            if (source.TryGetValue(technology, out double energyMwh))
+            {
+                entries.Add(new TechnologyEnergy(technology, energyMwh));
+            }
         }
 
         return new EnergyMix(entries, entries.Sum(entry => entry.EnergyMwh));
@@ -58,7 +68,7 @@ public sealed record EnergyMix(IReadOnlyList<TechnologyEnergy> ByTechnology, dou
     {
         ArgumentNullException.ThrowIfNull(mixes);
 
-        var totals = new Dictionary<string, double>(StringComparer.Ordinal);
+        var totals = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
         foreach (EnergyMix mix in mixes)
         {
             foreach (TechnologyEnergy entry in mix.ByTechnology)

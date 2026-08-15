@@ -173,28 +173,50 @@ public sealed record SystemAnalysis(
         TimeSpan resolution)
     {
         double hours = resolution.TotalHours;
-        var byId = new Dictionary<string, LinkFlowEvidence>(StringComparer.OrdinalIgnoreCase);
+        var byId = new Dictionary<string, DispatchInterconnectorDTO>(StringComparer.OrdinalIgnoreCase);
         foreach (DispatchInterconnectorDTO link in interconnectors ?? [])
         {
-            double[] flow = link.FlowMw ?? [];
-            double[] losses = link.LossesMw ?? [];
-            byId[link.Id] = new LinkFlowEvidence(
-                flow.Sum() * hours,
-                losses.Sum() * hours,
-                flow.Length == 0 ? 0 : flow.Max(),
-                flow.Count(value => value > 0),
-                flow.Length,
-                hours,
-                link.CapacityMw);
+            byId[link.Id] = link;
         }
 
         // A link the evidence does not mention keeps a null flow rather than a zero: the run
         // declared it, and nothing was published about what it did.
         var analysis = this with
         {
-            Links = [.. Links.Select(link => link with { Flow = byId.GetValueOrDefault(link.Id) })],
+            Links = [.. Links.Select(link => link with
+            {
+                Flow = byId.TryGetValue(link.Id, out DispatchInterconnectorDTO? evidence)
+                    ? Integrate(evidence, link.CapacityMw, hours)
+                    : null,
+            })],
         };
         return analysis with { Findings = Derive(analysis) };
+    }
+
+    /// <summary>
+    /// Integrates one link's interval series into energy.
+    /// </summary>
+    /// <remarks>
+    /// The capacity is the topology's rather than the evidence's own copy of it, so the utilisation
+    /// a row states is a share of the capacity that same row displays. The two agree in a healthy
+    /// artifact — the validator checks link evidence against topology — and using one of them makes
+    /// a disagreement visible in validation rather than as a percentage that does not divide.
+    /// </remarks>
+    private static LinkFlowEvidence Integrate(
+        DispatchInterconnectorDTO link,
+        double capacityMw,
+        double hours)
+    {
+        double[] flow = link.FlowMw ?? [];
+        double[] losses = link.LossesMw ?? [];
+        return new LinkFlowEvidence(
+            flow.Sum() * hours,
+            losses.Sum() * hours,
+            flow.Length == 0 ? 0 : flow.Max(),
+            flow.Count(value => value > 0),
+            flow.Length,
+            hours,
+            capacityMw);
     }
 
     /// <summary>
