@@ -1,0 +1,70 @@
+@using NEM.Web.Services.Insights
+
+@*
+    What the run found, stated before the reader has to derive it. Every card is generated from the
+    artifact on screen, so the list is short when the evidence is unremarkable and long when it is
+    not — a page with nothing to say says nothing rather than filling the space.
+*@
+@if (Findings.Count > 0)
+{
+    <section class="findings @Class" aria-labelledby="@_headingId">
+        <div class="findings-heading">
+            <p class="section-label">@Eyebrow</p>
+            <h2 id="@_headingId">@Heading</h2>
+            @if (!string.IsNullOrWhiteSpace(Description))
+            {
+                <p>@Description</p>
+            }
+        </div>
+        <div class="finding-cards">
+            @foreach (Finding finding in Findings)
+            {
+                <article class="finding @ToneClass(finding.Tone)">
+                    <p class="finding-tone">@ToneLabel(finding.Tone)</p>
+                    <h3>@finding.Headline</h3>
+                    @if (finding.Metric is { Length: > 0 })
+                    {
+                        <p class="finding-metric">
+                            <strong>@finding.Metric</strong>
+                            @if (finding.MetricUnit is { Length: > 0 })
+                            {
+                                <small>@finding.MetricUnit</small>
+                            }
+                        </p>
+                    }
+                    <p class="finding-detail">@finding.Detail</p>
+                    @if (finding.Href is { Length: > 0 } href)
+                    {
+                        <a href="@href">@(finding.LinkText ?? "Open the evidence")</a>
+                    }
+                </article>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<Finding> Findings { get; set; } = [];
+    [Parameter] public string Heading { get; set; } = "What this run shows";
+    [Parameter] public string Eyebrow { get; set; } = "Findings";
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    private readonly string _headingId = $"findings-{Guid.NewGuid():N}";
+
+    private static string ToneClass(FindingTone tone) => tone switch
+    {
+        FindingTone.Favourable => "tone-favourable",
+        FindingTone.Caution => "tone-caution",
+        FindingTone.Constraint => "tone-constraint",
+        _ => "tone-neutral",
+    };
+
+    private static string ToneLabel(FindingTone tone) => tone switch
+    {
+        FindingTone.Favourable => "Favourable",
+        FindingTone.Caution => "Worth a second look",
+        FindingTone.Constraint => "Limit reached",
+        _ => "Observation",
+    };
+}

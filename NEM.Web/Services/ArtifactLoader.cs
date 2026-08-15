@@ -32,10 +32,6 @@ public sealed record ArtifactLoadResult<T>(ArtifactLoadState State, T? Value)
     public bool IsSuccess => State.Status == ArtifactLoadStatus.Success;
 }
 
-public sealed record SystemRegionArtifactPair(
-    SystemDispatchResultsDTO System,
-    RegionDispatchResultsDTO Region);
-
 public sealed class ArtifactLoader(HttpClient http)
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -53,32 +49,29 @@ public sealed class ArtifactLoader(HttpClient http)
         CancellationToken cancellationToken = default)
         where T : class => await LoadCoreAsync<T>(path, validateSchema: false, cancellationToken);
 
-    public async Task<ArtifactLoadResult<SystemRegionArtifactPair>> LoadSystemWithRegionAsync(
-        string systemPath,
+    /// <summary>
+    /// Loads a regional detail belonging to a system result already in hand, refusing one that
+    /// carries a different run id. Regional details are megabytes each and the system artifact is
+    /// larger still, so the system is passed in rather than fetched again every time a reader
+    /// switches region.
+    /// </summary>
+    public async Task<ArtifactLoadResult<RegionDispatchResultsDTO>> LoadRegionForAsync(
+        SystemDispatchResultsDTO system,
         string regionPath,
         CancellationToken cancellationToken = default)
     {
-        ArtifactLoadResult<SystemDispatchResultsDTO> systemResult =
-            await LoadAsync<SystemDispatchResultsDTO>(systemPath, cancellationToken);
-        if (!systemResult.IsSuccess)
-        {
-            return new(systemResult.State, null);
-        }
+        ArgumentNullException.ThrowIfNull(system);
 
         ArtifactLoadResult<RegionDispatchResultsDTO> regionResult =
             await LoadAsync<RegionDispatchResultsDTO>(regionPath, cancellationToken);
         if (!regionResult.IsSuccess)
         {
-            return new(regionResult.State, null);
+            return regionResult;
         }
 
-        if (!string.Equals(systemResult.Value!.RunId, regionResult.Value!.RunId, StringComparison.Ordinal))
-        {
-            return new(ArtifactLoadState.InvalidData("System and regional artifact run IDs do not match."), null);
-        }
-
-        return new(new(ArtifactLoadStatus.Success, null),
-            new(systemResult.Value, regionResult.Value));
+        return string.Equals(system.RunId, regionResult.Value!.RunId, StringComparison.Ordinal)
+            ? regionResult
+            : new(ArtifactLoadState.InvalidData("System and regional artifact run IDs do not match."), null);
     }
 
     private async Task<ArtifactLoadResult<T>> LoadCoreAsync<T>(

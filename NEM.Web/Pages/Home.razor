@@ -1,6 +1,9 @@
 @page "/"
 @using NEM.Contracts
+@using NEM.Web.Components.Viz
 @using NEM.Web.Services
+@using NEM.Web.Services.Insights
+@inject ArtifactLoader ArtifactLoader
 @inject SweepManifestLoader SweepManifestLoader
 @inject SweepIndexLoader SweepIndexLoader
 
@@ -14,13 +17,6 @@
             An open model of Australia's National Electricity Market, being built in public one
             validated layer at a time.
         </p>
-        <div class="build-status" role="status">
-            <span>Validated scope</span>
-            <p>
-                Hourly merit-order dispatch now includes storage operation and sizing, reliability
-                evidence, and annualised generation and storage contributions to system cost.
-            </p>
-        </div>
         <div class="project-actions">
             <MudButton Variant="Variant.Filled"
                        Color="Color.Primary"
@@ -40,6 +36,49 @@
             </MudButton>
         </div>
     </header>
+
+    @if (_system is not null && _analysis is not null)
+    {
+        <section class="headline-section" aria-labelledby="headline-heading">
+            <div class="section-heading">
+                <div>
+                    <p class="section-label">Latest run</p>
+                    <h2 id="headline-heading">What the current simulation costs</h2>
+                </div>
+                <p>@ScopeSentence</p>
+            </div>
+
+            <MetricStrip Items="@HeadlineMetrics" AriaLabel="Current run headline figures"
+                         Style="--metric-value-size: 1.5rem;" />
+
+            @if (_analysis.SystemMix.TotalMwh > 0)
+            {
+                <div class="headline-mix">
+                    <MixBar Segments="@_analysis.SystemMix.Segments()"
+                            Label="Delivered energy by technology"
+                            Detail="@($"{PlotFormat.Compact(_analysis.SystemMix.TotalMwh)} MWh delivered")"
+                            AriaLabel="System delivered generation by technology" />
+                </div>
+            }
+
+            <div class="headline-links">
+                <a href="regions">Compare the states</a>
+                <a href="dispatch">Open the hourly dispatch</a>
+            </div>
+        </section>
+
+        <FindingCards Findings="@_analysis.Findings"
+                      Eyebrow="Read this first"
+                      Heading="What the current run found"
+                      Description="Generated from the run's own figures each time this page loads, not written by hand."
+                      Class="home-findings" />
+    }
+    else if (_systemState.Status is ArtifactLoadStatus.Loading)
+    {
+        <section class="headline-section">
+            <div class="status-block"><MudProgressCircular Color="Color.Primary" Indeterminate="true" /></div>
+        </section>
+    }
 
     <section class="question-section">
         <div>
@@ -82,21 +121,49 @@
                     <h2>Compare runs across one varying input</h2>
                 </div>
                 <p>
-                    Every result the sweep recorded, point by point, with each run openable as a
-                    full year of hourly dispatch.
+                    Each sweep holds the whole scenario constant and moves one input. The headline is
+                    what that input bought, and what it cost.
                 </p>
             </div>
 
-            <div class="explore-links">
-                @foreach (SweepIndexDTO sweep in _sweeps)
+            <div class="sweep-cards">
+                @foreach (SweepSummary summary in _sweeps)
                 {
-                    <a href="@SweepPaths.PageRoute(sweep.SweepId)">
-                        <MudIcon Icon="@Icons.Material.Filled.Insights" />
-                        <span>
-                            <strong>@sweep.Name</strong>
-                            <small>@sweep.Points.Length runs · @sweep.Axis.Label (@sweep.Axis.Unit)</small>
+                    <a class="sweep-card" href="@SweepPaths.PageRoute(summary.Index.SweepId)">
+                        <p class="sweep-card-kind">@summary.Index.Axis.Label · @summary.Index.Axis.Unit</p>
+                        <h3>@summary.Index.Name</h3>
+                        @if (summary.Analysis.Findings.Count > 0)
+                        {
+                            <p class="sweep-card-finding">@summary.Analysis.Findings[0].Headline</p>
+                        }
+                        <dl class="sweep-card-facts">
+                            <div>
+                                <dt>Runs</dt>
+                                <dd>@summary.Index.Points.Length.ToString("N0")</dd>
+                            </div>
+                            @if (summary.Analysis.First is { } first && summary.Analysis.Last is { } last)
+                            {
+                                <div>
+                                    <dt>Levelised cost</dt>
+                                    <dd>@PlotFormat.Money(first.Scalars.SlcoeAudPerMwh) → @PlotFormat.Money(last.Scalars.SlcoeAudPerMwh)</dd>
+                                </div>
+                                <div>
+                                    <dt>Annual cost</dt>
+                                    <dd>@PlotFormat.MoneyTotal((decimal)first.TotalAnnualCostAud) → @PlotFormat.MoneyTotal((decimal)last.TotalAnnualCostAud)</dd>
+                                </div>
+                            }
+                            @if (summary.Analysis.ConstrainedPoints.Count > 0)
+                            {
+                                <div class="sweep-card-constraint">
+                                    <dt>Without results</dt>
+                                    <dd>@summary.Analysis.ConstrainedPoints.Count.ToString("N0") runs</dd>
+                                </div>
+                            }
+                        </dl>
+                        <span class="sweep-card-open">
+                            Open the sweep
+                            <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" />
                         </span>
-                        <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
                     </a>
                 }
             </div>
@@ -106,20 +173,28 @@
     <section class="explore-section">
         <div class="section-heading">
             <div>
-                <p class="section-label">Current simulation</p>
-                <h2>Start with the dispatch outcome</h2>
+                <p class="section-label">Trace it back</p>
+                <h2>Every result rests on a published input</h2>
             </div>
             <p>
-                Explore the first hourly dispatch result, then trace it back through the
-                validated demand, weather, fleet, and model-method inputs.
+                Each result on this site names the exact artifact bytes it was computed from. These
+                are those inputs, and the method behind them.
             </p>
         </div>
 
         <div class="explore-links">
+            <a href="regions">
+                <MudIcon Icon="@Icons.Material.Filled.Map" />
+                <span>
+                    <strong>System and states</strong>
+                    <small>Where the cost, the spill and the shortfall actually sit</small>
+                </span>
+                <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
+            </a>
             <a href="dispatch">
                 <MudIcon Icon="@Icons.Material.Filled.AreaChart" />
                 <span>
-                    <strong>Baseline dispatch</strong>
+                    <strong>Hourly dispatch</strong>
                     <small>Generation, storage, reliability, and annual system cost</small>
                 </span>
                 <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
@@ -128,7 +203,7 @@
                 <MudIcon Icon="@Icons.Material.Filled.ElectricBolt" />
                 <span>
                     <strong>Operational demand</strong>
-                    <small>New South Wales demand by year, month, or day</small>
+                    <small>Actual demand by year, month, or day</small>
                 </span>
                 <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
             </a>
@@ -152,7 +227,7 @@
                 <MudIcon Icon="@Icons.Material.Filled.ShowChart" />
                 <span>
                     <strong>Solar geometry</strong>
-                    <small>Hourly solar zenith for the Sydney weather location</small>
+                    <small>Hourly solar zenith for the weather location</small>
                 </span>
                 <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
             </a>
@@ -161,11 +236,56 @@
 </div>
 
 @code {
-    private List<SweepIndexDTO> _sweeps = [];
+    private List<SweepSummary> _sweeps = [];
     private ArtifactLoadState _manifestState = ArtifactLoadState.Loading();
+    private ArtifactLoadState _systemState = ArtifactLoadState.Loading();
+    private SystemDispatchResultsDTO? _system;
+    private SystemAnalysis? _analysis;
+
+    private string ScopeSentence => _system is null
+        ? string.Empty
+        : $"{string.Join(" and ", _system.RegionIds.Select(RegionNames.State))}, "
+            + $"{_system.PeriodStart:MMM yyyy} to {_system.PeriodEnd.AddTicks(-1):MMM yyyy}, "
+            + $"simulated at {_system.Resolution.TotalHours:N0}-hour resolution against a typical "
+            + "meteorological year.";
+
+    private IReadOnlyList<MetricStripItem> HeadlineMetrics => _analysis is null
+        ?
+        []
+        :
+        [
+            new("Levelised cost", PlotFormat.Money(_analysis.Result.Cost.SlcoeAudPerMwh), "AUD/MWh served"),
+            new("Annual system cost", PlotFormat.MoneyTotal(_analysis.Result.Cost.TotalAnnualisedCostAud), "generation, storage and transmission"),
+            new("Renewable share", RenewableShare, "of delivered energy"),
+            new(
+                "Reliability",
+                _analysis.Result.Reliability.WithinTarget ? "Within target" : "Outside target",
+                $"{PlotFormat.Share(AllowanceUsed, 0)} of the unserved-energy allowance used"),
+        ];
+
+    private string RenewableShare => _analysis!.SystemMix.TotalMwh > 0
+        ? PlotFormat.Share(_analysis.SystemMix.RenewableShare)
+        : "—";
+
+    private double AllowanceUsed => _analysis!.Result.Reliability.TargetUsePercentageOfDemand <= 0
+        ? 0
+        : _analysis.Result.Reliability.AchievedUsePercentageOfDemand
+            / _analysis.Result.Reliability.TargetUsePercentageOfDemand;
 
     protected override async Task OnInitializedAsync()
     {
+        // The system result is what the page leads with, so it is fetched first and rendered before
+        // the sweep indexes are walked.
+        ArtifactLoadResult<SystemDispatchResultsDTO> system =
+            await ArtifactLoader.LoadAsync<SystemDispatchResultsDTO>("data/results.json");
+        _systemState = system.State;
+        if (system.IsSuccess)
+        {
+            _system = system.Value!;
+            _analysis = SystemAnalysis.Build(_system);
+            StateHasChanged();
+        }
+
         ArtifactLoadResult<SweepManifestDTO> manifest = await SweepManifestLoader.LoadAsync();
         _manifestState = manifest.State;
         if (!manifest.IsSuccess)
@@ -179,8 +299,10 @@
                 await SweepIndexLoader.LoadAsync(SweepPaths.IndexPath(entry));
             if (index.IsSuccess)
             {
-                _sweeps.Add(index.Value!);
+                _sweeps.Add(new SweepSummary(index.Value!, SweepAnalysis.Build(index.Value!)));
             }
         }
     }
+
+    private sealed record SweepSummary(SweepIndexDTO Index, SweepAnalysis Analysis);
 }

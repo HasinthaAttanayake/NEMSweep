@@ -24,7 +24,6 @@
     --color-generation-dark: #792615;
     --color-production-solar: #2563a8;
     --color-production-wind: #087f5b;
-    --color-home-status: #334b45;
     --color-home-copy: #33414d;
     --color-border-strong: #cbd3d9;
     --color-accent-border: #82b6aa;
@@ -35,6 +34,13 @@
     --color-chart-surface: #fbfcfc;
     --color-demand-line: #101820;
     --color-empty-storage: #f5f8f7;
+    --color-accent-warm: #b8613f;
+    --color-accent-cool: #4372a8;
+    --color-positive: #176b5b;
+    --color-negative: #b3341f;
+    --color-positive-soft: #e8f5f1;
+    --color-negative-soft: #fdeeea;
+    --color-notice-soft: #fdf4e3;
     --font-body: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     --font-display: Georgia, "Times New Roman", serif;
     --type-eyebrow: 0.78rem;
@@ -163,4 +169,222 @@ code {
 
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
+}
+
+/* ---------------------------------------------------------------------------
+   Selects
+
+   MudBlazor's outlined select takes its width from the selected value, and some
+   of the values on this site are full measure names such as "Achieved renewable
+   share (grid scale)". Left alone, a select wider than the viewport scrolls the
+   whole page sideways on a phone, so the value is allowed to shrink and clip
+   instead. The full text stays available in the open menu.
+   --------------------------------------------------------------------------- */
+
+.mud-select {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.mud-select .mud-input-slot {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------
+   Plot system
+
+   These rules are global rather than component-scoped because the plots render
+   their SVG text through a child component, which CSS isolation cannot reach,
+   and because line, scatter and bar plots share one visual language that would
+   otherwise be restated three times.
+   --------------------------------------------------------------------------- */
+
+.plot-scroll {
+    width: 100%;
+    overflow-x: auto;
+    border-block: 1px solid var(--color-border);
+    background: var(--color-chart-surface);
+}
+
+.plot-scroll svg {
+    display: block;
+    width: 100%;
+    min-width: 620px;
+}
+
+.line-plot,
+.scatter-plot {
+    margin: 0;
+}
+
+.plot-grid {
+    stroke: var(--color-border);
+    stroke-width: 1;
+}
+
+.plot-grid-vertical {
+    stroke-dasharray: 3 5;
+}
+
+.plot-baseline {
+    stroke: var(--color-border-strong);
+    stroke-width: 1;
+}
+
+.plot-tick {
+    fill: var(--color-muted);
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+}
+
+.plot-tick-secondary {
+    fill: var(--color-muted-generation);
+}
+
+.plot-axis-title {
+    fill: var(--color-muted);
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.plot-line {
+    stroke-width: 2.5;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.plot-line-dashed {
+    stroke-width: 2;
+    stroke-dasharray: 6 4;
+}
+
+.plot-fill {
+    opacity: 0.1;
+}
+
+.plot-marker {
+    stroke: var(--color-chart-surface);
+    stroke-width: 1.5;
+}
+
+.plot-annotation-rule {
+    stroke: var(--color-notice);
+    stroke-width: 1.5;
+    stroke-dasharray: 4 4;
+}
+
+.plot-annotation-label {
+    fill: var(--color-notice);
+    font-family: var(--font-body);
+    font-size: 12.5px;
+    font-weight: 700;
+}
+
+/* The crosshair stays invisible until pointed at, so it reads as a response rather than as chart
+   furniture competing with the series. */
+.plot-crosshair {
+    stroke: var(--color-ink);
+    stroke-width: 1;
+    opacity: 0;
+}
+
+.plot-hit:hover .plot-crosshair,
+.plot-hit.is-selected .plot-crosshair {
+    opacity: 0.4;
+}
+
+.plot-hit[role="button"] {
+    cursor: pointer;
+}
+
+.plot-hit:focus {
+    outline: none;
+}
+
+.plot-hit:focus-visible .plot-crosshair {
+    stroke-width: 2;
+    opacity: 1;
+}
+
+.plot-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem 1.35rem;
+    padding: 0.85rem 0 0;
+    color: var(--color-muted);
+    font-size: 0.82rem;
+}
+
+.plot-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.plot-legend i {
+    display: inline-block;
+    width: 14px;
+    height: 8px;
+}
+
+.plot-legend i.dashed {
+    height: 0;
+    border-top: 3px dashed currentColor;
+    background: none !important;
+}
+
+.plot-legend em {
+    font-size: 0.72rem;
+    font-style: normal;
+    opacity: 0.8;
+}
+
+/* The connecting path is sweep order, not a fit: it shows whether the runs advance along a
+   frontier or double back, which an unordered cloud of markers cannot. */
+.scatter-path {
+    stroke: var(--color-border-control);
+    stroke-width: 1.5;
+    stroke-dasharray: 5 4;
+}
+
+.scatter-marker circle {
+    fill: var(--accent, #176b5b);
+    stroke: var(--color-chart-surface);
+    stroke-width: 2;
+}
+
+.scatter-marker a {
+    cursor: pointer;
+}
+
+.scatter-marker:hover circle,
+.scatter-marker a:focus-visible circle {
+    fill: var(--color-ink);
+    stroke-width: 3;
+}
+
+.scatter-marker.is-highlighted circle {
+    fill: var(--color-notice);
+}
+
+.scatter-label {
+    fill: var(--color-muted);
+    font-family: var(--font-body);
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+}
+
+.scatter-caption {
+    padding: 0.85rem 0 0;
+    color: var(--color-muted);
+    font-size: 0.82rem;
+    line-height: 1.5;
 }

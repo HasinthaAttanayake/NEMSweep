@@ -314,7 +314,7 @@
                 <div class="chart-legend" aria-label="Storage chart series">
                     @foreach (StorageTrace trace in _storageTraces)
                     {
-                        <span><i style="background-color: @trace.Color"></i>@trace.Technology · @trace.EnergyCapacityMwh.ToString("N0") MWh / @trace.PowerCapacityMw.ToString("N0") MW</span>
+                        <span><i style="background-color: @trace.Color"></i>@trace.LegendText</span>
                     }
                 </div>
             }
@@ -394,10 +394,38 @@
             </div>
         </section>
 
-        <WeatherBasisNote Basis="_result.DataSources.WeatherBasis" />
+        @* A system run covers several regions, each simulated against its own weather file. Showing
+           one of them would state a basis the other regions were not run against. *@
+        @if (ScopedSources.Count > 1)
+        {
+            <section class="weather-bases" aria-labelledby="weather-bases-heading">
+                <p class="section-label">Weather inputs</p>
+                <h2 id="weather-bases-heading">@ScopedSources.Count regions, @ScopedSources.Count weather files</h2>
+                <p class="weather-bases-note">
+                    Every region in this run is simulated against its own typical meteorological
+                    year. There is no single weather basis for the system result.
+                </p>
+                @foreach (KeyValuePair<string, DispatchSourcesDTO> source in ScopedSources)
+                {
+                    <div class="weather-region">
+                        <h3>@RegionNames.Full(source.Key)</h3>
+                        <WeatherBasisNote Basis="source.Value.WeatherBasis" />
+                    </div>
+                }
+            </section>
+        }
+        else
+        {
+            <WeatherBasisNote Basis="ScopedSources[0].Value.WeatherBasis" />
+        }
 
         <section class="assumption-band" aria-label="Scenario assumptions and provenance">
-            <div><span>Scenario fleet</span><strong>@string.Join(" · ", _result!.PowerSystem.Fleets.Select(fleet => $"{fleet.Technology} {fleet.NameplateCapacityMw:N0} MW"))</strong></div>
+            @* The system artifact does not republish the fleets behind it; the row is omitted
+               rather than shown empty, and each region carries its own. *@
+            @if (_result!.PowerSystem.Fleets.Length > 0)
+            {
+                <div><span>Scenario fleet</span><strong>@string.Join(" · ", _result.PowerSystem.Fleets.Select(fleet => $"{fleet.Technology} {fleet.NameplateCapacityMw:N0} MW"))</strong></div>
+            }
             <div><span>Storage fleet</span><strong>@StorageFleetSummary()</strong></div>
             <div>
                 <span>Reliability outcome</span>
@@ -517,19 +545,34 @@
     [
         new("Peak demand", _peakDemandMw.ToString("N0"), "MW"),
         new("Energy delivered", _deliveredEnergyMwh.ToString("N0"), "MWh"),
-        new("Renewable share", _renewableSharePercent.ToString("N1"), "% of delivered generation"),
+        new("Renewable share", _renewableSharePercent.ToString("N1"), "% of delivered generation, solar, wind and hydro"),
         new("Unserved energy", _unservedEnergyMwh.ToString("N0"), $"MWh · {_unservedEnergyPercent:N3}% USE · {_peakUnservedPowerMw:N0} MW peak"),
     ];
 
+    /// <summary>
+    /// The sources in view. A regional scope has one set; a system scope has one per region, and
+    /// naming only the first would attribute the whole run to one region's inputs.
+    /// </summary>
+    private IReadOnlyList<KeyValuePair<string, DispatchSourcesDTO>> ScopedSources =>
+        IsSystemScope && _systemResult is not null && _systemResult.DataSourcesByRegion.Count > 0
+            ? [.. _systemResult.DataSourcesByRegion]
+            : [new(_selectedRegionId ?? _result!.Scenario.Region, _result!.DataSources)];
+
     private IReadOnlyList<ProvenanceInputFile> ProvenanceInputs => _runContext is null
-        ?
-        [
-            new(_result!.DataSources.DemandInput.FileName, _result.DataSources.DemandInput.Sha256),
-            new(_result.DataSources.WeatherInput.FileName, _result.DataSources.WeatherInput.Sha256),
-        ]
+        ? [.. ScopedSources.SelectMany(source => new ProvenanceInputFile[]
+            {
+                new(source.Value.DemandInput.FileName, source.Value.DemandInput.Sha256, DemandPurpose(source.Key)),
+                new(source.Value.WeatherInput.FileName, source.Value.WeatherInput.Sha256, WeatherPurpose(source.Key)),
+            })]
         : _runContext.Sweep.Provenance.InputFiles
             .Select(input => new ProvenanceInputFile(input.Path, input.Sha256, input.Purpose))
             .ToArray();
+
+    private string DemandPurpose(string regionId) =>
+        ScopedSources.Count > 1 ? $"{regionId} demand" : "Demand";
+
+    private string WeatherPurpose(string regionId) =>
+        ScopedSources.Count > 1 ? $"{regionId} weather" : "Weather";
 
     private string ReliabilityStandardSuffix => _result!.Reliability.StandardName is { Length: > 0 } name
         ? $" ({name})"
@@ -594,6 +637,14 @@
 
             _systemResult = loadResult.Value!;
             await InitialiseResultAsync(ToEvidence(_systemResult), null, loadResult.State);
+
+            // The comparison page links straight to one region's dispatch, so the baseline route
+            // honours the same region parameter the sweep run route already does.
+            if (_loadState.Status == ArtifactLoadStatus.Success
+                && RequestedRegionId(_systemResult) is { } requestedRegionId)
+            {
+                await OnRegionChanged(requestedRegionId);
+            }
         }
         catch (Exception exception)
         {
@@ -886,21 +937,21 @@
             return;
         }
 
-        string systemPath = _runContext?.DetailArtifactPath ?? "data/results.json";
         string regionPath = _runContext is null
             ? $"data/{_selectedRegionDetailPath}"
             : $"{_runContext.SweepRootPath}/{_selectedRegionDetailPath}";
-        ArtifactLoadResult<SystemRegionArtifactPair> pair = await ArtifactLoader.LoadSystemWithRegionAsync(systemPath, regionPath);
-        if (!pair.IsSuccess)
+        ArtifactLoadResult<RegionDispatchResultsDTO> region =
+            await ArtifactLoader.LoadRegionForAsync(_systemResult, regionPath);
+        if (!region.IsSuccess)
         {
-            _loadState = pair.State;
+            _loadState = region.State;
             return;
         }
 
         await InitialiseResultAsync(
-            ToEvidence(pair.Value!.Region),
+            ToEvidence(region.Value!),
             _runContext,
-            pair.State,
+            region.State,
             regionPath);
     }
 
@@ -920,26 +971,41 @@
             return null;
         }
 
-        ArtifactLoadResult<SystemRegionArtifactPair> pair = await ArtifactLoader.LoadSystemWithRegionAsync(
-            context.DetailArtifactPath,
+        ArtifactLoadResult<RegionDispatchResultsDTO> region = await ArtifactLoader.LoadRegionForAsync(
+            system,
             $"{context.SweepRootPath}/{regionDetailPath}");
-        if (!pair.IsSuccess)
+        if (!region.IsSuccess)
         {
             return null;
         }
 
-        DispatchResultsDTO regional = ToEvidence(pair.Value!.Region);
+        DispatchResultsDTO regional = ToEvidence(region.Value!);
         return await ResolveBaseDemandAsync(
             regional,
             context,
             $"{context.SweepRootPath}/{regionDetailPath}");
     }
 
+    /// <summary>
+    /// The region the query names, as the artifact spells it, or null when it names none of them.
+    /// An unknown region leaves the system view rather than failing the page.
+    /// </summary>
+    private string? RequestedRegionId(SystemDispatchResultsDTO system) =>
+        string.IsNullOrWhiteSpace(RegionQuery)
+            ? null
+            : system.RegionIds.FirstOrDefault(regionId =>
+                string.Equals(regionId, RegionQuery, StringComparison.OrdinalIgnoreCase));
+
     private string? RegionDetailPath(SweepIndexPointDTO point, string? regionId) => regionId is null
         ? null
         : point.RegionDetails?.FirstOrDefault(detail =>
             string.Equals(detail.RegionId, regionId, StringComparison.OrdinalIgnoreCase))?.DetailPath;
 
+    /// <summary>
+    /// Flattens a system result into the shape the charts read. The single sources slot cannot hold
+    /// one entry per region, so it carries the first only to satisfy the type: anything displaying
+    /// sources reads <see cref="ScopedSources"/> instead, which keeps every region's.
+    /// </summary>
     private static DispatchResultsDTO ToEvidence(SystemDispatchResultsDTO result)
     {
         DispatchSourcesDTO sources = result.DataSourcesByRegion.Values.FirstOrDefault()
@@ -949,12 +1015,37 @@
             new("system", "NEM system", "NEM", result.PeriodStart, result.PeriodEnd, result.Resolution),
             DateTimeOffset.MinValue,
             sources,
-            new("system", [], []),
+            new("system", [], SystemStorageFleets(result)),
             result.DataSeries,
             result.Metrics,
             result.Reliability,
             result.StorageSizing,
             result.Cost);
+    }
+
+    /// <summary>
+    /// The system artifact reports one storage sizing outcome for the whole system rather than a
+    /// fleet list, so a capacity can be stated only when the run has a single storage technology to
+    /// attribute it to. With more than one, the state-of-charge series is still drawn; only the
+    /// capacity in the legend is withheld, because splitting a system total across technologies
+    /// would be a guess.
+    /// </summary>
+    private static DispatchStorageFleetDTO[] SystemStorageFleets(SystemDispatchResultsDTO result)
+    {
+        string[] technologies = result.DataSeries.StateOfChargeByTechnologyMwh is { } stateOfCharge
+            ? [.. stateOfCharge.Keys]
+            : [];
+        return technologies.Length == 1
+            && result.StorageSizing.FinalEnergyMwh > 0
+            && result.StorageSizing.FinalPowerMw > 0
+            ?
+            [
+                new DispatchStorageFleetDTO(
+                    technologies[0],
+                    result.StorageSizing.FinalEnergyMwh,
+                    result.StorageSizing.FinalPowerMw),
+            ]
+            : [];
     }
 
     private static DispatchResultsDTO ToEvidence(RegionDispatchResultsDTO result) => new(
@@ -1030,8 +1121,11 @@
         _deliveredEnergyMwh = technologies.Sum(technology => selectedIndexes.Sum(
             index => result.DataSeries.DeliveredGenerationByTechnologyMw[technology][index]))
             * result.Scenario.Resolution.TotalHours;
+        // Solar, wind and hydro, matching the model's own grid-scale renewable share and the figure
+        // the comparison pages state. Counting solar and wind alone reproduced the separate native
+        // share instead, so the same run read differently on two pages of this site.
         double renewableEnergyMwh = technologies
-            .Where(technology => technology is "Solar" or "Wind")
+            .Where(TechnologyPalette.Renewable.Contains)
             .Sum(technology => selectedIndexes.Sum(
                 index => result.DataSeries.DeliveredGenerationByTechnologyMw[technology][index]))
             * result.Scenario.Resolution.TotalHours;
@@ -1125,18 +1219,15 @@
         List<double> demand = BucketAverages(comparison.DataSeries.Demand.TotalDemandMw, selectedIndexes, bucketSize);
         _comparisonDemandPoints = LinePoints(demand);
 
-        foreach (DispatchStorageFleetDTO fleet in comparison.PowerSystem.StorageFleets)
+        // The comparison is drawn as a dashed trace with no legend entry of its own, so it needs
+        // the series alone and never the capacities behind it.
+        foreach ((string technology, double[] stateOfCharge) in comparison.DataSeries.StateOfChargeByTechnologyMwh)
         {
-            if (!comparison.DataSeries.StateOfChargeByTechnologyMwh.TryGetValue(fleet.Technology, out double[]? stateOfCharge))
-            {
-                continue;
-            }
-
             _comparisonStorageTraces.Add(new StorageTrace(
-                fleet.Technology,
-                StorageColors.GetValueOrDefault(fleet.Technology, "#8a7d72"),
-                fleet.EnergyCapacityMwh,
-                fleet.PowerCapacityMw,
+                technology,
+                StorageColors.GetValueOrDefault(technology, "#8a7d72"),
+                null,
+                null,
                 [],
                 StorageLinePoints(BucketFirsts(stateOfCharge, selectedIndexes, bucketSize))));
         }
@@ -1174,15 +1265,21 @@
         return values;
     }
 
+    /// <summary>
+    /// Draws every state-of-charge series the run carries. The series is the evidence; the fleet
+    /// list only supplies the capacities for the legend, so a result that reports storage operating
+    /// without republishing its fleet is still drawn rather than reported as having no storage.
+    /// </summary>
     private void BuildStorageChart(
         DispatchResultsDTO result,
         int[] selectedIndexes,
         int bucketSize)
     {
         _storageTraces = [];
-        foreach (DispatchStorageFleetDTO fleet in result.PowerSystem.StorageFleets)
+        foreach ((string technology, double[] stateOfCharge) in result.DataSeries.StateOfChargeByTechnologyMwh)
         {
-            double[] stateOfCharge = result.DataSeries.StateOfChargeByTechnologyMwh[fleet.Technology];
+            DispatchStorageFleetDTO? fleet = result.PowerSystem.StorageFleets.FirstOrDefault(candidate =>
+                string.Equals(candidate.Technology, technology, StringComparison.OrdinalIgnoreCase));
             var displayedValues = new List<double>();
             for (int offset = 0; offset < selectedIndexes.Length; offset += bucketSize)
             {
@@ -1191,19 +1288,19 @@
             }
 
             _storageTraces.Add(new StorageTrace(
-                fleet.Technology,
-                StorageColors.GetValueOrDefault(fleet.Technology, "#8a7d72"),
-                fleet.EnergyCapacityMwh,
-                fleet.PowerCapacityMw,
+                technology,
+                StorageColors.GetValueOrDefault(technology, "#8a7d72"),
+                fleet?.EnergyCapacityMwh,
+                fleet?.PowerCapacityMw,
                 displayedValues));
         }
 
-        _storageChartMaximumMwh = Math.Max(
-            1,
-            result.PowerSystem.StorageFleets
-                .Select(fleet => fleet.EnergyCapacityMwh)
-                .DefaultIfEmpty(1)
-                .Max());
+        // Without a declared capacity the axis is scaled to what the series reached, so an
+        // undeclared fleet still produces a readable chart rather than a flat line at the floor.
+        _storageChartMaximumMwh = Math.Max(1, _storageTraces
+            .Select(trace => trace.EnergyCapacityMwh ?? trace.Values.DefaultIfEmpty(0).Max())
+            .DefaultIfEmpty(1)
+            .Max());
         _storageTraces = _storageTraces.Select(trace => trace with
         {
             Points = StorageLinePoints(trace.Values),
@@ -1238,10 +1335,24 @@
         StorageChartBottom
         - ((StorageChartBottom - StorageChartTop) * value / _storageChartMaximumMwh);
 
-    private string StorageFleetSummary() => _result!.PowerSystem.StorageFleets.Length == 0
-        ? "None installed"
-        : string.Join(" · ", _result.PowerSystem.StorageFleets.Select(fleet =>
-            $"{fleet.Technology} {fleet.EnergyCapacityMwh:N0} MWh / {fleet.PowerCapacityMw:N0} MW"));
+    /// <summary>
+    /// The storage the run finished with. A system-scope result reports one sizing total rather
+    /// than a fleet, so it is stated as a system total rather than left reading as no storage.
+    /// </summary>
+    private string StorageFleetSummary()
+    {
+        if (_result!.PowerSystem.StorageFleets.Length > 0)
+        {
+            return string.Join(" · ", _result.PowerSystem.StorageFleets.Select(fleet =>
+                $"{fleet.Technology} {fleet.EnergyCapacityMwh:N0} MWh / {fleet.PowerCapacityMw:N0} MW"));
+        }
+
+        return _storageTraces.Count == 0
+            ? "None installed"
+            : $"{string.Join(", ", _storageTraces.Select(trace => trace.Technology))} · "
+                + $"{_result.StorageSizing.FinalEnergyMwh:N0} MWh / "
+                + $"{_result.StorageSizing.FinalPowerMw:N0} MW system total";
+    }
 
     private string CostShareStyle(decimal componentAudPerMwh)
     {
@@ -1293,21 +1404,25 @@
         return months;
     }
 
-    private static string RegionName(string region) => region switch
-    {
-        "NSW1" => "New South Wales (NSW1)", "QLD1" => "Queensland (QLD1)",
-        "SA1" => "South Australia (SA1)", "TAS1" => "Tasmania (TAS1)",
-        "VIC1" => "Victoria (VIC1)", _ => region,
-    };
+    private static string RegionName(string region) => RegionNames.Full(region);
 
     private sealed record AreaLayer(string Name, string Color, string Points);
+    /// <summary>
+    /// A drawn state-of-charge series. Capacities are nullable because a system-scope result
+    /// reports storage operating without republishing the fleet it belongs to.
+    /// </summary>
     private sealed record StorageTrace(
         string Technology,
         string Color,
-        double EnergyCapacityMwh,
-        double PowerCapacityMw,
+        double? EnergyCapacityMwh,
+        double? PowerCapacityMw,
         IReadOnlyList<double> Values,
-        string Points = "");
+        string Points = "")
+    {
+        public string LegendText => EnergyCapacityMwh is { } energy && PowerCapacityMw is { } power
+            ? $"{Technology} · {energy:N0} MWh / {power:N0} MW"
+            : $"{Technology} · capacity not stated by this artifact";
+    }
     private sealed record HeadroomTrace(string Name, string Color, string Points);
     private sealed record MonthOption(int Month, string Label);
     private readonly Dictionary<string, RegularSeriesDTO> _baseDemandCache = new(StringComparer.Ordinal);

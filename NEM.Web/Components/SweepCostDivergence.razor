@@ -1,0 +1,157 @@
+@using NEM.Contracts
+@using NEM.Web.Components.Viz
+@using NEM.Web.Services
+@using NEM.Web.Services.Insights
+@inject NavigationManager Navigation
+
+@*
+    The two cost readings on one pair of axes. A levelised cost answers "what does a megawatt-hour
+    cost here"; the annual total answers "what does this scenario cost". They can move in opposite
+    directions, and a page that shows only the first turns a larger bill into an apparent saving.
+*@
+<ChartFrame Heading="Cost per megawatt-hour against the annual bill"
+            SectionIndex="The headline"
+            Description="@Description">
+    <TrailingContent>
+        <span class="unit-badge">AUD</span>
+    </TrailingContent>
+    <ChildContent>
+        <LinePlot Series="@_series"
+                  XLabels="@_labels"
+                  Annotations="@_annotations"
+                  AriaLabel="Levelised cost and annual system cost across the sweep"
+                  YPrefix="$"
+                  SecondaryPrefix="$"
+                  XAxisTitle="@($"{Analysis.AxisLabel} ({Analysis.AxisUnit})")"
+                  Height="380"
+                  ReadoutFor="Readout"
+                  OnSelect="OpenRun"
+                  SelectedIndex="@Analysis.UnitCostTurningPoint?.Index">
+            <Caption>
+                <span class="divergence-note">
+                    Annual cost is the levelised cost multiplied by the energy served — both are
+                    published per run; the product is not. Select a point to open that run.
+                </span>
+            </Caption>
+        </LinePlot>
+
+        <div class="divergence-readout">
+            @foreach (DivergenceRow row in _rows)
+            {
+                <div class="divergence-cell @(row.IsHighlighted ? "is-highlighted" : null)">
+                    <span>@row.Caption</span>
+                    <strong>@row.Run.Label</strong>
+                    <dl>
+                        <div>
+                            <dt>Per MWh</dt>
+                            <dd>@PlotFormat.Money(row.Run.Scalars.SlcoeAudPerMwh)</dd>
+                        </div>
+                        <div>
+                            <dt>Annual</dt>
+                            <dd>@PlotFormat.MoneyTotal((decimal)row.Run.TotalAnnualCostAud)</dd>
+                        </div>
+                        <div>
+                            <dt>Energy served</dt>
+                            <dd>@PlotFormat.Compact(row.Run.Scalars.EnergyServedMwh) MWh</dd>
+                        </div>
+                    </dl>
+                </div>
+            }
+        </div>
+    </ChildContent>
+</ChartFrame>
+
+@code {
+    [Parameter, EditorRequired] public SweepAnalysis Analysis { get; set; } = default!;
+    [Parameter] public string? RegionId { get; set; }
+
+    private List<PlotSeries> _series = [];
+    private List<string> _labels = [];
+    private List<PlotAnnotation> _annotations = [];
+    private List<DivergenceRow> _rows = [];
+
+    private string Description => Analysis.UnitCostTurningPoint is null
+        ? "Both readings of cost across every run that produced results, drawn on their own axes."
+        : "Both readings of cost across every run that produced results. The marked run is where the "
+            + "levelised cost turns — the two lines part company from there.";
+
+    protected override void OnParametersSet()
+    {
+        IReadOnlyList<SweepRun> runs = Analysis.Runs;
+        _labels = [.. runs.Select(run => run.Label)];
+        _series =
+        [
+            PlotSeries.From(
+                "Levelised cost (AUD/MWh)",
+                "var(--color-demand)",
+                runs.Select(run => (double)run.Scalars.SlcoeAudPerMwh)),
+            PlotSeries.From(
+                "Annual system cost (AUD)",
+                "var(--color-accent-warm)",
+                runs.Select(run => run.TotalAnnualCostAud),
+                dashed: true,
+                useSecondaryAxis: true),
+        ];
+
+        _annotations = Analysis.UnitCostTurningPoint is { } turn
+            ? [new PlotAnnotation(turn.Index, turn.IsMinimum ? "cheapest per MWh" : "dearest per MWh")]
+            : [];
+
+        _rows = BuildRows(runs);
+    }
+
+    /// <summary>
+    /// The three runs worth naming under the chart: where the sweep starts, where the levelised
+    /// cost turns, and where it ends. When there is no turn, the ends alone tell the story.
+    /// </summary>
+    private List<DivergenceRow> BuildRows(IReadOnlyList<SweepRun> runs)
+    {
+        if (runs.Count == 0)
+        {
+            return [];
+        }
+
+        var rows = new List<DivergenceRow> { new("First run", runs[0], false) };
+        if (Analysis.UnitCostTurningPoint is { } turn && turn.Index > 0 && turn.Index < runs.Count - 1)
+        {
+            rows.Add(new DivergenceRow(
+                turn.IsMinimum ? "Lowest cost per MWh" : "Highest cost per MWh",
+                turn.Run,
+                true));
+        }
+
+        if (runs.Count > 1)
+        {
+            rows.Add(new DivergenceRow("Last run", runs[^1], false));
+        }
+
+        return rows;
+    }
+
+    private string Readout(int index)
+    {
+        if (index < 0 || index >= Analysis.Runs.Count)
+        {
+            return string.Empty;
+        }
+
+        SweepRun run = Analysis.Runs[index];
+        return $"{run.Label} ({run.AxisValue:N0} {Analysis.AxisUnit})"
+            + $"\nLevelised cost: {PlotFormat.Money(run.Scalars.SlcoeAudPerMwh)}/MWh"
+            + $"\nAnnual system cost: {PlotFormat.MoneyTotal((decimal)run.TotalAnnualCostAud)}"
+            + $"\nEnergy served: {PlotFormat.Compact(run.Scalars.EnergyServedMwh)} MWh";
+    }
+
+    private void OpenRun(int index)
+    {
+        if (index >= 0 && index < Analysis.Runs.Count)
+        {
+            Navigation.NavigateTo(SweepPaths.RunRoute(
+                Analysis.Index.SweepId,
+                Analysis.Runs[index].Point.PointId,
+                RegionId));
+        }
+    }
+
+    private sealed record DivergenceRow(string Caption, SweepRun Run, bool IsHighlighted);
+}

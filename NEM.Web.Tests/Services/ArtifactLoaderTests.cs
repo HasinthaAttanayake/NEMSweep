@@ -113,23 +113,35 @@ public sealed class ArtifactLoaderTests
     }
 
     [Fact]
-    public async Task LoadSystemWithRegionAsync_AcceptsMatchingRunIds()
+    public async Task LoadRegionForAsync_AcceptsADetailFromTheSameRun()
     {
-        ArtifactLoadResult<SystemRegionArtifactPair> result = await LoadPairAsync("run-1", "run-1");
+        ArtifactLoadResult<RegionDispatchResultsDTO> result = await LoadRegionAsync("run-1", "run-1");
 
         result.IsSuccess.Should().BeTrue();
-        result.Value!.System.RunId.Should().Be("run-1");
-        result.Value.Region.RegionId.Should().Be("NSW1");
+        result.Value!.RegionId.Should().Be("NSW1");
     }
 
     [Fact]
-    public async Task LoadSystemWithRegionAsync_RejectsMismatchedRunIdsAsInvalidData()
+    public async Task LoadRegionForAsync_RejectsADetailFromAnotherRunAsInvalidData()
     {
-        ArtifactLoadResult<SystemRegionArtifactPair> result = await LoadPairAsync("run-1", "run-2");
+        ArtifactLoadResult<RegionDispatchResultsDTO> result = await LoadRegionAsync("run-1", "run-2");
 
         result.State.Status.Should().Be(ArtifactLoadStatus.InvalidData);
         result.State.Message.Should().Be("System and regional artifact run IDs do not match.");
         result.Value.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task LoadRegionForAsync_DoesNotRefetchTheSystemArtifact()
+    {
+        var handler = new PairResponseHandler("run-1", "run-1");
+        using var http = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") };
+
+        await new ArtifactLoader(http).LoadRegionForAsync(
+            ArtifactFixtures.SystemResults(runId: "run-1"),
+            "data/results-nsw1.json");
+
+        handler.Requests.Should().ContainSingle().Which.Should().EndWith("results-nsw1.json");
     }
 
     [Fact]
@@ -248,7 +260,7 @@ public sealed class ArtifactLoaderTests
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     });
 
-    private static async Task<ArtifactLoadResult<SystemRegionArtifactPair>> LoadPairAsync(
+    private static async Task<ArtifactLoadResult<RegionDispatchResultsDTO>> LoadRegionAsync(
         string systemRunId,
         string regionRunId)
     {
@@ -257,8 +269,8 @@ public sealed class ArtifactLoaderTests
             BaseAddress = new Uri("https://example.test/"),
         };
 
-        return await new ArtifactLoader(http).LoadSystemWithRegionAsync(
-            "data/results.json",
+        return await new ArtifactLoader(http).LoadRegionForAsync(
+            ArtifactFixtures.SystemResults(runId: systemRunId),
             "data/results-nsw1.json");
     }
 
@@ -283,10 +295,13 @@ public sealed class ArtifactLoaderTests
 
     private sealed class PairResponseHandler(string systemRunId, string regionRunId) : HttpMessageHandler
     {
+        public List<string> Requests { get; } = [];
+
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
+            Requests.Add(request.RequestUri!.AbsolutePath);
             string runId = request.RequestUri!.AbsolutePath.EndsWith("results-nsw1.json", StringComparison.Ordinal)
                 ? regionRunId
                 : systemRunId;

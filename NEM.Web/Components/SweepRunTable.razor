@@ -1,4 +1,5 @@
 @using NEM.Contracts
+@using NEM.Web.Components.Viz
 @using NEM.Web.Services
 
 @* Every headline figure for every run. The index now carries the reliability metrics that used to
@@ -7,7 +8,7 @@
     <div class="run-table-heading">
         <div>
             <h2>All runs</h2>
-            <p>Every figure the sweep index records, per run. Each run opens in the same viewer as the baseline dispatch.</p>
+            <p>Every figure the sweep index records, per run, with the annual cost each one implies. Each run opens in the same viewer as the baseline dispatch.</p>
         </div>
     </div>
 
@@ -20,6 +21,7 @@
                     <th scope="col">Outcome</th>
                     <th scope="col">Reliability<small>vs target</small></th>
                     <th scope="col">Storage sizing</th>
+                    <th scope="col">Annual system cost<small>AUD, derived</small></th>
                     @foreach (SweepChartYAxis column in SweepSeriesCatalogue.All)
                     {
                         <th scope="col">@column.Label<small>@column.Unit</small></th>
@@ -30,7 +32,7 @@
             <tbody>
                 @foreach (SweepIndexPointDTO point in Index.Points)
                 {
-                    <tr>
+                    <tr class="@(point.PointId == HighlightPointId ? "run-highlighted" : null)">
                         <th scope="row" class="sticky-column">@point.Label</th>
                         <td>@point.AxisValue.ToString(_axisFormat)</td>
                         <td>
@@ -58,6 +60,7 @@
                             }
                         </td>
                         <td>@SizingLabel(point.StorageSizing)</td>
+                        <td class="cell-derived">@AnnualCost(point)</td>
                         @foreach (SweepChartYAxis column in SweepSeriesCatalogue.All)
                         {
                             <td>@Scalar(point, column)</td>
@@ -82,6 +85,9 @@
 @code {
     [Parameter, EditorRequired] public SweepIndexDTO Index { get; set; } = default!;
     [Parameter] public string? RegionId { get; set; }
+
+    /// <summary>The run to mark as the reference in the table, usually the cheapest per MWh.</summary>
+    [Parameter] public string? HighlightPointId { get; set; }
 
     private readonly Dictionary<string, string> _columnFormats = new(StringComparer.Ordinal);
     private string _axisFormat = "N0";
@@ -109,6 +115,18 @@
         return value is null
             ? "—"
             : SweepValueFormat.WithPrefix(column.ValuePrefix, value.Value, value.Value.ToString(_columnFormats[column.Key]));
+    }
+
+    /// <summary>
+    /// What the run's whole year costs, from the levelised cost and the energy it served. Marked as
+    /// derived in the header because the artifact publishes the two factors, not the product.
+    /// </summary>
+    private string AnnualCost(SweepIndexPointDTO point)
+    {
+        SweepPointScalarResultsDTO? scalars = SweepChartData.SelectScalars(point, RegionId);
+        return scalars is null
+            ? "—"
+            : PlotFormat.MoneyTotal(scalars.SlcoeAudPerMwh * (decimal)scalars.EnergyServedMwh);
     }
 
     private static string SizingLabel(StorageSizingOutcomeDTO? sizing) => sizing?.Outcome switch

@@ -1,0 +1,637 @@
+@page "/regions"
+@using NEM.Contracts
+@using NEM.Web.Components.Viz
+@using NEM.Web.Services
+@using NEM.Web.Services.Insights
+@inject ArtifactLoader ArtifactLoader
+
+<PageTitle>System and states</PageTitle>
+
+<main class="regions-page">
+    <PageHeader Eyebrow="Comparison" Title="System and states">
+        <ScopeContent>
+            @if (_analysis is not null)
+            {
+                <ScopeLine Region="@ScopeRegions" Period="@Period" Resolution="@Resolution" />
+                <p class="scope-note">
+                    One dispatch run, read two ways. The system figures are what the whole
+                    interconnected fleet did; the regional figures are what each state did inside it.
+                </p>
+            }
+        </ScopeContent>
+    </PageHeader>
+
+    <ArtifactLoadStateView State="_loadState">
+        @if (_analysis is not null)
+        {
+            <MetricStrip Items="@HeadlineMetrics" AriaLabel="System result summary" />
+
+            <FindingCards Findings="_analysis.Findings"
+                          Heading="What separates the regions"
+                          Description="Derived from this run's own figures — the same figures the cards and tables below report. Nothing here is modelled, forecast, or brought in from another run." />
+
+            <section class="region-section" aria-labelledby="scorecards-heading">
+                <div class="section-heading">
+                    <p class="section-label">Region by region</p>
+                    <h2 id="scorecards-heading">The states behind the system number</h2>
+                    <p>
+                        Each card is one region's own result: its levelised cost, what it burned to
+                        get there, and what it could not serve. The system row is the
+                        demand-weighted whole, not the average of the cards.
+                    </p>
+                </div>
+
+                <div class="scorecards">
+                    <article class="scorecard scorecard-system">
+                        <header>
+                            <p class="scorecard-kind">Whole system</p>
+                            <h3>NEM system</h3>
+                        </header>
+                        <p class="scorecard-cost">
+                            <strong>@PlotFormat.Money(_analysis.Result.Cost.SlcoeAudPerMwh)</strong>
+                            <small>AUD/MWh served</small>
+                        </p>
+                        @if (_analysis.SystemMix.TotalMwh > 0)
+                        {
+                            <MixBar Segments="@_analysis.SystemMix.Segments()"
+                                    Label="Delivered energy"
+                                    AriaLabel="System delivered generation by technology"
+                                    Detail="@($"{PlotFormat.Share(_analysis.SystemMix.RenewableShare)} renewable")" />
+                        }
+                        <dl class="scorecard-facts">
+                            <div><dt>Annual cost</dt><dd>@PlotFormat.MoneyTotal(_analysis.Result.Cost.TotalAnnualisedCostAud)</dd></div>
+                            <div><dt>Demand</dt><dd>@PlotFormat.Compact(_analysis.Result.Metrics.DemandMwh) MWh</dd></div>
+                            <div><dt>Curtailed</dt><dd>@PlotFormat.Compact(_analysis.Result.Metrics.CurtailedEnergyMwh) MWh</dd></div>
+                            <div><dt>Unserved</dt><dd>@PlotFormat.Compact(_analysis.Result.Metrics.UnservedEnergyMwh) MWh</dd></div>
+                            <div><dt>Storage</dt><dd>@PlotFormat.Compact(_analysis.Result.StorageSizing.FinalEnergyMwh) MWh</dd></div>
+                            <div><dt>Transmission</dt><dd>@PlotFormat.Money(_analysis.Result.Cost.TransmissionSlcotAudPerMwh)/MWh</dd></div>
+                        </dl>
+                        <a class="scorecard-link" href="dispatch">Open system dispatch</a>
+                    </article>
+
+                    @foreach (RegionProfile region in _analysis.Regions)
+                    {
+                        <article class="scorecard">
+                            <header>
+                                <p class="scorecard-kind">@region.RegionId</p>
+                                <h3>@region.State</h3>
+                            </header>
+                            <p class="scorecard-cost">
+                                <strong>@PlotFormat.Money(region.Cost.SlcoeAudPerMwh)</strong>
+                                <small>AUD/MWh served</small>
+                                <span class="@DeltaClass(region)">@SystemDelta(region)</span>
+                            </p>
+                            @if (region.Mix.TotalMwh > 0)
+                            {
+                                <MixBar Segments="@region.Mix.Segments()"
+                                        Label="Delivered energy"
+                                        AriaLabel="@($"{region.Name} delivered generation by technology")"
+                                        Detail="@($"{PlotFormat.Share(region.Mix.RenewableShare)} renewable")" />
+                            }
+                            else if (_detailState == RegionDetailState.Loading)
+                            {
+                                <p class="scorecard-pending">Loading generation mix…</p>
+                            }
+                            <dl class="scorecard-facts">
+                                <div><dt>Annual cost</dt><dd>@PlotFormat.MoneyTotal(region.Cost.TotalAnnualisedCostAud)</dd></div>
+                                <div><dt>Demand</dt><dd>@PlotFormat.Compact(region.Metrics.DemandMwh) MWh</dd></div>
+                                <div>
+                                    <dt>Curtailed</dt>
+                                    <dd>@PlotFormat.Compact(region.Metrics.CurtailedEnergyMwh) MWh
+                                        <em>@PlotFormat.Share(region.CurtailedShareOfAvailable) of available</em></dd>
+                                </div>
+                                <div>
+                                    <dt>Unserved</dt>
+                                    <dd>@PlotFormat.Compact(region.Metrics.UnservedEnergyMwh) MWh
+                                        <em>@region.Metrics.UnservedHours @(region.Metrics.UnservedHours == 1 ? "hour" : "hours")</em></dd>
+                                </div>
+                                <div>
+                                    <dt>Storage</dt>
+                                    <dd>@PlotFormat.Compact(region.StorageSizing.FinalEnergyMwh) MWh
+                                        <em>@SizingLabel(region.StorageSizing.Outcome)</em></dd>
+                                </div>
+                                <div>
+                                    <dt>Net trade</dt>
+                                    <dd>@PlotFormat.Compact(region.NetTradeMwh) MWh
+                                        <em>@(region.NetTradeMwh <= 0 ? "no exchange" : region.IsNetImporter ? "imported" : "exported")</em></dd>
+                                </div>
+                            </dl>
+                            <p class="scorecard-reliability @(region.Reliability.WithinTarget ? "is-within" : "is-outside")">
+                                @(region.Reliability.WithinTarget ? "Within reliability target" : "Outside reliability target")
+                                <span>@PlotFormat.Share(region.ReliabilityAllowanceUsed, 0) of allowance used</span>
+                            </p>
+                            <a class="scorecard-link" href="@($"dispatch?region={region.RegionId}")">
+                                Open @region.RegionId dispatch
+                            </a>
+                        </article>
+                    }
+                </div>
+            </section>
+
+            <section class="region-section" aria-labelledby="compare-heading">
+                <div class="section-heading section-heading-inline">
+                    <div>
+                        <p class="section-label">Side by side</p>
+                        <h2 id="compare-heading">Compare one measure across the run</h2>
+                        <p>
+                            Bars run from zero against the largest value on show. Where the measure
+                            also exists for the whole system, the black rule marks it.
+                        </p>
+                    </div>
+                    <MudSelect T="string" Label="Measure" Value="_selectedMeasureKey"
+                               ValueChanged="OnMeasureChanged" Variant="Variant.Outlined"
+                               Class="measure-select">
+                        @foreach (RegionMeasure measure in Measures)
+                        {
+                            <MudSelectItem T="string" Value="@measure.Key">@measure.Label</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+
+                <CompareBars Rows="@MeasureRows"
+                             Reference="@SelectedMeasure.SystemValue?.Invoke(_analysis)"
+                             ReferenceLabel="@ReferenceLabel"
+                             AriaLabel="@($"{SelectedMeasure.Label} by region")" />
+                <p class="measure-note">@SelectedMeasure.Note</p>
+            </section>
+
+            <section class="region-section" aria-labelledby="cost-split-heading">
+                <div class="section-heading">
+                    <p class="section-label">Cost decomposition</p>
+                    <h2 id="cost-split-heading">What each region is paying for</h2>
+                    <p>
+                        Levelised cost split into the assets behind it. Transmission is a
+                        system-level asset and is not allocated to regions, so the regional columns
+                        do not sum to the system row.
+                    </p>
+                </div>
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Scope</th>
+                                <th scope="col">Generation</th>
+                                <th scope="col">Storage</th>
+                                <th scope="col">Transmission</th>
+                                <th scope="col">Levelised</th>
+                                <th scope="col">Annual cost</th>
+                                <th scope="col">Energy served</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="row-system">
+                                <th scope="row">NEM system</th>
+                                <td>@PlotFormat.Money(_analysis.Result.Cost.GenerationSlcoeAudPerMwh)</td>
+                                <td>@PlotFormat.Money(_analysis.Result.Cost.StorageSlcoeAudPerMwh)</td>
+                                <td>@PlotFormat.Money(_analysis.Result.Cost.TransmissionSlcotAudPerMwh)</td>
+                                <td class="cell-emphasis">@PlotFormat.Money(_analysis.Result.Cost.SlcoeAudPerMwh)</td>
+                                <td>@PlotFormat.MoneyTotal(_analysis.Result.Cost.TotalAnnualisedCostAud)</td>
+                                <td>@PlotFormat.Compact(_analysis.ServedEnergyMwh) MWh</td>
+                            </tr>
+                            @foreach (RegionProfile region in _analysis.Regions)
+                            {
+                                <tr>
+                                    <th scope="row">@region.Name</th>
+                                    <td>@PlotFormat.Money(region.Cost.GenerationSlcoeAudPerMwh)</td>
+                                    <td>@PlotFormat.Money(region.Cost.StorageSlcoeAudPerMwh)</td>
+                                    <td class="cell-absent">not allocated</td>
+                                    <td class="cell-emphasis">@PlotFormat.Money(region.Cost.SlcoeAudPerMwh)</td>
+                                    <td>@PlotFormat.MoneyTotal(region.Cost.TotalAnnualisedCostAud)</td>
+                                    <td>@PlotFormat.Compact(region.ServedEnergyMwh) MWh</td>
+                                </tr>
+                            }
+                            <tr class="row-derived">
+                                <th scope="row">Plain average of regions</th>
+                                <td colspan="3"></td>
+                                <td class="cell-emphasis">@PlotFormat.Money(_analysis.MeanRegionalSlcoe)</td>
+                                <td colspan="2">Shown to make the point that the system figure is not this one.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            @if (_costAgainstShare.Count > 1)
+            {
+                <ChartFrame Heading="Cost against renewable share"
+                            Description="Each marker is one region of this run. A cheaper region on the right would mean renewable share and cost move together; a cheaper region on the left would mean they trade off."
+                            SectionIndex="Trade-off">
+                    <ScatterPlot Markers="@_costAgainstShare"
+                                 AriaLabel="Levelised cost against renewable share by region"
+                                 XAxisTitle="Renewable share of delivered energy (%)"
+                                 YAxisTitle="Levelised cost (AUD/MWh)"
+                                 YPrefix="$"
+                                 Connected="false"
+                                 Height="360" />
+                </ChartFrame>
+            }
+
+            @if (_analysis.Links.Count > 0)
+            {
+                <section class="region-section" aria-labelledby="trade-heading">
+                    <div class="section-heading">
+                        <p class="section-label">Between regions</p>
+                        <h2 id="trade-heading">What moves across the interconnectors</h2>
+                        <p>
+                            Directed solver evidence over the whole period. Flow is metered at the
+                            sending end and losses are reported separately, so a link's delivered
+                            energy is its flow less its losses.
+                        </p>
+                    </div>
+                    <div class="table-wrap">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Link</th>
+                                    <th scope="col">Capacity</th>
+                                    <th scope="col">Energy carried</th>
+                                    <th scope="col">Losses</th>
+                                    <th scope="col">Peak flow</th>
+                                    <th scope="col">Intervals flowing</th>
+                                    <th scope="col">Capacity used</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (LinkFlow link in _analysis.Links)
+                                {
+                                    <tr class="@(link.EnergyMwh <= 0 ? "row-idle" : null)">
+                                        <th scope="row">@link.Label</th>
+                                        <td>@PlotFormat.Compact(link.CapacityMw) MW</td>
+                                        <td>@PlotFormat.Compact(link.EnergyMwh) MWh</td>
+                                        <td>@PlotFormat.Compact(link.LossesMwh) MWh</td>
+                                        <td>@PlotFormat.Compact(link.PeakFlowMw) MW</td>
+                                        <td>@link.FlowingIntervals.ToString("N0") <em>@PlotFormat.Share(link.FlowingShare, 0)</em></td>
+                                        <td>@PlotFormat.Share(link.CapacityFactor, 1)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    @if (_flowSeries.Count > 0)
+                    {
+                        <LinePlot Series="@_flowSeries"
+                                  XLabels="@_flowLabels"
+                                  AriaLabel="Interconnector flow across the dispatch period"
+                                  Height="280"
+                                  ShowMarkers="false"
+                                  XAxisTitle="Dispatch period"
+                                  Class="flow-plot">
+                            <Caption>
+                                <span class="plot-note">
+                                    Each point is the mean flow over @_flowBucketHours hours, so a
+                                    short burst at full capacity is drawn smaller than it ran.
+                                </span>
+                            </Caption>
+                        </LinePlot>
+                    }
+                </section>
+            }
+
+            <section class="region-section" aria-labelledby="weather-heading">
+                <div class="section-heading">
+                    <p class="section-label">Inputs</p>
+                    <h2 id="weather-heading">Each region is simulated against its own weather</h2>
+                </div>
+                @foreach (KeyValuePair<string, DispatchSourcesDTO> source in _analysis.Result.DataSourcesByRegion)
+                {
+                    <div class="weather-region">
+                        <h3>@RegionNames.Full(source.Key)</h3>
+                        <WeatherBasisNote Basis="source.Value.WeatherBasis" />
+                    </div>
+                }
+            </section>
+
+            <ProvenanceFooter Inputs="@ProvenanceInputs"
+                              Region="@ScopeRegions"
+                              Period="@Period"
+                              Resolution="@Resolution" />
+        }
+    </ArtifactLoadStateView>
+</main>
+
+@code {
+    private const string SystemArtifactPath = "data/results.json";
+
+    private ArtifactLoadState _loadState = ArtifactLoadState.Loading();
+    private SystemDispatchResultsDTO? _result;
+    private SystemAnalysis? _analysis;
+    private RegionDetailState _detailState = RegionDetailState.Loading;
+    private string _selectedMeasureKey = "slcoe";
+    private List<PlotMarker> _costAgainstShare = [];
+    private List<PlotSeries> _flowSeries = [];
+    private List<string> _flowLabels = [];
+    private int _flowBucketHours = 1;
+
+    private string ScopeRegions => _analysis is null
+        ? string.Empty
+        : string.Join(", ", _analysis.Result.RegionIds.Select(RegionNames.Full));
+
+    private string Period => _result is null
+        ? string.Empty
+        : $"{_result.PeriodStart:dd MMM yyyy} to {_result.PeriodEnd.AddTicks(-1):dd MMM yyyy}";
+
+    private string Resolution => _result is null
+        ? string.Empty
+        : $"{_result.Resolution.TotalHours:N0}-hour intervals";
+
+    private IReadOnlyList<ProvenanceInputFile> ProvenanceInputs => _result is null
+        ? []
+        : [.. _result.DataSourcesByRegion.SelectMany(source => new ProvenanceInputFile[]
+            {
+                new(source.Value.DemandInput.FileName, source.Value.DemandInput.Sha256, $"{source.Key} demand"),
+                new(source.Value.WeatherInput.FileName, source.Value.WeatherInput.Sha256, $"{source.Key} weather"),
+            })];
+
+    private IReadOnlyList<MetricStripItem> HeadlineMetrics => _analysis is null
+        ?
+        []
+        :
+        [
+            new("System levelised cost", PlotFormat.Money(_analysis.Result.Cost.SlcoeAudPerMwh), "AUD/MWh served"),
+            new("Annual system cost", PlotFormat.MoneyTotal(_analysis.Result.Cost.TotalAnnualisedCostAud), "generation, storage and transmission"),
+            new("Regional spread", RegionalSpread, "between the cheapest and dearest region"),
+            new("Unserved energy", PlotFormat.Compact(_analysis.Result.Metrics.UnservedEnergyMwh), $"MWh · {_analysis.Result.Metrics.UnservedHours:N0} hours"),
+        ];
+
+    private string RegionalSpread => _analysis?.Cheapest is { } cheapest && _analysis.Dearest is { } dearest
+        ? PlotFormat.Money(dearest.Cost.SlcoeAudPerMwh - cheapest.Cost.SlcoeAudPerMwh)
+        : "—";
+
+    protected override async Task OnInitializedAsync()
+    {
+        ArtifactLoadResult<SystemDispatchResultsDTO> load =
+            await ArtifactLoader.LoadAsync<SystemDispatchResultsDTO>(SystemArtifactPath);
+        _loadState = load.State;
+        if (!load.IsSuccess)
+        {
+            return;
+        }
+
+        _result = load.Value!;
+        _analysis = SystemAnalysis.Build(_result);
+        BuildFlowSeries(_result);
+
+        // The system artifact carries every regional summary, so the page is usable immediately.
+        // Regional generation mixes live in separate artifacts of a megabyte or more each; they are
+        // fetched afterwards and filled in rather than held behind a blank screen.
+        StateHasChanged();
+        await LoadRegionDetailsAsync(_result);
+    }
+
+    private async Task LoadRegionDetailsAsync(SystemDispatchResultsDTO result)
+    {
+        var paths = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (string regionId in result.RegionIds)
+        {
+            if (result.RegionSummariesById.GetValueOrDefault(regionId)?.DetailPath is { Length: > 0 } path)
+            {
+                paths[regionId] = $"data/{path}";
+            }
+        }
+
+        if (paths.Count == 0)
+        {
+            _detailState = RegionDetailState.Unavailable;
+            return;
+        }
+
+        // The loader refuses a detail whose run id does not match, so a stale artifact cannot
+        // silently mix two scenarios into one comparison.
+        KeyValuePair<string, ArtifactLoadResult<RegionDispatchResultsDTO>>[] loaded = await Task.WhenAll(
+            paths.Select(async entry => new KeyValuePair<string, ArtifactLoadResult<RegionDispatchResultsDTO>>(
+                entry.Key,
+                await ArtifactLoader.LoadRegionForAsync(result, entry.Value))));
+
+        var details = new Dictionary<string, RegionDispatchResultsDTO>(StringComparer.Ordinal);
+        foreach ((string regionId, ArtifactLoadResult<RegionDispatchResultsDTO> detail) in loaded)
+        {
+            if (detail.IsSuccess)
+            {
+                details[regionId] = detail.Value!;
+            }
+        }
+
+        _detailState = details.Count == paths.Count
+            ? RegionDetailState.Loaded
+            : RegionDetailState.Unavailable;
+        _analysis = SystemAnalysis.Build(result, details);
+        BuildCostAgainstShare();
+        StateHasChanged();
+    }
+
+    private void BuildCostAgainstShare()
+    {
+        _costAgainstShare = _analysis is null
+            ? []
+            : [.. _analysis.Regions
+                .Where(region => region.Mix.TotalMwh > 0)
+                .Select(region => new PlotMarker(
+                    region.RegionId,
+                    100 * region.Mix.RenewableShare,
+                    (double)region.Cost.SlcoeAudPerMwh,
+                    $"dispatch?region={region.RegionId}",
+                    Detail: $"{PlotFormat.Compact(region.Metrics.DemandMwh)} MWh demand"))];
+    }
+
+    /// <summary>
+    /// Interconnector flow over the whole period, averaged into buckets. A year of hourly values is
+    /// 8,760 points per link, which is more marks than the plot has pixels; bucketing keeps the
+    /// shape of when a link ran without pretending to draw every hour.
+    /// </summary>
+    private void BuildFlowSeries(SystemDispatchResultsDTO result)
+    {
+        DispatchInterconnectorDTO[] links = [.. (result.Interconnectors ?? [])
+            .Where(link => link.FlowMw is { Length: > 0 } && link.FlowMw.Any(value => value > 0))];
+        if (links.Length == 0)
+        {
+            _flowSeries = [];
+            _flowLabels = [];
+            return;
+        }
+
+        int length = links.Max(link => link.FlowMw.Length);
+        int bucketSize = Math.Max(1, (int)Math.Ceiling(length / 300.0));
+        _flowBucketHours = (int)Math.Max(1, Math.Round(bucketSize * result.Resolution.TotalHours));
+
+        string[] palette = ["#4372a8", "#b8613f", "#176b5b", "#8a5fa8"];
+        var series = new List<PlotSeries>();
+        for (int index = 0; index < links.Length; index++)
+        {
+            DispatchInterconnectorDTO link = links[index];
+            var values = new List<double?>();
+            for (int offset = 0; offset < link.FlowMw.Length; offset += bucketSize)
+            {
+                int end = Math.Min(offset + bucketSize, link.FlowMw.Length);
+                values.Add(link.FlowMw[offset..end].Average());
+            }
+
+            series.Add(new PlotSeries(
+                $"{link.FromRegionId} to {link.ToRegionId}",
+                palette[index % palette.Length],
+                values,
+                Filled: true));
+        }
+
+        int bucketCount = series.Max(entry => entry.Values.Count);
+        _flowLabels = [.. Enumerable.Range(0, bucketCount)
+            .Select(bucket => result.PeriodStart
+                .AddTicks(result.Resolution.Ticks * (long)bucket * bucketSize)
+                .ToString("MMM yyyy"))];
+        _flowSeries = series;
+    }
+
+    private void OnMeasureChanged(string key)
+    {
+        _selectedMeasureKey = key;
+        StateHasChanged();
+    }
+
+    private RegionMeasure SelectedMeasure => Measures
+        .FirstOrDefault(measure => measure.Key == _selectedMeasureKey) ?? Measures[0];
+
+    private string? ReferenceLabel => SelectedMeasure.SystemValue is null || _analysis is null
+        ? null
+        : $"The rule marks the system figure, {SelectedMeasure.Format(SelectedMeasure.SystemValue(_analysis))}.";
+
+    private IReadOnlyList<CompareRow> MeasureRows
+    {
+        get
+        {
+            if (_analysis is null)
+            {
+                return [];
+            }
+
+            RegionMeasure measure = SelectedMeasure;
+            return [.. _analysis.Regions.Select(region =>
+            {
+                double value = measure.RegionValue(region);
+                return new CompareRow(
+                    region.RegionId,
+                    value,
+                    measure.Format(value),
+                    measure.Color,
+                    IsMuted: value == 0);
+            })];
+        }
+    }
+
+    /// <summary>
+    /// The measures worth putting side by side. Each states how to read it off a region, how to
+    /// read the system equivalent where one exists, and what a reader should take from it.
+    /// </summary>
+    private static readonly RegionMeasure[] Measures =
+    [
+        new("slcoe", "Levelised cost (AUD/MWh)",
+            region => (double)region.Cost.SlcoeAudPerMwh,
+            analysis => (double)analysis.Result.Cost.SlcoeAudPerMwh,
+            value => PlotFormat.Money((decimal)value),
+            "Annualised asset cost per megawatt-hour served. The system figure includes transmission; the regional figures do not.",
+            "var(--color-demand)"),
+        new("total", "Annual cost (AUD)",
+            region => (double)region.Cost.TotalAnnualisedCostAud,
+            analysis => (double)analysis.Result.Cost.TotalAnnualisedCostAud,
+            value => PlotFormat.MoneyTotal((decimal)value),
+            "What the region's fleet costs for the year. A cheap region per megawatt-hour can still be the larger bill.",
+            "var(--color-demand)"),
+        new("demand", "Demand (MWh)",
+            region => region.Metrics.DemandMwh,
+            analysis => analysis.Result.Metrics.DemandMwh,
+            value => $"{PlotFormat.Compact(value)} MWh",
+            "Operational demand over the period. This is the weight each region carries in the system figure.",
+            "var(--color-accent-cool)"),
+        new("curtailed", "Curtailed energy (MWh)",
+            region => region.Metrics.CurtailedEnergyMwh,
+            analysis => analysis.Result.Metrics.CurtailedEnergyMwh,
+            value => $"{PlotFormat.Compact(value)} MWh",
+            "Available renewable generation the fleet had no room for. It is energy that existed and was not used.",
+            "var(--color-accent-warm)"),
+        new("curtailedShare", "Curtailed share of available",
+            region => 100 * region.CurtailedShareOfAvailable,
+            null,
+            value => $"{value:N1}%",
+            "Curtailment as a share of everything the region's fleet could have delivered, which is what makes two regions of different size comparable.",
+            "var(--color-accent-warm)"),
+        new("unserved", "Unserved energy (MWh)",
+            region => region.Metrics.UnservedEnergyMwh,
+            analysis => analysis.Result.Metrics.UnservedEnergyMwh,
+            value => $"{PlotFormat.Compact(value)} MWh",
+            "Demand the fleet could not meet. Judge it against the reliability target rather than against zero.",
+            "var(--color-negative)"),
+        new("allowance", "Reliability allowance used",
+            region => 100 * region.ReliabilityAllowanceUsed,
+            null,
+            value => $"{value:N0}%",
+            "How much of the region's unserved-energy allowance the run spent. At 100% the target is binding.",
+            "var(--color-negative)"),
+        new("storageEnergy", "Storage energy (MWh)",
+            region => region.StorageSizing.FinalEnergyMwh,
+            analysis => analysis.Result.StorageSizing.FinalEnergyMwh,
+            value => $"{PlotFormat.Compact(value)} MWh",
+            "Storage the region finished the sizing loop with, whether it was installed or grown to reach the target.",
+            "var(--color-positive)"),
+        new("storageGrowth", "Storage added by sizing (MWh)",
+            region => region.StorageGrowthMwh,
+            null,
+            value => $"{PlotFormat.Compact(value)} MWh",
+            "How much storage the sizing loop had to add. Zero means the installed fleet already met the target.",
+            "var(--color-positive)"),
+        new("trade", "Net energy traded (MWh)",
+            region => region.Cost.NetImportedEnergyMwh,
+            null,
+            value => value > 0
+                ? $"{PlotFormat.Compact(value)} MWh imported"
+                : value < 0 ? $"{PlotFormat.Compact(Math.Abs(value))} MWh exported" : "none",
+            "Positive is imported energy, negative is exported. Regional costs do not price transferred energy, so an importer's cost can understate its supply.",
+            "var(--color-accent-cool)"),
+        new("renewable", "Renewable share of delivered energy",
+            region => 100 * region.Mix.RenewableShare,
+            analysis => 100 * analysis.SystemMix.RenewableShare,
+            value => $"{value:N1}%",
+            "Solar, wind and hydro as a share of what the region delivered. Read from the regional dispatch series, so it appears once those artifacts load.",
+            "var(--color-positive)"),
+    ];
+
+    private string SystemDelta(RegionProfile region)
+    {
+        decimal delta = region.Cost.SlcoeAudPerMwh - _analysis!.Result.Cost.SlcoeAudPerMwh;
+        return delta == 0
+            ? "level with system"
+            : $"{(delta > 0 ? "+" : "-")}{PlotFormat.Money(Math.Abs(delta))} vs system";
+    }
+
+    private string DeltaClass(RegionProfile region) =>
+        region.Cost.SlcoeAudPerMwh > _analysis!.Result.Cost.SlcoeAudPerMwh
+            ? "delta delta-above"
+            : region.Cost.SlcoeAudPerMwh < _analysis.Result.Cost.SlcoeAudPerMwh
+                ? "delta delta-below"
+                : "delta";
+
+    private static string SizingLabel(StorageSizingOutcome outcome) => outcome switch
+    {
+        StorageSizingOutcome.NotRequired => "already sufficient",
+        StorageSizingOutcome.Resized => "grown to meet target",
+        StorageSizingOutcome.EnergyLimited => "energy-limited",
+        StorageSizingOutcome.StorageNoLongerImprovesReliability => "no longer improves reliability",
+        StorageSizingOutcome.BatteryCapacityLimitReached => "capacity limit reached",
+        StorageSizingOutcome.PassLimitReached => "pass limit reached",
+        _ => "unknown outcome",
+    };
+
+    private enum RegionDetailState
+    {
+        Loading,
+        Loaded,
+        Unavailable,
+    }
+
+    private sealed record RegionMeasure(
+        string Key,
+        string Label,
+        Func<RegionProfile, double> RegionValue,
+        Func<SystemAnalysis, double>? SystemValue,
+        Func<double, string> Format,
+        string Note,
+        string Color);
+}
