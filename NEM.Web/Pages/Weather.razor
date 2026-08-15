@@ -56,16 +56,15 @@
                 <p>@WindLocationLabel</p>
                 <small>@_weather.Wind.SourceFile</small>
             </div>
-            @* Two sites for one region is easy to miss when the difference is two strings a reader
-               has to compare. A dispatch result records only one site per region, so this page is
-               the only place the second one appears. *@
+            @* Two sites for one region is easy to miss when the difference is two strings a
+               reader has to compare, and a resource read hundreds of kilometres from where it is
+               used is worth stating rather than leaving to be noticed. *@
             @if (SitesDiffer)
             {
                 <p class="weather-sites-note">
-                    This region's solar and wind traces come from different weather files.
-                    A dispatch result records one site per region, so it names
-                    @_weather.Solar.Location.City for @RegionLabel and does not mention
-                    @_weather.Wind.Location.City.
+                    This region's solar and wind traces come from different weather files:
+                    @_weather.Solar.Location.City for solar and @_weather.Wind.Location.City for
+                    wind. Every dispatch result for @RegionLabel names both.
                 </p>
             }
         </section>
