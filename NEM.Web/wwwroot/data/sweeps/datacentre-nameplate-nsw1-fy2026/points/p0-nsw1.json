@@ -122854,8 +122854,8 @@
     "withinTarget": true
   },
   "resolution": "01:00:00",
-  "runId": "944a6af1804d49faa404996bbc752cbb",
-  "schemaVersion": 7,
+  "runId": "ca9ae0026deb4bda8da242a2f6b15af2",
+  "schemaVersion": 8,
   "storageSizing": {
     "energyLimitedEvidence": null,
     "finalEnergyMwh": 5515,

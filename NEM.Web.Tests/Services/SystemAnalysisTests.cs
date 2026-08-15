@@ -210,14 +210,16 @@ public sealed class SystemAnalysisTests
             Sizing(5515, nswResized ? 9000 : 5515, StorageOutcome(nswResized)),
             Cost(slcoe: 167.27m, generation: 164.08m, storage: 3.19m, total: 11_085_977_181m, netImported: -266_101),
             Mix(coal: 41_275_989, solar: 15_000_000, wind: 7_500_000, hydro: 2_766_101),
-            "results-nsw1.json");
+            "results-nsw1.json",
+            "results-nsw1-overview.json");
         RegionDispatchSummaryDTO vic = new(
             Metrics(demandMwh: 44_977_270, deliveredMwh: 44_665_751, curtailedMwh: 2_891_385, unservedMwh: vicUnservedMwh),
             new ReliabilityBasisDTO(0.002, vicUnservedMwh > 0 ? 0.00164 : 0, true, "NEM reliability standard"),
             Sizing(3243.4, 6772, StorageSizingOutcome.Resized),
             Cost(slcoe: 145.47m, generation: 138.90m, storage: 6.57m, total: 6_542_903_141m, netImported: 252_796),
             Mix(coal: 18_577_270, solar: 14_000_000, wind: 11_000_000, hydro: 1_088_481),
-            "results-vic1.json");
+            "results-vic1.json",
+            "results-vic1-overview.json");
 
         return new SystemDispatchResultsDTO(
             ArtifactSchemaVersions.SystemDispatchResults,

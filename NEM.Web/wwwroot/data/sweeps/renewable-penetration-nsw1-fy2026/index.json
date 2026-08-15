@@ -16,10 +16,12 @@
         "peakUnservedIntervalIndex": null
       },
       "label": "Baseline",
+      "overviewPath": "points/p0-overview.json",
       "pointId": "p0",
       "regionDetails": [
         {
           "detailPath": "points/p0-nsw1.json",
+          "overviewPath": "points/p0-nsw1-overview.json",
           "regionId": "NSW1"
         }
       ],
@@ -109,10 +111,12 @@
         "peakUnservedIntervalIndex": null
       },
       "label": "10% renewable capacity uplift",
+      "overviewPath": "points/p1-overview.json",
       "pointId": "p1",
       "regionDetails": [
         {
           "detailPath": "points/p1-nsw1.json",
+          "overviewPath": "points/p1-nsw1-overview.json",
           "regionId": "NSW1"
         }
       ],
@@ -202,10 +206,12 @@
         "peakUnservedIntervalIndex": null
       },
       "label": "20% renewable capacity uplift",
+      "overviewPath": "points/p2-overview.json",
       "pointId": "p2",
       "regionDetails": [
         {
           "detailPath": "points/p2-nsw1.json",
+          "overviewPath": "points/p2-nsw1-overview.json",
           "regionId": "NSW1"
         }
       ],
@@ -295,10 +301,12 @@
         "peakUnservedIntervalIndex": null
       },
       "label": "30% renewable capacity uplift",
+      "overviewPath": "points/p3-overview.json",
       "pointId": "p3",
       "regionDetails": [
         {
           "detailPath": "points/p3-nsw1.json",
+          "overviewPath": "points/p3-nsw1-overview.json",
           "regionId": "NSW1"
         }
       ],
@@ -388,10 +396,12 @@
         "peakUnservedIntervalIndex": null
       },
       "label": "40% renewable capacity uplift",
+      "overviewPath": "points/p4-overview.json",
       "pointId": "p4",
       "regionDetails": [
         {
           "detailPath": "points/p4-nsw1.json",
+          "overviewPath": "points/p4-nsw1-overview.json",
           "regionId": "NSW1"
         }
       ],
@@ -472,7 +482,7 @@
     }
   ],
   "provenance": {
-    "gitCommitSha": "69434b48fb5cf1deb5977ffe629e22b8bd4b46da",
+    "gitCommitSha": "19b07988981bc4c138ddfa6705724238577c0993",
     "inputFiles": [
       {
         "path": "NEM.Web/wwwroot/data/demand-nsw1.json",
@@ -501,12 +511,12 @@
       "operationalDemand": 2,
       "regularSeries": 1,
       "sweepDefinition": 1,
-      "sweepIndex": 7,
+      "sweepIndex": 8,
       "weather": 6
     },
     "workingTreeDirty": true
   },
-  "schemaVersion": 7,
+  "schemaVersion": 8,
   "scope": {
     "periodEnd": "2026-07-01T00:00:00\u002B10:00",
     "periodStart": "2025-07-01T00:00:00\u002B10:00",
