@@ -16,10 +16,12 @@
         "peakUnservedIntervalIndex": null
       },
       "label": "Baseline",
+      "overviewPath": "points/p0-overview.json",
       "pointId": "p0",
       "regionDetails": [
         {
           "detailPath": "points/p0-nsw1.json",
+          "overviewPath": "points/p0-nsw1-overview.json",
           "regionId": "NSW1"
         }
       ],
@@ -109,10 +111,12 @@
         "peakUnservedIntervalIndex": null
       },
       "label": "\u002B500 MW",
+      "overviewPath": "points/p1-overview.json",
       "pointId": "p1",
       "regionDetails": [
         {
           "detailPath": "points/p1-nsw1.json",
+          "overviewPath": "points/p1-nsw1-overview.json",
           "regionId": "NSW1"
         }
       ],
@@ -202,10 +206,12 @@
         "peakUnservedIntervalIndex": null
       },
       "label": "\u002B1,000 MW",
+      "overviewPath": "points/p2-overview.json",
       "pointId": "p2",
       "regionDetails": [
         {
           "detailPath": "points/p2-nsw1.json",
+          "overviewPath": "points/p2-nsw1-overview.json",
           "regionId": "NSW1"
         }
       ],
@@ -295,10 +301,12 @@
         "peakUnservedIntervalIndex": null
       },
       "label": "\u002B1,500 MW",
+      "overviewPath": "points/p3-overview.json",
       "pointId": "p3",
       "regionDetails": [
         {
           "detailPath": "points/p3-nsw1.json",
+          "overviewPath": "points/p3-nsw1-overview.json",
           "regionId": "NSW1"
         }
       ],
@@ -388,10 +396,12 @@
         "peakUnservedIntervalIndex": null
       },
       "label": "\u002B2,000 MW",
+      "overviewPath": "points/p4-overview.json",
       "pointId": "p4",
       "regionDetails": [
         {
           "detailPath": "points/p4-nsw1.json",
+          "overviewPath": "points/p4-nsw1-overview.json",
           "regionId": "NSW1"
         }
       ],
@@ -481,10 +491,12 @@
         "peakUnservedIntervalIndex": null
       },
       "label": "\u002B2,500 MW",
+      "overviewPath": "points/p5-overview.json",
       "pointId": "p5",
       "regionDetails": [
         {
           "detailPath": "points/p5-nsw1.json",
+          "overviewPath": "points/p5-nsw1-overview.json",
           "regionId": "NSW1"
         }
       ],
@@ -574,10 +586,12 @@
         "peakUnservedIntervalIndex": 1170
       },
       "label": "\u002B3,000 MW",
+      "overviewPath": "points/p6-overview.json",
       "pointId": "p6",
       "regionDetails": [
         {
           "detailPath": "points/p6-nsw1.json",
+          "overviewPath": "points/p6-nsw1-overview.json",
           "regionId": "NSW1"
         }
       ],
@@ -667,10 +681,12 @@
         "peakUnservedIntervalIndex": 1170
       },
       "label": "\u002B3,500 MW",
+      "overviewPath": "points/p7-overview.json",
       "pointId": "p7",
       "regionDetails": [
         {
           "detailPath": "points/p7-nsw1.json",
+          "overviewPath": "points/p7-nsw1-overview.json",
           "regionId": "NSW1"
         }
       ],
@@ -928,10 +944,12 @@
         "peakUnservedIntervalIndex": 1170
       },
       "label": "\u002B4,000 MW",
+      "overviewPath": "points/p8-overview.json",
       "pointId": "p8",
       "regionDetails": [
         {
           "detailPath": "points/p8-nsw1.json",
+          "overviewPath": "points/p8-nsw1-overview.json",
           "regionId": "NSW1"
         }
       ],
@@ -1189,10 +1207,12 @@
         "peakUnservedIntervalIndex": 1170
       },
       "label": "\u002B4,500 MW",
+      "overviewPath": "points/p9-overview.json",
       "pointId": "p9",
       "regionDetails": [
         {
           "detailPath": "points/p9-nsw1.json",
+          "overviewPath": "points/p9-nsw1-overview.json",
           "regionId": "NSW1"
         }
       ],
@@ -1513,10 +1533,12 @@
         "peakUnservedIntervalIndex": 1170
       },
       "label": "\u002B5,000 MW",
+      "overviewPath": "points/p10-overview.json",
       "pointId": "p10",
       "regionDetails": [
         {
           "detailPath": "points/p10-nsw1.json",
+          "overviewPath": "points/p10-nsw1-overview.json",
           "regionId": "NSW1"
         }
       ],
@@ -1837,10 +1859,12 @@
         "peakUnservedIntervalIndex": 1170
       },
       "label": "\u002B5,500 MW",
+      "overviewPath": "points/p11-overview.json",
       "pointId": "p11",
       "regionDetails": [
         {
           "detailPath": "points/p11-nsw1.json",
+          "overviewPath": "points/p11-nsw1-overview.json",
           "regionId": "NSW1"
         }
       ],
@@ -2168,10 +2192,12 @@
         "peakUnservedIntervalIndex": 1170
       },
       "label": "\u002B6,000 MW",
+      "overviewPath": "points/p12-overview.json",
       "pointId": "p12",
       "regionDetails": [
         {
           "detailPath": "points/p12-nsw1.json",
+          "overviewPath": "points/p12-nsw1-overview.json",
           "regionId": "NSW1"
         }
       ],
@@ -2485,10 +2511,12 @@
         "peakUnservedIntervalIndex": 1170
       },
       "label": "\u002B6,500 MW",
+      "overviewPath": "points/p13-overview.json",
       "pointId": "p13",
       "regionDetails": [
         {
           "detailPath": "points/p13-nsw1.json",
+          "overviewPath": "points/p13-nsw1-overview.json",
           "regionId": "NSW1"
         }
       ],
@@ -2886,10 +2914,12 @@
         "peakUnservedIntervalIndex": 1170
       },
       "label": "\u002B7,000 MW",
+      "overviewPath": "points/p14-overview.json",
       "pointId": "p14",
       "regionDetails": [
         {
           "detailPath": "points/p14-nsw1.json",
+          "overviewPath": "points/p14-nsw1-overview.json",
           "regionId": "NSW1"
         }
       ],
@@ -3294,6 +3324,7 @@
       },
       "intervalPointers": null,
       "label": "\u002B7,500 MW",
+      "overviewPath": null,
       "pointId": "p15",
       "regionDetails": null,
       "regionScalars": null,
@@ -3313,6 +3344,7 @@
       },
       "intervalPointers": null,
       "label": "\u002B8,000 MW",
+      "overviewPath": null,
       "pointId": "p16",
       "regionDetails": null,
       "regionScalars": null,
@@ -3323,7 +3355,7 @@
     }
   ],
   "provenance": {
-    "gitCommitSha": "69434b48fb5cf1deb5977ffe629e22b8bd4b46da",
+    "gitCommitSha": "19b07988981bc4c138ddfa6705724238577c0993",
     "inputFiles": [
       {
         "path": "NEM.Web/wwwroot/data/demand-nsw1.json",
@@ -3352,12 +3384,12 @@
       "operationalDemand": 2,
       "regularSeries": 1,
       "sweepDefinition": 1,
-      "sweepIndex": 7,
+      "sweepIndex": 8,
       "weather": 6
     },
     "workingTreeDirty": true
   },
-  "schemaVersion": 7,
+  "schemaVersion": 8,
   "scope": {
     "periodEnd": "2026-07-01T00:00:00\u002B10:00",
     "periodStart": "2025-07-01T00:00:00\u002B10:00",

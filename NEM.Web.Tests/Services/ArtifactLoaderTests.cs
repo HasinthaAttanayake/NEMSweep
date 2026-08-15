@@ -87,7 +87,7 @@ public sealed class ArtifactLoaderTests
             Serialize(ArtifactFixtures.SystemResults() with { SchemaVersion = 1 }));
 
         result.State.Status.Should().Be(ArtifactLoadStatus.InvalidData);
-            result.State.Message.Should().Be("Artifact schema 1 is not supported; expected schema 9.");
+            result.State.Message.Should().Be("Artifact schema 1 is not supported; expected schema 10.");
     }
 
     [Fact]
@@ -109,27 +109,125 @@ public sealed class ArtifactLoaderTests
             """{ "schemaVersion": 1 }""");
 
         result.State.Status.Should().Be(ArtifactLoadStatus.InvalidData);
-        result.State.Message.Should().Be("Artifact schema 1 is not supported; expected schema 7.");
+        result.State.Message.Should().Be("Artifact schema 1 is not supported; expected schema 8.");
     }
 
     [Fact]
-    public async Task LoadSystemWithRegionAsync_AcceptsMatchingRunIds()
+    public async Task LoadRegionForAsync_AcceptsADetailFromTheSameRun()
     {
-        ArtifactLoadResult<SystemRegionArtifactPair> result = await LoadPairAsync("run-1", "run-1");
+        ArtifactLoadResult<RegionDispatchResultsDTO> result = await LoadRegionAsync("run-1", "run-1");
 
         result.IsSuccess.Should().BeTrue();
-        result.Value!.System.RunId.Should().Be("run-1");
-        result.Value.Region.RegionId.Should().Be("NSW1");
+        result.Value!.RegionId.Should().Be("NSW1");
     }
 
     [Fact]
-    public async Task LoadSystemWithRegionAsync_RejectsMismatchedRunIdsAsInvalidData()
+    public async Task LoadRegionForAsync_RejectsADetailFromAnotherRunAsInvalidData()
     {
-        ArtifactLoadResult<SystemRegionArtifactPair> result = await LoadPairAsync("run-1", "run-2");
+        ArtifactLoadResult<RegionDispatchResultsDTO> result = await LoadRegionAsync("run-1", "run-2");
 
         result.State.Status.Should().Be(ArtifactLoadStatus.InvalidData);
         result.State.Message.Should().Be("System and regional artifact run IDs do not match.");
         result.Value.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task LoadAsync_ReadsAnArtifactOnceAndServesTheParsedInstanceAfterwards()
+    {
+        var handler = new CountingHandler(Serialize(ArtifactFixtures.SystemResults()));
+        using var http = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") };
+        var loader = new ArtifactLoader(http);
+
+        ArtifactLoadResult<SystemDispatchResultsDTO> first =
+            await loader.LoadAsync<SystemDispatchResultsDTO>("data/results.json");
+        ArtifactLoadResult<SystemDispatchResultsDTO> second =
+            await loader.LoadAsync<SystemDispatchResultsDTO>("data/results.json");
+
+        handler.Requests.Should().Be(1);
+        second.IsSuccess.Should().BeTrue();
+        second.Value.Should().BeSameAs(first.Value);
+    }
+
+    [Fact]
+    public async Task LoadAsync_DoesNotServeACachedArtifactToADifferentType()
+    {
+        var handler = new CountingHandler(Serialize(ArtifactFixtures.SystemResults()));
+        using var http = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") };
+        var loader = new ArtifactLoader(http);
+
+        await loader.LoadAsync<SystemDispatchResultsDTO>("data/results.json");
+        ArtifactLoadResult<RegionDispatchResultsDTO> other =
+            await loader.LoadAsync<RegionDispatchResultsDTO>("data/results.json");
+
+        handler.Requests.Should().Be(2);
+        other.IsSuccess.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task LoadAsync_CoalescesConcurrentRequestsForTheSameArtifactIntoOneFetch()
+    {
+        var handler = new GatedHandler(Serialize(ArtifactFixtures.SystemResults()));
+        using var http = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") };
+        var loader = new ArtifactLoader(http);
+
+        // Neither call is awaited before the other starts, so both reach the loader while the
+        // first request is still outstanding — exactly what a fast repeat navigation or a sweep
+        // manifest's own loop can do before the cache has anything to serve.
+        Task<ArtifactLoadResult<SystemDispatchResultsDTO>> first =
+            loader.LoadAsync<SystemDispatchResultsDTO>("data/results.json");
+        Task<ArtifactLoadResult<SystemDispatchResultsDTO>> second =
+            loader.LoadAsync<SystemDispatchResultsDTO>("data/results.json");
+        handler.Release();
+
+        ArtifactLoadResult<SystemDispatchResultsDTO>[] results = await Task.WhenAll(first, second);
+
+        handler.Requests.Should().Be(1);
+        results[0].Value.Should().BeSameAs(results[1].Value);
+    }
+
+    [Fact]
+    public async Task LoadAsync_DoesNotCacheAnArtifactThatFailedItsChecks()
+    {
+        var handler = new CountingHandler("""{ "schemaVersion": 99 }""");
+        using var http = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") };
+        var loader = new ArtifactLoader(http);
+
+        await loader.LoadAsync<GenerationInformationDTO>("data/test.json");
+        await loader.LoadAsync<GenerationInformationDTO>("data/test.json");
+
+        handler.Requests.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task LoadAsync_EvictsTheLeastRecentlyReadArtifactRatherThanGrowingWithoutBound()
+    {
+        var handler = new CountingHandler(Serialize(ArtifactFixtures.SystemResults()));
+        using var http = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") };
+        var loader = new ArtifactLoader(http);
+
+        // One more distinct path than the cache holds, so the first read is evicted.
+        for (int index = 0; index < 7; index++)
+        {
+            await loader.LoadAsync<SystemDispatchResultsDTO>($"data/results-{index}.json");
+        }
+
+        await loader.LoadAsync<SystemDispatchResultsDTO>("data/results-0.json");
+        await loader.LoadAsync<SystemDispatchResultsDTO>("data/results-6.json");
+
+        handler.Requests.Should().Be(8);
+    }
+
+    [Fact]
+    public async Task LoadRegionForAsync_DoesNotRefetchTheSystemArtifact()
+    {
+        var handler = new PairResponseHandler("run-1", "run-1");
+        using var http = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") };
+
+        await new ArtifactLoader(http).LoadRegionForAsync(
+            ArtifactFixtures.SystemResults(runId: "run-1"),
+            "data/results-nsw1.json");
+
+        handler.Requests.Should().ContainSingle().Which.Should().EndWith("results-nsw1.json");
     }
 
     [Fact]
@@ -256,7 +354,7 @@ public sealed class ArtifactLoaderTests
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     });
 
-    private static async Task<ArtifactLoadResult<SystemRegionArtifactPair>> LoadPairAsync(
+    private static async Task<ArtifactLoadResult<RegionDispatchResultsDTO>> LoadRegionAsync(
         string systemRunId,
         string regionRunId)
     {
@@ -265,8 +363,8 @@ public sealed class ArtifactLoaderTests
             BaseAddress = new Uri("https://example.test/"),
         };
 
-        return await new ArtifactLoader(http).LoadSystemWithRegionAsync(
-            "data/results.json",
+        return await new ArtifactLoader(http).LoadRegionForAsync(
+            ArtifactFixtures.SystemResults(runId: systemRunId),
             "data/results-nsw1.json");
     }
 
@@ -281,6 +379,44 @@ public sealed class ArtifactLoaderTests
             });
     }
 
+    /// <summary>Holds every request open until the test releases it, to force two requests to overlap.</summary>
+    private sealed class GatedHandler(string content) : HttpMessageHandler
+    {
+        private readonly TaskCompletionSource _gate = new();
+
+        public int Requests { get; private set; }
+
+        public void Release() => _gate.TrySetResult();
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            Requests++;
+            await _gate.Task;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(content, Encoding.UTF8, "application/json"),
+            };
+        }
+    }
+
+    private sealed class CountingHandler(string content) : HttpMessageHandler
+    {
+        public int Requests { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            Requests++;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(content, Encoding.UTF8, "application/json"),
+            });
+        }
+    }
+
     private sealed class ThrowingHandler : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(
@@ -291,10 +427,13 @@ public sealed class ArtifactLoaderTests
 
     private sealed class PairResponseHandler(string systemRunId, string regionRunId) : HttpMessageHandler
     {
+        public List<string> Requests { get; } = [];
+
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
+            Requests.Add(request.RequestUri!.AbsolutePath);
             string runId = request.RequestUri!.AbsolutePath.EndsWith("results-nsw1.json", StringComparison.Ordinal)
                 ? regionRunId
                 : systemRunId;

@@ -8,7 +8,8 @@
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
-    gap: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem 1.5rem;
     margin-bottom: 1rem;
 }
 
@@ -103,6 +104,17 @@
 
 .run-table a {
     color: var(--accent);
+    font-weight: 700;
+}
+
+/* The reference run is tinted rather than outlined, so it survives horizontal scrolling of a wide
+   table where a border on one edge would scroll out of view. */
+.run-table .run-highlighted td,
+.run-table .run-highlighted th {
+    background: var(--color-notice-soft);
+}
+
+.run-table .cell-derived {
     font-weight: 700;
 }
 

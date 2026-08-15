@@ -1,0 +1,232 @@
+@namespace NEM.Web.Components.Viz
+
+@*
+    The interconnected system as nodes and edges. A table of links answers "how much moved on this
+    line"; only a drawing answers "which way does energy run through this market", which is the
+    question a whole-of-system view exists for.
+
+    The run declares its own network, so this draws the graph the model solved rather than one
+    inferred from whichever links happened to carry something: a link that never ran is still a
+    link, and it is drawn idle rather than left out. What the artifact still does not record is a
+    path, so nothing here traces an import across more than one hop.
+*@
+<figure class="network-map @Class">
+    <div class="plot-scroll">
+        <svg viewBox="@($"0 0 1000 {Height}")" role="group" aria-label="@AriaLabel"
+             style="@($"aspect-ratio: 1000 / {Height};")">
+            @foreach (EdgeGeometry edge in _edges)
+            {
+                <g class="network-edge @(edge.Source.EnergyMwh is > 0 ? "is-flowing" : "is-idle")">
+                    <title>@edge.Readout</title>
+                    <line x1="@Fmt(edge.FromX)" y1="@Fmt(edge.FromY)"
+                          x2="@Fmt(edge.ToX)" y2="@Fmt(edge.ToY)"
+                          stroke-width="@Fmt(edge.Width)" />
+                    @if (edge.Source.EnergyMwh is > 0)
+                    {
+                        <polygon class="network-arrow" points="@edge.Arrow" />
+                        <SvgText Class="network-edge-label" X="edge.LabelX" Y="edge.LabelY"
+                                 Anchor="middle" Value="@edge.Label" />
+                    }
+                </g>
+            }
+
+            @foreach (NodeGeometry node in _nodes)
+            {
+                <g class="network-node @NodeClass(node)">
+                    <title>@node.Readout</title>
+                    <circle cx="@Fmt(node.X)" cy="@Fmt(node.Y)" r="@Fmt(node.Radius)" />
+                    <SvgText Class="network-node-id" X="node.X" Y="node.Y + 5" Anchor="middle"
+                             Value="@node.Source.RegionId" />
+                    <SvgText Class="network-node-label" X="node.X" Y="node.Y + node.Radius + 20"
+                             Anchor="middle" Value="@node.Source.Name" />
+                    <SvgText Class="network-node-detail" X="node.X" Y="node.Y + node.Radius + 36"
+                             Anchor="middle" Value="@node.Detail" />
+                </g>
+            }
+        </svg>
+    </div>
+    <figcaption class="network-caption">
+        <span><i class="network-key-importer"></i>net importer</span>
+        <span><i class="network-key-exporter"></i>net exporter</span>
+        <span><i class="network-key-balanced"></i>balanced</span>
+        <span class="network-note">
+            Node size follows demand; line thickness follows how much of the link's capacity was
+            used. Every link the run declares is drawn, so a line without an arrow is a link that
+            carried nothing. The model records which regions each link joins and not the path an
+            import travelled, so nothing here traces energy across more than one hop.
+        </span>
+    </figcaption>
+</figure>
+
+@code {
+    /// <summary>One region as a node: its size, its trade balance and what to say about it.</summary>
+    public sealed record NetworkNode(
+        string RegionId,
+        string Name,
+        double DemandMwh,
+        double NetImportedMwh);
+
+    /// <summary>
+    /// One directed link of the declared network. The three flow figures are null until the
+    /// interval series are read, which is drawn as a link of unknown loading rather than as an
+    /// idle one.
+    /// </summary>
+    public sealed record NetworkEdge(
+        string Id,
+        string FromRegionId,
+        string ToRegionId,
+        double CapacityMw,
+        double? EnergyMwh,
+        double? PeakMw,
+        double? CapacityFactor);
+
+    [Parameter, EditorRequired] public IReadOnlyList<NetworkNode> Nodes { get; set; } = [];
+    [Parameter, EditorRequired] public IReadOnlyList<NetworkEdge> Edges { get; set; } = [];
+    [Parameter, EditorRequired] public string AriaLabel { get; set; } = string.Empty;
+    [Parameter] public double Height { get; set; } = 380;
+    [Parameter] public string? Class { get; set; }
+
+    private List<NodeGeometry> _nodes = [];
+    private List<EdgeGeometry> _edges = [];
+
+    protected override void OnParametersSet()
+    {
+        _nodes = LayOutNodes();
+        _edges = [.. Edges.Select(BuildEdge).Where(edge => edge is not null).Select(edge => edge!.Value)];
+    }
+
+    /// <summary>
+    /// Places the regions evenly around a circle in the order the artifact lists them. A geographic
+    /// layout would be a better map, but the model publishes no coordinates and inventing them
+    /// would put a claim about where things are into a picture of what flowed.
+    /// </summary>
+    private List<NodeGeometry> LayOutNodes()
+    {
+        var placed = new List<NodeGeometry>();
+        if (Nodes.Count == 0)
+        {
+            return placed;
+        }
+
+        double centreX = 500;
+        double centreY = (Height / 2) - 12;
+        double orbit = Math.Min(centreY - 70, 300);
+        double largestDemand = Nodes.Max(node => Math.Abs(node.DemandMwh));
+        for (int index = 0; index < Nodes.Count; index++)
+        {
+            NetworkNode node = Nodes[index];
+            // Two regions read better facing each other than stacked on a vertical axis.
+            double angle = Nodes.Count == 1
+                ? 0
+                : (2 * Math.PI * index / Nodes.Count) - (Math.PI / 2)
+                    + (Nodes.Count == 2 ? Math.PI / 2 : 0);
+            double x = Nodes.Count == 1 ? centreX : centreX + (orbit * Math.Cos(angle));
+            double y = Nodes.Count == 1 ? centreY : centreY + (orbit * Math.Sin(angle) * 0.55);
+            double share = largestDemand <= 0 ? 1 : Math.Abs(node.DemandMwh) / largestDemand;
+            placed.Add(new NodeGeometry(
+                node,
+                x,
+                y,
+                26 + (22 * Math.Sqrt(share)),
+                $"{PlotFormat.Compact(node.DemandMwh)} MWh",
+                $"{node.Name}\nDemand {PlotFormat.Compact(node.DemandMwh)} MWh\n"
+                    + (node.NetImportedMwh > 0
+                        ? $"Net importer of {PlotFormat.Compact(node.NetImportedMwh)} MWh"
+                        : node.NetImportedMwh < 0
+                            ? $"Net exporter of {PlotFormat.Compact(-node.NetImportedMwh)} MWh"
+                            : "No net trade")));
+        }
+
+        return placed;
+    }
+
+    private EdgeGeometry? BuildEdge(NetworkEdge edge)
+    {
+        NodeGeometry? from = _nodes.FirstOrDefault(node =>
+            string.Equals(node.Source.RegionId, edge.FromRegionId, StringComparison.OrdinalIgnoreCase));
+        NodeGeometry? to = _nodes.FirstOrDefault(node =>
+            string.Equals(node.Source.RegionId, edge.ToRegionId, StringComparison.OrdinalIgnoreCase));
+        if (from is null || to is null)
+        {
+            return null;
+        }
+
+        double dx = to.X - from.X;
+        double dy = to.Y - from.Y;
+        double length = Math.Sqrt((dx * dx) + (dy * dy));
+        if (length <= 0)
+        {
+            return null;
+        }
+
+        // Both directions of a pair exist as separate links, so each is offset to its own side
+        // rather than drawn on top of its opposite.
+        double unitX = dx / length;
+        double unitY = dy / length;
+        double offset = 9;
+        double shiftX = -unitY * offset;
+        double shiftY = unitX * offset;
+
+        double startX = from.X + (unitX * from.Radius) + shiftX;
+        double startY = from.Y + (unitY * from.Radius) + shiftY;
+        double endX = to.X - (unitX * to.Radius) + shiftX;
+        double endY = to.Y - (unitY * to.Radius) + shiftY;
+
+        double midX = (startX + endX) / 2;
+        double midY = (startY + endY) / 2;
+        double head = 11;
+        string arrow = string.Join(" ",
+            PlotFormat.Coordinate(endX, endY),
+            PlotFormat.Coordinate(endX - (unitX * head) - (unitY * head * 0.5), endY - (unitY * head) + (unitX * head * 0.5)),
+            PlotFormat.Coordinate(endX - (unitX * head) + (unitY * head * 0.5), endY - (unitY * head) - (unitX * head * 0.5)));
+
+        return new EdgeGeometry(
+            edge,
+            startX,
+            startY,
+            endX,
+            endY,
+            2 + (10 * Math.Clamp(edge.CapacityFactor ?? 0, 0, 1)),
+            arrow,
+            midX + (shiftX * 1.6),
+            midY + (shiftY * 1.6) - 6,
+            edge.EnergyMwh is { } energy ? $"{PlotFormat.Compact(energy)} MWh" : string.Empty,
+            $"{edge.Id} · {edge.FromRegionId} to {edge.ToRegionId}\n"
+                + $"Link capacity {PlotFormat.Compact(edge.CapacityMw)} MW\n"
+                + (edge.EnergyMwh is { } carried
+                    ? $"{PlotFormat.Compact(carried)} MWh carried\n"
+                        + $"Peak {PlotFormat.Compact(edge.PeakMw ?? 0)} MW\n"
+                        + $"{PlotFormat.Share(edge.CapacityFactor ?? 0, 1)} of capacity used"
+                    : "No flow evidence read yet"));
+    }
+
+    private static string NodeClass(NodeGeometry node) => node.Source.NetImportedMwh switch
+    {
+        > 0 => "is-importer",
+        < 0 => "is-exporter",
+        _ => "is-balanced",
+    };
+
+    private static string Fmt(double value) => PlotFormat.Length(value);
+
+    private sealed record NodeGeometry(
+        NetworkNode Source,
+        double X,
+        double Y,
+        double Radius,
+        string Detail,
+        string Readout);
+
+    private readonly record struct EdgeGeometry(
+        NetworkEdge Source,
+        double FromX,
+        double FromY,
+        double ToX,
+        double ToY,
+        double Width,
+        string Arrow,
+        double LabelX,
+        double LabelY,
+        string Label,
+        string Readout);
+}

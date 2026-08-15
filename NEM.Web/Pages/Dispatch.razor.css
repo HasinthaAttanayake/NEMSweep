@@ -65,6 +65,14 @@
 .empty-storage { display: flex; align-items: center; gap: 1rem; min-height: 110px; padding: 1.25rem; border-block: 1px solid var(--color-border); background: var(--color-empty-storage); color: var(--accent); }
 .empty-storage strong, .empty-storage span { display: block; }
 .empty-storage span { margin-top: .2rem; color: var(--color-muted); font-size: .88rem; }
+.region-loading { display: flex; align-items: center; gap: 1rem; margin-top: 1.5rem; padding: 1.5rem; border-block: 1px solid var(--color-border); background: var(--color-surface-muted); }
+.region-loading strong, .region-loading span { display: block; }
+.region-loading span { max-width: 60ch; margin-top: .2rem; color: var(--color-muted); font-size: .84rem; line-height: 1.5; }
+.weather-bases { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--color-border); }
+.weather-bases h2 { margin: 0; font-family: var(--font-display); font-size: 1.35rem; font-weight: 600; }
+.weather-bases-note { max-width: 640px; margin: .35rem 0 0; color: var(--color-muted); font-size: .85rem; line-height: 1.55; }
+.weather-region { margin-top: 1.15rem; }
+.weather-region h3 { margin: 0 0 .4rem; font-family: var(--font-display); font-size: 1.02rem; font-weight: 600; }
 .assumption-band { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem 2rem; margin-top: 1rem; padding: 1.25rem 0; border-top: 1px solid var(--color-border); }
 .assumption-band div { min-width: 0; }
 .assumption-band span, .assumption-band strong, .assumption-band small { display: block; }
@@ -81,3 +89,10 @@
 .reliability-band .within-target { color: var(--accent); }
 .reliability-band .outside-target { color: var(--color-notice); }
 @media (max-width: 760px) { .reliability-band { grid-template-columns: 1fr; } }
+.storage-capacity-rule { stroke: var(--color-border-control); stroke-width: 1.5; stroke-dasharray: 6 4; }
+.storage-capacity-label { fill: var(--color-muted); font-family: var(--font-body); font-size: 12.5px; }
+.storage-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 1px; margin: .25rem 0 0; background: var(--color-border); border: 1px solid var(--color-border); }
+.storage-summary > div { padding: .8rem 1rem; background: var(--color-surface); }
+.storage-summary dt { color: var(--color-muted); font-size: .76rem; }
+.storage-summary dd { margin: .15rem 0 0; color: var(--accent); font-family: var(--font-display); font-size: 1.4rem; font-variant-numeric: tabular-nums; font-weight: 600; }
+.storage-summary .storage-summary-detail { margin-top: .2rem; color: var(--color-muted); font-family: var(--font-body); font-size: .74rem; font-weight: 400; line-height: 1.45; }

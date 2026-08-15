@@ -1,0 +1,141 @@
+@namespace NEM.Web.Components.Viz
+
+@*
+    Delivered generation stacked by technology with the demand trace over it. Drawn against an axis
+    the caller supplies, so a row of these — one per region — can be compared by area rather than
+    each being scaled to its own maximum, which would make the smallest region look the largest.
+*@
+<figure class="stack-plot @Class">
+    @if (!string.IsNullOrWhiteSpace(Title))
+    {
+        <figcaption class="stack-plot-title">
+            <strong>@Title</strong>
+            @if (!string.IsNullOrWhiteSpace(Detail))
+            {
+                <small>@Detail</small>
+            }
+        </figcaption>
+    }
+    <div class="plot-scroll">
+        <svg viewBox="@($"0 0 1000 {Height}")" role="img" aria-label="@AriaLabel"
+             style="@($"aspect-ratio: 1000 / {Height};")">
+            @foreach (double tick in _axis.Ticks)
+            {
+                double y = PlotPath.Y(tick, _box, _axis);
+                <line class="plot-grid" x1="@Fmt(_box.Left)" y1="@Fmt(y)" x2="@Fmt(_box.Right)" y2="@Fmt(y)" />
+                <SvgText Class="plot-tick" X="_box.Left - 10" Y="y + 4" Anchor="end"
+                         Value="@PlotFormat.Tick(tick, _axis)" />
+            }
+
+            @foreach (StackLayer layer in _layers)
+            {
+                <polygon points="@layer.Points" fill="@layer.Color">
+                    <title>@layer.Name</title>
+                </polygon>
+            }
+
+            @if (_demandPoints.Length > 0)
+            {
+                <polyline class="stack-demand" points="@_demandPoints" fill="none"
+                          vector-effect="non-scaling-stroke">
+                    <title>Demand</title>
+                </polyline>
+            }
+
+            <line class="plot-baseline" x1="@Fmt(_box.Left)" y1="@Fmt(_box.Bottom)"
+                  x2="@Fmt(_box.Right)" y2="@Fmt(_box.Bottom)" />
+
+            @for (int index = 0; index < _labels.Count; index++)
+            {
+                <SvgText Class="plot-tick" X="_labels[index].X" Y="_box.Bottom + 20"
+                         Anchor="@_labels[index].Anchor" Value="@_labels[index].Text" />
+            }
+        </svg>
+    </div>
+</figure>
+
+@code {
+    /// <summary>Stacked bottom to top, in the order given.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<PlotSeries> Series { get; set; } = [];
+
+    /// <summary>Drawn over the stack. Null when the plot is a composition alone.</summary>
+    [Parameter] public IReadOnlyList<double>? Demand { get; set; }
+
+    /// <summary>Supplied by the caller so a row of plots shares one scale.</summary>
+    [Parameter, EditorRequired] public PlotAxis Axis { get; set; } = default!;
+
+    [Parameter] public IReadOnlyList<string> XLabels { get; set; } = [];
+    [Parameter, EditorRequired] public string AriaLabel { get; set; } = string.Empty;
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? Detail { get; set; }
+    [Parameter] public double Height { get; set; } = 240;
+    [Parameter] public string? Class { get; set; }
+
+    private PlotBox _box;
+    private PlotAxis _axis = PlotAxis.Nice(0, 1);
+    private List<StackLayer> _layers = [];
+    private List<LabelTick> _labels = [];
+    private string _demandPoints = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        _axis = Axis;
+        _box = new PlotBox(72, 14, 984, Height - 30);
+
+        int points = Series.Count == 0 ? 0 : Series.Max(series => series.Values.Count);
+        double[] cumulative = new double[points];
+        double[] baseline = new double[points];
+        _layers = [];
+        foreach (PlotSeries series in Series)
+        {
+            cumulative.CopyTo(baseline, 0);
+            for (int index = 0; index < points; index++)
+            {
+                cumulative[index] += index < series.Values.Count ? series.Values[index] ?? 0 : 0;
+            }
+
+            _layers.Add(new StackLayer(
+                series.Name,
+                series.Color,
+                PlotPath.Band(baseline, cumulative, _box, _axis)));
+        }
+
+        _demandPoints = Demand is { Count: > 0 }
+            ? string.Join(" ", PlotPath.Segments([.. Demand.Select(value => (double?)value)], _box, _axis))
+            : string.Empty;
+        _labels = BuildLabels();
+    }
+
+    private List<LabelTick> BuildLabels()
+    {
+        if (XLabels.Count == 0)
+        {
+            return [];
+        }
+
+        int stride = Math.Max(1, (int)Math.Ceiling(XLabels.Count / 6.0));
+        var labels = new List<LabelTick>();
+        for (int index = 0; index < XLabels.Count; index += stride)
+        {
+            labels.Add(Label(index));
+        }
+
+        if ((XLabels.Count - 1) % stride != 0)
+        {
+            labels.Add(Label(XLabels.Count - 1));
+        }
+
+        return labels;
+    }
+
+    private LabelTick Label(int index) => new(
+        PlotPath.X(index, XLabels.Count, _box),
+        XLabels[index],
+        index == 0 ? "start" : index == XLabels.Count - 1 ? "end" : "middle");
+
+    private static string Fmt(double value) => PlotFormat.Length(value);
+
+    private sealed record StackLayer(string Name, string Color, string Points);
+
+    private readonly record struct LabelTick(double X, string Text, string Anchor);
+}

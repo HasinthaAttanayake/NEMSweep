@@ -38,31 +38,6 @@
     line-height: 1.65;
 }
 
-.build-status {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: start;
-    gap: 0.75rem 1rem;
-    max-width: 760px;
-    margin-top: 1.25rem;
-    padding: 0.9rem 1rem;
-    border-left: 3px solid var(--accent);
-    background: var(--accent-soft);
-}
-
-.build-status span {
-    color: var(--accent);
-    font-size: 0.8rem;
-    font-weight: 700;
-    text-transform: uppercase;
-}
-
-.build-status p {
-    margin: 0;
-    color: var(--color-home-status);
-    line-height: 1.5;
-}
-
 .project-actions {
     display: flex;
     flex-wrap: wrap;
@@ -71,9 +46,235 @@
 }
 
 .question-section,
-.explore-section {
+.explore-section,
+.headline-section,
+.state-section {
     padding: 2rem 0;
     border-top: 1px solid var(--color-border);
+}
+
+/* Model state -------------------------------------------------------------- */
+
+.state-section h2 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.65rem;
+    font-weight: 600;
+}
+
+.capabilities {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1px;
+    margin: 1.5rem 0 0;
+    padding: 0;
+    list-style: none;
+    background: var(--color-border);
+    border: 1px solid var(--color-border);
+}
+
+.capabilities li {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 0.7rem;
+    padding: 1rem 1.15rem;
+    background: var(--color-surface);
+}
+
+.capabilities li.is-present {
+    color: var(--color-positive);
+}
+
+.capabilities li.is-absent {
+    color: var(--color-muted);
+}
+
+.capabilities strong,
+.capabilities small {
+    display: block;
+    min-width: 0;
+}
+
+.capabilities strong {
+    color: var(--color-ink);
+    font-size: 0.92rem;
+}
+
+.capabilities small {
+    margin-top: 0.2rem;
+    color: var(--color-muted);
+    font-size: 0.82rem;
+    line-height: 1.5;
+}
+
+.schema-line {
+    margin: 1rem 0 0;
+    color: var(--color-muted);
+    font-size: 0.78rem;
+    line-height: 1.6;
+}
+
+/* Headline result ---------------------------------------------------------- */
+
+.headline-section h2 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.65rem;
+    font-weight: 600;
+}
+
+.headline-mix {
+    margin-top: 1.5rem;
+}
+
+/* The two links a first-time reader is actually here for — the run this whole section
+   summarises, read in full. Styled with the same weight as the "Track project"/"View source"
+   pair above so a reader's eye does not read the external, secondary links as the primary
+   action and these in-app ones as an afterthought. */
+.headline-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.9rem;
+    margin-top: 1.5rem;
+}
+
+.headline-links a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.6rem 1.1rem;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.headline-links a::after {
+    content: "\2192";
+}
+
+.headline-links a:first-child {
+    color: var(--accent);
+    border: 1px solid var(--accent);
+}
+
+.headline-links a:first-child:hover {
+    background: var(--color-demand-soft);
+}
+
+.headline-links a:last-child {
+    background: var(--accent);
+    color: #fff;
+}
+
+.headline-links a:last-child:hover {
+    filter: brightness(0.9);
+}
+
+.status-block {
+    display: grid;
+    min-height: 220px;
+    place-items: center;
+}
+
+.home-findings {
+    margin: 0;
+    padding: 2rem 0 0;
+    border-top: 1px solid var(--color-border);
+}
+
+/* Sweep cards -------------------------------------------------------------- */
+
+.sweep-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1px;
+    margin-top: 1.5rem;
+    background: var(--color-border);
+    border: 1px solid var(--color-border);
+}
+
+.sweep-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    padding: 1.25rem;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    text-decoration: none;
+}
+
+.sweep-card:hover {
+    background: var(--accent-soft);
+}
+
+.sweep-card-kind {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.sweep-card h3 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.sweep-card-finding {
+    margin: 0;
+    padding-left: 0.7rem;
+    border-left: 3px solid var(--accent);
+    color: var(--color-home-copy);
+    font-size: 0.86rem;
+    line-height: 1.45;
+}
+
+.sweep-card-facts {
+    margin: 0.35rem 0 0;
+}
+
+.sweep-card-facts div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.35rem 0;
+    border-top: 1px solid var(--color-track);
+}
+
+.sweep-card-facts dt {
+    color: var(--color-muted);
+    font-size: 0.78rem;
+    white-space: nowrap;
+}
+
+.sweep-card-facts dd {
+    margin: 0;
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    text-align: right;
+}
+
+.sweep-card-constraint dd {
+    color: var(--color-notice);
+}
+
+.sweep-card-open {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: auto;
+    padding-top: 0.5rem;
+    color: var(--accent);
+    font-size: 0.82rem;
+    font-weight: 700;
 }
 
 .question-section {
@@ -179,9 +380,5 @@
         align-items: flex-start;
         flex-direction: column;
         gap: 0.75rem;
-    }
-
-    .build-status {
-        grid-template-columns: 1fr;
     }
 }

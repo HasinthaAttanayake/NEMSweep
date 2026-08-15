@@ -287,6 +287,7 @@
         "unservedEnergyPercentageOfDemand": 0,
         "unservedHours": 0
       },
+      "overviewPath": "results-nsw1-overview.json",
       "reliability": {
         "achievedUsePercentageOfDemand": 0,
         "standardName": "NEM reliability standard",
@@ -392,6 +393,7 @@
         "unservedEnergyPercentageOfDemand": 0.001640767689108,
         "unservedHours": 2
       },
+      "overviewPath": "results-vic1-overview.json",
       "reliability": {
         "achievedUsePercentageOfDemand": 0.001640767689108,
         "standardName": "NEM reliability standard",
@@ -441,8 +443,8 @@
     "withinTarget": true
   },
   "resolution": "01:00:00",
-  "runId": "f16e7e594f8b467ab78341ccecbd9b92",
-  "schemaVersion": 1,
+  "runId": "589a688c2d3d427389e6e38df684c1f3",
+  "schemaVersion": 2,
   "storageSizing": {
     "energyLimitedEvidence": null,
     "finalEnergyMwh": 12287,

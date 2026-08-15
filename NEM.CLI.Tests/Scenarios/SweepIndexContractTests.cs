@@ -93,7 +93,8 @@ public sealed class SweepIndexContractTests
                         0m,
                         TransmissionCostStatus.NotModelled,
                         100))],
-                [new SweepPointRegionDetailDTO("NSW1", "points/p0-nsw1.json")])]);
+                [new SweepPointRegionDetailDTO("NSW1", "points/p0-nsw1.json", "points/p0-nsw1-overview.json")],
+                "points/p0-overview.json")]);
 
         string json = JsonSerializer.Serialize(index, new JsonSerializerOptions
         {
@@ -113,6 +114,7 @@ public sealed class SweepIndexContractTests
         json.Should().Contain("\"regionIds\"");
         json.Should().Contain("\"regionScalars\"");
         json.Should().Contain("\"regionDetails\"");
+        json.Should().Contain("\"overviewPath\":\"points/p0-overview.json\"");
         json.Should().Contain("\"weatherBasis\"");
         json.Should().Contain("\"solar\"");
         json.Should().Contain("\"wind\"");

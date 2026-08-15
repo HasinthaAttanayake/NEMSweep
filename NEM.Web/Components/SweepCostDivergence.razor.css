@@ -1,0 +1,65 @@
+.divergence-note {
+    color: var(--color-muted);
+    font-size: 0.8rem;
+    line-height: 1.5;
+}
+
+.divergence-readout {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 1px;
+    margin-top: 1.25rem;
+    background: var(--color-border);
+    border: 1px solid var(--color-border);
+}
+
+.divergence-cell {
+    padding: 0.9rem 1rem 1rem;
+    background: var(--color-surface);
+}
+
+.divergence-cell.is-highlighted {
+    background: var(--color-notice-soft);
+}
+
+.divergence-cell > span {
+    display: block;
+    color: var(--color-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.divergence-cell > strong {
+    display: block;
+    margin: 0.15rem 0 0.6rem;
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    font-weight: 600;
+}
+
+.divergence-cell dl {
+    margin: 0;
+}
+
+.divergence-cell dl div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.3rem 0;
+    border-top: 1px solid var(--color-track);
+}
+
+.divergence-cell dt {
+    color: var(--color-muted);
+    font-size: 0.76rem;
+}
+
+.divergence-cell dd {
+    margin: 0;
+    font-size: 0.82rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+}

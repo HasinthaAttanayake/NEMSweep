@@ -44,4 +44,5 @@ public sealed record RegionDispatchSummaryDTO(
     StorageSizingOutcomeDTO StorageSizing,
     DispatchCostDTO Cost,
     [property: JsonRequired] Dictionary<string, double> DeliveredGenerationByTechnologyMwh,
-    string? DetailPath = null);
+    [property: JsonRequired] string DetailPath,
+    [property: JsonRequired] string OverviewPath);

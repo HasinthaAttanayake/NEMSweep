@@ -1,0 +1,65 @@
+.compare-bars {
+    display: grid;
+    gap: 0.55rem;
+}
+
+.compare-row {
+    display: grid;
+    grid-template-columns: minmax(72px, 0.9fr) minmax(0, 3fr) minmax(72px, auto);
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.compare-row.is-muted {
+    opacity: 0.62;
+}
+
+.compare-label {
+    overflow: hidden;
+    color: var(--color-muted);
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.compare-track {
+    position: relative;
+    height: 12px;
+    background: var(--color-track);
+}
+
+.compare-track i {
+    display: block;
+    height: 100%;
+}
+
+/* The reference is a threshold, not a series, so it is drawn as a rule across the track rather
+   than as a second bar competing for the same length. */
+.compare-track b {
+    position: absolute;
+    top: -3px;
+    bottom: -3px;
+    width: 2px;
+    background: var(--color-ink);
+}
+
+.compare-value {
+    font-size: 0.84rem;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.compare-reference {
+    margin: 0.35rem 0 0;
+    color: var(--color-muted);
+    font-size: 0.76rem;
+}
+
+@media (max-width: 640px) {
+    .compare-row {
+        grid-template-columns: minmax(60px, 1fr) minmax(0, 2fr) minmax(64px, auto);
+        gap: 0.5rem;
+    }
+}

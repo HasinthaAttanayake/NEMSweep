@@ -35,7 +35,8 @@ internal sealed record DispatchPublicationRequest(
 internal sealed record DispatchPublication(
     SystemDispatchResultsDTO System,
     SystemDispatchOverviewDTO Overview,
-    IReadOnlyDictionary<string, RegionDispatchResultsDTO> Regions);
+    IReadOnlyDictionary<string, RegionDispatchResultsDTO> Regions,
+    IReadOnlyDictionary<string, RegionDispatchOverviewDTO> RegionOverviews);
 
 internal static class DispatchResultsExport
 {
@@ -70,12 +71,19 @@ internal static class DispatchResultsExport
                 WriteText(result, Path.Combine(stagingDirectory, fileName), writeText);
             }
 
+            foreach ((string fileName, RegionDispatchOverviewDTO overview) in publication.RegionOverviews)
+            {
+                WriteText(overview, Path.Combine(stagingDirectory, fileName), writeText);
+            }
+
             var targets = new List<(string Staged, string Final)>
             {
                 (systemPath, finalResultsPath),
                 (overviewPath, Path.Combine(outputDirectory, overviewFileName)),
             };
             targets.AddRange(publication.Regions.Select(region =>
+                (Path.Combine(stagingDirectory, region.Key), Path.Combine(outputDirectory, region.Key))));
+            targets.AddRange(publication.RegionOverviews.Select(region =>
                 (Path.Combine(stagingDirectory, region.Key), Path.Combine(outputDirectory, region.Key))));
             Directory.CreateDirectory(backupDirectory);
             var backups = new List<(string Backup, string Final)>();
@@ -140,6 +148,7 @@ internal static class DispatchResultsExport
             request.SizingOptions.TargetUsePercentage);
         string runId = Guid.NewGuid().ToString("N");
         var regions = new Dictionary<string, RegionDispatchResultsDTO>(StringComparer.OrdinalIgnoreCase);
+        var regionOverviews = new Dictionary<string, RegionDispatchOverviewDTO>(StringComparer.OrdinalIgnoreCase);
         var summaries = new Dictionary<string, RegionDispatchSummaryDTO>(StringComparer.OrdinalIgnoreCase);
         var sourcesByRegion = new Dictionary<string, DispatchSourcesDTO>(StringComparer.OrdinalIgnoreCase);
 
@@ -189,18 +198,38 @@ internal static class DispatchResultsExport
                 evidence.StorageSizing,
                 cost);
             string detailPath = $"{request.RegionFileNamePrefix ?? "results-"}{regionId.ToLowerInvariant()}.json";
+            Dictionary<string, double> deliveredGenerationByTechnologyMwh =
+                evidence.DataSeries.DeliveredGenerationByTechnologyMw.ToDictionary(
+                    entry => entry.Key,
+                    entry => entry.Value.Sum() * evidence.Scenario.Resolution.TotalHours,
+                    StringComparer.OrdinalIgnoreCase);
+            string overviewPath = $"{Path.GetFileNameWithoutExtension(detailPath)}-overview.json";
+            RegionDispatchOverviewDTO regionOverview = new(
+                ArtifactSchemaVersions.RegionDispatchOverview,
+                runId,
+                regionId,
+                evidence.Scenario.PeriodStart,
+                evidence.Scenario.PeriodEnd,
+                evidence.Scenario.Resolution,
+                sources,
+                evidence.PowerSystem,
+                evidence.Metrics,
+                evidence.Reliability,
+                evidence.StorageSizing,
+                cost,
+                deliveredGenerationByTechnologyMwh,
+                evidence.DataSeries.TransmissionLossesMw.Sum() * evidence.Scenario.Resolution.TotalHours);
             regions.Add(detailPath, detail);
+            regionOverviews.Add(overviewPath, regionOverview);
             sourcesByRegion.Add(regionId, sources);
             summaries.Add(regionId, new RegionDispatchSummaryDTO(
                 evidence.Metrics,
                 evidence.Reliability,
                 evidence.StorageSizing,
                 cost,
-                evidence.DataSeries.DeliveredGenerationByTechnologyMw.ToDictionary(
-                    entry => entry.Key,
-                    entry => entry.Value.Sum() * evidence.Scenario.Resolution.TotalHours,
-                    StringComparer.OrdinalIgnoreCase),
-                detailPath));
+                deliveredGenerationByTechnologyMwh,
+                detailPath,
+                overviewPath));
         }
 
 
@@ -251,7 +280,7 @@ internal static class DispatchResultsExport
             system.StorageSizing,
             system.Cost,
             system.Topology);
-        return new DispatchPublication(system, overview, regions);
+        return new DispatchPublication(system, overview, regions, regionOverviews);
     }
 
     private static string LinkId(string fromRegionId, string toRegionId) =>
