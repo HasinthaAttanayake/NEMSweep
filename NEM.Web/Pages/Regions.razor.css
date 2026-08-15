@@ -162,57 +162,6 @@
 /* Reserves the height a rendered mix bar occupies — heading, track and legend — so the figures
    below it do not move when the regional artifact lands. Measured against the real component
    rather than estimated. */
-.scorecard-mix {
-    min-height: 88px;
-}
-
-.mix-placeholder span,
-.mix-placeholder small {
-    display: block;
-    color: var(--color-muted);
-}
-
-.mix-placeholder span {
-    margin-bottom: 0.4rem;
-    color: var(--color-ink);
-    font-size: 0.85rem;
-    font-weight: 700;
-}
-
-.mix-placeholder i {
-    display: block;
-    height: 14px;
-    border-radius: 2px;
-    background: var(--color-track);
-}
-
-.mix-placeholder small {
-    margin-top: 0.55rem;
-    font-size: 0.76rem;
-}
-
-.mix-placeholder.is-loading i {
-    background: linear-gradient(90deg, var(--color-track) 25%, var(--color-surface-muted) 50%, var(--color-track) 75%);
-    background-size: 200% 100%;
-    animation: mix-shimmer 1.4s ease-in-out infinite;
-}
-
-@keyframes mix-shimmer {
-    from {
-        background-position: 200% 0;
-    }
-
-    to {
-        background-position: -200% 0;
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .mix-placeholder.is-loading i {
-        animation: none;
-    }
-}
-
 .scorecard-facts {
     margin: 0;
     border-top: 1px solid var(--color-track);
@@ -391,4 +340,41 @@
 
 .region-network {
     margin-top: 1.35rem;
+}
+
+/* The generation cost and the energy it bought, stacked so the eye compares the two
+   distributions directly rather than reading two figures and subtracting. */
+.cost-mix-pair {
+    display: grid;
+    gap: 1.1rem;
+    margin-bottom: 1.6rem;
+}
+
+.region-cost-splits {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.6rem;
+    margin-top: 1.8rem;
+}
+
+.region-cost-split h3 {
+    margin: 0 0 0.9rem;
+    font-size: 0.95rem;
+}
+
+.region-cost-split > :global(*) + :global(*) {
+    margin-top: 1rem;
+}
+
+.data-table .swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    margin-right: 0.5rem;
+    border-radius: 2px;
+    vertical-align: baseline;
+}
+
+.reconcile-alert {
+    margin-top: 1.2rem;
 }

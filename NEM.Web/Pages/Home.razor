@@ -287,7 +287,8 @@
     private List<SweepSummary> _sweeps = [];
     private ArtifactLoadState _manifestState = ArtifactLoadState.Loading();
     private ArtifactLoadState _systemState = ArtifactLoadState.Loading();
-    private SystemDispatchResultsDTO? _system;
+    private SystemFacts? _system;
+    private int _systemSchemaVersion;
     private SystemAnalysis? _analysis;
     private ModelState? _modelState;
 
@@ -324,13 +325,16 @@
     protected override async Task OnInitializedAsync()
     {
         // The system result is what the page leads with, so it is fetched first and rendered before
-        // the sweep indexes are walked.
-        ArtifactLoadResult<SystemDispatchResultsDTO> system =
-            await ArtifactLoader.LoadAsync<SystemDispatchResultsDTO>("data/results.json");
+        // the sweep indexes are walked. Nothing here plots an interval series, so this reads the
+        // overview artifact rather than the full result and the landing page costs about 19 KB
+        // instead of two megabytes.
+        ArtifactLoadResult<SystemDispatchOverviewDTO> system =
+            await ArtifactLoader.LoadAsync<SystemDispatchOverviewDTO>("data/results-overview.json");
         _systemState = system.State;
         if (system.IsSuccess)
         {
-            _system = system.Value!;
+            _systemSchemaVersion = system.Value!.SchemaVersion;
+            _system = SystemFacts.From(system.Value!);
             _analysis = SystemAnalysis.Build(_system);
             StateHasChanged();
         }
@@ -356,7 +360,10 @@
         // dispatch run and partly about how many sweeps sit behind it.
         if (_system is not null)
         {
-            _modelState = ModelState.From(_system, [.. _sweeps.Select(sweep => sweep.Index)]);
+            _modelState = ModelState.From(
+                _system,
+                _systemSchemaVersion,
+                [.. _sweeps.Select(sweep => sweep.Index)]);
         }
     }
 

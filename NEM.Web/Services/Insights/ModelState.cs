@@ -15,20 +15,26 @@ public sealed record ModelState(
     IReadOnlyDictionary<string, int> SchemaVersions)
 {
     public static ModelState From(
-        SystemDispatchResultsDTO result,
+        SystemFacts result,
+        int schemaVersion,
         IReadOnlyList<SweepIndexDTO> sweeps)
     {
         ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(sweeps);
 
-        int intervals = result.DataSeries.Demand.TotalDemandMw?.Length ?? 0;
-        DispatchInterconnectorDTO[] links = result.Interconnectors ?? [];
-        int activeLinks = links.Count(link => link.FlowMw is { Length: > 0 } flow && flow.Any(value => value > 0));
+        // The interval count is the period divided by the resolution, which is a fact about the run
+        // rather than about any one series, so it needs no series to state.
+        int intervals = result.Resolution <= TimeSpan.Zero
+            ? 0
+            : (int)((result.PeriodEnd - result.PeriodStart) / result.Resolution);
+        DispatchTopologyLinkDTO[] links = result.Topology?.Links ?? [];
         // Only Resized means the loop grew storage and reached the target. Every other non-default
         // outcome means it stopped without reaching it, and reporting those as success would turn a
         // failed run into a capability claim.
         StorageSizingOutcome sizingOutcome = result.StorageSizing.Outcome;
-        bool transmissionCosted = result.Cost.AnnualisedTransmissionCostAud != 0;
+        bool transmissionCosted =
+            result.Cost.TransmissionCostStatus == TransmissionCostStatus.Calculated;
+        int technologiesCosted = result.Cost.GenerationCostContributions?.Length ?? 0;
         int totalRuns = sweeps.Sum(sweep => sweep.Points.Length);
 
         var capabilities = new List<ModelCapability>
@@ -44,8 +50,9 @@ public sealed record ModelState(
                 "Directed inter-regional flow",
                 links.Length == 0
                     ? "No interconnectors in the published run"
-                    : $"{links.Length} directed {(links.Length == 1 ? "link" : "links")}, "
-                        + $"{activeLinks} carrying energy, with losses metered separately",
+                    : $"{links.Length} directed {(links.Length == 1 ? "link" : "links")} declared by "
+                        + $"the run, up to {links.Max(link => link.CapacityMw):N0} MW, with losses "
+                        + "metered per link and reported against the receiving region",
                 links.Length > 0),
             new(
                 "Hourly merit-order dispatch",
@@ -67,10 +74,13 @@ public sealed record ModelState(
                 true),
             new(
                 "Annualised system cost",
-                transmissionCosted
+                (transmissionCosted
                     ? "Generation, storage and transmission assets, levelised per MWh served"
                     : "Generation and storage assets, levelised per MWh served; transmission is "
-                        + "calculated but priced at zero in this run",
+                        + "not priced in this run")
+                    + (technologiesCosted > 0
+                        ? $", with the generation cost decomposed across {technologiesCosted} technologies"
+                        : string.Empty),
                 true),
             new(
                 "Scenario sweeps",
@@ -81,7 +91,7 @@ public sealed record ModelState(
                 sweeps.Count > 0),
         };
 
-        return new ModelState(capabilities, CollectSchemaVersions(result, sweeps));
+        return new ModelState(capabilities, CollectSchemaVersions(schemaVersion, sweeps));
     }
 
     /// <summary>
@@ -120,12 +130,12 @@ public sealed record ModelState(
     /// raw JSON needs to know which shape they are opening.
     /// </summary>
     private static IReadOnlyDictionary<string, int> CollectSchemaVersions(
-        SystemDispatchResultsDTO result,
+        int systemSchemaVersion,
         IReadOnlyList<SweepIndexDTO> sweeps)
     {
         var versions = new Dictionary<string, int>(StringComparer.Ordinal)
         {
-            ["System dispatch"] = result.SchemaVersion,
+            ["System dispatch overview"] = systemSchemaVersion,
         };
 
         foreach (SweepIndexDTO sweep in sweeps)

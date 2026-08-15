@@ -51,20 +51,36 @@ public sealed record RegionProfile(
     public double StorageGrowthMwh => StorageSizing.FinalEnergyMwh - StorageSizing.InitialEnergyMwh;
 }
 
-/// <summary>Energy carried over one interconnector across a dispatch period.</summary>
+/// <summary>
+/// One directed link of the declared system network, and what ran over it if the interval evidence
+/// is in hand.
+/// </summary>
+/// <remarks>
+/// The link exists because the run's topology declares it, not because a flow was observed on it,
+/// so a link that never ran is still drawn rather than missing. <see cref="Flow"/> is null until
+/// the artifact carrying the interconnector series is read, which keeps "no flow evidence yet"
+/// distinguishable from "carried nothing".
+/// </remarks>
 public sealed record LinkFlow(
+    string Id,
     string FromRegionId,
     string ToRegionId,
     double CapacityMw,
+    LinkFlowEvidence? Flow = null)
+{
+    public string Label => $"{FromRegionId} to {ToRegionId}";
+}
+
+/// <summary>What one link carried over a dispatch period, integrated from its interval series.</summary>
+public sealed record LinkFlowEvidence(
     double EnergyMwh,
     double LossesMwh,
     double PeakFlowMw,
     int FlowingIntervals,
     int TotalIntervals,
-    double IntervalHours)
+    double IntervalHours,
+    double CapacityMw)
 {
-    public string Label => $"{FromRegionId} to {ToRegionId}";
-
     public double FlowingShare => TotalIntervals <= 0 ? 0 : (double)FlowingIntervals / TotalIntervals;
 
     /// <summary>Energy carried as a share of what the link could have carried had it run flat out.</summary>
@@ -81,12 +97,13 @@ public sealed record LinkFlow(
 }
 
 /// <summary>
-/// A system dispatch result read as a comparison between its regions. The system artifact already
-/// carries every regional summary, so this needs no extra fetch; passing the regional detail
-/// artifacts as well adds each region's generation mix.
+/// A system dispatch result read as a comparison between its regions. Everything here comes from
+/// the compact overview artifact, which carries each region's summary, cost decomposition and
+/// generation mix; the interval series are needed only to say what ran over each link, and are
+/// folded in with <see cref="WithLinkEvidence"/> when they arrive.
 /// </summary>
 public sealed record SystemAnalysis(
-    SystemDispatchResultsDTO Result,
+    SystemFacts Result,
     IReadOnlyList<RegionProfile> Regions,
     IReadOnlyList<LinkFlow> Links,
     EnergyMix SystemMix,
@@ -110,9 +127,15 @@ public sealed record SystemAnalysis(
         ? null
         : Regions.MaxBy(region => region.Cost.SlcoeAudPerMwh);
 
-    public static SystemAnalysis Build(
-        SystemDispatchResultsDTO result,
-        IReadOnlyDictionary<string, RegionDispatchResultsDTO>? regionDetails = null)
+    /// <summary>Every link the run declares that carried energy, busiest first.</summary>
+    public IReadOnlyList<LinkFlow> FlowingLinks =>
+        [.. Links.Where(link => link.Flow is { EnergyMwh: > 0 })
+            .OrderByDescending(link => link.Flow!.EnergyMwh)];
+
+    /// <summary>True once the interconnector series have been read, whatever they turned out to say.</summary>
+    public bool HasLinkEvidence => Links.Any(link => link.Flow is not null);
+
+    public static SystemAnalysis Build(SystemFacts result)
     {
         ArgumentNullException.ThrowIfNull(result);
 
@@ -124,7 +147,6 @@ public sealed record SystemAnalysis(
                 continue;
             }
 
-            RegionDispatchResultsDTO? detail = regionDetails?.GetValueOrDefault(regionId);
             regions.Add(new RegionProfile(
                 regionId,
                 summary.Metrics,
@@ -132,37 +154,59 @@ public sealed record SystemAnalysis(
                 summary.StorageSizing,
                 summary.Cost,
                 summary.DetailPath,
-                EnergyMix.From(detail?.DataSeries, result.Resolution)));
+                EnergyMix.FromTotals(summary.DeliveredGenerationByTechnologyMwh)));
         }
 
-        IReadOnlyList<LinkFlow> links = BuildLinks(result);
-        EnergyMix systemMix = EnergyMix.From(result.DataSeries, result.Resolution);
-        var analysis = new SystemAnalysis(result, regions, links, systemMix, []);
+        // The system mix is the sum of the regional ones by construction: every generator sits in
+        // exactly one region, so summing them is the system total rather than an approximation of it.
+        EnergyMix systemMix = EnergyMix.Combine(regions.Select(region => region.Mix));
+        var analysis = new SystemAnalysis(result, regions, BuildLinks(result.Topology), systemMix, []);
         return analysis with { Findings = Derive(analysis) };
     }
 
-    private static IReadOnlyList<LinkFlow> BuildLinks(SystemDispatchResultsDTO result)
+    /// <summary>
+    /// The same analysis with what actually ran over each link, once the artifact carrying the
+    /// interconnector series has been read. Findings are re-derived because trade is one of them.
+    /// </summary>
+    public SystemAnalysis WithLinkEvidence(
+        IReadOnlyList<DispatchInterconnectorDTO>? interconnectors,
+        TimeSpan resolution)
     {
-        double hours = result.Resolution.TotalHours;
-        var links = new List<LinkFlow>();
-        foreach (DispatchInterconnectorDTO link in result.Interconnectors ?? [])
+        double hours = resolution.TotalHours;
+        var byId = new Dictionary<string, LinkFlowEvidence>(StringComparer.OrdinalIgnoreCase);
+        foreach (DispatchInterconnectorDTO link in interconnectors ?? [])
         {
             double[] flow = link.FlowMw ?? [];
             double[] losses = link.LossesMw ?? [];
-            links.Add(new LinkFlow(
-                link.FromRegionId,
-                link.ToRegionId,
-                link.CapacityMw,
+            byId[link.Id] = new LinkFlowEvidence(
                 flow.Sum() * hours,
                 losses.Sum() * hours,
                 flow.Length == 0 ? 0 : flow.Max(),
                 flow.Count(value => value > 0),
                 flow.Length,
-                hours));
+                hours,
+                link.CapacityMw);
         }
 
-        return links;
+        // A link the evidence does not mention keeps a null flow rather than a zero: the run
+        // declared it, and nothing was published about what it did.
+        var analysis = this with
+        {
+            Links = [.. Links.Select(link => link with { Flow = byId.GetValueOrDefault(link.Id) })],
+        };
+        return analysis with { Findings = Derive(analysis) };
     }
+
+    /// <summary>
+    /// The declared network, whether or not anything ran over it. Reading the graph from the links
+    /// that happen to appear in the flow evidence would make an idle link vanish from the picture.
+    /// </summary>
+    private static IReadOnlyList<LinkFlow> BuildLinks(DispatchTopologyDTO? topology) =>
+        [.. (topology?.Links ?? []).Select(link => new LinkFlow(
+            link.Id,
+            link.FromRegionId,
+            link.ToRegionId,
+            link.CapacityMw))];
 
     /// <summary>
     /// Each finding is guarded by the condition that makes it true, so a run where regions agree,
@@ -177,6 +221,7 @@ public sealed record SystemAnalysis(
         AddCurtailmentWithShortfall(analysis, findings);
         AddTrade(analysis, findings);
         AddStorageDivergence(analysis, findings);
+        AddCostDriver(analysis, findings);
         // Highest priority first, so a page showing only the first few shows the ones that matter.
         return [.. findings.OrderByDescending(finding => finding.Priority)];
     }
@@ -307,24 +352,22 @@ public sealed record SystemAnalysis(
 
     private static void AddTrade(SystemAnalysis analysis, List<Finding> findings)
     {
-        LinkFlow? busiest = analysis.Links
-            .Where(link => link.EnergyMwh > 0)
-            .MaxBy(link => link.EnergyMwh);
-        if (busiest is null)
+        if (analysis.FlowingLinks.FirstOrDefault() is not { Flow: { } flow } busiest)
         {
             return;
         }
 
         findings.Add(new Finding(
             $"{RegionNames.State(busiest.FromRegionId)} underwrites {RegionNames.State(busiest.ToRegionId)}",
-            $"{PlotFormat.Compact(busiest.EnergyMwh)} MWh flowed from {busiest.FromRegionId} to "
-            + $"{busiest.ToRegionId} over {busiest.FlowingIntervals:N0} intervals — "
-            + $"{PlotFormat.Share(busiest.FlowingShare, 0)} of the period — reaching "
-            + $"{PlotFormat.Compact(busiest.PeakFlowMw)} MW against a "
+            $"{PlotFormat.Compact(flow.EnergyMwh)} MWh flowed from {busiest.FromRegionId} to "
+            + $"{busiest.ToRegionId} over {flow.FlowingIntervals:N0} intervals — "
+            + $"{PlotFormat.Share(flow.FlowingShare, 0)} of the period — reaching "
+            + $"{PlotFormat.Compact(flow.PeakFlowMw)} MW against a "
             + $"{PlotFormat.Compact(busiest.CapacityMw)} MW limit. "
-            + $"{PlotFormat.Compact(busiest.LossesMwh)} MWh was lost in transmission.",
+            + $"{PlotFormat.Compact(flow.LossesMwh)} MWh was lost in transmission, and is reported "
+            + $"against {RegionNames.State(busiest.ToRegionId)} as the receiving region.",
             FindingTone.Neutral,
-            PlotFormat.Share(busiest.CapacityFactor, 1),
+            PlotFormat.Share(flow.CapacityFactor, 1),
             "of link capacity used",
             Priority: 50));
     }
@@ -362,6 +405,48 @@ public sealed record SystemAnalysis(
             PlotFormat.Compact(addedMwh),
             "MWh of storage added",
             Priority: 70));
+    }
+
+    /// <summary>
+    /// What is actually driving the levelised cost. The three-way generation, storage and
+    /// transmission split answers which bucket the money fell in; this answers which fleet, which
+    /// is the decomposition a reader of a renewable-target result is after.
+    /// </summary>
+    private static void AddCostDriver(SystemAnalysis analysis, List<Finding> findings)
+    {
+        CostByTechnology cost = CostByTechnology.From(analysis.Result.Cost, analysis.SystemMix);
+        if (cost.Entries.Count < 2 || cost.Entries[0] is not { } dearest)
+        {
+            return;
+        }
+
+        // Cost share against energy share is what makes the figure mean something: a fleet costing
+        // a third of the bill for a third of the energy is unremarkable, and the gap is the story.
+        string energyClause = dearest.EnergyShare > 0
+            ? $"{PlotFormat.Share(dearest.CostShare)} of the generation bill for "
+                + $"{PlotFormat.Share(dearest.EnergyShare)} of the delivered energy"
+            : $"{PlotFormat.Share(dearest.CostShare)} of the generation bill";
+
+        CostEntry? dearestPerMwh = cost.Entries
+            .Where(entry => entry.EnergyMwh > 0)
+            .MaxBy(entry => entry.AudPerOwnMwh);
+        string comparison = dearestPerMwh is not null && dearestPerMwh.Technology != dearest.Technology
+            ? $" {dearestPerMwh.Technology} is the dearest per megawatt-hour it delivers, at "
+                + $"{PlotFormat.Money(dearestPerMwh.AudPerOwnMwh)}/MWh against "
+                + $"{PlotFormat.Money(dearest.AudPerOwnMwh)}/MWh for {dearest.Technology.ToLowerInvariant()}."
+            : string.Empty;
+
+        findings.Add(new Finding(
+            $"{dearest.Technology} is the largest single cost in the system",
+            $"{dearest.Technology} carries {PlotFormat.MoneyTotal(dearest.AnnualisedCostAud)} a year — "
+            + $"{energyClause} — and contributes "
+            + $"{PlotFormat.Money(dearest.LevelisedContributionAudPerMwh)}/MWh of the "
+            + $"{PlotFormat.Money(analysis.Result.Cost.GenerationSlcoeAudPerMwh)}/MWh generation "
+            + $"levelised cost.{comparison}",
+            FindingTone.Neutral,
+            PlotFormat.Money(dearest.LevelisedContributionAudPerMwh),
+            $"AUD/MWh from {dearest.Technology.ToLowerInvariant()}",
+            Priority: 80));
     }
 
     /// <summary>Names in a readable list, so three regions read as "A, B and C" rather than "A, B, C".</summary>

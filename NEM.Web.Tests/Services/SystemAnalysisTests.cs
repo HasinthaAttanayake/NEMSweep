@@ -9,7 +9,7 @@ public sealed class SystemAnalysisTests
     [Fact]
     public void Build_ReadsOneProfilePerRegionInTheArtifactsOwnOrder()
     {
-        SystemAnalysis analysis = SystemAnalysis.Build(TwoRegionSystem());
+        SystemAnalysis analysis = Analyse(TwoRegionSystem());
 
         analysis.Regions.Select(region => region.RegionId).Should().Equal("NSW1", "VIC1");
         analysis.Cheapest!.RegionId.Should().Be("VIC1");
@@ -19,7 +19,7 @@ public sealed class SystemAnalysisTests
     [Fact]
     public void Build_StatesTheSpreadBetweenTheCheapestAndDearestRegion()
     {
-        SystemAnalysis analysis = SystemAnalysis.Build(TwoRegionSystem());
+        SystemAnalysis analysis = Analyse(TwoRegionSystem());
 
         Finding finding = analysis.Findings.Should()
             .ContainSingle(finding => finding.Headline.Contains("more than")).Subject;
@@ -30,7 +30,7 @@ public sealed class SystemAnalysisTests
     [Fact]
     public void Build_DistinguishesTheSystemFigureFromThePlainAverageOfTheRegions()
     {
-        SystemAnalysis analysis = SystemAnalysis.Build(TwoRegionSystem());
+        SystemAnalysis analysis = Analyse(TwoRegionSystem());
 
         analysis.MeanRegionalSlcoe.Should().Be(156.37m);
         analysis.Findings.Should().ContainSingle(finding =>
@@ -40,7 +40,7 @@ public sealed class SystemAnalysisTests
     [Fact]
     public void Build_NamesTheRegionCarryingTheUnservedEnergy()
     {
-        SystemAnalysis analysis = SystemAnalysis.Build(TwoRegionSystem());
+        SystemAnalysis analysis = Analyse(TwoRegionSystem());
 
         Finding finding = analysis.Findings.Should()
             .ContainSingle(finding => finding.Headline.Contains("Unserved energy is concentrated")).Subject;
@@ -53,7 +53,7 @@ public sealed class SystemAnalysisTests
     {
         SystemDispatchResultsDTO system = TwoRegionSystem(systemUnservedMwh: 0, vicUnservedMwh: 0);
 
-        SystemAnalysis analysis = SystemAnalysis.Build(system);
+        SystemAnalysis analysis = Analyse(system);
 
         analysis.Findings.Should().ContainSingle(finding =>
             finding.Headline == "Every hour of demand was served"
@@ -63,7 +63,7 @@ public sealed class SystemAnalysisTests
     [Fact]
     public void Build_SeparatesSpillingFromRunningShortWhenARegionDoesBoth()
     {
-        SystemAnalysis analysis = SystemAnalysis.Build(TwoRegionSystem());
+        SystemAnalysis analysis = Analyse(TwoRegionSystem());
 
         analysis.Findings.Should().ContainSingle(finding =>
             finding.Headline == "Victoria spills energy and still runs short");
@@ -74,19 +74,44 @@ public sealed class SystemAnalysisTests
     {
         SystemDispatchResultsDTO system = TwoRegionSystem(resolutionHours: 2);
 
-        LinkFlow link = SystemAnalysis.Build(system).Links[0];
+        LinkFlowEvidence flow = Analyse(system).Links[0].Flow!;
 
         // 1,000 MW held for one of three two-hour intervals is 2,000 MWh, not 1,000.
-        link.EnergyMwh.Should().Be(2000);
-        link.LossesMwh.Should().Be(100);
-        link.FlowingIntervals.Should().Be(1);
-        link.PeakFlowMw.Should().Be(1000);
+        flow.EnergyMwh.Should().Be(2000);
+        flow.LossesMwh.Should().Be(100);
+        flow.FlowingIntervals.Should().Be(1);
+        flow.PeakFlowMw.Should().Be(1000);
+    }
+
+    [Fact]
+    public void Build_DrawsEveryLinkTheRunDeclaresBeforeAnyFlowEvidenceIsRead()
+    {
+        SystemAnalysis analysis = SystemAnalysis.Build(SystemFacts.From(TwoRegionSystem()));
+
+        // The topology declares both directions, so both are links whether or not either ran. A
+        // null flow says the evidence has not been read; it is not a link that carried nothing.
+        analysis.Links.Select(link => link.Id).Should().Equal("NSW1->VIC1", "VIC1->NSW1");
+        analysis.Links.Should().OnlyContain(link => link.Flow == null);
+        analysis.HasLinkEvidence.Should().BeFalse();
+        analysis.FlowingLinks.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void WithLinkEvidence_LeavesADeclaredLinkTheEvidenceOmitsWithoutAFlow()
+    {
+        SystemDispatchResultsDTO system = TwoRegionSystem();
+
+        SystemAnalysis analysis = SystemAnalysis.Build(SystemFacts.From(system))
+            .WithLinkEvidence([system.Interconnectors[0]], system.Resolution);
+
+        analysis.Links.Single(link => link.Id == "NSW1->VIC1").Flow.Should().NotBeNull();
+        analysis.Links.Single(link => link.Id == "VIC1->NSW1").Flow.Should().BeNull();
     }
 
     [Fact]
     public void Build_ReportsTheDirectionOfTheBusiestLink()
     {
-        SystemAnalysis analysis = SystemAnalysis.Build(TwoRegionSystem());
+        SystemAnalysis analysis = Analyse(TwoRegionSystem());
 
         analysis.Findings.Should().ContainSingle(finding =>
             finding.Headline == "New South Wales underwrites Victoria");
@@ -95,7 +120,7 @@ public sealed class SystemAnalysisTests
     [Fact]
     public void Build_NamesTheRegionTheSizingLoopHadToGrowStorageIn()
     {
-        SystemAnalysis analysis = SystemAnalysis.Build(TwoRegionSystem());
+        SystemAnalysis analysis = Analyse(TwoRegionSystem());
 
         Finding finding = analysis.Findings.Should()
             .ContainSingle(finding => finding.Headline.Contains("needed more storage")).Subject;
@@ -108,44 +133,48 @@ public sealed class SystemAnalysisTests
     {
         SystemDispatchResultsDTO system = TwoRegionSystem(nswResized: true);
 
-        SystemAnalysis.Build(system).Findings.Should().NotContain(finding =>
+        Analyse(system).Findings.Should().NotContain(finding =>
             finding.Headline.Contains("needed more storage"));
     }
 
     [Fact]
-    public void Build_AddsEachRegionsGenerationMixWhenTheDetailArtifactsAreSupplied()
+    public void Build_ReadsEachRegionsGenerationMixFromItsSummaryWithoutTheDetailArtifact()
     {
-        SystemDispatchResultsDTO system = TwoRegionSystem();
-        RegionDispatchResultsDTO detail = ArtifactFixtures.RegionResults() with
-        {
-            DataSeries = ArtifactFixtures.RegionResults().DataSeries with
-            {
-                DeliveredGenerationByTechnologyMw = new Dictionary<string, double[]>
-                {
-                    ["Wind"] = [100, 100, 100],
-                    ["Coal"] = [300, 300, 300],
-                },
-            },
-        };
-
-        SystemAnalysis analysis = SystemAnalysis.Build(
-            system,
-            new Dictionary<string, RegionDispatchResultsDTO> { ["VIC1"] = detail });
+        SystemAnalysis analysis = Analyse(TwoRegionSystem());
 
         RegionProfile victoria = analysis.Regions.Single(region => region.RegionId == "VIC1");
-        victoria.Mix.TotalMwh.Should().Be(1200);
-        victoria.Mix.RenewableShare.Should().Be(0.25);
-        analysis.Regions.Single(region => region.RegionId == "NSW1").Mix.TotalMwh.Should().Be(0);
+        victoria.Mix.TotalMwh.Should().Be(44_665_751);
+        victoria.Mix.RenewableShare.Should().BeApproximately(0.5841, 0.0001);
+    }
+
+    [Fact]
+    public void Build_TakesTheSystemMixAsTheSumOfTheRegionalOnes()
+    {
+        SystemAnalysis analysis = Analyse(TwoRegionSystem());
+
+        // Every generator sits in exactly one region, so the regional mixes add to the system's.
+        analysis.SystemMix.TotalMwh.Should()
+            .Be(analysis.Regions.Sum(region => region.Mix.TotalMwh));
+        analysis.SystemMix.ByTechnology.Single(entry => entry.Technology == "Coal")
+            .EnergyMwh.Should().Be(59_853_259);
     }
 
     [Fact]
     public void CurtailedShareOfAvailable_MeasuresSpillAgainstEverythingTheFleetCouldHaveDelivered()
     {
-        SystemAnalysis analysis = SystemAnalysis.Build(TwoRegionSystem());
+        SystemAnalysis analysis = Analyse(TwoRegionSystem());
 
         analysis.Regions.Single(region => region.RegionId == "VIC1")
             .CurtailedShareOfAvailable.Should().BeApproximately(0.0607, 0.0005);
     }
+
+    /// <summary>
+    /// The analysis as a page builds it: the compact overview first, then the interval evidence
+    /// folded in when the artifact carrying it arrives.
+    /// </summary>
+    private static SystemAnalysis Analyse(SystemDispatchResultsDTO system) =>
+        SystemAnalysis.Build(SystemFacts.From(system))
+            .WithLinkEvidence(system.Interconnectors, system.Resolution);
 
     /// <summary>
     /// A two-region run shaped like the published one: a larger, dearer exporter and a smaller,

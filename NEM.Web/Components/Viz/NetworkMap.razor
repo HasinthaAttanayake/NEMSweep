@@ -5,9 +5,10 @@
     line"; only a drawing answers "which way does energy run through this market", which is the
     question a whole-of-system view exists for.
 
-    The model publishes pairwise directed links and nothing about paths, so this draws exactly what
-    it has: who is joined to whom, which way each joint ran, and how hard. It does not claim to
-    show a route, because the artifact does not record one.
+    The run declares its own network, so this draws the graph the model solved rather than one
+    inferred from whichever links happened to carry something: a link that never ran is still a
+    link, and it is drawn idle rather than left out. What the artifact still does not record is a
+    path, so nothing here traces an import across more than one hop.
 *@
 <figure class="network-map @Class">
     <div class="plot-scroll">
@@ -15,12 +16,12 @@
              style="@($"aspect-ratio: 1000 / {Height};")">
             @foreach (EdgeGeometry edge in _edges)
             {
-                <g class="network-edge @(edge.Source.EnergyMwh > 0 ? "is-flowing" : "is-idle")">
+                <g class="network-edge @(edge.Source.EnergyMwh is > 0 ? "is-flowing" : "is-idle")">
                     <title>@edge.Readout</title>
                     <line x1="@Fmt(edge.FromX)" y1="@Fmt(edge.FromY)"
                           x2="@Fmt(edge.ToX)" y2="@Fmt(edge.ToY)"
                           stroke-width="@Fmt(edge.Width)" />
-                    @if (edge.Source.EnergyMwh > 0)
+                    @if (edge.Source.EnergyMwh is > 0)
                     {
                         <polygon class="network-arrow" points="@edge.Arrow" />
                         <SvgText Class="network-edge-label" X="edge.LabelX" Y="edge.LabelY"
@@ -50,8 +51,9 @@
         <span><i class="network-key-balanced"></i>balanced</span>
         <span class="network-note">
             Node size follows demand; line thickness follows how much of the link's capacity was
-            used. The model records links between neighbours and not the path an import travelled,
-            so nothing here traces energy across more than one hop.
+            used. Every link the run declares is drawn, so a line without an arrow is a link that
+            carried nothing. The model records which regions each link joins and not the path an
+            import travelled, so nothing here traces energy across more than one hop.
         </span>
     </figcaption>
 </figure>
@@ -64,14 +66,19 @@
         double DemandMwh,
         double NetImportedMwh);
 
-    /// <summary>One directed link as an edge, already integrated over the period in view.</summary>
+    /// <summary>
+    /// One directed link of the declared network. The three flow figures are null until the
+    /// interval series are read, which is drawn as a link of unknown loading rather than as an
+    /// idle one.
+    /// </summary>
     public sealed record NetworkEdge(
+        string Id,
         string FromRegionId,
         string ToRegionId,
         double CapacityMw,
-        double EnergyMwh,
-        double PeakMw,
-        double CapacityFactor);
+        double? EnergyMwh,
+        double? PeakMw,
+        double? CapacityFactor);
 
     [Parameter, EditorRequired] public IReadOnlyList<NetworkNode> Nodes { get; set; } = [];
     [Parameter, EditorRequired] public IReadOnlyList<NetworkEdge> Edges { get; set; } = [];
@@ -179,15 +186,18 @@
             startY,
             endX,
             endY,
-            2 + (10 * Math.Clamp(edge.CapacityFactor, 0, 1)),
+            2 + (10 * Math.Clamp(edge.CapacityFactor ?? 0, 0, 1)),
             arrow,
             midX + (shiftX * 1.6),
             midY + (shiftY * 1.6) - 6,
-            $"{PlotFormat.Compact(edge.EnergyMwh)} MWh",
-            $"{edge.FromRegionId} to {edge.ToRegionId}\n"
-                + $"{PlotFormat.Compact(edge.EnergyMwh)} MWh carried\n"
-                + $"Peak {PlotFormat.Compact(edge.PeakMw)} MW of {PlotFormat.Compact(edge.CapacityMw)} MW\n"
-                + $"{PlotFormat.Share(edge.CapacityFactor, 1)} of capacity used");
+            edge.EnergyMwh is { } energy ? $"{PlotFormat.Compact(energy)} MWh" : string.Empty,
+            $"{edge.Id} · {edge.FromRegionId} to {edge.ToRegionId}\n"
+                + $"Link capacity {PlotFormat.Compact(edge.CapacityMw)} MW\n"
+                + (edge.EnergyMwh is { } carried
+                    ? $"{PlotFormat.Compact(carried)} MWh carried\n"
+                        + $"Peak {PlotFormat.Compact(edge.PeakMw ?? 0)} MW\n"
+                        + $"{PlotFormat.Share(edge.CapacityFactor ?? 0, 1)} of capacity used"
+                    : "No flow evidence read yet"));
     }
 
     private static string NodeClass(NodeGeometry node) => node.Source.NetImportedMwh switch

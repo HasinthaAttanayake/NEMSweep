@@ -166,6 +166,18 @@ public static class PlotFormat
     public static string Money(decimal value, int decimals = 2) =>
         (value < 0 ? "-$" : "$") + Math.Abs(value).ToString($"N{decimals}", CultureInfo.CurrentCulture);
 
+    /// <summary>
+    /// Money kept to enough decimals to stay a number. Two decimals is right for nearly every
+    /// figure the site states, but the system's transmission cost is a real $0.0015/MWh, and
+    /// rounding that to "$0.00" reads as a defect rather than as a genuinely small price.
+    /// </summary>
+    public static string MoneyPrecise(decimal value, int maximumDecimals = 4)
+    {
+        decimal magnitude = Math.Abs(value);
+        int decimals = magnitude > 0 && magnitude < 0.01m ? maximumDecimals : 2;
+        return Money(value, decimals);
+    }
+
     /// <summary>An abbreviated money total: $17,629,045,241 reads as $17.63b.</summary>
     public static string MoneyTotal(decimal value)
     {

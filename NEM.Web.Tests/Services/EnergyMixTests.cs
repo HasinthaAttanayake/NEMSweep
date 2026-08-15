@@ -88,6 +88,45 @@ public sealed class EnergyMixTests
         segments.Single().Color.Should().Be(TechnologyPalette.ForGeneration("Wind"));
     }
 
+    [Fact]
+    public void FromTotals_OrdersAPublishedMixTheSameWayAnIntegratedOneIsOrdered()
+    {
+        EnergyMix totals = EnergyMix.FromTotals(new Dictionary<string, double>
+        {
+            ["Wind"] = 100,
+            ["Coal"] = 300,
+        });
+
+        // The producer's key order is whatever the JSON happened to carry; the site's is the
+        // palette's, so the same run reads the same way on every page.
+        EnergyMix integrated = Mix(TimeSpan.FromHours(1), ("Coal", [300]), ("Wind", [100]));
+        totals.ByTechnology.Select(entry => entry.Technology).Should()
+            .Equal(integrated.ByTechnology.Select(entry => entry.Technology));
+        totals.TotalMwh.Should().Be(400);
+        totals.RenewableShare.Should().Be(0.25);
+    }
+
+    [Fact]
+    public void FromTotals_IsEmptyForAMixTheArtifactDoesNotCarry()
+    {
+        EnergyMix.FromTotals(null).Should().BeSameAs(EnergyMix.Empty);
+        EnergyMix.FromTotals(new Dictionary<string, double>()).Should().BeSameAs(EnergyMix.Empty);
+    }
+
+    [Fact]
+    public void Combine_AddsRegionalMixesIntoTheSystemTotal()
+    {
+        EnergyMix combined = EnergyMix.Combine(
+        [
+            EnergyMix.FromTotals(new Dictionary<string, double> { ["Wind"] = 100, ["Coal"] = 300 }),
+            EnergyMix.FromTotals(new Dictionary<string, double> { ["Wind"] = 50, ["Solar"] = 50 }),
+        ]);
+
+        combined.TotalMwh.Should().Be(500);
+        combined.ByTechnology.Single(entry => entry.Technology == "Wind").EnergyMwh.Should().Be(150);
+        combined.ByTechnology.Single(entry => entry.Technology == "Solar").EnergyMwh.Should().Be(50);
+    }
+
     private static EnergyMix Mix(TimeSpan resolution, params (string Technology, double[] Values)[] series)
     {
         DispatchSeriesDTO source = ArtifactFixtures.Results().DataSeries with
