@@ -1,0 +1,36 @@
+.sizing-trajectory {
+    margin-top: 2.5rem;
+}
+
+.section-heading {
+    max-width: 70ch;
+    margin-bottom: 1.4rem;
+}
+
+.section-label {
+    margin: 0 0 0.35rem;
+    color: var(--color-muted);
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+}
+
+.section-heading h2 {
+    margin: 0 0 0.6rem;
+    font-size: 1.35rem;
+}
+
+.section-heading p {
+    margin: 0;
+    color: var(--color-ink-soft);
+    line-height: 1.6;
+}
+
+.sizing-note {
+    max-width: 80ch;
+    margin: 1rem 0 0;
+    color: var(--color-muted);
+    font-size: 0.85rem;
+    line-height: 1.6;
+}

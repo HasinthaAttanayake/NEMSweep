@@ -22,6 +22,13 @@
                 {
                     <span class="scalar-tile-absent">Not carried by this artifact</span>
                 }
+                else if (sparkline.IsNotModelled)
+                {
+                    @* Every run in the sweep declares this cost out of scope. A flat line labelled
+                       "no change" would read as a quantity that held still rather than one that
+                       was never priced. *@
+                    <span class="scalar-tile-absent">Not modelled in any run of this sweep</span>
+                }
                 else
                 {
                     <svg class="scalar-spark" viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true">
@@ -60,6 +67,7 @@
         SweepChartYAxis Axis,
         bool HasValues,
         bool IsFlat,
+        bool IsNotModelled,
         double First,
         double Last,
         string Points)
@@ -72,8 +80,13 @@
             double[] values = SweepChartData.Build(index, axis, regionId).Values;
             if (values.Length == 0)
             {
-                return new SweepSparkline(axis, false, false, 0, 0, string.Empty);
+                return new SweepSparkline(axis, false, false, false, 0, 0, string.Empty);
             }
+
+            bool notModelled = IsTransmissionCost(axis) && index.Points
+                .Select(point => SweepChartData.SelectScalars(point, regionId))
+                .Where(scalars => scalars is not null)
+                .All(scalars => scalars!.TransmissionCostStatus == TransmissionCostStatus.NotModelled);
 
             double minimum = values.Min();
             double maximum = values.Max();
@@ -86,7 +99,16 @@
                 return FormattableString.Invariant($"{x:F2},{y:F2}");
             }));
 
-            return new SweepSparkline(axis, true, range == 0, values[0], values[^1], points);
+            return new SweepSparkline(axis, true, range == 0, notModelled, values[0], values[^1], points);
+        }
+
+        /// <summary>
+        /// The only scalar the contract publishes a modelled/not-modelled status for. Matched on
+        /// the descriptor rather than assumed, so a second priced component gains the treatment by
+        /// being named here rather than by accident.
+        /// </summary>
+        private static bool IsTransmissionCost(SweepChartYAxis axis) =>
+            string.Equals(axis.Key, "transmissionSlcotAudPerMwh", StringComparison.Ordinal);
         }
     }
 }

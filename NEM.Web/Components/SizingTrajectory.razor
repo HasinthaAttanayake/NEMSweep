@@ -1,0 +1,167 @@
+@using NEM.Contracts
+@using NEM.Web.Components.Viz
+@using NEM.Web.Services.Insights
+
+@*
+    What the storage sizing loop tried, and what each attempt bought.
+
+    The outcome alone says storage grew from one figure to another. It does not say whether the
+    reliability target was expensive or nearly free to reach, and that shape — unserved energy
+    against capacity — is the argument for or against a storage build. The run now publishes every
+    pass, so it can be drawn.
+*@
+@if (_search.HasPath)
+{
+    <section class="sizing-trajectory" aria-labelledby="@($"{Id}-heading")">
+        <div class="section-heading">
+            <p class="section-label">Sizing evidence</p>
+            <h2 id="@($"{Id}-heading")">What it took to reach @Scope's reliability target</h2>
+            <p>@Summary</p>
+        </div>
+
+        <ScatterPlot Markers="@_markers"
+                     AriaLabel="@($"{Scope} unserved energy against storage energy capacity across the sizing passes")"
+                     XAxisTitle="Storage energy capacity (MWh)"
+                     YAxisTitle="Unserved energy (MWh)"
+                     Connected="true"
+                     Height="320" />
+
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Pass</th>
+                        <th scope="col">Storage energy</th>
+                        <th scope="col">Storage power</th>
+                        <th scope="col">Unserved energy</th>
+                        <th scope="col">Unserved hours</th>
+                        <th scope="col">Change from previous</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (int index = 0; index < _passes.Count; index++)
+                    {
+                        StorageSizingPassDTO pass = _passes[index];
+                        StorageSizingPassDTO? previous = index == 0 ? null : _passes[index - 1];
+                        <tr class="@(index == _passes.Count - 1 ? "row-derived" : null)">
+                            <th scope="row">@pass.Pass</th>
+                            <td>@pass.EnergyCapacityMwh.ToString("N0") MWh</td>
+                            <td>@pass.PowerCapacityMw.ToString("N0") MW</td>
+                            <td>@pass.UnservedEnergyMwh.ToString("N1") MWh</td>
+                            <td>@pass.UnservedHours.ToString("N0")</td>
+                            <td>@ChangeText(pass, previous)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <p class="sizing-note">@Reading</p>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public StorageSizingOutcomeDTO Sizing { get; set; } = default!;
+
+    /// <summary>What the sizing was run for — a region name, or the system.</summary>
+    [Parameter, EditorRequired] public string Scope { get; set; } = string.Empty;
+
+    /// <summary>Distinguishes headings when several of these appear on one page.</summary>
+    [Parameter, EditorRequired] public string Id { get; set; } = string.Empty;
+
+    private SizingSearch _search = SizingSearch.Empty;
+    private List<PlotMarker> _markers = [];
+
+    private IReadOnlyList<StorageSizingPassDTO> _passes => _search.Passes;
+
+    protected override void OnParametersSet()
+    {
+        _search = SizingSearch.From(Sizing);
+        _markers = [.. _search.Passes.Select(pass => new PlotMarker(
+            $"Pass {pass.Pass}",
+            pass.EnergyCapacityMwh,
+            pass.UnservedEnergyMwh,
+            IsHighlighted: pass.Pass == _search.Last.Pass,
+            Detail: $"{pass.PowerCapacityMw:N0} MW · {pass.UnservedHours:N0} unserved "
+                + (pass.UnservedHours == 1 ? "hour" : "hours")))];
+    }
+
+    /// <summary>
+    /// The whole trajectory as one sentence: what was added, and what it removed. Stated as a
+    /// change between the first and last pass rather than pass by pass, because a reader wants the
+    /// price of the target before they want the path to it.
+    /// </summary>
+    private string Summary
+    {
+        get
+        {
+            StorageSizingPassDTO first = _search.First;
+            StorageSizingPassDTO last = _search.Last;
+
+            if (!_search.GrewStorage)
+            {
+                return $"The loop dispatched {Scope} {_passes.Count} times without adding storage: "
+                    + $"{first.EnergyCapacityMwh:N0} MWh already met the target, leaving "
+                    + $"{last.UnservedEnergyMwh:N1} MWh unserved.";
+            }
+
+            return $"Reaching the target cost {_search.AddedEnergyMwh:N0} MWh of added storage — "
+                + $"{first.EnergyCapacityMwh:N0} MWh to {last.EnergyCapacityMwh:N0} MWh — which "
+                + $"removed {_search.RemovedUnservedMwh:N1} MWh of unserved energy across {_passes.Count} dispatch "
+                + $"{(_passes.Count == 1 ? "pass" : "passes")}.";
+        }
+    }
+
+    /// <summary>
+    /// How to read the curve. A steep fall means the last megawatt-hours of reliability were cheap;
+    /// a flat tail means storage had stopped buying much and the run was paying for the target
+    /// rather than earning it.
+    /// </summary>
+    private string Reading
+    {
+        get
+        {
+            if (!_search.GrewStorage)
+            {
+                return "Every pass ran the same fleet, so this is a check that the target held "
+                    + "rather than a search for the capacity that reaches it.";
+            }
+
+            // A pass that repeats a capacity already reached is a probe the search dispatched and
+            // did not accept, rather than a step it took.
+            int repeated = _search.RepeatedCapacityPasses;
+            string probes = repeated == 0
+                ? string.Empty
+                : $" {repeated} of the {_passes.Count} passes re-ran a capacity the search had "
+                    + "already reached, which is a probe it did not accept rather than a step it took.";
+
+            return $"Averaged over the search, each megawatt-hour of storage added removed "
+                + $"{_search.UnservedRemovedPerMwhAdded:N3} MWh of unserved energy. The curve is what matters more than the "
+                + $"average: a steep fall means reliability was cheap to buy, a flat tail means "
+                + $"storage had stopped paying for itself before the target was met.{probes}";
+        }
+    }
+
+    private static string ChangeText(StorageSizingPassDTO pass, StorageSizingPassDTO? previous)
+    {
+        if (previous is null)
+        {
+            return "starting fleet";
+        }
+
+        double capacity = pass.EnergyCapacityMwh - previous.EnergyCapacityMwh;
+        double unserved = pass.UnservedEnergyMwh - previous.UnservedEnergyMwh;
+        if (capacity == 0 && unserved == 0)
+        {
+            return "no change";
+        }
+
+        string capacityText = capacity == 0
+            ? "same capacity"
+            : $"{(capacity > 0 ? "+" : "−")}{Math.Abs(capacity):N0} MWh";
+        string unservedText = unserved == 0
+            ? "same unserved energy"
+            : $"{(unserved > 0 ? "+" : "−")}{Math.Abs(unserved):N1} MWh unserved";
+        return $"{capacityText}, {unservedText}";
+    }
+}

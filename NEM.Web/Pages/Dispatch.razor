@@ -2,6 +2,7 @@
 @page "/runs/{SweepId}/{PointId}"
 @using NEM.Contracts
 @using NEM.Web.Services
+@using NEM.Web.Services.Insights
 @using System.Globalization
 @using System.Text
 @inject ArtifactLoader ArtifactLoader
@@ -191,7 +192,10 @@
                     }
                     @if (!IsSystemScope)
                     {
-                        <p class="regional-cost-note">Positive net imported energy denotes imports. Regional costs exclude system transmission and do not price transferred energy, so they can understate imported supply costs. Regional transmission losses are allocated from incoming links for reporting and are not regional transmission charges.</p>
+                        @* The losses figure is an allocation for reporting, not a charge. Saying so
+                           is the difference between a reader taking it as this region's
+                           transmission cost and taking it as the energy that did not arrive. *@
+                        <p class="regional-cost-note">Positive net imported energy denotes imports. This scope declares transmission not modelled: regional costs do not price transferred energy, so they can understate imported supply. Losses are metered on each link and attributed to the region receiving the energy, which is a reporting allocation rather than a transmission charge.</p>
                     }
                 </div>
 
@@ -207,10 +211,36 @@
                     @if (!IsSystemScope)
                     {
                         <div><dt>Net imported energy</dt><dd>@_result.Cost.NetImportedEnergyMwh.ToString("N0") MWh</dd></div>
+                        @* Losses are metered per link and reported against the receiving region, so
+                           an exporter's figure is genuinely zero rather than unpopulated. *@
+                        <div>
+                            <dt>Transmission losses received</dt>
+                            <dd>@TransmissionLossesMwh().ToString("N0") MWh</dd>
+                        </div>
                     }
                 </dl>
             </div>
         </section>
+
+        @if (_costByFleet.Entries.Count > 0)
+        {
+            <section class="cost-section" aria-labelledby="cost-fleet-heading">
+                <div class="section-heading">
+                    <p class="section-label">Full financial year</p>
+                    <h2 id="cost-fleet-heading">What is driving @(IsSystemScope ? "the system" : ScopeLabel)'s levelised cost</h2>
+                    <p>
+                        The generation bill split by the fleet that incurred it, against what each
+                        fleet delivered for the money. A technology taking a larger share of the
+                        bill than of the energy is raising the levelised cost.
+                    </p>
+                </div>
+                <CostByFleet Cost="_costByFleet"
+                             Mix="_energyMix"
+                             Scope="@ScopeLabel"
+                             GenerationSlcoeAudPerMwh="_result.Cost.GenerationSlcoeAudPerMwh"
+                             AnnualisedGenerationCostAud="_result.Cost.AnnualisedGenerationCostAud" />
+            </section>
+        }
 
         @if (!IsCompareScope && _selectedRegionId is null && _systemResult?.Interconnectors is { Length: > 0 } links)
         {
@@ -489,6 +519,10 @@
             </div>
         </section>
 
+        <SizingTrajectory Sizing="_result.StorageSizing"
+                          Scope="@(IsSystemScope ? "the system" : ScopeLabel)"
+                          Id="@($"sizing-{(IsSystemScope ? "system" : _selectedRegionId!.ToLowerInvariant())}")" />
+
         @* A system run covers several regions, each simulated against its own weather file. Showing
            one of them would state a basis the other regions were not run against. *@
         @if (ScopedSources.Count > 1)
@@ -576,6 +610,8 @@
     private List<RegionCompareGrid.RegionEvidence> _regionEvidence = [];
     private DispatchResultsDTO? _result;
     private SystemDispatchResultsDTO? _systemResult;
+    private EnergyMix _energyMix = EnergyMix.Empty;
+    private CostByTechnology _costByFleet = CostByTechnology.Empty;
     private string? _selectedRegionId;
     private string? _selectedRegionDetailPath;
     private DispatchRunContext? _runContext;
@@ -712,7 +748,7 @@
         : $"Annualised generation and storage asset costs per MWh served in {ScopeLabel}.";
     private string CostInclusionsDescription => IsSystemScope
         ? "Generation, storage, and system-level transmission assets are included."
-        : "Generation and storage assets are included; system transmission is not allocated to regions.";
+        : "Generation and storage assets are included; this scope declares transmission not modelled.";
     private string ArtifactPeriod => $"{_result!.Scenario.PeriodStart:dd MMM yyyy} to {_result.Scenario.PeriodEnd.AddTicks(-1):dd MMM yyyy}";
     private string ResolutionLabel => $"{_result!.Scenario.Resolution.TotalHours:N0}-hour intervals";
 
@@ -884,6 +920,10 @@
 
         _result = result;
         _runContext = context;
+        // The cost decomposition is a whole-period figure like the ledger above it, so it is built
+        // once here rather than following the period selector.
+        _energyMix = EnergyMix.From(result.DataSeries, result.Scenario.Resolution);
+        _costByFleet = CostByTechnology.From(result.Cost, _energyMix);
         DispatchSeriesDTO? series = _result.DataSeries;
         DispatchPowerSystemDTO? powerSystem = _result.PowerSystem;
             if (series is null
@@ -1722,6 +1762,14 @@
     private static string FormatTransmissionSlcot(decimal value) =>
         (value < 0 ? "-$" : "$") + Math.Abs(value).ToString(
             Math.Abs(value) < 0.01m ? "N4" : "N2");
+
+    /// <summary>
+    /// Transmission losses attributed to this region over the whole period. The producer allocates
+    /// each link's losses to the region receiving the energy, so an exporter's series is genuinely
+    /// zero rather than unpopulated, and this is a reporting attribution rather than a charge.
+    /// </summary>
+    private double TransmissionLossesMwh() =>
+        (_result!.DataSeries.TransmissionLossesMw ?? []).Sum() * _result.Scenario.Resolution.TotalHours;
 
     private double AnnualServedEnergyMwh() =>
         _result!.Metrics.DemandMwh - _result.Metrics.UnservedEnergyMwh;

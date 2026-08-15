@@ -541,3 +541,93 @@ code {
     flex: 1 1 100%;
     line-height: 1.5;
 }
+
+/* Data tables.
+
+   CSS isolation cannot reach a child component's elements, and the same table appears on the
+   comparison page, the dispatch page and inside the sizing-trajectory component. One definition
+   here beats three that drift apart. A wide table scrolls inside its own box rather than widening
+   the page. */
+
+.table-wrap {
+    margin-top: 1.25rem;
+    overflow-x: auto;
+    border-block: 1px solid var(--color-border);
+}
+
+.data-table {
+    width: 100%;
+    min-width: 720px;
+    border-collapse: collapse;
+    font-size: 0.83rem;
+}
+
+.data-table th,
+.data-table td {
+    padding: 0.65rem 0.8rem;
+    border-bottom: 1px solid var(--color-border);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.data-table th:first-child,
+.data-table td:first-child {
+    text-align: left;
+}
+
+.data-table thead th {
+    color: var(--color-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.data-table tbody th {
+    font-weight: 700;
+}
+
+.data-table .row-system {
+    background: var(--color-surface-table);
+}
+
+.data-table .row-derived td,
+.data-table .row-derived th {
+    color: var(--color-muted);
+    font-weight: 400;
+}
+
+.data-table .row-derived td:last-child {
+    font-size: 0.78rem;
+    text-align: right;
+}
+
+.data-table .row-idle {
+    color: var(--color-muted);
+}
+
+.data-table .cell-emphasis {
+    font-weight: 700;
+}
+
+.data-table .cell-absent {
+    color: var(--color-muted);
+    font-size: 0.76rem;
+    font-variant-numeric: normal;
+}
+
+.data-table em {
+    display: block;
+    color: var(--color-muted);
+    font-size: 0.72rem;
+    font-style: normal;
+}
+
+.data-table .swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    margin-right: 0.5rem;
+    border-radius: 2px;
+    vertical-align: baseline;
+}
