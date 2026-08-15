@@ -81,17 +81,31 @@
                                 <small>AUD/MWh served</small>
                                 <span class="@DeltaClass(region)">@SystemDelta(region)</span>
                             </p>
-                            @if (region.Mix.TotalMwh > 0)
-                            {
-                                <MixBar Segments="@region.Mix.Segments()"
-                                        Label="Delivered energy"
-                                        AriaLabel="@($"{region.Name} delivered generation by technology")"
-                                        Detail="@($"{PlotFormat.Share(region.Mix.RenewableShare)} renewable")" />
-                            }
-                            else if (_detailState == RegionDetailState.Loading)
-                            {
-                                <p class="scorecard-pending">Loading generation mix…</p>
-                            }
+                            @* The mix arrives with the regional detail artifact, well after the
+                               card itself. The placeholder is the same height as the bar it
+                               replaces so the figures below do not jump when it resolves. *@
+                            <div class="scorecard-mix">
+                                @if (region.Mix.TotalMwh > 0)
+                                {
+                                    <MixBar Segments="@region.Mix.Segments()"
+                                            Label="Delivered energy"
+                                            AriaLabel="@($"{region.Name} delivered generation by technology")"
+                                            Detail="@($"{PlotFormat.Share(region.Mix.RenewableShare)} renewable")" />
+                                }
+                                else
+                                {
+                                    <div class="mix-placeholder @(_detailState == RegionDetailState.Loading ? "is-loading" : null)"
+                                         role="status">
+                                        <span>Delivered energy</span>
+                                        <i aria-hidden="true"></i>
+                                        <small>
+                                            @(_detailState == RegionDetailState.Loading
+                                                ? "Reading the regional dispatch series…"
+                                                : "Regional dispatch series unavailable")
+                                        </small>
+                                    </div>
+                                }
+                            </div>
                             <dl class="scorecard-facts">
                                 <div><dt>Annual cost</dt><dd>@PlotFormat.MoneyTotal(region.Cost.TotalAnnualisedCostAud)</dd></div>
                                 <div><dt>Demand</dt><dd>@PlotFormat.Compact(region.Metrics.DemandMwh) MWh</dd></div>

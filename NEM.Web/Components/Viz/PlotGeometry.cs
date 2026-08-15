@@ -124,6 +124,11 @@ public static class PlotFormat
     /// <summary>
     /// A magnitude-scaled figure: 128,000,000 reads as 128M rather than as fourteen characters of
     /// digits that no axis has room for.
+    ///
+    /// Abbreviation starts at a hundred thousand rather than ten. Storage capacities in these runs
+    /// sit either side of ten thousand megawatt-hours, so the lower threshold printed 5,515 beside
+    /// 12.3k in the same comparison — two units for one measure, which is exactly what a reader
+    /// scanning a row of regions should never have to reconcile.
     /// </summary>
     public static string Compact(double value, int decimals = 1)
     {
@@ -134,7 +139,7 @@ public static class PlotFormat
             >= 1e12 => $"{sign}{(magnitude / 1e12).ToString($"N{decimals}", CultureInfo.CurrentCulture)}T",
             >= 1e9 => $"{sign}{(magnitude / 1e9).ToString($"N{decimals}", CultureInfo.CurrentCulture)}B",
             >= 1e6 => $"{sign}{(magnitude / 1e6).ToString($"N{decimals}", CultureInfo.CurrentCulture)}M",
-            >= 1e4 => $"{sign}{(magnitude / 1e3).ToString($"N{decimals}", CultureInfo.CurrentCulture)}k",
+            >= 1e5 => $"{sign}{(magnitude / 1e3).ToString($"N{decimals}", CultureInfo.CurrentCulture)}k",
             >= 1 => value.ToString("N0", CultureInfo.CurrentCulture),
             0 => "0",
             _ => value.ToString("G3", CultureInfo.CurrentCulture),

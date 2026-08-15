@@ -170,7 +170,8 @@ public sealed record SystemAnalysis(
         AddCurtailmentWithShortfall(analysis, findings);
         AddTrade(analysis, findings);
         AddStorageDivergence(analysis, findings);
-        return findings;
+        // Highest priority first, so a page showing only the first few shows the ones that matter.
+        return [.. findings.OrderByDescending(finding => finding.Priority)];
     }
 
     private static void AddCostSpread(SystemAnalysis analysis, List<Finding> findings)
@@ -199,7 +200,8 @@ public sealed record SystemAnalysis(
             + $"{percentage:N1}% between two regions of the same run.",
             FindingTone.Neutral,
             PlotFormat.Money(spread),
-            "AUD/MWh spread"));
+            "AUD/MWh spread",
+            Priority: 95));
     }
 
     private static void AddWeightedAverage(SystemAnalysis analysis, List<Finding> findings)
@@ -223,7 +225,8 @@ public sealed record SystemAnalysis(
             + $"regional figures is {PlotFormat.Money(mean)}/MWh. {largest.State} serves "
             + $"{PlotFormat.Share(largest.ServedEnergyMwh / Math.Max(1, analysis.ServedEnergyMwh))} of "
             + "system energy, so its cost dominates the system number.",
-            FindingTone.Neutral));
+            FindingTone.Neutral,
+            Priority: 60));
     }
 
     private static void AddReliabilityConcentration(SystemAnalysis analysis, List<Finding> findings)
@@ -236,7 +239,8 @@ public sealed record SystemAnalysis(
                 $"No region recorded unserved energy against a "
                 + $"{analysis.Result.Reliability.TargetUsePercentageOfDemand:G3}% of demand target"
                 + ReliabilityStandard(analysis.Result.Reliability) + ".",
-                FindingTone.Favourable));
+                FindingTone.Favourable,
+                Priority: 40));
             return;
         }
 
@@ -263,7 +267,8 @@ public sealed record SystemAnalysis(
             + $"against the system's {PlotFormat.Share(SystemAllowanceUsed(analysis), 0)}.",
             worst.Reliability.WithinTarget ? FindingTone.Caution : FindingTone.Constraint,
             PlotFormat.Compact(worst.Metrics.PeakUnservedPowerMw),
-            "MW peak shortfall"));
+            "MW peak shortfall",
+            Priority: worst.Reliability.WithinTarget ? 90 : 100));
     }
 
     private static void AddCurtailmentWithShortfall(SystemAnalysis analysis, List<Finding> findings)
@@ -289,7 +294,8 @@ public sealed record SystemAnalysis(
                     + "of demand unserved. Both at once is a timing result, not a capacity one: the energy "
                     + "existed, but not in the hours it was needed."
                 : ". Curtailed energy is available generation the fleet had no room for."),
-            alsoShort ? FindingTone.Caution : FindingTone.Neutral));
+            alsoShort ? FindingTone.Caution : FindingTone.Neutral,
+            Priority: alsoShort ? 85 : 55));
     }
 
     private static void AddTrade(SystemAnalysis analysis, List<Finding> findings)
@@ -312,7 +318,8 @@ public sealed record SystemAnalysis(
             + $"{PlotFormat.Compact(busiest.LossesMwh)} MWh was lost in transmission.",
             FindingTone.Neutral,
             PlotFormat.Share(busiest.CapacityFactor, 1),
-            "of link capacity used"));
+            "of link capacity used",
+            Priority: 50));
     }
 
     private static void AddStorageDivergence(SystemAnalysis analysis, List<Finding> findings)
@@ -335,7 +342,8 @@ public sealed record SystemAnalysis(
             + $"target, while {held} met the target with the fleet already installed.",
             FindingTone.Caution,
             PlotFormat.Compact(grown.StorageGrowthMwh),
-            "MWh of storage added"));
+            "MWh of storage added",
+            Priority: 70));
     }
 
     private static double SystemAllowanceUsed(SystemAnalysis analysis) =>

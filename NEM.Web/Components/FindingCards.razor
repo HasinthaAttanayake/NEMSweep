@@ -17,7 +17,7 @@
             }
         </div>
         <div class="finding-cards">
-            @foreach (Finding finding in Findings)
+            @foreach (Finding finding in Shown)
             {
                 <article class="finding @ToneClass(finding.Tone)">
                     <p class="finding-tone">@ToneLabel(finding.Tone)</p>
@@ -33,13 +33,27 @@
                         </p>
                     }
                     <p class="finding-detail">@finding.Detail</p>
-                    @if (finding.Href is { Length: > 0 } href)
+                    @{
+                        // A finding names its own evidence when it has one; otherwise the page
+                        // hosting the cards says where the figures behind them live.
+                        string? evidenceHref = finding.Href ?? EvidenceHref;
+                    }
+                    @if (evidenceHref is { Length: > 0 })
                     {
-                        <a href="@href">@(finding.LinkText ?? "Open the evidence")</a>
+                        <a href="@evidenceHref">@(finding.LinkText ?? EvidenceText ?? "Open the evidence")</a>
                     }
                 </article>
             }
         </div>
+        @if (Findings.Count > Shown.Count && EvidenceHref is { Length: > 0 } moreHref)
+        {
+            <p class="findings-more">
+                <a href="@moreHref">
+                    @(Findings.Count - Shown.Count) more @(Findings.Count - Shown.Count == 1 ? "finding" : "findings")
+                    from this run
+                </a>
+            </p>
+        }
     </section>
 }
 
@@ -48,9 +62,25 @@
     [Parameter] public string Heading { get; set; } = "What this run shows";
     [Parameter] public string Eyebrow { get; set; } = "Findings";
     [Parameter] public string? Description { get; set; }
+
+    /// <summary>
+    /// How many to show. Findings arrive ranked, so a limit keeps the most significant. Null shows
+    /// every one, which is what the page that owns the evidence should do.
+    /// </summary>
+    [Parameter] public int? Limit { get; set; }
+
+    /// <summary>Where a reader goes to check a finding against the figures behind it.</summary>
+    [Parameter] public string? EvidenceHref { get; set; }
+
+    [Parameter] public string? EvidenceText { get; set; }
+
     [Parameter] public string? Class { get; set; }
 
     private readonly string _headingId = $"findings-{Guid.NewGuid():N}";
+
+    private IReadOnlyList<Finding> Shown => Limit is { } limit && Findings.Count > limit
+        ? [.. Findings.Take(limit)]
+        : Findings;
 
     private static string ToneClass(FindingTone tone) => tone switch
     {

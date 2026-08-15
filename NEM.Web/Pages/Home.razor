@@ -70,13 +70,53 @@
         <FindingCards Findings="@_analysis.Findings"
                       Eyebrow="Read this first"
                       Heading="What the current run found"
-                      Description="Generated from the run's own figures each time this page loads, not written by hand."
+                      Description="Generated from the run's own figures each time this page loads, not written by hand. The most significant are shown here; the comparison page carries them all with the tables behind them."
+                      Limit="3"
+                      EvidenceHref="regions"
+                      EvidenceText="See the figures behind this"
                       Class="home-findings" />
     }
     else if (_systemState.Status is ArtifactLoadStatus.Loading)
     {
         <section class="headline-section">
             <div class="status-block"><MudProgressCircular Color="Color.Primary" Indeterminate="true" /></div>
+        </section>
+    }
+
+    @* What the model can do, read out of the artifacts rather than described in prose, so this
+       section moves when the model does instead of going quietly stale. *@
+    @if (_modelState is not null)
+    {
+        <section class="state-section" aria-labelledby="state-heading">
+            <div class="section-heading">
+                <div>
+                    <p class="section-label">Where the build is</p>
+                    <h2 id="state-heading">What the model does today</h2>
+                </div>
+                <p>
+                    NemSim is built one validated layer at a time. Every line below is read from the
+                    artifacts the latest run produced, so this list is current by construction.
+                </p>
+            </div>
+
+            <ul class="capabilities">
+                @foreach (ModelCapability capability in _modelState.Capabilities)
+                {
+                    <li class="@(capability.IsPresent ? "is-present" : "is-absent")">
+                        <MudIcon Icon="@(capability.IsPresent ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.RadioButtonUnchecked)"
+                                 Size="Size.Small" />
+                        <span>
+                            <strong>@capability.Name</strong>
+                            <small>@capability.Detail</small>
+                        </span>
+                    </li>
+                }
+            </ul>
+
+            <p class="schema-line">
+                Artifact schemas in this build:
+                @string.Join(" · ", _modelState.SchemaVersions.Select(entry => $"{entry.Key} v{entry.Value}"))
+            </p>
         </section>
     }
 
@@ -241,6 +281,7 @@
     private ArtifactLoadState _systemState = ArtifactLoadState.Loading();
     private SystemDispatchResultsDTO? _system;
     private SystemAnalysis? _analysis;
+    private ModelState? _modelState;
 
     private string ScopeSentence => _system is null
         ? string.Empty
@@ -301,6 +342,13 @@
             {
                 _sweeps.Add(new SweepSummary(index.Value!, SweepAnalysis.Build(index.Value!)));
             }
+        }
+
+        // Stated once both halves are in hand: what the model does is partly a question about the
+        // dispatch run and partly about how many sweeps sit behind it.
+        if (_system is not null)
+        {
+            _modelState = ModelState.From(_system, [.. _sweeps.Select(sweep => sweep.Index)]);
         }
     }
 

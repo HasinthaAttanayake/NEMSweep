@@ -132,6 +132,70 @@ public sealed class ArtifactLoaderTests
     }
 
     [Fact]
+    public async Task LoadAsync_ReadsAnArtifactOnceAndServesTheParsedInstanceAfterwards()
+    {
+        var handler = new CountingHandler(Serialize(ArtifactFixtures.SystemResults()));
+        using var http = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") };
+        var loader = new ArtifactLoader(http);
+
+        ArtifactLoadResult<SystemDispatchResultsDTO> first =
+            await loader.LoadAsync<SystemDispatchResultsDTO>("data/results.json");
+        ArtifactLoadResult<SystemDispatchResultsDTO> second =
+            await loader.LoadAsync<SystemDispatchResultsDTO>("data/results.json");
+
+        handler.Requests.Should().Be(1);
+        second.IsSuccess.Should().BeTrue();
+        second.Value.Should().BeSameAs(first.Value);
+    }
+
+    [Fact]
+    public async Task LoadAsync_DoesNotServeACachedArtifactToADifferentType()
+    {
+        var handler = new CountingHandler(Serialize(ArtifactFixtures.SystemResults()));
+        using var http = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") };
+        var loader = new ArtifactLoader(http);
+
+        await loader.LoadAsync<SystemDispatchResultsDTO>("data/results.json");
+        ArtifactLoadResult<RegionDispatchResultsDTO> other =
+            await loader.LoadAsync<RegionDispatchResultsDTO>("data/results.json");
+
+        handler.Requests.Should().Be(2);
+        other.IsSuccess.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task LoadAsync_DoesNotCacheAnArtifactThatFailedItsChecks()
+    {
+        var handler = new CountingHandler("""{ "schemaVersion": 99 }""");
+        using var http = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") };
+        var loader = new ArtifactLoader(http);
+
+        await loader.LoadAsync<GenerationInformationDTO>("data/test.json");
+        await loader.LoadAsync<GenerationInformationDTO>("data/test.json");
+
+        handler.Requests.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task LoadAsync_EvictsTheLeastRecentlyReadArtifactRatherThanGrowingWithoutBound()
+    {
+        var handler = new CountingHandler(Serialize(ArtifactFixtures.SystemResults()));
+        using var http = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") };
+        var loader = new ArtifactLoader(http);
+
+        // One more distinct path than the cache holds, so the first read is evicted.
+        for (int index = 0; index < 7; index++)
+        {
+            await loader.LoadAsync<SystemDispatchResultsDTO>($"data/results-{index}.json");
+        }
+
+        await loader.LoadAsync<SystemDispatchResultsDTO>("data/results-0.json");
+        await loader.LoadAsync<SystemDispatchResultsDTO>("data/results-6.json");
+
+        handler.Requests.Should().Be(8);
+    }
+
+    [Fact]
     public async Task LoadRegionForAsync_DoesNotRefetchTheSystemArtifact()
     {
         var handler = new PairResponseHandler("run-1", "run-1");
@@ -283,6 +347,22 @@ public sealed class ArtifactLoaderTests
             {
                 Content = new StringContent(content, Encoding.UTF8, "application/json"),
             });
+    }
+
+    private sealed class CountingHandler(string content) : HttpMessageHandler
+    {
+        public int Requests { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            Requests++;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(content, Encoding.UTF8, "application/json"),
+            });
+        }
     }
 
     private sealed class ThrowingHandler : HttpMessageHandler

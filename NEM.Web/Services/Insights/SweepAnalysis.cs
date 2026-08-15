@@ -146,7 +146,8 @@ public sealed record SweepAnalysis(
         AddRenewableShare(analysis, findings);
         AddConstraints(analysis, findings);
         AddReliabilityBinding(analysis, findings);
-        return findings;
+        // Highest priority first, so a page showing only the first few shows the ones that matter.
+        return [.. findings.OrderByDescending(finding => finding.Priority)];
     }
 
     /// <summary>
@@ -188,7 +189,8 @@ public sealed record SweepAnalysis(
                 : "."),
             diverges ? FindingTone.Caution : FindingTone.Neutral,
             PlotFormat.Signed(totalChange, "N0") + "%",
-            "annual system cost"));
+            "annual system cost",
+            Priority: diverges ? 100 : 70));
     }
 
     private static void AddTurningPoint(SweepAnalysis analysis, List<Finding> findings)
@@ -208,7 +210,8 @@ public sealed record SweepAnalysis(
             + "sweep would miss the turn entirely.",
             FindingTone.Caution,
             PlotFormat.Money(turn.Run.Scalars.SlcoeAudPerMwh),
-            $"/MWh at {turn.Run.AxisValue:N0} {analysis.AxisUnit}"));
+            $"/MWh at {turn.Run.AxisValue:N0} {analysis.AxisUnit}",
+            Priority: 95));
     }
 
     /// <summary>
@@ -245,7 +248,8 @@ public sealed record SweepAnalysis(
             + $"({PlotFormat.Signed(storageChange, "N0")}%). Storage grows from "
             + $"{PlotFormat.Share(first.StorageCostShare)} to {PlotFormat.Share(last.StorageCostShare)} "
             + "of the levelised cost.",
-            FindingTone.Neutral));
+            FindingTone.Neutral,
+            Priority: 65));
     }
 
     /// <summary>
@@ -283,7 +287,8 @@ public sealed record SweepAnalysis(
                     : "."),
                 curtailmentChange < 0 ? FindingTone.Favourable : FindingTone.Caution,
                 PlotFormat.Share(Math.Clamp(absorbed, 0, 1), 0),
-                "of new load met from recovered spill"));
+                "of new load met from recovered spill",
+                Priority: 75));
             return;
         }
 
@@ -310,7 +315,8 @@ public sealed record SweepAnalysis(
             + "produce never reaches load, because demand is unchanged and storage is not grown.",
             FindingTone.Caution,
             PlotFormat.Share(spilledShare, 0),
-            "of new renewable energy curtailed"));
+            "of new renewable energy curtailed",
+            Priority: 85));
     }
 
     private static void AddRenewableShare(SweepAnalysis analysis, List<Finding> findings)
@@ -339,7 +345,8 @@ public sealed record SweepAnalysis(
                 : "."),
             points < 0 ? FindingTone.Caution : FindingTone.Favourable,
             PlotFormat.Share(lastShare),
-            "renewable at the last run"));
+            "renewable at the last run",
+            Priority: 60));
     }
 
     private static void AddConstraints(SweepAnalysis analysis, List<Finding> findings)
@@ -370,7 +377,8 @@ public sealed record SweepAnalysis(
             + (firstConstrained.Failure?.Message ?? "no reason was recorded."),
             FindingTone.Constraint,
             analysis.ConstrainedPoints.Count.ToString("N0"),
-            "runs without results"));
+            "runs without results",
+            Priority: 90));
     }
 
     private static void AddReliabilityBinding(SweepAnalysis analysis, List<Finding> findings)
@@ -393,7 +401,8 @@ public sealed record SweepAnalysis(
             + "the target is setting the cost, not the weather.",
             FindingTone.Constraint,
             atTarget.Length.ToString("N0"),
-            $"of {analysis.Runs.Count:N0} runs at the limit"));
+            $"of {analysis.Runs.Count:N0} runs at the limit",
+            Priority: 55));
     }
 
     private static double PercentageChange(double from, double to) =>

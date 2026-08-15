@@ -104,6 +104,21 @@
     text-decoration: underline;
 }
 
+.findings-more {
+    margin: 0.9rem 0 0;
+}
+
+.findings-more a {
+    color: var(--accent);
+    font-size: 0.84rem;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.findings-more a:hover {
+    text-decoration: underline;
+}
+
 .tone-neutral {
     --finding-tone: var(--color-track-fill);
 }

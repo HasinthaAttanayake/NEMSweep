@@ -39,6 +39,31 @@ public sealed class ArtifactLoader(HttpClient http)
         PropertyNameCaseInsensitive = true,
     };
 
+    /// <summary>
+    /// Parsed artifacts, kept so navigating between pages does not re-read them. The dispatch
+    /// results are megabytes of interval series, and deserializing them dominates a page change:
+    /// returning to the comparison page cost about 1.7 seconds of parsing against 14 milliseconds
+    /// of transfer, because the browser's own cache serves the bytes but not the objects.
+    ///
+    /// Published artifacts are immutable — a rerun writes new files and the page is reloaded — so a
+    /// cached instance cannot go stale within a session. Nothing mutates a loaded artifact: the
+    /// pages copy with <c>with</c> expressions rather than assigning into one.
+    /// </summary>
+    private readonly Dictionary<string, object> _cache = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Cached paths in the order they were last read, oldest first. Kept beside the cache so a long
+    /// session moving through many sweep points cannot grow without bound.
+    /// </summary>
+    private readonly List<string> _cacheOrder = [];
+
+    /// <summary>
+    /// How many parsed artifacts to keep. A dispatch result holds several 8,760-element series, so
+    /// this is tens of megabytes at worst; it is sized to cover a system result, its regions, and a
+    /// couple of sweep points at once, rather than a whole sweep.
+    /// </summary>
+    private const int MaximumCachedArtifacts = 6;
+
     public async Task<ArtifactLoadResult<T>> LoadAsync<T>(
         string path,
         CancellationToken cancellationToken = default)
@@ -80,6 +105,14 @@ public sealed class ArtifactLoader(HttpClient http)
         CancellationToken cancellationToken)
         where T : class
     {
+        // The requested type is part of the identity: the same path read as two different artifact
+        // types would otherwise hand back the wrong one.
+        string key = $"{typeof(T).FullName}|{path}";
+        if (TryTakeCached(key, out T? cached))
+        {
+            return new(new(ArtifactLoadStatus.Success, null), cached);
+        }
+
         try
         {
             using HttpResponseMessage response = await http.GetAsync(path, cancellationToken);
@@ -114,6 +147,9 @@ public sealed class ArtifactLoader(HttpClient http)
                 return new(ArtifactLoadState.InvalidData(validationMessage), null);
             }
 
+            // Only artifacts that passed every check are kept, so a cache hit is always a result
+            // the caller could have got from a fresh read.
+            Cache(key, artifact);
             return new(new(ArtifactLoadStatus.Success, null), artifact);
         }
         catch (JsonException)
@@ -123,6 +159,33 @@ public sealed class ArtifactLoader(HttpClient http)
         catch (HttpRequestException)
         {
             return new(ArtifactLoadState.Failed("Artifact request failed."), null);
+        }
+    }
+
+    private bool TryTakeCached<T>(string key, out T? artifact)
+        where T : class
+    {
+        if (_cache.TryGetValue(key, out object? stored) && stored is T typed)
+        {
+            _cacheOrder.Remove(key);
+            _cacheOrder.Add(key);
+            artifact = typed;
+            return true;
+        }
+
+        artifact = null;
+        return false;
+    }
+
+    private void Cache(string key, object artifact)
+    {
+        _cache[key] = artifact;
+        _cacheOrder.Remove(key);
+        _cacheOrder.Add(key);
+        while (_cacheOrder.Count > MaximumCachedArtifacts)
+        {
+            _cache.Remove(_cacheOrder[0]);
+            _cacheOrder.RemoveAt(0);
         }
     }
 }

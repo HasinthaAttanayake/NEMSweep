@@ -25,6 +25,12 @@ public enum FindingTone
 /// carries the figures it is drawn from so it can be checked against the tables on the same page;
 /// nothing here estimates, forecasts, or advises.
 /// </summary>
+/// <param name="Priority">
+/// How much this finding matters relative to the others from the same artifact, highest first. Set
+/// by the code that derives it, because only that code knows whether a cost curve reversing is the
+/// headline or a footnote. Tone cannot stand in for it: a reversal worth leading with and a target
+/// that merely binds are both cautions.
+/// </param>
 public sealed record Finding(
     string Headline,
     string Detail,
@@ -32,4 +38,5 @@ public sealed record Finding(
     string? Metric = null,
     string? MetricUnit = null,
     string? Href = null,
-    string? LinkText = null);
+    string? LinkText = null,
+    int Priority = 50);

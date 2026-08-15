@@ -17,15 +17,33 @@ public sealed record SweepMeasure(
     Func<SweepRun, double?> Select,
     bool IsDerived = false)
 {
-    public string AxisTitle => string.IsNullOrWhiteSpace(Unit) ? Label : $"{Label} ({Unit})";
+    /// <summary>
+    /// The contract states shares as fractions. A reader does not read 0.38 as thirty-eight
+    /// percent, so a fraction is scaled and relabelled for display while the underlying scalar is
+    /// left exactly as the artifact publishes it.
+    /// </summary>
+    public bool IsFraction => string.Equals(Unit, "fraction", StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>Formats a value of this measure the way the site states it elsewhere.</summary>
-    public string Format(double value) => Prefix switch
+    public string DisplayUnit => IsFraction ? "%" : Unit;
+
+    public string AxisTitle =>
+        string.IsNullOrWhiteSpace(DisplayUnit) ? Label : $"{Label} ({DisplayUnit})";
+
+    /// <summary>Reads the measure off a run in the units this measure is displayed in.</summary>
+    public double? SelectForDisplay(SweepRun run)
     {
-        "$" => PlotFormat.Money((decimal)value),
-        "%" => $"{value:N2}%",
-        _ => PlotFormat.Compact(value, 2),
-    };
+        double? value = Select(run);
+        return IsFraction && value is { } fraction ? 100 * fraction : value;
+    }
+
+    /// <summary>Formats a displayed value the way the site states it elsewhere.</summary>
+    public string Format(double value) => IsFraction
+        ? $"{value:N1}%"
+        : Prefix switch
+        {
+            "$" => PlotFormat.Money((decimal)value),
+            _ => PlotFormat.Compact(value, 2),
+        };
 }
 
 /// <summary>

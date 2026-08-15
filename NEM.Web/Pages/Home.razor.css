@@ -47,9 +47,72 @@
 
 .question-section,
 .explore-section,
-.headline-section {
+.headline-section,
+.state-section {
     padding: 2rem 0;
     border-top: 1px solid var(--color-border);
+}
+
+/* Model state -------------------------------------------------------------- */
+
+.state-section h2 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.65rem;
+    font-weight: 600;
+}
+
+.capabilities {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1px;
+    margin: 1.5rem 0 0;
+    padding: 0;
+    list-style: none;
+    background: var(--color-border);
+    border: 1px solid var(--color-border);
+}
+
+.capabilities li {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 0.7rem;
+    padding: 1rem 1.15rem;
+    background: var(--color-surface);
+}
+
+.capabilities li.is-present {
+    color: var(--color-positive);
+}
+
+.capabilities li.is-absent {
+    color: var(--color-muted);
+}
+
+.capabilities strong,
+.capabilities small {
+    display: block;
+    min-width: 0;
+}
+
+.capabilities strong {
+    color: var(--color-ink);
+    font-size: 0.92rem;
+}
+
+.capabilities small {
+    margin-top: 0.2rem;
+    color: var(--color-muted);
+    font-size: 0.82rem;
+    line-height: 1.5;
+}
+
+.schema-line {
+    margin: 1rem 0 0;
+    color: var(--color-muted);
+    font-size: 0.78rem;
+    line-height: 1.6;
 }
 
 /* Headline result ---------------------------------------------------------- */

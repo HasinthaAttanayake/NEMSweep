@@ -120,6 +120,19 @@ public sealed class PlotGeometryTests
         PlotFormat.Compact(value).Should().Be(expected);
     }
 
+    /// <summary>
+    /// Storage capacities across regions straddle ten thousand megawatt-hours, and abbreviating
+    /// from there printed 5,515 beside 12.3k in the same comparison.
+    /// </summary>
+    [Theory]
+    [InlineData(5_515, "5,515")]
+    [InlineData(6_772, "6,772")]
+    [InlineData(12_287, "12,287")]
+    public void Compact_KeepsOneUnitAcrossValuesThatStraddleTenThousand(double value, string expected)
+    {
+        PlotFormat.Compact(value).Should().Be(expected);
+    }
+
     [Fact]
     public void Money_KeepsTheMinusSignOutsideTheCurrencySymbol()
     {

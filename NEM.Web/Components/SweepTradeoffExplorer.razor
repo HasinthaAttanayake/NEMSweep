@@ -113,7 +113,7 @@
         for (int index = 0; index < Analysis.Runs.Count; index++)
         {
             SweepRun run = Analysis.Runs[index];
-            if (_x.Select(run) is not { } x || _y.Select(run) is not { } y)
+            if (_x.SelectForDisplay(run) is not { } x || _y.SelectForDisplay(run) is not { } y)
             {
                 continue;
             }
@@ -183,6 +183,7 @@
         Build();
     }
 
-    private static string Option(SweepMeasure measure) =>
-        string.IsNullOrWhiteSpace(measure.Unit) ? measure.Label : $"{measure.Label} ({measure.Unit})";
+    private static string Option(SweepMeasure measure) => string.IsNullOrWhiteSpace(measure.DisplayUnit)
+        ? measure.Label
+        : $"{measure.Label} ({measure.DisplayUnit})";
 }
