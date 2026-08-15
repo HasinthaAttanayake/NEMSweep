@@ -56,6 +56,18 @@
                 <p>@WindLocationLabel</p>
                 <small>@_weather.Wind.SourceFile</small>
             </div>
+            @* Two sites for one region is easy to miss when the difference is two strings a reader
+               has to compare. A dispatch result records only one site per region, so this page is
+               the only place the second one appears. *@
+            @if (SitesDiffer)
+            {
+                <p class="weather-sites-note">
+                    This region's solar and wind traces come from different weather files.
+                    A dispatch result records one site per region, so it names
+                    @_weather.Solar.Location.City for @RegionLabel and does not mention
+                    @_weather.Wind.Location.City.
+                </p>
+            }
         </section>
 
         <MudTabs Elevation="0" Class="weather-tabs" Style="max-width: 100%; overflow: hidden">
@@ -317,6 +329,19 @@
     private string WeatherResolution => $"{_weather!.Resolution.TotalHours:N0}-hour intervals";
     private string SolarLocationLabel => FormatLocation(_weather!.Solar.Location);
     private string WindLocationLabel => FormatLocation(_weather!.Wind.Location);
+
+    private string RegionLabel => RegionNames.Full(_weather!.RegionId);
+
+    /// <summary>
+    /// Whether the two roles were assembled from different weather files. The WMO identifier is the
+    /// comparison rather than the file name, because one site can be published under more than one
+    /// file while remaining the same location.
+    /// </summary>
+    private bool SitesDiffer => _weather is not null
+        && !string.Equals(
+            _weather.Solar.Location.Wmo,
+            _weather.Wind.Location.Wmo,
+            StringComparison.OrdinalIgnoreCase);
 
     private static string FormatLocation(WeatherLocation location) =>
         $"{location.City} · WMO {location.Wmo} · {location.Latitude:0.0000}, {location.Longitude:0.0000}";

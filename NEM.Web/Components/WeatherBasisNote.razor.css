@@ -36,3 +36,18 @@
     font-size: 0.72rem;
     overflow-wrap: anywhere;
 }
+
+.weather-basis-caveat {
+    max-width: 80ch;
+    margin-top: 0.55rem !important;
+    padding-top: 0.55rem;
+    border-top: 1px solid var(--color-border);
+    color: var(--color-muted);
+    font-size: 0.78rem;
+    line-height: 1.55;
+}
+
+.weather-basis-caveat a {
+    color: var(--color-notice);
+    font-weight: 700;
+}

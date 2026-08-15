@@ -44,8 +44,19 @@
     background: var(--color-surface-muted);
 }
 
-.weather-provenance div:last-child {
+/* The wind block is addressed by position rather than as the last child, because a note now
+   follows it and would otherwise take the wind colouring with it. */
+.weather-provenance div:nth-of-type(2) {
     border-left-color: var(--wind);
+}
+
+.weather-sites-note {
+    grid-column: 1 / -1;
+    margin: 0;
+    padding-top: 0.35rem;
+    color: var(--color-muted);
+    font-size: 0.82rem;
+    line-height: 1.55;
 }
 
 .weather-provenance h2,
