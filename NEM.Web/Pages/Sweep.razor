@@ -6,6 +6,7 @@
 @inject SweepManifestLoader SweepManifestLoader
 @inject SweepIndexLoader SweepIndexLoader
 @inject NavigationManager Navigation
+@inject ViewportScroller Scroller
 
 <PageTitle>@(_index?.Name ?? "Sweep")</PageTitle>
 
@@ -54,12 +55,28 @@
             <MetricStrip Items="@Metrics" AriaLabel="Sweep result summary" Columns="4"
                          Style="--metric-value-size: 1.3rem;" />
 
+            @* A sweep page is long and gets longer with every measure the contract adds and every
+               region a run covers. The sections are listed once at the top so the page stays
+               traversable rather than relying on the reader scrolling to discover it. *@
+            <nav class="sweep-sections" aria-label="Sections on this page">
+                <a href="@SectionHref("findings")">Findings</a>
+                @if (_analysis.Runs.Count > 1)
+                {
+                    <a href="@SectionHref("headline")">Cost headline</a>
+                    <a href="@SectionHref("tradeoff-heading")">Trade-offs</a>
+                }
+                <a href="@SectionHref("series-heading")">Every measure</a>
+                <a href="@SectionHref("runs")">All runs</a>
+            </nav>
+
+            <div id="findings"></div>
             <FindingCards Findings="@_analysis.Findings"
                           Heading="What this sweep shows"
                           Description="Derived from the sweep index alone. Each finding names the runs it is drawn from, so it can be checked against the table at the foot of this page." />
 
             @if (_analysis.Runs.Count > 1)
             {
+                <div id="headline"></div>
                 <SweepCostDivergence Analysis="@_analysis" RegionId="@SelectedRegionId" />
                 <SweepTradeoffExplorer Analysis="@_analysis" RegionId="@SelectedRegionId" />
             }
@@ -78,18 +95,24 @@
                 <SweepScalarGrid Index="@_index"
                                  RegionId="@SelectedRegionId"
                                  SelectedKey="@_axis.Key"
-                                 OnSelect="SelectSeries" />
+                                 OnSelect="SelectSeriesAsync" />
 
-                <SweepChart Index="@_index"
-                            YAxis="@_axis"
-                            RegionId="@SelectedRegionId"
-                            Heading="@_axis.Label"
-                            Description="@($"Achieved {_axis.Label.ToLowerInvariant()} at each run of the sweep. Select a point to open that run.")"
-                            DrillDownTarget="ResolveDrillDownTarget" />
+                @* The picker is a grid of eighteen tiles, so the chart it drives can sit a
+                   screen below the tile that was clicked. The chart is brought into view when the
+                   selection lands off screen. *@
+                <div @ref="_seriesChart">
+                    <SweepChart Index="@_index"
+                                YAxis="@_axis"
+                                RegionId="@SelectedRegionId"
+                                Heading="@_axis.Label"
+                                Description="@($"Achieved {_axis.Label.ToLowerInvariant()} at each run of the sweep. Select a point to open that run.")"
+                                DrillDownTarget="ResolveDrillDownTarget" />
+                </div>
             </section>
 
             <SweepOutcomeSummary Index="_index" />
 
+            <div id="runs"></div>
             <SweepRunTable Index="@_index"
                            RegionId="@SelectedRegionId"
                            AnnualCostLabel="@_analysis.AnnualCostLabel"
@@ -135,6 +158,7 @@
     private SweepChartYAxis? _axis;
     private SweepAnalysis? _analysis;
     private string _selectedRegion = "System";
+    private ElementReference _seriesChart;
 
     private IReadOnlyList<string> RegionOptions => _index?.Points
         .SelectMany(point => point.RegionScalars ?? [])
@@ -265,7 +289,23 @@
         return withValues;
     }
 
-    private void SelectSeries(string key) => _axis = SweepSeriesCatalogue.Resolve(key) ?? _axis;
+    private async Task SelectSeriesAsync(string key)
+    {
+        _axis = SweepSeriesCatalogue.Resolve(key) ?? _axis;
+        StateHasChanged();
+        await Scroller.RevealAsync(_seriesChart);
+    }
+
+    /// <summary>
+    /// An in-page link that keeps whatever region and axes the address already names, so jumping
+    /// to a section does not quietly reset the view someone was sent.
+    /// </summary>
+    private string SectionHref(string anchor)
+    {
+        string uri = Navigation.Uri;
+        int hash = uri.IndexOf('#', StringComparison.Ordinal);
+        return $"{(hash < 0 ? uri : uri[..hash])}#{anchor}";
+    }
 
     private string ResolveDrillDownTarget(SweepIndexPointDTO point) =>
         SweepPaths.RunRoute(SweepId, point.PointId, SelectedRegionId);

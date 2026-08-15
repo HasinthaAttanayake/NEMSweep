@@ -63,3 +63,28 @@
     color: var(--color-muted);
     line-height: 1.55;
 }
+
+/* Section links. A sweep page grows with every measure the contract adds and every region a run
+   covers, so it needs a way in other than scrolling to find out what is there. */
+.sweep-sections {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 1.25rem;
+}
+
+.sweep-sections a {
+    padding: 0.35rem 0.7rem;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 999px;
+    color: var(--color-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.sweep-sections a:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent);
+}
