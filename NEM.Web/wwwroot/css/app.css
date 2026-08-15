@@ -435,3 +435,109 @@ code {
     font-size: 0.82rem;
     line-height: 1.5;
 }
+/* ---------------------------------------------------------------------------
+   Network map
+   --------------------------------------------------------------------------- */
+
+.network-map {
+    margin: 0;
+}
+
+.network-edge line {
+    stroke: var(--color-accent-cool);
+    stroke-linecap: round;
+}
+
+.network-edge.is-idle line {
+    stroke: var(--color-border-control);
+    stroke-dasharray: 5 5;
+}
+
+.network-arrow {
+    fill: var(--color-accent-cool);
+}
+
+.network-edge-label {
+    fill: var(--color-accent-cool);
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+}
+
+.network-node circle {
+    fill: var(--color-surface);
+    stroke: var(--color-track-fill);
+    stroke-width: 2.5;
+}
+
+.network-node.is-importer circle {
+    fill: var(--color-negative-soft);
+    stroke: var(--color-negative);
+}
+
+.network-node.is-exporter circle {
+    fill: var(--color-positive-soft);
+    stroke: var(--color-positive);
+}
+
+.network-node-id {
+    fill: var(--color-ink);
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.network-node-label {
+    fill: var(--color-ink);
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.network-node-detail {
+    fill: var(--color-muted);
+    font-family: var(--font-body);
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+}
+
+.network-caption {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem 1.25rem;
+    padding: 0.85rem 0 0;
+    color: var(--color-muted);
+    font-size: 0.82rem;
+}
+
+.network-caption span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.network-caption i {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid var(--color-track-fill);
+    background: var(--color-surface);
+}
+
+.network-caption .network-key-importer {
+    border-color: var(--color-negative);
+    background: var(--color-negative-soft);
+}
+
+.network-caption .network-key-exporter {
+    border-color: var(--color-positive);
+    background: var(--color-positive-soft);
+}
+
+.network-caption .network-note {
+    display: block;
+    flex: 1 1 100%;
+    line-height: 1.5;
+}

@@ -252,6 +252,13 @@
                             energy is its flow less its losses.
                         </p>
                     </div>
+                    @* A table says how much moved on each line; only a drawing says which way
+                       energy runs through the market as a whole. *@
+                    <NetworkMap Nodes="@_networkNodes"
+                                Edges="@_networkEdges"
+                                AriaLabel="Regions and the interconnectors between them"
+                                Class="region-network" />
+
                     <div class="table-wrap">
                         <table class="data-table">
                             <thead>
@@ -281,6 +288,27 @@
                             </tbody>
                         </table>
                     </div>
+
+                    @if (_regionTradeSeries.Count > 0)
+                    {
+                        @* Each region's own imports and exports. The artifacts carry these per
+                           region and nothing on the site drew them, so a reader could see the
+                           link's total but not which region was leaning on it. *@
+                        <LinePlot Series="@_regionTradeSeries"
+                                  XLabels="@_flowLabels"
+                                  AriaLabel="Imports and exports by region across the dispatch period"
+                                  Height="280"
+                                  ShowMarkers="false"
+                                  XAxisTitle="Dispatch period"
+                                  Class="flow-plot">
+                            <Caption>
+                                <span class="plot-note">
+                                    Positive is energy arriving in the region, negative is energy
+                                    leaving it.
+                                </span>
+                            </Caption>
+                        </LinePlot>
+                    }
 
                     @if (_flowSeries.Count > 0)
                     {
@@ -334,6 +362,9 @@
     private string _selectedMeasureKey = "slcoe";
     private List<PlotMarker> _costAgainstShare = [];
     private List<PlotSeries> _flowSeries = [];
+    private List<PlotSeries> _regionTradeSeries = [];
+    private List<NetworkMap.NetworkNode> _networkNodes = [];
+    private List<NetworkMap.NetworkEdge> _networkEdges = [];
     private List<string> _flowLabels = [];
     private int _flowBucketHours = 1;
 
@@ -385,6 +416,7 @@
         _result = load.Value!;
         _analysis = SystemAnalysis.Build(_result);
         BuildFlowSeries(_result);
+        BuildNetwork();
 
         // The system artifact carries every regional summary, so the page is usable immediately.
         // Regional generation mixes live in separate artifacts of a megabyte or more each; they are
@@ -431,7 +463,94 @@
             : RegionDetailState.Unavailable;
         _analysis = SystemAnalysis.Build(result, details);
         BuildCostAgainstShare();
+        BuildNetwork();
+        BuildRegionTrade(result, details);
         StateHasChanged();
+    }
+
+    /// <summary>
+    /// The system as nodes and edges. Everything here is a figure the run already publishes; the
+    /// layout is a circle because the model records no coordinates, and placing regions
+    /// geographically would put a claim about where they are into a picture of what flowed.
+    /// </summary>
+    private void BuildNetwork()
+    {
+        if (_analysis is null)
+        {
+            return;
+        }
+
+        _networkNodes = [.. _analysis.Regions.Select(region => new NetworkMap.NetworkNode(
+            region.RegionId,
+            region.State,
+            region.Metrics.DemandMwh,
+            region.Cost.NetImportedEnergyMwh))];
+        _networkEdges = [.. _analysis.Links.Select(link => new NetworkMap.NetworkEdge(
+            link.FromRegionId,
+            link.ToRegionId,
+            link.CapacityMw,
+            link.EnergyMwh,
+            link.PeakFlowMw,
+            link.CapacityFactor))];
+    }
+
+    /// <summary>
+    /// Imports and exports per region, as one signed series each: arriving energy above the axis
+    /// and departing energy below it, so a reader sees which region leaned on the link and when.
+    /// </summary>
+    private void BuildRegionTrade(
+        SystemDispatchResultsDTO result,
+        IReadOnlyDictionary<string, RegionDispatchResultsDTO> details)
+    {
+        int length = result.DataSeries.Demand.TotalDemandMw?.Length ?? 0;
+        if (length == 0 || details.Count == 0)
+        {
+            _regionTradeSeries = [];
+            return;
+        }
+
+        int bucketSize = Math.Max(1, (int)Math.Ceiling(length / 300.0));
+        string[] palette = ["#4372a8", "#b8613f", "#176b5b", "#8a5fa8", "#915300"];
+        var series = new List<PlotSeries>();
+        int index = 0;
+        foreach (string regionId in result.RegionIds)
+        {
+            if (!details.TryGetValue(regionId, out RegionDispatchResultsDTO? detail))
+            {
+                continue;
+            }
+
+            double[] imports = detail.DataSeries.ImportsMw ?? [];
+            double[] exports = detail.DataSeries.ExportsMw ?? [];
+            if (imports.Length == 0 && exports.Length == 0)
+            {
+                continue;
+            }
+
+            var values = new List<double?>();
+            for (int offset = 0; offset < length; offset += bucketSize)
+            {
+                int end = Math.Min(offset + bucketSize, length);
+                double net = 0;
+                for (int interval = offset; interval < end; interval++)
+                {
+                    net += (interval < imports.Length ? imports[interval] : 0)
+                        - (interval < exports.Length ? exports[interval] : 0);
+                }
+
+                values.Add(net / (end - offset));
+            }
+
+            series.Add(new PlotSeries(
+                $"{regionId} net imports (MW)",
+                palette[index % palette.Length],
+                values));
+            index++;
+        }
+
+        // A signed series needs an axis that shows both signs, which the plot derives from the
+        // values themselves, so nothing more is needed here.
+        _regionTradeSeries = series;
     }
 
     private void BuildCostAgainstShare()
