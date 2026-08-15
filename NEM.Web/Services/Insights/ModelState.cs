@@ -24,7 +24,10 @@ public sealed record ModelState(
         int intervals = result.DataSeries.Demand.TotalDemandMw?.Length ?? 0;
         DispatchInterconnectorDTO[] links = result.Interconnectors ?? [];
         int activeLinks = links.Count(link => link.FlowMw is { Length: > 0 } flow && flow.Any(value => value > 0));
-        bool storageSized = result.StorageSizing.Outcome != StorageSizingOutcome.NotRequired;
+        // Only Resized means the loop grew storage and reached the target. Every other non-default
+        // outcome means it stopped without reaching it, and reporting those as success would turn a
+        // failed run into a capability claim.
+        StorageSizingOutcome sizingOutcome = result.StorageSizing.Outcome;
         bool transmissionCosted = result.Cost.AnnualisedTransmissionCostAud != 0;
         int totalRuns = sweeps.Sum(sweep => sweep.Points.Length);
 
@@ -53,13 +56,8 @@ public sealed record ModelState(
                 intervals > 0),
             new(
                 "Coupled storage sizing",
-                storageSized
-                    ? $"Storage grown to {result.StorageSizing.FinalEnergyMwh:N0} MWh over "
-                        + $"{result.StorageSizing.PassesUsed} dispatch "
-                        + $"{(result.StorageSizing.PassesUsed == 1 ? "pass" : "passes")} to reach the "
-                        + "reliability target"
-                    : "The installed fleet met the reliability target without resizing",
-                true),
+                SizingDetail(result.StorageSizing, sizingOutcome),
+                sizingOutcome is StorageSizingOutcome.NotRequired or StorageSizingOutcome.Resized),
             new(
                 "Reliability against a standard",
                 result.Reliability.StandardName is { Length: > 0 } standard
@@ -84,6 +82,37 @@ public sealed record ModelState(
         };
 
         return new ModelState(capabilities, CollectSchemaVersions(result, sweeps));
+    }
+
+    /// <summary>
+    /// What the sizing loop did, in its own terms. The distinction that matters is whether the
+    /// reliability target was reached: three of these outcomes mean the loop stopped without
+    /// reaching it, and one means it was never needed.
+    /// </summary>
+    private static string SizingDetail(StorageSizingOutcomeDTO sizing, StorageSizingOutcome outcome)
+    {
+        string passes = $"{sizing.PassesUsed} dispatch {(sizing.PassesUsed == 1 ? "pass" : "passes")}";
+        return outcome switch
+        {
+            StorageSizingOutcome.NotRequired =>
+                "The installed fleet met the reliability target without resizing",
+            StorageSizingOutcome.Resized =>
+                $"Storage grown to {sizing.FinalEnergyMwh:N0} MWh over {passes} to reach the "
+                    + "reliability target",
+            StorageSizingOutcome.EnergyLimited =>
+                $"Stopped at {sizing.FinalEnergyMwh:N0} MWh after {passes}: available generation "
+                    + "energy is below demand, so more storage cannot reach the target",
+            StorageSizingOutcome.StorageNoLongerImprovesReliability =>
+                $"Stopped at {sizing.FinalEnergyMwh:N0} MWh after {passes}: further storage stopped "
+                    + "reducing unserved energy before the target was reached",
+            StorageSizingOutcome.BatteryCapacityLimitReached =>
+                $"Stopped at the {sizing.MaximumEnergyMwh:N0} MWh capacity ceiling after {passes} "
+                    + "without reaching the reliability target",
+            StorageSizingOutcome.PassLimitReached =>
+                $"Stopped at the dispatch-pass limit after {passes} without reaching the "
+                    + "reliability target",
+            _ => $"Finished at {sizing.FinalEnergyMwh:N0} MWh after {passes}",
+        };
     }
 
     /// <summary>

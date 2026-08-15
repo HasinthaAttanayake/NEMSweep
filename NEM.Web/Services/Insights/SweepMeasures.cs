@@ -57,7 +57,12 @@ public static class SweepMeasures
     public const string RenewableShareKey = "achievedRenewableShareGridScale";
     public const string AxisKey = "sweepAxis";
 
-    public static IReadOnlyList<SweepMeasure> For(SweepIndexDTO index)
+    /// <summary>
+    /// The measures for a sweep at a given scope. The region is part of the signature because the
+    /// derived annual cost is the selected scope's cost, and labelling a region's figure as the
+    /// system's would overstate it by the size of every other region.
+    /// </summary>
+    public static IReadOnlyList<SweepMeasure> For(SweepIndexDTO index, string? regionId = null)
     {
         ArgumentNullException.ThrowIfNull(index);
 
@@ -71,7 +76,7 @@ public static class SweepMeasures
                 run => run.AxisValue),
             new(
                 TotalCostKey,
-                "Annual system cost",
+                regionId is null ? "Annual system cost" : $"Annual cost, {regionId}",
                 "AUD",
                 "$",
                 run => run.TotalAnnualCostAud,

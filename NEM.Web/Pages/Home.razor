@@ -76,10 +76,18 @@
                       EvidenceText="See the figures behind this"
                       Class="home-findings" />
     }
-    else if (_systemState.Status is ArtifactLoadStatus.Loading)
+    else
     {
-        <section class="headline-section">
-            <div class="status-block"><MudProgressCircular Color="Color.Primary" Indeterminate="true" /></div>
+        @* Loading has a spinner and every other non-success state says why. Dropping the section
+           silently would leave the page looking as though the run simply has no headline. *@
+        <section class="headline-section" aria-labelledby="headline-heading">
+            <div class="section-heading">
+                <div>
+                    <p class="section-label">Latest run</p>
+                    <h2 id="headline-heading">What the current simulation costs</h2>
+                </div>
+            </div>
+            <ArtifactLoadStateView State="_systemState"><span /></ArtifactLoadStateView>
         </section>
     }
 

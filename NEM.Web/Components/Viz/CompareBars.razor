@@ -6,7 +6,9 @@
     the system figure, and a bar that crosses the reference is a different result from one that
     does not.
 *@
-<div class="compare-bars @Class" role="img" aria-label="@AriaLabel">
+@* A labelled group rather than an image: every row carries its own name and value as text, and
+   an image role would collapse the whole comparison into one label. *@
+<div class="compare-bars @Class" role="group" aria-label="@AriaLabel">
     @foreach (CompareRowGeometry row in _rows)
     {
         <div class="compare-row @(row.Source.IsMuted ? "is-muted" : null)">

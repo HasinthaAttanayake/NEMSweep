@@ -78,17 +78,32 @@ public sealed record PlotAxis(double Minimum, double Maximum, IReadOnlyList<doub
     public double Fraction(double value) =>
         Maximum <= Minimum ? 0 : (value - Minimum) / (Maximum - Minimum);
 
-    /// <summary>Decimal places the tick step needs, so an axis of 0.25 steps is not labelled "0".</summary>
+    /// <summary>
+    /// Decimal places the tick labels need. Counted by shifting the step until it is whole rather
+    /// than from its magnitude: a step of 0.25 has a magnitude suggesting one decimal, which would
+    /// label consecutive ticks 0.2 and 0.3 and hide that they are 0.05 apart from where they claim.
+    /// </summary>
     public int TickDecimals
     {
         get
         {
-            if (Step <= 0 || Step >= 1)
+            if (Step <= 0 || double.IsNaN(Step) || double.IsInfinity(Step))
             {
                 return 0;
             }
 
-            return Math.Min(6, (int)Math.Ceiling(-Math.Log10(Step)));
+            double remaining = Math.Abs(Step);
+            for (int decimals = 0; decimals < 6; decimals++)
+            {
+                if (Math.Abs(remaining - Math.Round(remaining)) < 1e-9)
+                {
+                    return decimals;
+                }
+
+                remaining *= 10;
+            }
+
+            return 6;
         }
     }
 

@@ -8,7 +8,9 @@
 *@
 <figure class="line-plot @Class">
     <div class="plot-scroll">
-        <svg viewBox="@($"0 0 1000 {Height}")" role="img" aria-label="@AriaLabel"
+        @* A group rather than an image: the plot contains focusable points, and role="img"
+           makes every descendant presentational so none of them reach assistive technology. *@
+        <svg viewBox="@($"0 0 1000 {Height}")" role="group" aria-label="@AriaLabel"
              style="@($"aspect-ratio: 1000 / {Height};")">
             @foreach (double tick in _primary.Ticks)
             {

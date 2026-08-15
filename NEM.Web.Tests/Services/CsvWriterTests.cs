@@ -45,6 +45,9 @@ public sealed class CsvWriterTests
     [Theory]
     [InlineData("=SUM(A1:A9)", "'=SUM(A1:A9)")]
     [InlineData("@import", "'@import")]
+    [InlineData("+SUM(A1:A9)", "'+SUM(A1:A9)")]
+    [InlineData("-1+2", "'-1+2")]
+    [InlineData("+500 MW", "'+500 MW")]
     public void Build_NeutralisesAFieldASpreadsheetWouldTreatAsAFormula(string field, string expected)
     {
         string csv = CsvWriter.Build(["Label"], [[field]]);
@@ -52,12 +55,18 @@ public sealed class CsvWriterTests
         csv.Should().Be($"Label\r\n{expected}\r\n");
     }
 
-    [Fact]
-    public void Build_LeavesSignedValuesAloneBecauseTheyAreOrdinaryFiguresHere()
+    /// <summary>
+    /// A signed number has to arrive as a number or the column cannot be summed, which is the whole
+    /// point of exporting it. Only signed values that are not numbers are expressions.
+    /// </summary>
+    [Theory]
+    [InlineData("-266101")]
+    [InlineData("-266101.5")]
+    [InlineData("+0.3798")]
+    [InlineData("-1.5E-08")]
+    public void Build_LeavesASignedNumberNumeric(string field)
     {
-        string csv = CsvWriter.Build(["Label"], [["+500 MW"], ["-266101"]]);
-
-        csv.Should().Be("Label\r\n+500 MW\r\n-266101\r\n");
+        CsvWriter.Build(["Value"], [[field]]).Should().Be($"Value\r\n{field}\r\n");
     }
 
     [Fact]

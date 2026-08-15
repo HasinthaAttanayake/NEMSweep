@@ -92,6 +92,7 @@
 
             <SweepRunTable Index="@_index"
                            RegionId="@SelectedRegionId"
+                           AnnualCostLabel="@_analysis.AnnualCostLabel"
                            HighlightPointId="@_analysis.CheapestUnitCost?.Point.PointId" />
 
             @if (_index.Scope is not null)
@@ -178,7 +179,7 @@
                     $"{PlotFormat.Money(first.Scalars.SlcoeAudPerMwh)} → {PlotFormat.Money(last.Scalars.SlcoeAudPerMwh)}",
                     $"AUD/MWh, {first.Label} to {last.Label}"),
                 new(
-                    "Annual system cost",
+                    analysis.AnnualCostLabel,
                     $"{PlotFormat.MoneyTotal((decimal)first.TotalAnnualCostAud)} → {PlotFormat.MoneyTotal((decimal)last.TotalAnnualCostAud)}",
                     "derived from cost per MWh and energy served"),
                 new(

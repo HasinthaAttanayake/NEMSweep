@@ -26,7 +26,7 @@
                     <th scope="col">Outcome</th>
                     <th scope="col">Reliability<small>vs target</small></th>
                     <th scope="col">Storage sizing</th>
-                    <th scope="col">Annual system cost<small>AUD, derived</small></th>
+                    <th scope="col">@AnnualCostLabel<small>AUD, derived</small></th>
                     @foreach (SweepChartYAxis column in SweepSeriesCatalogue.All)
                     {
                         <th scope="col">@column.Label<small>@column.Unit</small></th>
@@ -91,6 +91,12 @@
     [Parameter, EditorRequired] public SweepIndexDTO Index { get; set; } = default!;
     [Parameter] public string? RegionId { get; set; }
 
+    /// <summary>
+    /// What the derived cost column is of. Selecting a region makes every scalar that region's, so
+    /// a fixed "Annual system cost" would report one region's bill as the market's.
+    /// </summary>
+    [Parameter] public string AnnualCostLabel { get; set; } = "Annual system cost";
+
     /// <summary>The run to mark as the reference in the table, usually the cheapest per MWh.</summary>
     [Parameter] public string? HighlightPointId { get; set; }
 
@@ -134,7 +140,7 @@
         "Outcome",
         "Reliability",
         "Storage sizing",
-        "Annual system cost (AUD, derived)",
+        $"{AnnualCostLabel} (AUD, derived)",
         .. SweepSeriesCatalogue.All.Select(column => $"{column.Label} ({column.Unit})"),
     ];
 

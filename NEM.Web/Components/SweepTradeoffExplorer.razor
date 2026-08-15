@@ -58,8 +58,9 @@
                 @if (_x.IsDerived || _y.IsDerived)
                 {
                     <span>
-                        Annual system cost is derived: it is the run's levelised cost multiplied by
-                        the energy it served.
+                        @Analysis.AnnualCostLabel is derived: it is the run's levelised cost for
+                        @(Analysis.RegionId is null ? "the system" : Analysis.RegionId), multiplied
+                        by the energy that scope served.
                     </span>
                 }
                 @if (_relationship is { Length: > 0 })
@@ -95,7 +96,7 @@
 
     protected override void OnParametersSet()
     {
-        _measures = SweepMeasures.For(Analysis.Index);
+        _measures = SweepMeasures.For(Analysis.Index, RegionId);
         // Only measures the runs actually carry a value for are offered, so the selector cannot
         // produce an empty chart.
         _available = [.. _measures.Where(measure =>

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 
 namespace NEM.Web.Services;
@@ -10,12 +11,11 @@ namespace NEM.Web.Services;
 public static class CsvWriter
 {
     /// <summary>
-    /// Characters that make a spreadsheet treat a text cell as a formula. A run label such as
-    /// "=SUM(A1)" would execute on open, so a leading one is neutralised with an apostrophe. Plus
-    /// and minus are left alone: they lead ordinary values here, and neither begins a formula
-    /// without a valid expression after it.
+    /// Characters that make a spreadsheet treat a cell as a formula. Plus and minus are included
+    /// because "+SUM(A1)" and "-1+2" evaluate just as "=" does; a signed number is exempted
+    /// separately so genuine figures stay numeric and can still be summed.
     /// </summary>
-    private static readonly char[] FormulaStarters = ['=', '@', '\t', '\r'];
+    private static readonly char[] FormulaStarters = ['=', '@', '+', '-', '\t', '\r'];
 
     public static string Build(IReadOnlyList<string> headers, IEnumerable<IReadOnlyList<string>> rows)
     {
@@ -80,7 +80,7 @@ public static class CsvWriter
     private static string Escape(string? field)
     {
         string value = field ?? string.Empty;
-        if (value.Length > 0 && FormulaStarters.Contains(value[0]))
+        if (value.Length > 0 && FormulaStarters.Contains(value[0]) && !IsNumber(value))
         {
             value = "'" + value;
         }
@@ -95,4 +95,16 @@ public static class CsvWriter
 
         return $"\"{value.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
     }
+
+    /// <summary>
+    /// Whether a signed field is a plain number rather than an expression. A negative scalar has to
+    /// reach the spreadsheet as a number — quoting or prefixing it would make the column unusable —
+    /// while a signed label like "+500 MW" or an expression like "-1+2" must not be evaluated.
+    /// Parsed invariantly because that is how <see cref="Build"/>'s callers write their figures.
+    /// </summary>
+    private static bool IsNumber(string value) => double.TryParse(
+        value,
+        NumberStyles.Float,
+        CultureInfo.InvariantCulture,
+        out _);
 }

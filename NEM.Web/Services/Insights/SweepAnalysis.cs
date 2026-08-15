@@ -12,11 +12,16 @@ public sealed record SweepRun(SweepIndexPointDTO Point, SweepPointScalarResultsD
     public double AxisValue => Point.AxisValue;
 
     /// <summary>
-    /// The run's whole annual cost, reconstructed from the two figures the index carries. The
-    /// levelised cost is published to the cent, so this is accurate to well under a tenth of a
-    /// percent — but it is a product of published scalars rather than a published total, and the
-    /// site says so wherever it is shown.
+    /// The whole annual cost of whatever scope these scalars describe, reconstructed from the two
+    /// figures the index carries. The levelised cost is published to the cent, so this is accurate
+    /// to well under a tenth of a percent — but it is a product of published scalars rather than a
+    /// published total, and the site says so wherever it is shown.
     /// </summary>
+    /// <remarks>
+    /// When the analysis is built for a region, these are that region's scalars and this is that
+    /// region's cost, not the system's. Callers must label it with
+    /// <see cref="SweepAnalysis.AnnualCostLabel"/> rather than assuming system scope.
+    /// </remarks>
     public double TotalAnnualCostAud => (double)Scalars.SlcoeAudPerMwh * Scalars.EnergyServedMwh;
 
     /// <summary>Delivered energy from renewable technologies, where the run carries a share.</summary>
@@ -58,6 +63,18 @@ public sealed record SweepAnalysis(
     public string AxisUnit => Index.Axis.Unit;
 
     public string AxisLabel => Index.Axis.Label;
+
+    /// <summary>
+    /// What these figures describe. Selecting a region rebuilds the analysis from that region's
+    /// scalars, so every label drawn from it has to move with the selection: a regional view that
+    /// still says "system" states a single region's result as the whole market's.
+    /// </summary>
+    public string ScopeName => RegionId is null ? "the whole system" : RegionNames.Full(RegionId);
+
+    /// <summary>Column and axis label for the derived annual cost at the selected scope.</summary>
+    public string AnnualCostLabel => RegionId is null
+        ? "Annual system cost"
+        : $"Annual cost, {RegionId}";
 
     public static SweepAnalysis Build(SweepIndexDTO index, string? regionId = null)
     {
@@ -169,19 +186,30 @@ public sealed record SweepAnalysis(
             return;
         }
 
-        bool diverges = Math.Sign(unitChange) != Math.Sign(totalChange)
-            && Math.Abs(unitChange) >= 0.5
-            && Math.Abs(totalChange) >= 0.5;
-        string headline = diverges
-            ? $"Cost per MWh {Direction(unitChange)} {Math.Abs(unitChange):N0}% while the annual bill "
-                + $"{Direction(totalChange)} {Math.Abs(totalChange):N0}%"
-            : $"Cost per MWh and the annual bill both {DirectionPlural(unitChange)}";
+        // A change under half a percent is not a movement worth a verb. Reading both verbs off the
+        // unit change alone reported a flat unit cost beside a ten percent rise in the bill as
+        // "both hold", which is false about the half that moved.
+        bool unitMoved = Math.Abs(unitChange) >= 0.5;
+        bool totalMoved = Math.Abs(totalChange) >= 0.5;
+        bool diverges = unitMoved && totalMoved && Math.Sign(unitChange) != Math.Sign(totalChange);
+        string headline = (unitMoved, totalMoved) switch
+        {
+            (true, true) when diverges =>
+                $"Cost per MWh {Direction(unitChange)} {Math.Abs(unitChange):N0}% while the annual bill "
+                    + $"{Direction(totalChange)} {Math.Abs(totalChange):N0}%",
+            (true, true) => $"Cost per MWh and the annual bill both {DirectionPlural(unitChange)}",
+            (true, false) =>
+                $"Cost per MWh {Direction(unitChange)} {Math.Abs(unitChange):N0}% while the annual bill holds",
+            (false, true) =>
+                $"The annual bill {Direction(totalChange)} {Math.Abs(totalChange):N0}% while cost per MWh holds",
+            _ => "Cost per MWh and the annual bill both hold",
+        };
         findings.Add(new Finding(
             headline,
             $"From {first.Label} to {last.Label}, levelised cost moves "
             + $"{PlotFormat.Money(first.Scalars.SlcoeAudPerMwh)} → "
-            + $"{PlotFormat.Money(last.Scalars.SlcoeAudPerMwh)}/MWh while the annual cost of the whole "
-            + $"system moves {PlotFormat.MoneyTotal((decimal)first.TotalAnnualCostAud)} → "
+            + $"{PlotFormat.Money(last.Scalars.SlcoeAudPerMwh)}/MWh while the annual cost of "
+            + $"{analysis.ScopeName} moves {PlotFormat.MoneyTotal((decimal)first.TotalAnnualCostAud)} → "
             + $"{PlotFormat.MoneyTotal((decimal)last.TotalAnnualCostAud)}"
             + (diverges
                 ? ". The average megawatt-hour gets cheaper because far more of them are sold, not "
@@ -189,7 +217,7 @@ public sealed record SweepAnalysis(
                 : "."),
             diverges ? FindingTone.Caution : FindingTone.Neutral,
             PlotFormat.Signed(totalChange, "N0") + "%",
-            "annual system cost",
+            analysis.AnnualCostLabel.ToLowerInvariant(),
             Priority: diverges ? 100 : 70));
     }
 

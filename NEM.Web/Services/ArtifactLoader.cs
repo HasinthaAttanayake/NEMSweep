@@ -106,8 +106,10 @@ public sealed class ArtifactLoader(HttpClient http)
         where T : class
     {
         // The requested type is part of the identity: the same path read as two different artifact
-        // types would otherwise hand back the wrong one.
-        string key = $"{typeof(T).FullName}|{path}";
+        // types would otherwise hand back the wrong one. So is the validation mode — an artifact
+        // first read unversioned is cached unchecked, and a later checked read of the same path
+        // would otherwise be handed that instance as though it had passed.
+        string key = $"{typeof(T).FullName}|{(validateSchema ? "checked" : "unchecked")}|{path}";
         if (TryTakeCached(key, out T? cached))
         {
             return new(new(ArtifactLoadStatus.Success, null), cached);

@@ -154,6 +154,31 @@ public sealed class PlotGeometryTests
         PlotFormat.Share(0.3798).Should().Be("38.0%");
     }
 
+    /// <summary>
+    /// The nice-step family includes 2.5, so a step can be 0.25. Taking the precision from the
+    /// step's magnitude gave one decimal, labelling consecutive ticks 0.2 and 0.3.
+    /// </summary>
+    [Theory]
+    [InlineData(1, 0)]
+    [InlineData(50, 0)]
+    [InlineData(0.5, 1)]
+    [InlineData(0.25, 2)]
+    [InlineData(0.025, 3)]
+    public void TickDecimals_CountsWhatTheStepActuallyNeeds(double step, int expected)
+    {
+        new PlotAxis(0, step * 4, [0, step], step).TickDecimals.Should().Be(expected);
+    }
+
+    [Fact]
+    public void TickDecimals_LabelsAQuarterStepAxisDistinctly()
+    {
+        PlotAxis axis = PlotAxis.Nice(0, 1, targetTicks: 4);
+
+        string[] labels = [.. axis.Ticks.Select(tick => PlotFormat.Tick(tick, axis))];
+
+        labels.Should().OnlyHaveUniqueItems();
+    }
+
     [Fact]
     public void Coordinate_UsesInvariantSeparatorsSoAPathCannotBreakUnderAnotherCulture()
     {

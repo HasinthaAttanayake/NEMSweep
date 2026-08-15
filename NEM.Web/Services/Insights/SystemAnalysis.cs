@@ -60,16 +60,22 @@ public sealed record LinkFlow(
     double LossesMwh,
     double PeakFlowMw,
     int FlowingIntervals,
-    int TotalIntervals)
+    int TotalIntervals,
+    double IntervalHours)
 {
     public string Label => $"{FromRegionId} to {ToRegionId}";
 
     public double FlowingShare => TotalIntervals <= 0 ? 0 : (double)FlowingIntervals / TotalIntervals;
 
     /// <summary>Energy carried as a share of what the link could have carried had it run flat out.</summary>
-    public double CapacityFactor => CapacityMw <= 0 || TotalIntervals <= 0
+    /// <remarks>
+    /// Both sides of the ratio are energy. The denominator has to include the interval length as
+    /// the numerator does, or a two-hour run reports twice the utilisation it achieved and a
+    /// half-hourly one reports half.
+    /// </remarks>
+    public double CapacityFactor => CapacityMw <= 0 || TotalIntervals <= 0 || IntervalHours <= 0
         ? 0
-        : EnergyMwh / (CapacityMw * TotalIntervals);
+        : EnergyMwh / (CapacityMw * TotalIntervals * IntervalHours);
 
     public double LossShare => EnergyMwh <= 0 ? 0 : LossesMwh / EnergyMwh;
 }
@@ -151,7 +157,8 @@ public sealed record SystemAnalysis(
                 losses.Sum() * hours,
                 flow.Length == 0 ? 0 : flow.Max(),
                 flow.Count(value => value > 0),
-                flow.Length));
+                flow.Length,
+                hours));
         }
 
         return links;
@@ -331,19 +338,42 @@ public sealed record SystemAnalysis(
         }
 
         RegionProfile grown = resized.MaxBy(region => region.StorageGrowthMwh)!;
-        string held = string.Join(
-            " and ",
-            analysis.Regions.Where(region => !region.WasResized).Select(region => region.State));
+        string held = Join(analysis.Regions.Where(region => !region.WasResized).Select(region => region.State));
+        double addedMwh = resized.Sum(region => region.StorageGrowthMwh);
+
+        // With one region resized the finding names it; with several it has to name all of them, or
+        // it reports the others as having held when they did not.
+        string headline = resized.Length == 1
+            ? $"Only {grown.State} needed more storage"
+            : $"{resized.Length} of {analysis.Regions.Count} regions needed more storage";
+        string detail = resized.Length == 1
+            ? $"The sizing loop grew {grown.Name} storage from "
+                + $"{PlotFormat.Compact(grown.StorageSizing.InitialEnergyMwh)} MWh to "
+                + $"{PlotFormat.Compact(grown.StorageSizing.FinalEnergyMwh)} MWh to reach the "
+                + $"reliability target, while {held} met the target with the fleet already installed."
+            : $"The sizing loop grew storage in {Join(resized.Select(region => region.State))} to reach "
+                + $"the reliability target, adding {PlotFormat.Compact(addedMwh)} MWh in total and most "
+                + $"of it in {grown.State}. {held} met the target with the fleet already installed.";
+
         findings.Add(new Finding(
-            $"Only {grown.State} needed more storage",
-            $"The sizing loop grew {grown.Name} storage from "
-            + $"{PlotFormat.Compact(grown.StorageSizing.InitialEnergyMwh)} MWh to "
-            + $"{PlotFormat.Compact(grown.StorageSizing.FinalEnergyMwh)} MWh to reach the reliability "
-            + $"target, while {held} met the target with the fleet already installed.",
+            headline,
+            detail,
             FindingTone.Caution,
-            PlotFormat.Compact(grown.StorageGrowthMwh),
+            PlotFormat.Compact(addedMwh),
             "MWh of storage added",
             Priority: 70));
+    }
+
+    /// <summary>Names in a readable list, so three regions read as "A, B and C" rather than "A, B, C".</summary>
+    private static string Join(IEnumerable<string> names)
+    {
+        string[] values = [.. names];
+        return values.Length switch
+        {
+            0 => string.Empty,
+            1 => values[0],
+            _ => $"{string.Join(", ", values[..^1])} and {values[^1]}",
+        };
     }
 
     private static double SystemAllowanceUsed(SystemAnalysis analysis) =>
