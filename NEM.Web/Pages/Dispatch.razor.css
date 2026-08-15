@@ -89,3 +89,10 @@
 .reliability-band .within-target { color: var(--accent); }
 .reliability-band .outside-target { color: var(--color-notice); }
 @media (max-width: 760px) { .reliability-band { grid-template-columns: 1fr; } }
+.storage-capacity-rule { stroke: var(--color-border-control); stroke-width: 1.5; stroke-dasharray: 6 4; }
+.storage-capacity-label { fill: var(--color-muted); font-family: var(--font-body); font-size: 12.5px; }
+.storage-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 1px; margin: .25rem 0 0; background: var(--color-border); border: 1px solid var(--color-border); }
+.storage-summary > div { padding: .8rem 1rem; background: var(--color-surface); }
+.storage-summary dt { color: var(--color-muted); font-size: .76rem; }
+.storage-summary dd { margin: .15rem 0 0; color: var(--accent); font-family: var(--font-display); font-size: 1.4rem; font-variant-numeric: tabular-nums; font-weight: 600; }
+.storage-summary .storage-summary-detail { margin-top: .2rem; color: var(--color-muted); font-family: var(--font-body); font-size: .74rem; font-weight: 400; line-height: 1.45; }

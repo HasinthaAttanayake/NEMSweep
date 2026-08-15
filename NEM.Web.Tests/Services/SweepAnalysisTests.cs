@@ -131,6 +131,49 @@ public sealed class SweepAnalysisTests
         finding.Metric.Should().Be("47%");
     }
 
+    /// <summary>
+    /// The run where the installed fleet stops being enough is a capital decision, and it is not
+    /// visible in any cost series because the storage cost is spread across every run after it.
+    /// </summary>
+    [Fact]
+    public void Build_NamesTheRunWhereNewStorageBecomesNecessary()
+    {
+        SweepAnalysis analysis = Analyse(
+            Sized("p0", "Baseline", 0, StorageSizingOutcome.NotRequired),
+            Sized("p1", "+3,000 MW", 3000, StorageSizingOutcome.NotRequired),
+            Sized("p2", "+3,500 MW", 3500, StorageSizingOutcome.Resized),
+            Sized("p3", "+4,000 MW", 4000, StorageSizingOutcome.Resized));
+
+        Finding finding = analysis.Findings.Should()
+            .ContainSingle(finding => finding.Headline.StartsWith("New storage becomes necessary")).Subject;
+        finding.Headline.Should().Contain("+3,500 MW");
+        finding.Detail.Should().Contain("+3,000 MW");
+        finding.Metric.Should().Be("3,500");
+        finding.Tone.Should().Be(FindingTone.Constraint);
+    }
+
+    [Fact]
+    public void Build_ClaimsNoStorageThresholdWhenTheFirstRunAlreadyNeedsBuilding()
+    {
+        SweepAnalysis analysis = Analyse(
+            Sized("p0", "Baseline", 0, StorageSizingOutcome.Resized),
+            Sized("p1", "+500 MW", 500, StorageSizingOutcome.Resized));
+
+        analysis.Findings.Should().NotContain(finding =>
+            finding.Headline.StartsWith("New storage becomes necessary"));
+    }
+
+    [Fact]
+    public void Build_ClaimsNoStorageThresholdWhenNothingIsEverResized()
+    {
+        SweepAnalysis analysis = Analyse(
+            Sized("p0", "Baseline", 0, StorageSizingOutcome.NotRequired),
+            Sized("p1", "+500 MW", 500, StorageSizingOutcome.NotRequired));
+
+        analysis.Findings.Should().NotContain(finding =>
+            finding.Headline.StartsWith("New storage becomes necessary"));
+    }
+
     [Fact]
     public void Build_NamesTheLastFeasibleRunWhenLaterRunsReachALimit()
     {
@@ -216,6 +259,24 @@ public sealed class SweepAnalysisTests
         ArtifactFixtures.Sizing(),
         new IntervalPointersDTO(null, null, 0),
         null);
+
+    /// <summary>A run whose sizing loop finished with a chosen outcome, growing storage when resized.</summary>
+    private static SweepIndexPointDTO Sized(
+        string pointId,
+        string label,
+        double axisValue,
+        StorageSizingOutcome outcome) => Run(pointId, label, axisValue) with
+    {
+        StorageSizing = new StorageSizingOutcomeDTO(
+            outcome,
+            5515,
+            940,
+            outcome == StorageSizingOutcome.Resized ? 6036 : 5515,
+            outcome == StorageSizingOutcome.Resized ? 1509 : 940,
+            100_000,
+            10_000,
+            3),
+    };
 
     private static SweepIndexPointDTO Failed(string pointId, string label, double axisValue) =>
         ArtifactFixtures.FailedPoint(pointId, label, axisValue, "The Battery capacity bounds are insufficient.");

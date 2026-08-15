@@ -315,11 +315,22 @@
                 else
                 {
                     <div class="dispatch-chart storage-chart">
-                        <svg viewBox="0 0 1000 300" role="img" aria-label="Storage state of charge by technology">
-                            @for (int tick = 0; tick <= 4; tick++)
+                        <svg viewBox="0 0 1000 300" role="group" aria-label="Storage state of charge by technology">
+                            @* Gridlines carried no values, so the trace showed a shape without a
+                               quantity: a reader could see storage moving but not how full it was. *@
+                            @foreach (double tick in _storageAxis.Ticks)
                             {
-                                double y = StorageChartY(_storageChartMaximumMwh * tick / 4);
-                                <line class="grid-line" x1="64" y1="@y" x2="984" y2="@y" stroke="#dce1e5" stroke-width="1" />
+                                double y = StorageChartY(tick);
+                                <line class="grid-line" x1="64" y1="@y" x2="984" y2="@y" stroke="var(--color-border)" stroke-width="1" />
+                                <SvgText Class="plot-tick" X="56" Y="y + 4" Anchor="end"
+                                         Value="@PlotFormat.Tick(tick, _storageAxis)" />
+                            }
+                            @if (_storageSummary is { CapacityMwh: > 0 } capacity)
+                            {
+                                double capacityY = StorageChartY(capacity.CapacityMwh);
+                                <line class="storage-capacity-rule" x1="64" y1="@capacityY" x2="984" y2="@capacityY" />
+                                <SvgText Class="storage-capacity-label" X="984" Y="capacityY - 6" Anchor="end"
+                                         Value="@($"installed {PlotFormat.Compact(capacity.CapacityMwh)} MWh")" />
                             }
                             @foreach (StorageTrace trace in _comparisonStorageTraces)
                             {
@@ -345,6 +356,53 @@
                             <span><i style="background-color: @trace.Color"></i>@trace.LegendText</span>
                         }
                     </div>
+                    @* A state-of-charge trace shows when storage moved but not whether it was ever
+                       close to empty, nor how hard it was worked. Both are the questions a storage
+                       result is read for. *@
+                    @if (_storageSummary is { } summary)
+                    {
+                        <dl class="storage-summary">
+                            <div>
+                                <dt>Lowest point</dt>
+                                <dd>@PlotFormat.Compact(summary.MinimumMwh) MWh</dd>
+                                <dd class="storage-summary-detail">
+                                    @if (summary.CapacityMwh > 0)
+                                    {
+                                        @($"{PlotFormat.Share(summary.MinimumMwh / summary.CapacityMwh, 0)} full")
+                                        <text> · </text>
+                                    }
+                                    @summary.MinimumAt.ToString("ddd d MMM, HH:mm")
+                                </dd>
+                            </div>
+                            <div>
+                                <dt>Energy discharged</dt>
+                                <dd>@PlotFormat.Compact(summary.DischargedMwh) MWh</dd>
+                                <dd class="storage-summary-detail">
+                                    @PlotFormat.Compact(summary.ChargedMwh) MWh charged
+                                    @if (summary.RoundTripEfficiency is { } efficiency)
+                                    {
+                                        <text> · </text>
+                                        @($"{PlotFormat.Share(efficiency, 0)} returned")
+                                    }
+                                </dd>
+                            </div>
+                            @if (summary.FullCycleEquivalents is { } cycles)
+                            {
+                                <div>
+                                    <dt>Full-cycle equivalents</dt>
+                                    <dd>@cycles.ToString("N1")</dd>
+                                    <dd class="storage-summary-detail">discharge energy over installed capacity</dd>
+                                </div>
+                            }
+                            <div>
+                                <dt>Idle intervals</dt>
+                                <dd>@PlotFormat.Share(summary.IdleShare, 0)</dd>
+                                <dd class="storage-summary-detail">
+                                    @summary.IdleIntervals.ToString("N0") of @summary.TotalIntervals.ToString("N0") neither charging nor discharging
+                                </dd>
+                            </div>
+                        </dl>
+                    }
                 }
             </ChartFrame>
 
@@ -534,6 +592,8 @@
     private string _maximumDate = string.Empty;
     private double _chartMaximumMw = 1;
     private double _storageChartMaximumMwh = 1;
+    private PlotAxis _storageAxis = PlotAxis.Nice(0, 1);
+    private StorageSummary? _storageSummary;
     private double _peakDemandMw;
     private double _deliveredEnergyMwh;
     private double _renewableSharePercent;
@@ -1494,10 +1554,66 @@
             .Select(trace => trace.EnergyCapacityMwh ?? trace.Values.DefaultIfEmpty(0).Max())
             .DefaultIfEmpty(1)
             .Max());
+        _storageAxis = PlotAxis.Nice(0, _storageChartMaximumMwh);
         _storageTraces = _storageTraces.Select(trace => trace with
         {
             Points = StorageLinePoints(trace.Values),
         }).ToList();
+        _storageSummary = BuildStorageSummary(result);
+    }
+
+    /// <summary>
+    /// What the storage actually did over the selected period. The trace answers "when did it
+    /// move"; these answer "how close did it come to empty" and "how hard was it worked", which is
+    /// what a storage result is read for.
+    /// </summary>
+    private StorageSummary? BuildStorageSummary(DispatchResultsDTO result)
+    {
+        if (_storageTraces.Count == 0 || _window is null || _window.IsEmpty)
+        {
+            return null;
+        }
+
+        DispatchSeriesDTO series = result.DataSeries;
+        double hours = result.Scenario.Resolution.TotalHours;
+        double capacityMwh = _storageTraces.Sum(trace => trace.EnergyCapacityMwh ?? 0);
+
+        double minimumMwh = double.PositiveInfinity;
+        int minimumIndex = _window.Indexes[0];
+        int idle = 0;
+        foreach (int index in _window.Indexes)
+        {
+            double stored = series.StateOfChargeByTechnologyMwh.Values
+                .Sum(values => index < values.Length ? values[index] : 0);
+            if (stored < minimumMwh)
+            {
+                minimumMwh = stored;
+                minimumIndex = index;
+            }
+
+            double charge = index < series.ChargeMw.Length ? series.ChargeMw[index] : 0;
+            double discharge = index < series.DischargeMw.Length ? series.DischargeMw[index] : 0;
+            if (charge == 0 && discharge == 0)
+            {
+                idle++;
+            }
+        }
+
+        double chargedMwh = _window.Integrate(series.ChargeMw, result.Scenario.Resolution);
+        double dischargedMwh = _window.Integrate(series.DischargeMw, result.Scenario.Resolution);
+        return new StorageSummary(
+            capacityMwh,
+            double.IsPositiveInfinity(minimumMwh) ? 0 : minimumMwh,
+            InstantAt(minimumIndex),
+            chargedMwh,
+            dischargedMwh,
+            // Round-trip efficiency is only meaningful once something has been put in, and only
+            // over a window where what went in is roughly what came back out.
+            chargedMwh > 0 ? dischargedMwh / chargedMwh : null,
+            capacityMwh > 0 ? dischargedMwh / capacityMwh : null,
+            idle,
+            _window.IntervalCount,
+            hours);
     }
 
     /// <summary>
@@ -1622,6 +1738,26 @@
     }
 
     private static string RegionName(string region) => RegionNames.Full(region);
+
+    /// <summary>
+    /// What the storage did over the window in view. Efficiency and cycle count are nullable
+    /// because neither means anything without, respectively, energy having gone in and a declared
+    /// capacity to divide by.
+    /// </summary>
+    private sealed record StorageSummary(
+        double CapacityMwh,
+        double MinimumMwh,
+        DateTimeOffset MinimumAt,
+        double ChargedMwh,
+        double DischargedMwh,
+        double? RoundTripEfficiency,
+        double? FullCycleEquivalents,
+        int IdleIntervals,
+        int TotalIntervals,
+        double IntervalHours)
+    {
+        public double IdleShare => TotalIntervals <= 0 ? 0 : (double)IdleIntervals / TotalIntervals;
+    }
 
     private sealed record AreaLayer(string Name, string Color, string Points);
     /// <summary>

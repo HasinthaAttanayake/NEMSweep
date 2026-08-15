@@ -161,6 +161,7 @@ public sealed record SweepAnalysis(
         AddCostComposition(analysis, findings);
         AddEnergyBalance(analysis, findings);
         AddRenewableShare(analysis, findings);
+        AddStorageOnset(analysis, findings);
         AddConstraints(analysis, findings);
         AddReliabilityBinding(analysis, findings);
         // Highest priority first, so a page showing only the first few shows the ones that matter.
@@ -375,6 +376,57 @@ public sealed record SweepAnalysis(
             PlotFormat.Share(lastShare),
             "renewable at the last run",
             Priority: 60));
+    }
+
+    /// <summary>
+    /// The run where the installed fleet stops being enough. Below it the sizing loop leaves
+    /// storage alone; from it onwards the scenario only meets its reliability target by building
+    /// something that is not there today. That threshold is a capital decision, and it is invisible
+    /// in every cost series because the cost of the storage is spread across the runs after it.
+    /// </summary>
+    private static void AddStorageOnset(SweepAnalysis analysis, List<Finding> findings)
+    {
+        int onset = -1;
+        for (int index = 0; index < analysis.Runs.Count; index++)
+        {
+            StorageSizingOutcome? outcome = analysis.Runs[index].Point.StorageSizing?.Outcome;
+            if (outcome == StorageSizingOutcome.Resized)
+            {
+                onset = index;
+                break;
+            }
+        }
+
+        // Nothing to say when the first run already needed storage: there is no threshold inside
+        // the sweep, only a scenario that starts beyond one.
+        if (onset <= 0)
+        {
+            return;
+        }
+
+        SweepRun first = analysis.Runs[onset];
+        SweepRun last = analysis.Runs[onset - 1];
+        StorageSizingOutcomeDTO sizing = first.Point.StorageSizing!;
+        double addedMwh = sizing.FinalEnergyMwh - sizing.InitialEnergyMwh;
+        double addedMw = sizing.FinalPowerMw - sizing.InitialPowerMw;
+        int resizedRuns = analysis.Runs.Count(run =>
+            run.Point.StorageSizing?.Outcome == StorageSizingOutcome.Resized);
+
+        string power = addedMw > 0
+            ? $" and {PlotFormat.Compact(addedMw)} MW of power"
+            : " with no additional power";
+        findings.Add(new Finding(
+            $"New storage becomes necessary at {first.Label}",
+            $"Every run up to {last.Label} met the reliability target with the storage already "
+            + $"installed. {first.Label} is the first that does not: the sizing loop adds "
+            + $"{PlotFormat.Compact(addedMwh)} MWh{power}, and "
+            + (resizedRuns == analysis.Runs.Count - onset
+                ? "every run beyond it needs more again."
+                : $"{resizedRuns} runs in the sweep need building."),
+            FindingTone.Constraint,
+            $"{first.AxisValue:N0}",
+            $"{analysis.AxisUnit} before new build",
+            Priority: 88));
     }
 
     private static void AddConstraints(SweepAnalysis analysis, List<Finding> findings)
