@@ -27,7 +27,9 @@
     --color-home-copy: #33414d;
     --color-border-strong: #cbd3d9;
     --color-accent-border: #82b6aa;
-    --color-notice: #a86000;
+    /* Darkened from #a86000, which fell to 4.47:1 against the muted surface the weather-basis note
+       sits on — just under the 4.5:1 needed for text at that size. */
+    --color-notice: #915300;
     --color-track: #e3e7ea;
     --color-track-fill: #3d667a;
     --color-track-border: #9da8b1;
