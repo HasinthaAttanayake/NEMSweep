@@ -128,11 +128,14 @@
     {
         try
         {
-            ArtifactLoadResult<SystemDispatchResultsDTO> systemResult =
-                await ArtifactLoader.LoadAsync<SystemDispatchResultsDTO>("data/results.json");
-            if (systemResult.IsSuccess)
+            ArtifactLoadResult<SystemDispatchOverviewDTO> overviewResult =
+                await ArtifactLoader.LoadAsync<SystemDispatchOverviewDTO>("data/results-overview.json");
+            if (overviewResult.IsSuccess)
             {
-                if (!TryConfigureRegions(systemResult.Value!, out string? validationMessage))
+                if (!TryConfigureRegions(
+                        overviewResult.Value!.RegionIds,
+                        overviewResult.Value.DataSourcesByRegion,
+                        out string? validationMessage))
                 {
                     _loadState = ArtifactLoadState.InvalidData(validationMessage!);
                     return;
@@ -142,9 +145,9 @@
                 return;
             }
 
-            if (!IsLegacyFallback(systemResult.State))
+            if (!IsLegacyFallback(overviewResult.State))
             {
-                _loadState = systemResult.State;
+                _loadState = overviewResult.State;
                 return;
             }
 
@@ -221,27 +224,28 @@
     }
 
     private bool TryConfigureRegions(
-        SystemDispatchResultsDTO system,
+        string[] regionIds,
+        Dictionary<string, DispatchSourcesDTO> dataSourcesByRegion,
         out string? validationMessage)
     {
         validationMessage = null;
-        if (system.RegionIds is null || system.RegionIds.Length == 0)
+        if (regionIds is null || regionIds.Length == 0)
         {
             validationMessage = "System dispatch results do not define any regions.";
             return false;
         }
 
-        if (system.DataSourcesByRegion is null)
+        if (dataSourcesByRegion is null)
         {
             validationMessage = "System dispatch results do not define regional data sources.";
             return false;
         }
 
         var pathsByRegion = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (string? regionId in system.RegionIds)
+        foreach (string? regionId in regionIds)
         {
             if (string.IsNullOrWhiteSpace(regionId)
-                || !system.DataSourcesByRegion.TryGetValue(regionId, out DispatchSourcesDTO? sources)
+            || !dataSourcesByRegion.TryGetValue(regionId, out DispatchSourcesDTO? sources)
                 || sources?.DemandInput is null
                 || !TryGetDataArtifactPath(sources.DemandInput.FileName, out string? demandPath))
             {

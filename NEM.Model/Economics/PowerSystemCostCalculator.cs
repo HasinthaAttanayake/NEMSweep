@@ -42,6 +42,7 @@ public static class PowerSystemCostCalculator
                 fleet => fleet.Technology);
 
             Money annualisedGenerationCost = Money.Zero;
+            var generationCostContributions = new List<GenerationCostContribution>();
             foreach ((GenerationTechnology technology, var generation) in outcome.PerFleetGeneration)
             {
                 ScenarioGeneratingFleet fleet = fleetsByTechnology[technology];
@@ -56,10 +57,14 @@ public static class PowerSystemCostCalculator
                 Money fuelCost = costs.FuelPrice.ForHeatRate(fleet.TechnologyProfile.HeatRate)
                     * generatedEnergy;
 
-                annualisedGenerationCost += annualisedCapex
+                Money technologyAnnualisedCost = annualisedCapex
                     + fixedOpex
                     + variableOpex
                     + fuelCost;
+                annualisedGenerationCost += technologyAnnualisedCost;
+                generationCostContributions.Add(new GenerationCostContribution(
+                    technology,
+                    technologyAnnualisedCost));
             }
 
             Region systemRegion = powerSystem.Regions.Single(region =>
@@ -93,25 +98,42 @@ public static class PowerSystemCostCalculator
                 annualisedGenerationCost,
                 annualisedStorageCost,
                 outcome.DeliveredToLoad.Integrate(),
-                outcome.Imports.Integrate() - outcome.Exports.Integrate()));
+                outcome.Imports.Integrate() - outcome.Exports.Integrate(),
+                generationCostContributions));
         }
 
-        Money totalAnnualisedGenerationCost = Money.Zero;
         Money totalAnnualisedStorageCost = Money.Zero;
         Energy totalDeliveredEnergy = Energy.Zero;
+        var systemGenerationCosts = new Dictionary<GenerationTechnology, Money>();
         foreach (RegionCostBreakdown region in regionBreakdowns)
         {
-            totalAnnualisedGenerationCost += region.AnnualisedGenerationCost;
             totalAnnualisedStorageCost += region.AnnualisedStorageCost;
             totalDeliveredEnergy += region.DeliveredEnergy;
+            foreach (GenerationCostContribution contribution in region.GenerationCostContributions)
+            {
+                systemGenerationCosts[contribution.Technology] =
+                    systemGenerationCosts.GetValueOrDefault(contribution.Technology, Money.Zero)
+                    + contribution.AnnualisedCost;
+            }
         }
+
+        // Sum by technology across regions, so the total reconciles exactly to the
+        // published per-technology contributions regardless of region iteration order.
+        Money totalAnnualisedGenerationCost = systemGenerationCosts.Values.Aggregate(
+            Money.Zero,
+            (total, contribution) => total + contribution);
 
         return new PowerSystemCostBreakdown(
             totalAnnualisedGenerationCost,
             totalAnnualisedStorageCost,
             AnnualisedTransmissionCost(scenario),
             totalDeliveredEnergy,
-            regionBreakdowns);
+            regionBreakdowns,
+            systemGenerationCosts
+                .OrderBy(entry => entry.Key)
+                .Select(entry => new GenerationCostContribution(entry.Key, entry.Value))
+                .ToArray(),
+            scenario.Interconnectors.Count > 0);
     }
 
     /// <summary>

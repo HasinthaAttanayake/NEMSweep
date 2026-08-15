@@ -19,6 +19,7 @@ internal sealed class StorageSizingSearch
     private IReadOnlyList<DispatchOutcome> _outcomes = [];
     private IReadOnlyList<InterconnectorFlow> _interconnectorFlows = [];
     private IReadOnlyList<InstalledBatteryAssessment> _installedBatteryAssessments = [];
+    private readonly List<StorageSizingPass> _trajectory = [];
 
     public StorageSizingSearch(
         PowerSystem powerSystem,
@@ -337,7 +338,31 @@ internal sealed class StorageSizingSearch
         outcomes = result.RegionalOutcomes;
         interconnectorFlows = result.InterconnectorFlows;
         DispatchPassCount++;
+        _trajectory.Add(CreatePass(powerSystem, outcomes));
         return true;
+    }
+
+    private StorageSizingPass CreatePass(PowerSystem powerSystem, IReadOnlyList<DispatchOutcome> outcomes)
+    {
+        var outcomesByRegion = outcomes.ToDictionary(outcome => outcome.RegionId, StringComparer.OrdinalIgnoreCase);
+        StorageSizingRegionPass[] regions = powerSystem.Regions.Select(region =>
+        {
+            StorageFleet? battery = FindBattery(region);
+            DispatchOutcome outcome = outcomesByRegion[region.RegionId];
+            return new StorageSizingRegionPass(
+                region.RegionId,
+                battery?.StorageCapacity ?? Energy.Zero,
+                battery?.PowerCapacity ?? Power.Zero,
+                outcome.Reliability.UnservedEnergy,
+                outcome.Reliability.UnservedHours);
+        }).ToArray();
+        int systemUnservedHours = Enumerable.Range(0, outcomes[0].Unserved.Length)
+            .Count(index => outcomes.Any(outcome => outcome.Unserved[index] > Power.Zero));
+        return new StorageSizingPass(
+            DispatchPassCount,
+            regions,
+            regions.Aggregate(Energy.Zero, (total, region) => total + region.UnservedEnergy),
+            systemUnservedHours);
     }
 
     private bool TryDispatch(
@@ -405,7 +430,8 @@ internal sealed class StorageSizingSearch
             status,
             evidence,
             energyLimitedAssessment,
-            _interconnectorFlows);
+            _interconnectorFlows,
+            _trajectory);
     }
 
     private RegionalSizingResult CreateRegionalResult(

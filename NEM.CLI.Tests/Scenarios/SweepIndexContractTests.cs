@@ -7,13 +7,13 @@ namespace NEM.CLI.Tests.Scenarios;
 public sealed class SweepIndexContractTests
 {
     [Fact]
-    public void V5_RoundTripsWithTransmissionScalarsAndExplicitUnits()
+    public void V6_RoundTripsWithTransmissionScalarsAndExplicitUnits()
     {
         var start = new DateTimeOffset(2025, 7, 1, 0, 0, 0, TimeSpan.FromHours(10));
         var weatherBasis = new WeatherBasisDTO(
             WeatherBasisKind.TypicalMeteorologicalYear,
-            "sydney.epw",
-            "Sydney (WMO 947680)",
+            new WeatherSiteDTO("sydney-solar.epw", "Sydney (WMO 947680)"),
+            new WeatherSiteDTO("sydney-wind.epw", "Sydney (WMO 947680)"),
             "Typical meteorological year from sydney.epw.");
         var index = new SweepIndexDTO(
             ArtifactSchemaVersions.SweepIndex,
@@ -57,6 +57,7 @@ public sealed class SweepIndexContractTests
                     0,
                     10,
                     2m,
+                    TransmissionCostStatus.Calculated,
                     -100),
                 new ReliabilityBasisDTO(0.002, 0, true, "NEM reliability standard"),
                 new StorageSizingOutcomeDTO(
@@ -90,6 +91,7 @@ public sealed class SweepIndexContractTests
                         0,
                         10,
                         0m,
+                        TransmissionCostStatus.NotModelled,
                         100))],
                 [new SweepPointRegionDetailDTO("NSW1", "points/p0-nsw1.json")])]);
 
@@ -112,10 +114,13 @@ public sealed class SweepIndexContractTests
         json.Should().Contain("\"regionScalars\"");
         json.Should().Contain("\"regionDetails\"");
         json.Should().Contain("\"weatherBasis\"");
+        json.Should().Contain("\"solar\"");
+        json.Should().Contain("\"wind\"");
         json.Should().Contain("\"outcome\":\"notRequired\"");
         json.Should().Contain("\"unservedHours\"");
         json.Should().Contain("\"peakUnservedPowerMw\"");
         json.Should().Contain("\"transmissionSlcotAudPerMwh\"");
+        json.Should().Contain("\"transmissionCostStatus\":\"calculated\"");
         json.Should().Contain("\"netImportedEnergyMwh\"");
     }
 

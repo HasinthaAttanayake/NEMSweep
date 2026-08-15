@@ -12,7 +12,8 @@ public sealed record SweepScalarDescriptor(
     string Name,
     string Label,
     string Unit,
-    string? Currency = null);
+    string? Currency = null,
+    bool Chartable = true);
 
 /// <summary>
 /// Catalogue of the sweep scalar descriptors, keyed by the JSON property name each scalar is
@@ -40,6 +41,7 @@ public static class SweepScalarCatalog
         new("peakUnservedPowerMw", "Peak unserved power", "MW"),
         new("curtailedEnergyMwh", "Curtailed energy", "MWh"),
         new("transmissionSlcotAudPerMwh", "Transmission levelised cost", "AUD/MWh served", "AUD"),
+        new("transmissionCostStatus", "Transmission cost status", "status", Chartable: false),
         new("netImportedEnergyMwh", "Net imported energy", "MWh"),
     ];
 

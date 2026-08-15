@@ -67,6 +67,7 @@ public sealed record DispatchSeriesDTO(
 
 /// <summary>Directed interconnector evidence retained in a system artifact.</summary>
 public sealed record DispatchInterconnectorDTO(
+    [property: JsonRequired] string Id,
     [property: JsonRequired] string FromRegionId,
     [property: JsonRequired] string ToRegionId,
     [property: JsonRequired] double CapacityMw,
@@ -94,4 +95,23 @@ public sealed record DispatchCostDTO(
     decimal SlcoeAudPerMwh,
     [property: JsonRequired] decimal AnnualisedTransmissionCostAud,
     [property: JsonRequired] decimal TransmissionSlcotAudPerMwh,
-    [property: JsonRequired] double NetImportedEnergyMwh);
+    [property: JsonRequired] TransmissionCostStatus TransmissionCostStatus,
+    [property: JsonRequired] double NetImportedEnergyMwh,
+    [property: JsonRequired] DispatchGenerationCostContributionDTO[] GenerationCostContributions);
+
+/// <summary>Whether transmission costs are included in this artifact's cost scope.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<TransmissionCostStatus>))]
+public enum TransmissionCostStatus
+{
+    [JsonStringEnumMemberName("notModelled")]
+    NotModelled,
+
+    [JsonStringEnumMemberName("calculated")]
+    Calculated,
+}
+
+/// <summary>Annualised and levelised generation cost attributable to one technology.</summary>
+public sealed record DispatchGenerationCostContributionDTO(
+    [property: JsonRequired] string Technology,
+    [property: JsonRequired] decimal AnnualisedCostAud,
+    [property: JsonRequired] decimal LevelisedContributionAudPerMwh);

@@ -166,7 +166,14 @@
                         <div class="cost-component transmission-cost-component">
                             <div>
                                 <span>Transmission</span>
-                                <strong>@FormatAudPerMwh(_result.Cost.TransmissionSlcotAudPerMwh) AUD/MWh</strong>
+                                @if (_result.Cost.TransmissionCostStatus == TransmissionCostStatus.Calculated)
+                                {
+                                    <strong>@FormatTransmissionSlcot(_result.Cost.TransmissionSlcotAudPerMwh) AUD/MWh</strong>
+                                }
+                                else
+                                {
+                                    <strong>Not modelled</strong>
+                                }
                             </div>
                             <div class="cost-track" aria-hidden="true">
                                 <i style="@CostShareStyle(_result.Cost.TransmissionSlcotAudPerMwh)"></i>
@@ -179,7 +186,7 @@
                     }
                     @if (!IsSystemScope)
                     {
-                        <p class="regional-cost-note">Positive net imported energy denotes imports. Regional costs exclude system transmission and do not price transferred energy, so they can understate imported supply costs.</p>
+                        <p class="regional-cost-note">Positive net imported energy denotes imports. Regional costs exclude system transmission and do not price transferred energy, so they can understate imported supply costs. Regional transmission losses are allocated from incoming links for reporting and are not regional transmission charges.</p>
                     }
                 </div>
 
@@ -217,7 +224,7 @@
                             @foreach (DispatchInterconnectorDTO link in links)
                             {
                                 <tr>
-                                    <th scope="row">@link.FromRegionId to @link.ToRegionId</th>
+                                    <th scope="row">@link.Id · @link.FromRegionId to @link.ToRegionId</th>
                                     <td>@link.CapacityMw.ToString("N0") MW</td>
                                     <td>@Average(link.FlowMw).ToString("N2") MW</td>
                                     <td>@Average(link.LossesMw).ToString("N2") MW</td>
@@ -1268,6 +1275,10 @@
 
     private static string FormatAudPerMwh(decimal value) =>
         (value < 0 ? "-$" : "$") + Math.Abs(value).ToString("N2");
+
+    private static string FormatTransmissionSlcot(decimal value) =>
+        (value < 0 ? "-$" : "$") + Math.Abs(value).ToString(
+            Math.Abs(value) < 0.01m ? "N4" : "N2");
 
     private double AnnualServedEnergyMwh() =>
         _result!.Metrics.DemandMwh - _result.Metrics.UnservedEnergyMwh;

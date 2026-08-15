@@ -164,6 +164,7 @@ internal static class SweepArtifactExport
             metrics.PeakUnservedPowerMw,
             metrics.CurtailedEnergyMwh,
             cost.TransmissionSlcotAudPerMwh,
+            cost.TransmissionCostStatus,
             cost.NetImportedEnergyMwh);
     }
 

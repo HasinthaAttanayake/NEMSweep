@@ -130,7 +130,7 @@ public static class SweepSeriesCatalogue
 
     private static readonly IReadOnlyDictionary<string, SweepChartYAxis> ByKey =
         SweepScalarCatalog.Descriptors
-            .Where(descriptor => Accessors.ContainsKey(descriptor.Name))
+            .Where(descriptor => descriptor.Chartable && Accessors.ContainsKey(descriptor.Name))
             .ToDictionary(
                 descriptor => descriptor.Name,
                 descriptor => new SweepChartYAxis(
@@ -146,12 +146,14 @@ public static class SweepSeriesCatalogue
     /// <summary>Every chartable scalar, in the order the contract declares them.</summary>
     public static IReadOnlyList<SweepChartYAxis> All { get; } =
         [.. SweepScalarCatalog.Descriptors
-            .Where(descriptor => ByKey.ContainsKey(descriptor.Name))
+            .Where(descriptor => descriptor.Chartable && ByKey.ContainsKey(descriptor.Name))
             .Select(descriptor => ByKey[descriptor.Name])];
 
     /// <summary>Scalar names the contract declares that this client cannot read. Empty in a healthy build.</summary>
     public static IReadOnlyList<string> UnmappedScalarNames { get; } =
-        [.. SweepScalarCatalog.ScalarNames().Where(name => !Accessors.ContainsKey(name))];
+        [.. SweepScalarCatalog.Descriptors
+            .Where(descriptor => descriptor.Chartable && !Accessors.ContainsKey(descriptor.Name))
+            .Select(descriptor => descriptor.Name)];
 
     public static SweepChartYAxis? Resolve(string? key) =>
         key is not null && ByKey.TryGetValue(key, out SweepChartYAxis? axis) ? axis : null;

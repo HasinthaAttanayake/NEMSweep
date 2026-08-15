@@ -142,6 +142,7 @@ public static class ArtifactSchemaRegistry
             [typeof(ModelInputOutputDTO)] = (artifact => ((ModelInputOutputDTO)artifact).SchemaVersion, new HashSet<int> { ArtifactSchemaVersions.OperationalDemand }),
             [typeof(DispatchResultsDTO)] = (artifact => ((DispatchResultsDTO)artifact).SchemaVersion, new HashSet<int> { ArtifactSchemaVersions.DispatchResults }),
             [typeof(SystemDispatchResultsDTO)] = (artifact => ((SystemDispatchResultsDTO)artifact).SchemaVersion, new HashSet<int> { ArtifactSchemaVersions.SystemDispatchResults }),
+            [typeof(SystemDispatchOverviewDTO)] = (artifact => ((SystemDispatchOverviewDTO)artifact).SchemaVersion, new HashSet<int> { ArtifactSchemaVersions.SystemDispatchOverview }),
             [typeof(RegionDispatchResultsDTO)] = (artifact => ((RegionDispatchResultsDTO)artifact).SchemaVersion, new HashSet<int> { ArtifactSchemaVersions.RegionDispatchResults }),
             [typeof(GenerationInformationDTO)] = (artifact => ((GenerationInformationDTO)artifact).SchemaVersion, new HashSet<int> { ArtifactSchemaVersions.GenerationInformation }),
             [typeof(RegularSeriesDTO)] = (artifact => ((RegularSeriesDTO)artifact).SchemaVersion, new HashSet<int> { ArtifactSchemaVersions.RegularSeries }),

@@ -29,7 +29,16 @@ public sealed record StorageSizingOutcomeDTO(
     double MaximumEnergyMwh,
     double MaximumPowerMw,
     int PassesUsed,
-    EnergyLimitedEvidenceDTO? EnergyLimitedEvidence = null);
+    EnergyLimitedEvidenceDTO? EnergyLimitedEvidence = null,
+    StorageSizingPassDTO[]? Trajectory = null);
+
+/// <summary>One capacity and reliability result attempted during storage sizing.</summary>
+public sealed record StorageSizingPassDTO(
+    int Pass,
+    double EnergyCapacityMwh,
+    double PowerCapacityMw,
+    double UnservedEnergyMwh,
+    int UnservedHours);
 
 /// <summary>
 /// System-wide evidence that storage cannot meet the reliability target because available
@@ -94,9 +103,14 @@ public sealed record IntervalPointersDTO(
 /// </summary>
 public sealed record WeatherBasisDTO(
     WeatherBasisKind Kind,
-    string SourceFile,
-    string LocationName,
+    WeatherSiteDTO Solar,
+    WeatherSiteDTO Wind,
     string Description);
+
+/// <summary>Source provenance for one weather role in a dispatch result.</summary>
+public sealed record WeatherSiteDTO(
+    string SourceFile,
+    string LocationName);
 
 /// <summary>Closed set of weather bases a run can be simulated against.</summary>
 [JsonConverter(typeof(JsonStringEnumConverter<WeatherBasisKind>))]

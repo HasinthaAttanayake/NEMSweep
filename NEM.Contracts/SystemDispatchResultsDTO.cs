@@ -22,7 +22,20 @@ public sealed record SystemDispatchResultsDTO(
     ReliabilityBasisDTO Reliability,
     StorageSizingOutcomeDTO StorageSizing,
     DispatchCostDTO Cost,
+    [property: JsonRequired] DispatchTopologyDTO Topology,
     [property: JsonRequired] DispatchInterconnectorDTO[] Interconnectors);
+
+/// <summary>Declared directed network topology for a whole-system dispatch result.</summary>
+public sealed record DispatchTopologyDTO(
+    [property: JsonRequired] string[] RegionIds,
+    [property: JsonRequired] DispatchTopologyLinkDTO[] Links);
+
+/// <summary>A stable directed link in the declared system network.</summary>
+public sealed record DispatchTopologyLinkDTO(
+    [property: JsonRequired] string Id,
+    [property: JsonRequired] string FromRegionId,
+    [property: JsonRequired] string ToRegionId,
+    [property: JsonRequired] double CapacityMw);
 
 /// <summary>Summary evidence for one region within a system dispatch run.</summary>
 public sealed record RegionDispatchSummaryDTO(
@@ -30,4 +43,5 @@ public sealed record RegionDispatchSummaryDTO(
     ReliabilityBasisDTO Reliability,
     StorageSizingOutcomeDTO StorageSizing,
     DispatchCostDTO Cost,
+    [property: JsonRequired] Dictionary<string, double> DeliveredGenerationByTechnologyMwh,
     string? DetailPath = null);

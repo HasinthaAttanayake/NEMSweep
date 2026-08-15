@@ -135,6 +135,7 @@ public sealed record SweepPointScalarResultsDTO(
     double PeakUnservedPowerMw,
     double CurtailedEnergyMwh,
     [property: JsonRequired] decimal TransmissionSlcotAudPerMwh,
+    [property: JsonRequired] TransmissionCostStatus TransmissionCostStatus,
     [property: JsonRequired] double NetImportedEnergyMwh);
 
 public sealed record RegularSeriesDTO(
