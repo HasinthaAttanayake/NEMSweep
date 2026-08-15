@@ -21,7 +21,8 @@ public sealed class StorageSizingRunResult
         StorageSizingStatus status,
         string terminationEvidence,
         EnergyLimitedAssessment? energyLimitedAssessment = null,
-        IReadOnlyList<InterconnectorFlow>? interconnectorFlows = null)
+        IReadOnlyList<InterconnectorFlow>? interconnectorFlows = null,
+        IReadOnlyList<StorageSizingPass>? trajectory = null)
     {
         ArgumentNullException.ThrowIfNull(powerSystem);
         ArgumentNullException.ThrowIfNull(regions);
@@ -102,6 +103,11 @@ public sealed class StorageSizingRunResult
         }
 
         InterconnectorFlow[] resolvedInterconnectorFlows = interconnectorFlows?.ToArray() ?? [];
+        StorageSizingPass[] resolvedTrajectory = trajectory?.ToArray() ?? [];
+        if (resolvedTrajectory.Length > 0 && resolvedTrajectory.Length != dispatchPassCount)
+        {
+            throw new ArgumentException("Sizing trajectory must contain one entry per dispatch pass.", nameof(trajectory));
+        }
         ValidateInterconnectorFlows(powerSystem, regions, resolvedInterconnectorFlows);
 
         PowerSystem = powerSystem;
@@ -114,6 +120,7 @@ public sealed class StorageSizingRunResult
         EnergyLimitedAssessment = energyLimitedAssessment;
         InterconnectorFlows = new ReadOnlyCollection<InterconnectorFlow>(
             resolvedInterconnectorFlows);
+        Trajectory = new ReadOnlyCollection<StorageSizingPass>(resolvedTrajectory);
     }
 
     /// <summary>Final candidate power system evaluated by the search.</summary>
@@ -135,6 +142,8 @@ public sealed class StorageSizingRunResult
     public EnergyLimitedAssessment? EnergyLimitedAssessment { get; }
     /// <summary>Final solver evidence for each interconnector in the result power system.</summary>
     public IReadOnlyList<InterconnectorFlow> InterconnectorFlows { get; }
+    /// <summary>Every successful whole-system dispatch attempted by the sizing search.</summary>
+    public IReadOnlyList<StorageSizingPass> Trajectory { get; }
 
     private static void ValidateInterconnectorFlows(
         PowerSystem powerSystem,

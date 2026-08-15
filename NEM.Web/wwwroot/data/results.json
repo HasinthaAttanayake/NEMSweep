@@ -1,15 +1,43 @@
 {
   "cost": {
-    "annualisedGenerationCostAud": 17121513041.17,
+    "annualisedGenerationCostAud": 17121513041.16,
     "annualisedStorageCostAud": 507367280.92,
     "annualisedTransmissionCostAud": 164919.7,
+    "generationCostContributions": [
+      {
+        "annualisedCostAud": 1055681846.1,
+        "levelisedContributionAudPerMwh": 9.49,
+        "technology": "Solar"
+      },
+      {
+        "annualisedCostAud": 2386649386.09,
+        "levelisedContributionAudPerMwh": 21.45,
+        "technology": "Wind"
+      },
+      {
+        "annualisedCostAud": 1447292533.23,
+        "levelisedContributionAudPerMwh": 13.01,
+        "technology": "Hydro"
+      },
+      {
+        "annualisedCostAud": 9482099893.14,
+        "levelisedContributionAudPerMwh": 85.23,
+        "technology": "Coal"
+      },
+      {
+        "annualisedCostAud": 2749789382.6,
+        "levelisedContributionAudPerMwh": 24.72,
+        "technology": "Gas"
+      }
+    ],
     "generationSlcoeAudPerMwh": 153.9,
     "netImportedEnergyMwh": 0,
     "slcoeAudPerMwh": 158.46,
     "status": "calculated",
     "storageSlcoeAudPerMwh": 4.56,
     "totalAnnualisedCostAud": 17629045241.79,
-    "transmissionSlcotAudPerMwh": 0
+    "transmissionCostStatus": "calculated",
+    "transmissionSlcotAudPerMwh": 0.0015
   },
   "dataSeries": {
     "chargeMw": [
@@ -131515,10 +131543,16 @@
         "PUBLIC_ARCHIVE#DEMANDOPERATIONALACTUAL#FILE01#202507010000.zip"
       ],
       "weatherBasis": {
-        "description": "Typical meteorological year from AUS_NSW_Dubbo.City.Rgnl.AP.957190_TMYx.2011-2025.epw for Dubbo.City.Rgnl.AP (WMO 957190), applied to the dispatch period by calendar hour. It represents typical rather than extreme years, so it does not contain the tail weather events that drive storage and reliability outcomes.",
+        "description": "Typical meteorological year using solar data from AUS_NSW_Dubbo.City.Rgnl.AP.957190_TMYx.2011-2025.epw at Dubbo.City.Rgnl.AP (WMO 957190) and wind data from AUS_NSW_Armidale.AP.957730_TMYx.2011-2025.epw at Armidale.AP (WMO 957730), applied to the dispatch period by calendar hour. It represents typical rather than extreme years, so it does not contain the tail weather events that drive storage and reliability outcomes.",
         "kind": "typicalMeteorologicalYear",
-        "locationName": "Dubbo.City.Rgnl.AP (WMO 957190)",
-        "sourceFile": "AUS_NSW_Dubbo.City.Rgnl.AP.957190_TMYx.2011-2025.epw"
+        "solar": {
+          "locationName": "Dubbo.City.Rgnl.AP (WMO 957190)",
+          "sourceFile": "AUS_NSW_Dubbo.City.Rgnl.AP.957190_TMYx.2011-2025.epw"
+        },
+        "wind": {
+          "locationName": "Armidale.AP (WMO 957730)",
+          "sourceFile": "AUS_NSW_Armidale.AP.957730_TMYx.2011-2025.epw"
+        }
       },
       "weatherInput": {
         "fileName": "weather-nsw1.json",
@@ -131589,10 +131623,16 @@
         "PUBLIC_ARCHIVE#DEMANDOPERATIONALACTUAL#FILE01#202507010000.zip"
       ],
       "weatherBasis": {
-        "description": "Typical meteorological year from AUS_VIC_Ballarat.AP.948520_TMYx.2011-2025.epw for Ballarat.AP (WMO 948520), applied to the dispatch period by calendar hour. It represents typical rather than extreme years, so it does not contain the tail weather events that drive storage and reliability outcomes.",
+        "description": "Typical meteorological year using solar and wind data from AUS_VIC_Ballarat.AP.948520_TMYx.2011-2025.epw at Ballarat.AP (WMO 948520), applied to the dispatch period by calendar hour. It represents typical rather than extreme years, so it does not contain the tail weather events that drive storage and reliability outcomes.",
         "kind": "typicalMeteorologicalYear",
-        "locationName": "Ballarat.AP (WMO 948520)",
-        "sourceFile": "AUS_VIC_Ballarat.AP.948520_TMYx.2011-2025.epw"
+        "solar": {
+          "locationName": "Ballarat.AP (WMO 948520)",
+          "sourceFile": "AUS_VIC_Ballarat.AP.948520_TMYx.2011-2025.epw"
+        },
+        "wind": {
+          "locationName": "Ballarat.AP (WMO 948520)",
+          "sourceFile": "AUS_VIC_Ballarat.AP.948520_TMYx.2011-2025.epw"
+        }
       },
       "weatherInput": {
         "fileName": "weather-vic1.json",
@@ -140367,6 +140407,7 @@
         0
       ],
       "fromRegionId": "NSW1",
+      "id": "NSW1-\u003EVIC1",
       "lossesMw": [
         0,
         0,
@@ -157896,6 +157937,7 @@
         0
       ],
       "fromRegionId": "VIC1",
+      "id": "VIC1-\u003ENSW1",
       "lossesMw": [
         0,
         0,
@@ -166688,13 +166730,48 @@
         "annualisedGenerationCostAud": 10874277763.9,
         "annualisedStorageCostAud": 211699417.27,
         "annualisedTransmissionCostAud": 0,
+        "generationCostContributions": [
+          {
+            "annualisedCostAud": 885515318.97,
+            "levelisedContributionAudPerMwh": 13.36,
+            "technology": "Solar"
+          },
+          {
+            "annualisedCostAud": 769281399.83,
+            "levelisedContributionAudPerMwh": 11.61,
+            "technology": "Wind"
+          },
+          {
+            "annualisedCostAud": 768959404.57,
+            "levelisedContributionAudPerMwh": 11.6,
+            "technology": "Hydro"
+          },
+          {
+            "annualisedCostAud": 6745744564.4,
+            "levelisedContributionAudPerMwh": 101.78,
+            "technology": "Coal"
+          },
+          {
+            "annualisedCostAud": 1704777076.13,
+            "levelisedContributionAudPerMwh": 25.72,
+            "technology": "Gas"
+          }
+        ],
         "generationSlcoeAudPerMwh": 164.08,
         "netImportedEnergyMwh": -266100.7,
         "slcoeAudPerMwh": 167.27,
         "status": "calculated",
         "storageSlcoeAudPerMwh": 3.19,
         "totalAnnualisedCostAud": 11085977181.18,
+        "transmissionCostStatus": "notModelled",
         "transmissionSlcotAudPerMwh": 0
+      },
+      "deliveredGenerationByTechnologyMwh": {
+        "Coal": 40227570.5,
+        "Gas": 1143233.6,
+        "Hydro": 2295920,
+        "Solar": 15287427.4,
+        "Wind": 7587938.2
       },
       "detailPath": "results-nsw1.json",
       "metrics": {
@@ -166727,7 +166804,30 @@
         "maximumEnergyMwh": 100000,
         "maximumPowerMw": 10000,
         "outcome": "notRequired",
-        "passesUsed": 3
+        "passesUsed": 3,
+        "trajectory": [
+          {
+            "energyCapacityMwh": 5515,
+            "pass": 1,
+            "powerCapacityMw": 940,
+            "unservedEnergyMwh": 0,
+            "unservedHours": 0
+          },
+          {
+            "energyCapacityMwh": 5515,
+            "pass": 2,
+            "powerCapacityMw": 940,
+            "unservedEnergyMwh": 0,
+            "unservedHours": 0
+          },
+          {
+            "energyCapacityMwh": 5515,
+            "pass": 3,
+            "powerCapacityMw": 940,
+            "unservedEnergyMwh": 0,
+            "unservedHours": 0
+          }
+        ]
       }
     },
     "VIC1": {
@@ -166735,13 +166835,48 @@
         "annualisedGenerationCostAud": 6247235277.27,
         "annualisedStorageCostAud": 295667863.65,
         "annualisedTransmissionCostAud": 0,
+        "generationCostContributions": [
+          {
+            "annualisedCostAud": 170166527.13,
+            "levelisedContributionAudPerMwh": 3.78,
+            "technology": "Solar"
+          },
+          {
+            "annualisedCostAud": 1617367986.26,
+            "levelisedContributionAudPerMwh": 35.96,
+            "technology": "Wind"
+          },
+          {
+            "annualisedCostAud": 678333128.67,
+            "levelisedContributionAudPerMwh": 15.08,
+            "technology": "Hydro"
+          },
+          {
+            "annualisedCostAud": 2736355328.74,
+            "levelisedContributionAudPerMwh": 60.84,
+            "technology": "Coal"
+          },
+          {
+            "annualisedCostAud": 1045012306.47,
+            "levelisedContributionAudPerMwh": 23.23,
+            "technology": "Gas"
+          }
+        ],
         "generationSlcoeAudPerMwh": 138.9,
         "netImportedEnergyMwh": 252795.7,
         "slcoeAudPerMwh": 145.47,
         "status": "calculated",
         "storageSlcoeAudPerMwh": 6.57,
         "totalAnnualisedCostAud": 6542903140.92,
+        "transmissionCostStatus": "notModelled",
         "transmissionSlcotAudPerMwh": 0
+      },
+      "deliveredGenerationByTechnologyMwh": {
+        "Coal": 15012969.4,
+        "Gas": 3567374.8,
+        "Hydro": 2025332.7,
+        "Solar": 2610113.1,
+        "Wind": 21449961.5
       },
       "detailPath": "results-vic1.json",
       "metrics": {
@@ -166774,7 +166909,30 @@
         "maximumEnergyMwh": 100000,
         "maximumPowerMw": 10000,
         "outcome": "resized",
-        "passesUsed": 3
+        "passesUsed": 3,
+        "trajectory": [
+          {
+            "energyCapacityMwh": 3243.4,
+            "pass": 1,
+            "powerCapacityMw": 1693,
+            "unservedEnergyMwh": 3526.1,
+            "unservedHours": 10
+          },
+          {
+            "energyCapacityMwh": 6772,
+            "pass": 2,
+            "powerCapacityMw": 1693,
+            "unservedEnergyMwh": 738,
+            "unservedHours": 2
+          },
+          {
+            "energyCapacityMwh": 6772,
+            "pass": 3,
+            "powerCapacityMw": 1693,
+            "unservedEnergyMwh": 738,
+            "unservedHours": 2
+          }
+        ]
       }
     }
   },
@@ -166785,8 +166943,8 @@
     "withinTarget": true
   },
   "resolution": "01:00:00",
-  "runId": "41cdb82856f44e1398e1b6ccbf1d2876",
-  "schemaVersion": 3,
+  "runId": "f16e7e594f8b467ab78341ccecbd9b92",
+  "schemaVersion": 9,
   "storageSizing": {
     "energyLimitedEvidence": null,
     "finalEnergyMwh": 12287,
@@ -166796,6 +166954,49 @@
     "maximumEnergyMwh": 100000,
     "maximumPowerMw": 10000,
     "outcome": "resized",
-    "passesUsed": 3
+    "passesUsed": 3,
+    "trajectory": [
+      {
+        "energyCapacityMwh": 8758.4,
+        "pass": 1,
+        "powerCapacityMw": 2633,
+        "unservedEnergyMwh": 3526.1,
+        "unservedHours": 10
+      },
+      {
+        "energyCapacityMwh": 12287,
+        "pass": 2,
+        "powerCapacityMw": 2633,
+        "unservedEnergyMwh": 738,
+        "unservedHours": 2
+      },
+      {
+        "energyCapacityMwh": 12287,
+        "pass": 3,
+        "powerCapacityMw": 2633,
+        "unservedEnergyMwh": 738,
+        "unservedHours": 2
+      }
+    ]
+  },
+  "topology": {
+    "links": [
+      {
+        "capacityMw": 1000,
+        "fromRegionId": "NSW1",
+        "id": "NSW1-\u003EVIC1",
+        "toRegionId": "VIC1"
+      },
+      {
+        "capacityMw": 1000,
+        "fromRegionId": "VIC1",
+        "id": "VIC1-\u003ENSW1",
+        "toRegionId": "NSW1"
+      }
+    ],
+    "regionIds": [
+      "NSW1",
+      "VIC1"
+    ]
   }
 }

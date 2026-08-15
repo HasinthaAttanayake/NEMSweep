@@ -294,8 +294,8 @@ public sealed class SweepRunTests
                 new DispatchInputArtifactDTO("weather.json", 5, "weather"),
                 new WeatherBasisDTO(
                     WeatherBasisKind.TypicalMeteorologicalYear,
-                    "test.epw",
-                    "Test",
+                    new WeatherSiteDTO("test-solar.epw", "Test solar"),
+                    new WeatherSiteDTO("test-wind.epw", "Test wind"),
                     "Typical meteorological year from test.epw."),
                 []),
             new DispatchPowerSystemDTO("test", [], [new DispatchStorageFleetDTO("Battery", 20, 20)]),
@@ -313,7 +313,9 @@ public sealed class SweepRunTests
             new DispatchMetricsDTO(150, 120, 0, 10, 10.0 / 150 * 100, 1, 0, 10, new IntervalPointersDTO(0, null, 0)),
             new ReliabilityBasisDTO(0.002, 10, false, "NEM reliability standard"),
             new StorageSizingOutcomeDTO(StorageSizingOutcome.Resized, 10, 10, 20, 20, 400, 100, 2),
-            new DispatchCostDTO("calculated", 0, 0, 0, 0, 0, 0, 0, 0, 0));
+            new DispatchCostDTO(
+                "calculated", 0, 0, 0, 0, 0, 0, 0, 0,
+                TransmissionCostStatus.NotModelled, 0, []));
 
         SweepPointScalarResultsDTO scalars = SweepArtifactExport.CreateScalars(result);
         RenewableShareMetrics sourceMetrics = RenewableShareMetrics.FromDeliveredEnergy(

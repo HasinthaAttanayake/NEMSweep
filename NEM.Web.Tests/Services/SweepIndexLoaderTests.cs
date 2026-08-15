@@ -215,8 +215,8 @@ public sealed class SweepIndexLoaderTests
         TimeSpan.FromHours(1),
         new WeatherBasisDTO(
             WeatherBasisKind.TypicalMeteorologicalYear,
-            "sydney.epw",
-            "Sydney (WMO 947680)",
+            new WeatherSiteDTO("sydney-solar.epw", "Sydney (WMO 947680)"),
+            new WeatherSiteDTO("sydney-wind.epw", "Sydney (WMO 947680)"),
             "Typical meteorological year from sydney.epw."));
 
     private static SweepIndexPointDTO ValidPoint() => new(
@@ -250,6 +250,7 @@ public sealed class SweepIndexLoaderTests
         0,
         0,
         0m,
+        TransmissionCostStatus.NotModelled,
         0);
 
     private sealed class StaticJsonHandler(string json) : HttpMessageHandler

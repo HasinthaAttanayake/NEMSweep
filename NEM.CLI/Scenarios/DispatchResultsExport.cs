@@ -23,7 +23,8 @@ internal sealed record DispatchExportRequest(
     StorageSizingOptions SizingOptions,
     string? ReliabilityStandardName,
     PowerSystemCostBreakdown CostBreakdown,
-    string? RegionId = null);
+    string? RegionId = null,
+    double[]? TransmissionLossesMw = null);
 
 internal sealed record DispatchPublicationRequest(
     ScenarioDispatchResult Dispatch,
@@ -33,6 +34,7 @@ internal sealed record DispatchPublicationRequest(
 
 internal sealed record DispatchPublication(
     SystemDispatchResultsDTO System,
+    SystemDispatchOverviewDTO Overview,
     IReadOnlyDictionary<string, RegionDispatchResultsDTO> Regions);
 
 internal static class DispatchResultsExport
@@ -59,7 +61,10 @@ internal static class DispatchResultsExport
         try
         {
             string systemPath = Path.Combine(stagingDirectory, "results.json");
+            string overviewFileName = $"{Path.GetFileNameWithoutExtension(resultsPath)}-overview.json";
+            string overviewPath = Path.Combine(stagingDirectory, overviewFileName);
             WriteText(publication.System, systemPath, writeText);
+            WriteText(publication.Overview, overviewPath, writeText);
             foreach ((string fileName, RegionDispatchResultsDTO result) in publication.Regions)
             {
                 WriteText(result, Path.Combine(stagingDirectory, fileName), writeText);
@@ -68,6 +73,7 @@ internal static class DispatchResultsExport
             var targets = new List<(string Staged, string Final)>
             {
                 (systemPath, finalResultsPath),
+                (overviewPath, Path.Combine(outputDirectory, overviewFileName)),
             };
             targets.AddRange(publication.Regions.Select(region =>
                 (Path.Combine(stagingDirectory, region.Key), Path.Combine(outputDirectory, region.Key))));
@@ -155,7 +161,7 @@ internal static class DispatchResultsExport
                 weatherInput,
                 WeatherBasis.Create(dispatch.WeatherInputs[regionId].Value),
                 demandData.SourceArchives.ToArray());
-            DispatchResultsDTO regionalLegacy = Create(new DispatchExportRequest(
+            DispatchEvidence evidence = CreateEvidence(new DispatchExportRequest(
                 demandData,
                 demandInput,
                 weatherInput,
@@ -165,32 +171,38 @@ internal static class DispatchResultsExport
                 request.SizingOptions,
                 request.ReliabilityStandardName,
                 dispatch.CostBreakdown,
-                regionId));
+                regionId,
+                IncomingTransmissionLossesMw(systemOutcome, regionId)));
             DispatchCostDTO cost = CreateCost(regionalCost);
             RegionDispatchResultsDTO detail = new(
                 ArtifactSchemaVersions.RegionDispatchResults,
                 runId,
                 regionId,
-                regionalLegacy.Scenario.PeriodStart,
-                regionalLegacy.Scenario.PeriodEnd,
-                regionalLegacy.Scenario.Resolution,
+                evidence.Scenario.PeriodStart,
+                evidence.Scenario.PeriodEnd,
+                evidence.Scenario.Resolution,
                 sources,
-                regionalLegacy.PowerSystem,
-                regionalLegacy.DataSeries,
-                regionalLegacy.Metrics,
-                regionalLegacy.Reliability,
-                regionalLegacy.StorageSizing,
+                evidence.PowerSystem,
+                evidence.DataSeries,
+                evidence.Metrics,
+                evidence.Reliability,
+                evidence.StorageSizing,
                 cost);
             string detailPath = $"{request.RegionFileNamePrefix ?? "results-"}{regionId.ToLowerInvariant()}.json";
             regions.Add(detailPath, detail);
             sourcesByRegion.Add(regionId, sources);
             summaries.Add(regionId, new RegionDispatchSummaryDTO(
-                regionalLegacy.Metrics,
-                regionalLegacy.Reliability,
-                regionalLegacy.StorageSizing,
+                evidence.Metrics,
+                evidence.Reliability,
+                evidence.StorageSizing,
                 cost,
+                evidence.DataSeries.DeliveredGenerationByTechnologyMw.ToDictionary(
+                    entry => entry.Key,
+                    entry => entry.Value.Sum() * evidence.Scenario.Resolution.TotalHours,
+                    StringComparer.OrdinalIgnoreCase),
                 detailPath));
         }
+
 
         DispatchCostDTO systemCost = CreateCost(dispatch.CostBreakdown);
         SystemDispatchResultsDTO system = new(
@@ -211,13 +223,55 @@ internal static class DispatchResultsExport
                 request.ReliabilityStandardName),
             CreateSystemStorageSizingOutcome(request, sizingResult),
             systemCost,
+            new DispatchTopologyDTO(
+                dispatch.PowerSystem.Regions.Select(region => region.RegionId).ToArray(),
+                dispatch.PowerSystem.Interconnectors.Select(link => new DispatchTopologyLinkDTO(
+                    LinkId(link.FromRegionId, link.ToRegionId),
+                    link.FromRegionId,
+                    link.ToRegionId,
+                    link.Capacity.Megawatts)).ToArray()),
             systemOutcome.InterconnectorFlows.Select(flow => new DispatchInterconnectorDTO(
+                LinkId(flow.Interconnector.FromRegionId, flow.Interconnector.ToRegionId),
                 flow.Interconnector.FromRegionId,
                 flow.Interconnector.ToRegionId,
                 flow.Interconnector.Capacity.Megawatts,
                 ValuesOf(flow.Flow),
                 ValuesOf(flow.Losses))).ToArray());
-        return new DispatchPublication(system, regions);
+        SystemDispatchOverviewDTO overview = new(
+            ArtifactSchemaVersions.SystemDispatchOverview,
+            system.RunId,
+            system.PeriodStart,
+            system.PeriodEnd,
+            system.Resolution,
+            system.RegionIds,
+            system.DataSourcesByRegion,
+            system.RegionSummariesById,
+            system.Metrics,
+            system.Reliability,
+            system.StorageSizing,
+            system.Cost,
+            system.Topology);
+        return new DispatchPublication(system, overview, regions);
+    }
+
+    private static string LinkId(string fromRegionId, string toRegionId) =>
+        $"{fromRegionId.ToUpperInvariant()}->{toRegionId.ToUpperInvariant()}";
+
+    private static double[] IncomingTransmissionLossesMw(
+        SystemDispatchOutcome outcome,
+        string receivingRegionId)
+    {
+        var losses = new double[outcome.Length];
+        foreach (InterconnectorFlow flow in outcome.InterconnectorFlows.Where(flow =>
+                     string.Equals(
+                         flow.Interconnector.ToRegionId,
+                         receivingRegionId,
+                         StringComparison.OrdinalIgnoreCase)))
+        {
+            AddValues(losses, ValuesOf(flow.Losses));
+        }
+
+        return losses;
     }
 
     private static void WriteText<T>(T value, string path, Action<string, string> writeText) =>
@@ -300,7 +354,13 @@ internal static class DispatchResultsExport
             request.SizingOptions.MaximumEnergy.MegawattHours,
             request.SizingOptions.MaximumPower.Megawatts,
             sizingResult.DispatchPassCount,
-            EvidenceFor(sizingResult.EnergyLimitedAssessment));
+            EvidenceFor(sizingResult.EnergyLimitedAssessment),
+            sizingResult.Trajectory.Select(pass => new StorageSizingPassDTO(
+                pass.Pass,
+                pass.Regions.Sum(region => region.EnergyCapacity.MegawattHours),
+                pass.Regions.Sum(region => region.PowerCapacity.Megawatts),
+                pass.SystemUnservedEnergy.MegawattHours,
+                pass.SystemUnservedHours)).ToArray());
     }
 
     private static StorageSizingOutcome OutcomeFor(StorageSizingStatus status, bool wasChanged) =>
@@ -318,10 +378,14 @@ internal static class DispatchResultsExport
             _ => throw new ArgumentOutOfRangeException(nameof(status)),
         };
 
-    private static DispatchCostDTO CreateCost(PowerSystemCostBreakdown cost) =>
-        new(
+    private static DispatchCostDTO CreateCost(PowerSystemCostBreakdown cost)
+    {
+        DispatchGenerationCostContributionDTO[] contributions = CreateGenerationCostContributions(
+            cost.GenerationCostContributions,
+            cost.DeliveredEnergy.MegawattHours);
+        return new(
             "calculated",
-            cost.TotalAnnualisedGenerationCost.Aud,
+            contributions.Sum(contribution => contribution.AnnualisedCostAud),
             cost.TotalAnnualisedStorageCost.Aud,
             cost.TotalAnnualisedCost.Aud,
             cost.SystemLevelisedCostOfGeneration.AudPerMwhDelivered,
@@ -329,12 +393,21 @@ internal static class DispatchResultsExport
             cost.SystemLevelisedCostOfElectricity.AudPerMwhDelivered,
             cost.TotalAnnualisedTransmissionCost.Aud,
             cost.SystemLevelisedCostOfTransmission.AudPerMwhDelivered,
-            0);
+            cost.TransmissionCostModelled
+                ? TransmissionCostStatus.Calculated
+                : TransmissionCostStatus.NotModelled,
+            0,
+            contributions);
+    }
 
-    private static DispatchCostDTO CreateCost(RegionCostBreakdown cost) =>
-        new(
+    private static DispatchCostDTO CreateCost(RegionCostBreakdown cost)
+    {
+        DispatchGenerationCostContributionDTO[] contributions = CreateGenerationCostContributions(
+            cost.GenerationCostContributions,
+            cost.DeliveredEnergy.MegawattHours);
+        return new(
             "calculated",
-            cost.AnnualisedGenerationCost.Aud,
+            contributions.Sum(contribution => contribution.AnnualisedCostAud),
             cost.AnnualisedStorageCost.Aud,
             cost.TotalAnnualisedCost.Aud,
             cost.LevelisedCostOfGeneration.AudPerMwhDelivered,
@@ -342,7 +415,24 @@ internal static class DispatchResultsExport
             cost.LevelisedCostOfElectricity.AudPerMwhDelivered,
             0,
             0,
-            cost.NetImportedEnergy.MegawattHours);
+            TransmissionCostStatus.NotModelled,
+            cost.NetImportedEnergy.MegawattHours,
+            contributions);
+    }
+
+    private static DispatchGenerationCostContributionDTO[] CreateGenerationCostContributions(
+        IEnumerable<GenerationCostContribution> contributions,
+        double deliveredEnergyMwh) =>
+        contributions
+            .OrderBy(contribution => contribution.Technology)
+            .Select(contribution => new DispatchGenerationCostContributionDTO(
+                contribution.Technology.ToString(),
+                Math.Round(contribution.AnnualisedCost.Aud, 2, MidpointRounding.AwayFromZero),
+                Math.Round(
+                    contribution.AnnualisedCost.Aud / (decimal)deliveredEnergyMwh,
+                    2,
+                    MidpointRounding.AwayFromZero)))
+            .ToArray();
 
     private static void AddValues(double[] target, double[] source)
     {
@@ -399,6 +489,33 @@ internal static class DispatchResultsExport
     public static DispatchResultsDTO Create(DispatchExportRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
+        DispatchEvidence evidence = CreateEvidence(request);
+        return new DispatchResultsDTO(
+            ArtifactSchemaVersions.DispatchResults,
+            evidence.Scenario,
+            DateTimeOffset.UtcNow,
+            evidence.Sources,
+            evidence.PowerSystem,
+            evidence.DataSeries,
+            evidence.Metrics,
+            evidence.Reliability,
+            evidence.StorageSizing,
+            CreateLegacyCost(request, evidence.Outcome));
+    }
+
+    /// <summary>Everything a dispatch-results artifact needs except cost, which depends on the caller's scope.</summary>
+    private sealed record DispatchEvidence(
+        DispatchScenarioDTO Scenario,
+        DispatchSourcesDTO Sources,
+        DispatchPowerSystemDTO PowerSystem,
+        DispatchSeriesDTO DataSeries,
+        DispatchMetricsDTO Metrics,
+        ReliabilityBasisDTO Reliability,
+        StorageSizingOutcomeDTO StorageSizing,
+        DispatchOutcome Outcome);
+
+    private static DispatchEvidence CreateEvidence(DispatchExportRequest request)
+    {
         StorageSizingRunResult sizingResult = request.SizingResult;
         PowerSystem powerSystem = sizingResult.PowerSystem;
         RegionalSizingResult regionalSizing = request.RegionId is null
@@ -425,8 +542,7 @@ internal static class DispatchResultsExport
             .Sum(series => series.Integrate().MegawattHours);
         Region region = powerSystem.Regions.Single(region => region.RegionId == outcome.RegionId);
 
-        return new DispatchResultsDTO(
-            ArtifactSchemaVersions.DispatchResults,
+        return new DispatchEvidence(
             new DispatchScenarioDTO(
                 request.Scenario.Id.Value,
                 request.Scenario.Name,
@@ -434,7 +550,6 @@ internal static class DispatchResultsExport
                 outcome.Demand.Start,
                 outcome.Demand.Start.AddTicks(outcome.Demand.Resolution.Ticks * outcome.Demand.Length),
                 outcome.Demand.Resolution),
-            DateTimeOffset.UtcNow,
             new DispatchSourcesDTO(
                 request.DemandInput,
                 request.WeatherInput,
@@ -469,7 +584,7 @@ internal static class DispatchResultsExport
                     entry => ValuesOf(entry.Value)),
                 ValuesOf(outcome.Imports),
                 ValuesOf(outcome.Exports),
-                new double[outcome.Demand.Length]),
+                request.TransmissionLossesMw ?? new double[outcome.Demand.Length]),
             new DispatchMetricsDTO(
                 outcome.Demand.Integrate().MegawattHours,
                 deliveredGenerationMwh,
@@ -486,18 +601,31 @@ internal static class DispatchResultsExport
                 regionalSizing.MeetsTarget,
                 request.ReliabilityStandardName),
             CreateStorageSizingOutcome(request, regionalSizing),
-            new DispatchCostDTO(
-                "calculated",
-                request.CostBreakdown.TotalAnnualisedGenerationCost.Aud,
-                request.CostBreakdown.TotalAnnualisedStorageCost.Aud,
-                request.CostBreakdown.TotalAnnualisedCost.Aud,
-                request.CostBreakdown.SystemLevelisedCostOfGeneration.AudPerMwhDelivered,
-                request.CostBreakdown.SystemLevelisedCostOfStorage.AudPerMwhDelivered,
-                request.CostBreakdown.SystemLevelisedCostOfElectricity.AudPerMwhDelivered,
-                0,
-                0,
-                outcome.Imports.Integrate().MegawattHours
-                    - outcome.Exports.Integrate().MegawattHours));
+            outcome);
+    }
+
+    /// <summary>Cost for the single-region legacy artifact, where system and region scope coincide.</summary>
+    private static DispatchCostDTO CreateLegacyCost(DispatchExportRequest request, DispatchOutcome outcome)
+    {
+        DispatchGenerationCostContributionDTO[] costContributions = CreateGenerationCostContributions(
+            request.CostBreakdown.GenerationCostContributions,
+            outcome.DeliveredToLoad.Integrate().MegawattHours);
+        return new DispatchCostDTO(
+            "calculated",
+            costContributions.Sum(contribution => contribution.AnnualisedCostAud),
+            request.CostBreakdown.TotalAnnualisedStorageCost.Aud,
+            request.CostBreakdown.TotalAnnualisedCost.Aud,
+            request.CostBreakdown.SystemLevelisedCostOfGeneration.AudPerMwhDelivered,
+            request.CostBreakdown.SystemLevelisedCostOfStorage.AudPerMwhDelivered,
+            request.CostBreakdown.SystemLevelisedCostOfElectricity.AudPerMwhDelivered,
+            0,
+            0,
+            request.Scenario.Interconnectors.Count > 0
+                ? TransmissionCostStatus.Calculated
+                : TransmissionCostStatus.NotModelled,
+            outcome.Imports.Integrate().MegawattHours
+                - outcome.Exports.Integrate().MegawattHours,
+            costContributions);
     }
 
     public static void WriteJson(DispatchResultsDTO result, string path)
@@ -521,7 +649,20 @@ internal static class DispatchResultsExport
             request.SizingOptions.MaximumEnergy.MegawattHours,
             request.SizingOptions.MaximumPower.Megawatts,
             request.SizingResult.DispatchPassCount,
-            EvidenceFor(request.SizingResult.EnergyLimitedAssessment));
+            EvidenceFor(request.SizingResult.EnergyLimitedAssessment),
+            request.SizingResult.Trajectory.Select(pass =>
+            {
+                StorageSizingRegionPass regionPass = pass.Regions.Single(snapshot => string.Equals(
+                    snapshot.RegionId,
+                    regionalSizing.BatterySizing.RegionId,
+                    StringComparison.OrdinalIgnoreCase));
+                return new StorageSizingPassDTO(
+                    pass.Pass,
+                    regionPass.EnergyCapacity.MegawattHours,
+                    regionPass.PowerCapacity.Megawatts,
+                    regionPass.UnservedEnergy.MegawattHours,
+                    regionPass.UnservedHours);
+            }).ToArray());
     }
 
     private static StorageSizingOutcome OutcomeFor(RegionalSizingResult regionalSizing) =>

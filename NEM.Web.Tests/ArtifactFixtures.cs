@@ -13,8 +13,8 @@ public static class ArtifactFixtures
 
     public static WeatherBasisDTO WeatherBasis() => new(
         WeatherBasisKind.TypicalMeteorologicalYear,
-        "sydney.epw",
-        "Sydney (WMO 947680)",
+        new WeatherSiteDTO("sydney-solar.epw", "Sydney (WMO 947680)"),
+        new WeatherSiteDTO("sydney-wind.epw", "Sydney (WMO 947680)"),
         "Typical meteorological year from sydney.epw.");
 
     public static SweepScopeDTO Scope() => new(
@@ -44,6 +44,7 @@ public static class ArtifactFixtures
         PeakUnservedPowerMw: 0,
         CurtailedEnergyMwh: 0,
         TransmissionSlcotAudPerMwh: 0m,
+        TransmissionCostStatus: TransmissionCostStatus.NotModelled,
         NetImportedEnergyMwh: 0);
 
     public static ReliabilityBasisDTO Reliability(bool withinTarget = true) =>
@@ -136,7 +137,9 @@ public static class ArtifactFixtures
         new DispatchMetricsDTO(0, 0, 0, 0, 0, 0, 1, 0, pointers ?? new IntervalPointersDTO(null, null, null)),
         Reliability(),
         Sizing(),
-        new DispatchCostDTO("calculated", 0, 0, 0, 0, 0, 0, 0, 0, 0));
+        new DispatchCostDTO(
+            "calculated", 0, 0, 0, 0, 0, 0, 0, 0,
+            TransmissionCostStatus.NotModelled, 0, []));
 
     public static SystemDispatchResultsDTO SystemResults(
         int intervals = 3,
@@ -159,6 +162,7 @@ public static class ArtifactFixtures
                     regional.Reliability,
                     regional.StorageSizing,
                     regional.Cost,
+                    [],
                     "results-nsw1.json"),
             },
             regional.DataSeries,
@@ -166,6 +170,7 @@ public static class ArtifactFixtures
             regional.Reliability,
             regional.StorageSizing,
             regional.Cost,
+            new DispatchTopologyDTO(["NSW1"], []),
             interconnectors ?? []);
     }
 

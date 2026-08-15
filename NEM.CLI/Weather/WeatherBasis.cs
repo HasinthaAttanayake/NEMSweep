@@ -14,23 +14,44 @@ internal static class WeatherBasis
     public static WeatherBasisDTO Create(WeatherDataDTO weather)
     {
         ArgumentNullException.ThrowIfNull(weather);
-        string locationName = string.IsNullOrWhiteSpace(weather.Solar.Location.Wmo)
-            ? weather.Solar.Location.City
-            : string.Format(
-                CultureInfo.InvariantCulture,
-                "{0} (WMO {1})",
-                weather.Solar.Location.City,
-                weather.Solar.Location.Wmo);
+        WeatherSiteDTO solar = CreateSite(weather.Solar.SourceFile, weather.Solar.Location);
+        WeatherSiteDTO wind = CreateSite(weather.Wind.SourceFile, weather.Wind.Location);
         return new WeatherBasisDTO(
             WeatherBasisKind.TypicalMeteorologicalYear,
-            weather.Solar.SourceFile,
-            locationName,
-            string.Format(
-                CultureInfo.InvariantCulture,
-                "Typical meteorological year from {0} for {1}, applied to the dispatch period by "
-                + "calendar hour. It represents typical rather than extreme years, so it does not "
-                + "contain the tail weather events that drive storage and reliability outcomes.",
-                weather.Solar.SourceFile,
-                locationName));
+            solar,
+            wind,
+            CreateDescription(solar, wind));
     }
+
+    private static WeatherSiteDTO CreateSite(string sourceFile, WeatherLocation location) =>
+        new(
+            sourceFile,
+            string.IsNullOrWhiteSpace(location.Wmo)
+                ? location.City
+                : string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0} (WMO {1})",
+                    location.City,
+                    location.Wmo));
+
+    private static string CreateDescription(WeatherSiteDTO solar, WeatherSiteDTO wind) =>
+        solar == wind
+            ? string.Format(
+                CultureInfo.InvariantCulture,
+                "Typical meteorological year using solar and wind data from {0} at {1}, applied to "
+                + "the dispatch period by calendar hour. It represents typical rather than extreme "
+                + "years, so it does not contain the tail weather events that drive storage and "
+                + "reliability outcomes.",
+                solar.SourceFile,
+                solar.LocationName)
+            : string.Format(
+                CultureInfo.InvariantCulture,
+                "Typical meteorological year using solar data from {0} at {1} and wind data from "
+                + "{2} at {3}, applied to the dispatch period by calendar hour. It represents typical "
+                + "rather than extreme years, so it does not contain the tail weather events that "
+                + "drive storage and reliability outcomes.",
+                solar.SourceFile,
+                solar.LocationName,
+                wind.SourceFile,
+                wind.LocationName);
 }

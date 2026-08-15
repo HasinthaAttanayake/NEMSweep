@@ -26,6 +26,7 @@ public sealed class SystemAndRegionDispatchResultsContractTests
         json.Should().Contain("\"regionIds\"");
         json.Should().Contain("\"dataSourcesByRegion\"");
         json.Should().Contain("\"regionSummariesById\"");
+        json.Should().Contain("\"deliveredGenerationByTechnologyMwh\"");
         json.Should().Contain("\"dataSeries\"");
         json.Should().Contain("\"totalDemandMw\"");
         json.Should().Contain("\"demandMwh\"");
@@ -72,7 +73,8 @@ public sealed class SystemAndRegionDispatchResultsContractTests
             CreateMetrics(),
             new ReliabilityBasisDTO(0.002, 0, true, "NEM reliability standard"),
             CreateSizing(),
-            CreateCost());
+            CreateCost(),
+            new Dictionary<string, double> { ["Solar"] = 165 });
 
         return new SystemDispatchResultsDTO(
             ArtifactSchemaVersions.SystemDispatchResults,
@@ -96,7 +98,11 @@ public sealed class SystemAndRegionDispatchResultsContractTests
             new ReliabilityBasisDTO(0.002, 0, true, "NEM reliability standard"),
             CreateSizing(),
             CreateCost(),
+            new DispatchTopologyDTO(
+                ["NSW1", "VIC1"],
+                [new DispatchTopologyLinkDTO("NSW1->VIC1", "NSW1", "VIC1", 100)]),
             [new DispatchInterconnectorDTO(
+                "NSW1->VIC1",
                 "NSW1",
                 "VIC1",
                 100,
@@ -129,8 +135,8 @@ public sealed class SystemAndRegionDispatchResultsContractTests
             new DispatchInputArtifactDTO("weather.json", 6, new string('b', 64)),
             new WeatherBasisDTO(
                 WeatherBasisKind.TypicalMeteorologicalYear,
-                "sydney.epw",
-                "Sydney (WMO 947680)",
+                new WeatherSiteDTO("sydney-solar.epw", "Sydney (WMO 947680)"),
+                new WeatherSiteDTO("sydney-wind.epw", "Sydney (WMO 947680)"),
                 "Typical meteorological year."),
             ["demand.zip"]);
 
@@ -154,7 +160,22 @@ public sealed class SystemAndRegionDispatchResultsContractTests
         new(StorageSizingOutcome.NotRequired, 120, 30, 120, 30, 240, 60, 1);
 
     private static DispatchCostDTO CreateCost() =>
-        new("calculated", 1000m, 200m, 1250m, 10m, 2m, 12.5m, 50m, 0.5m, 9.5);
+        new(
+            "calculated",
+            1000m,
+            200m,
+            1250m,
+            10m,
+            2m,
+            12.5m,
+            50m,
+            0.5m,
+            TransmissionCostStatus.Calculated,
+            9.5,
+            [
+                new DispatchGenerationCostContributionDTO("Solar", 600m, 6m),
+                new DispatchGenerationCostContributionDTO("Coal", 400m, 4m),
+            ]);
 
     private static JsonSerializerOptions CamelCaseOptions => new()
     {

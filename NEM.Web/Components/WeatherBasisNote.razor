@@ -4,9 +4,11 @@
    on the page rather than left in provenance. The wording is the artifact's own. *@
 <aside class="weather-basis" aria-label="Weather basis">
     <p class="weather-basis-label">@KindLabel(Basis.Kind)</p>
-    <p class="weather-basis-location">@Basis.LocationName</p>
+    <p class="weather-basis-location">Solar: @Basis.Solar.LocationName</p>
+    <p class="weather-basis-source">@Basis.Solar.SourceFile</p>
+    <p class="weather-basis-location">Wind: @Basis.Wind.LocationName</p>
+    <p class="weather-basis-source">@Basis.Wind.SourceFile</p>
     <p class="weather-basis-description">@Basis.Description</p>
-    <p class="weather-basis-source">@Basis.SourceFile</p>
 </aside>
 
 @code {

@@ -112,16 +112,28 @@ public sealed class ScenarioRunnerMultiRegionTests
         system.DataSourcesByRegion["NSW1"].DemandInput.FileName.Should().Be("demand-nsw1.json");
         system.DataSourcesByRegion["VIC1"].WeatherInput.FileName.Should().Be("weather-vic1.json");
         system.RegionSummariesById["NSW1"].DetailPath.Should().Be("results-nsw1.json");
+        system.RegionSummariesById["NSW1"].DeliveredGenerationByTechnologyMwh.Values.Sum()
+            .Should().Be(nsw.Metrics.DeliveredGenerationMwh);
+        system.RegionSummariesById["VIC1"].DeliveredGenerationByTechnologyMwh.Values.Sum()
+            .Should().Be(vic.Metrics.DeliveredGenerationMwh);
         nsw.RegionId.Should().Be("NSW1");
         vic.RegionId.Should().Be("VIC1");
+        system.Topology.RegionIds.Should().Equal("NSW1", "VIC1");
+        system.Topology.Links.Should().ContainSingle().Which.Should().Be(
+            new DispatchTopologyLinkDTO("NSW1->VIC1", "NSW1", "VIC1", 30));
         DispatchInterconnectorDTO link = system.Interconnectors.Should().ContainSingle().Subject;
+        link.Id.Should().Be("NSW1->VIC1");
         link.FromRegionId.Should().Be("NSW1");
         link.ToRegionId.Should().Be("VIC1");
         link.CapacityMw.Should().Be(30);
         link.FlowMw.Should().HaveCount(8_760);
         link.LossesMw.Should().HaveCount(8_760);
         nsw.DataSeries.TransmissionLossesMw.Should().OnlyContain(value => value == 0);
-        vic.DataSeries.TransmissionLossesMw.Should().OnlyContain(value => value == 0);
+        vic.DataSeries.TransmissionLossesMw.Should().Equal(system.DataSeries.TransmissionLossesMw);
+        nsw.DataSeries.TransmissionLossesMw
+            .Zip(vic.DataSeries.TransmissionLossesMw)
+            .Select(losses => losses.First + losses.Second)
+            .Should().Equal(system.DataSeries.TransmissionLossesMw);
     }
 
     [Fact]
