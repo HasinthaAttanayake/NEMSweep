@@ -299,3 +299,6 @@ data/
 
 # Generated files
 dist/
+
+# Local Claude Code launch configuration.
+.claude/launch.json
