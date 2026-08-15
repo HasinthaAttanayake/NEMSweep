@@ -1,4 +1,5 @@
 @using NEM.Contracts
+@using System.Globalization
 @using NEM.Web.Components.Viz
 @using NEM.Web.Services
 @using NEM.Web.Services.Insights
@@ -17,6 +18,13 @@
             directly. The demand trace is the region's own; where it rises above the stack, the
             shortfall is met by imports or not at all.
         </p>
+    </div>
+
+    <div class="compare-export">
+        <CsvDownload Headers="@CsvHeaders"
+                     Rows="@CsvRows"
+                     FileName="@CsvWriter.FileName("regions", PeriodLabel)"
+                     Label="Download this period" />
     </div>
 
     <div class="compare-metrics">
@@ -114,6 +122,40 @@
     [Parameter, EditorRequired] public TimeSpan Resolution { get; set; }
     [Parameter, EditorRequired] public string PeriodLabel { get; set; } = string.Empty;
     [Parameter] public IReadOnlyList<DispatchInterconnectorDTO> Interconnectors { get; set; } = [];
+
+    private static readonly string[] CsvHeaders =
+    [
+        "Region",
+        "Peak demand (MW)",
+        "Demand energy (MWh)",
+        "Delivered (MWh)",
+        "Renewable share",
+        "Curtailed (MWh)",
+        "Unserved (MWh)",
+        "Peak shortfall (MW)",
+    ];
+
+    /// <summary>
+    /// Unrounded figures rather than the abbreviated ones on screen: a spreadsheet is where someone
+    /// goes to do arithmetic, and "2.9M MWh" cannot be added up.
+    /// </summary>
+    private IReadOnlyList<IReadOnlyList<string>> CsvRows =>
+    [
+        .. _panels.Select(panel => (IReadOnlyList<string>)
+        [
+            panel.Name,
+            Number(panel.PeakDemandMw),
+            Number(panel.DemandMwh),
+            Number(panel.DeliveredMwh),
+            Number(panel.RenewableShare),
+            Number(panel.CurtailedMwh),
+            Number(panel.UnservedMwh),
+            Number(panel.PeakUnservedMw),
+        ]),
+    ];
+
+    /// <summary>Shortest round-trippable form, so an exported figure is the model's own value.</summary>
+    private static string Number(double value) => value.ToString(CultureInfo.InvariantCulture);
 
     private List<RegionPanel> _panels = [];
     private List<LinkWindow> _links = [];

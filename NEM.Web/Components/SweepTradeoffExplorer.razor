@@ -2,6 +2,7 @@
 @using NEM.Web.Components.Viz
 @using NEM.Web.Services
 @using NEM.Web.Services.Insights
+@inject NavigationManager Navigation
 
 @*
     Any measure against any other, one marker per run. A sweep plotted against its own input says
@@ -74,6 +75,14 @@
     [Parameter, EditorRequired] public SweepAnalysis Analysis { get; set; } = default!;
     [Parameter] public string? RegionId { get; set; }
 
+    /// <summary>
+    /// Axis choices arrive from the query string so a view can be linked. A chart someone had to
+    /// describe in words to a colleague is a chart they cannot send.
+    /// </summary>
+    [SupplyParameterFromQuery(Name = "x")] public string? XQuery { get; set; }
+
+    [SupplyParameterFromQuery(Name = "y")] public string? YQuery { get; set; }
+
     private IReadOnlyList<SweepMeasure> _measures = [];
     private List<SweepMeasure> _available = [];
     private SweepMeasure _x = default!;
@@ -92,16 +101,36 @@
         _available = [.. _measures.Where(measure =>
             Analysis.Runs.Any(run => measure.Select(run).HasValue))];
 
+        // A named axis in the URL wins; otherwise the sweep opens on its own defaults, and those
+        // are only reset when the sweep or region actually changes.
         string identity = $"{Analysis.Index.SweepId}|{RegionId}";
-        if (_builtForSweepId != identity)
+        bool isNewSweep = _builtForSweepId != identity;
+        _builtForSweepId = identity;
+        if (Named(XQuery) is { } namedX)
         {
-            _builtForSweepId = identity;
+            _xKey = namedX;
+        }
+        else if (isNewSweep)
+        {
             _xKey = SweepMeasures.DefaultX(_available, Analysis.Runs).Key;
+        }
+
+        if (Named(YQuery) is { } namedY)
+        {
+            _yKey = namedY;
+        }
+        else if (isNewSweep)
+        {
             _yKey = SweepMeasures.Resolve(_available, SweepMeasures.LevelisedCostKey).Key;
         }
 
         Build();
     }
+
+    /// <summary>The measure a query names, or null when it names none this sweep carries.</summary>
+    private string? Named(string? key) => _available
+        .FirstOrDefault(measure => string.Equals(measure.Key, key, StringComparison.OrdinalIgnoreCase))
+        ?.Key;
 
     private void Build()
     {
@@ -171,16 +200,26 @@
             : $"{movement} at every run in the sweep.";
     }
 
-    private void OnXChanged(string key)
-    {
-        _xKey = key;
-        Build();
-    }
+    private void OnXChanged(string key) => Navigate(key, _yKey);
 
-    private void OnYChanged(string key)
+    private void OnYChanged(string key) => Navigate(_xKey, key);
+
+    /// <summary>
+    /// Selecting an axis rewrites the address rather than only the component's state, so the view
+    /// on screen is the view the address describes and can be copied out of the bar.
+    /// </summary>
+    private void Navigate(string x, string y)
     {
-        _yKey = key;
-        Build();
+        string route = SweepPaths.PageRoute(Analysis.Index.SweepId);
+        var query = new List<string>();
+        if (!string.IsNullOrWhiteSpace(RegionId))
+        {
+            query.Add($"region={Uri.EscapeDataString(RegionId)}");
+        }
+
+        query.Add($"x={Uri.EscapeDataString(x)}");
+        query.Add($"y={Uri.EscapeDataString(y)}");
+        Navigation.NavigateTo($"{route}?{string.Join("&", query)}", replace: true);
     }
 
     private static string Option(SweepMeasure measure) => string.IsNullOrWhiteSpace(measure.DisplayUnit)

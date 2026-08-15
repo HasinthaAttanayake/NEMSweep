@@ -1,4 +1,5 @@
 @using NEM.Contracts
+@using System.Globalization
 @using NEM.Web.Components.Viz
 @using NEM.Web.Services
 
@@ -10,6 +11,10 @@
             <h2>All runs</h2>
             <p>Every figure the sweep index records, per run, with the annual cost each one implies. Each run opens in the same viewer as the baseline dispatch.</p>
         </div>
+        <CsvDownload Headers="@CsvHeaders"
+                     Rows="@CsvRows"
+                     FileName="@CsvWriter.FileName(Index.SweepId, RegionId ?? "system", "runs")"
+                     Label="Download runs" />
     </div>
 
     <div class="run-table-scroll">
@@ -116,6 +121,55 @@
             ? "—"
             : SweepValueFormat.WithPrefix(column.ValuePrefix, value.Value, value.Value.ToString(_columnFormats[column.Key]));
     }
+
+    /// <summary>
+    /// Every column the table shows, as machine-readable values. A spreadsheet is where someone
+    /// goes to do arithmetic on these, so the figures are written unformatted and invariant —
+    /// "$11.06b" and "66,275,989" read well on screen and cannot be summed anywhere else.
+    /// </summary>
+    private IReadOnlyList<string> CsvHeaders =>
+    [
+        "Run",
+        $"{Index.Axis.Label} ({Index.Axis.Unit})",
+        "Outcome",
+        "Reliability",
+        "Storage sizing",
+        "Annual system cost (AUD, derived)",
+        .. SweepSeriesCatalogue.All.Select(column => $"{column.Label} ({column.Unit})"),
+    ];
+
+    private IReadOnlyList<IReadOnlyList<string>> CsvRows =>
+    [
+        .. Index.Points.Select(point =>
+        {
+            SweepPointScalarResultsDTO? scalars = SweepChartData.SelectScalars(point, RegionId);
+            return (IReadOnlyList<string>)
+            [
+                point.Label,
+                Number(point.AxisValue),
+                point.Status == SweepPointStatus.Succeeded
+                    ? "Completed"
+                    : $"{StageLabel(point.Failure?.Stage)} constraint: {point.Failure?.Message}",
+                point.Reliability is null ? string.Empty : point.Reliability.WithinTarget ? "Within" : "Outside",
+                point.StorageSizing is null ? string.Empty : SizingLabel(point.StorageSizing),
+                scalars is null
+                    ? string.Empty
+                    : Number((double)scalars.SlcoeAudPerMwh * scalars.EnergyServedMwh),
+                .. SweepSeriesCatalogue.All.Select(column =>
+                {
+                    double? value = scalars is null ? null : column.SelectValue(scalars);
+                    return value is null ? string.Empty : Number(value.Value);
+                }),
+            ];
+        }),
+    ];
+
+    /// <summary>
+    /// The shortest form that round-trips back to the same double, which is what a bare invariant
+    /// ToString gives. A fixed 17 significant digits is equally exact and prints 166.9 as
+    /// 166.90000000000001, which reads as a defect rather than as precision.
+    /// </summary>
+    private static string Number(double value) => value.ToString(CultureInfo.InvariantCulture);
 
     /// <summary>
     /// What the run's whole year costs, from the levelised cost and the energy it served. Marked as

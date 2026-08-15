@@ -27,8 +27,14 @@
     line-height: 1.55;
 }
 
-.compare-metrics {
+.compare-export {
+    display: flex;
+    justify-content: flex-end;
     margin-top: 1.35rem;
+}
+
+.compare-metrics {
+    margin-top: 0.6rem;
     overflow-x: auto;
     border-block: 1px solid var(--color-border);
 }
