@@ -8,12 +8,12 @@ namespace NEM.CLI.Tests.Configuration;
 public sealed class ScenarioConfigTests
 {
     [Fact]
-    public void Load_RequiresSchemaVersionThree()
+    public void Load_RequiresSchemaVersionFour()
     {
         var act = () => Load(config => config["schemaVersion"] = 1);
 
         act.Should().Throw<FormatException>()
-            .WithMessage("*found 1*expected 3*");
+            .WithMessage("*found 1*expected 4*");
     }
 
     [Fact]
@@ -245,7 +245,7 @@ public sealed class ScenarioConfigTests
     {
         JsonObject config = JsonNode.Parse("""
         {
-                    "schemaVersion": 3,
+                    "schemaVersion": 4,
           "id": "test",
           "name": "Test",
           "costBasis": { "year": 2026, "realDiscountRate": 0.07 },

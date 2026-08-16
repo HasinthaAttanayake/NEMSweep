@@ -1,0 +1,10 @@
+{
+  "axisValue": 3500,
+  "failure": {
+    "code": "passLimitReached",
+    "message": "Storage sizing ended with PassLimitReached: The dispatch pass limit was reached during compliant frontier refinement.",
+    "stage": "sizing"
+  },
+  "pointId": "p7",
+  "status": "failed"
+}

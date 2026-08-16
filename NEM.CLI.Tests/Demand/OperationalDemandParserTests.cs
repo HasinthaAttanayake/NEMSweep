@@ -29,6 +29,20 @@ public sealed class OperationalDemandParserTests
     }
 
     [Fact]
+    public void Read_FloorsNegativeOperationalDemandToZero()
+    {
+        using var fixture = new DemandArchiveFixture();
+        fixture.AddRows(
+            "sa1.zip",
+            [(PeriodStart + TimeSpan.FromMinutes(30), "SA1", -14)]);
+
+        OperationalDemandData result = OperationalDemandParser.Read(
+            [fixture.PathFor("sa1.zip")], ["SA1"], PeriodStart, PeriodStart.AddMinutes(30))["SA1"];
+
+        result.Demand[0].Megawatts.Should().Be(0);
+    }
+
+    [Fact]
     public void Read_DropsIdenticalOverlapsAcrossHeaderLayouts()
     {
         using var fixture = new DemandArchiveFixture();

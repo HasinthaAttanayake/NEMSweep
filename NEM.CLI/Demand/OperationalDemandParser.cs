@@ -242,11 +242,15 @@ internal static class OperationalDemandParser
                 Field(record, columns, "OPERATIONAL_DEMAND", sourcePath),
                 NumberStyles.Float,
                 CultureInfo.InvariantCulture);
-            if (!double.IsFinite(megawatts) || megawatts < 0)
+            if (!double.IsFinite(megawatts))
             {
                 throw new OperationalDemandDataQualityException(
                     $"{sourcePath}: invalid operational demand {megawatts} MW for {recordRegion} at {intervalStart:o}.");
             }
+
+            // Operational demand goes negative when rooftop solar exceeds underlying demand
+            // (a real, recurring condition in SA1); the model has no concept of negative demand.
+            megawatts = Math.Max(megawatts, 0);
 
             if (valuesByIntervalStart.TryGetValue(intervalStart, out DemandValue? existing))
             {

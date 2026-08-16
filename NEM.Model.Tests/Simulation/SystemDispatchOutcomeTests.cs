@@ -203,6 +203,35 @@ public sealed class SystemDispatchOutcomeTests
     }
 
     [Fact]
+    public void Create_AcceptsSolverFlowWithinFloatingPointToleranceOfCapacity()
+    {
+        PowerSystem system = LinkedSystem();
+        double flow = 1_000 + 4e-10;
+        double losses = 5;
+        double imports = flow - losses;
+        DispatchOutcome[] outcomes =
+        [
+            Outcome(
+                "NSW1", GenerationTechnology.Coal, [100 + flow, 100 + flow],
+                demand: [100, 100], exports: [flow, flow]),
+            Outcome(
+                "VIC1", GenerationTechnology.Gas, [5, 5],
+                demand: [5 + imports, 5 + imports], imports: [imports, imports]),
+        ];
+
+        SystemDispatchOutcome outcome = SystemDispatchOutcome.Create(
+            system,
+            new SystemDispatchRunResult(
+                outcomes,
+                [new InterconnectorFlow(
+                    system.Interconnectors.Single(),
+                    Hourly([flow, flow]),
+                    Hourly([losses, losses]))]));
+
+        AssertFlow(outcome.Exports, flow, flow);
+    }
+
+    [Fact]
     public void Create_RejectsNegativeBoundaryFlow()
     {
         var act = () => SystemDispatchOutcome.Create(System("NSW1"),

@@ -1,0 +1,708 @@
+{
+  "schemaVersion": 1,
+  "sweepId": "datacentre-nameplate-fy2026",
+  "name": "Data centre nameplate added, all regions",
+  "axis": {
+    "label": "Data centre nameplate added",
+    "unit": "MW"
+  },
+  "baselineConfigPath": "scenarios/nem-fy2026-all-regions.json",
+  "points": [
+    {
+      "pointId": "p0",
+      "axisValue": 0,
+      "label": "Baseline",
+      "overrides": {
+        "regions": []
+      }
+    },
+    {
+      "pointId": "p1",
+      "axisValue": 500,
+      "label": "+500 MW",
+      "overrides": {
+        "regions": [
+          {
+            "regionId": "NSW1",
+            "dataCentreNameplateMw": 200
+          },
+          {
+            "regionId": "QLD1",
+            "dataCentreNameplateMw": 100
+          },
+          {
+            "regionId": "SA1",
+            "dataCentreNameplateMw": 100
+          },
+          {
+            "regionId": "VIC1",
+            "dataCentreNameplateMw": 100
+          }
+        ]
+      }
+    },
+    {
+      "pointId": "p2",
+      "axisValue": 900,
+      "label": "+900 MW",
+      "overrides": {
+        "regions": [
+          {
+            "regionId": "NSW1",
+            "dataCentreNameplateMw": 400
+          },
+          {
+            "regionId": "QLD1",
+            "dataCentreNameplateMw": 100
+          },
+          {
+            "regionId": "SA1",
+            "dataCentreNameplateMw": 100
+          },
+          {
+            "regionId": "VIC1",
+            "dataCentreNameplateMw": 300
+          }
+        ]
+      }
+    },
+    {
+      "pointId": "p3",
+      "axisValue": 1500,
+      "label": "+1,500 MW",
+      "overrides": {
+        "regions": [
+          {
+            "regionId": "NSW1",
+            "dataCentreNameplateMw": 600
+          },
+          {
+            "regionId": "QLD1",
+            "dataCentreNameplateMw": 200
+          },
+          {
+            "regionId": "SA1",
+            "dataCentreNameplateMw": 200
+          },
+          {
+            "regionId": "TAS1",
+            "dataCentreNameplateMw": 100
+          },
+          {
+            "regionId": "VIC1",
+            "dataCentreNameplateMw": 400
+          }
+        ]
+      }
+    },
+    {
+      "pointId": "p4",
+      "axisValue": 2100,
+      "label": "+2,100 MW",
+      "overrides": {
+        "regions": [
+          {
+            "regionId": "NSW1",
+            "dataCentreNameplateMw": 900
+          },
+          {
+            "regionId": "QLD1",
+            "dataCentreNameplateMw": 300
+          },
+          {
+            "regionId": "SA1",
+            "dataCentreNameplateMw": 200
+          },
+          {
+            "regionId": "TAS1",
+            "dataCentreNameplateMw": 100
+          },
+          {
+            "regionId": "VIC1",
+            "dataCentreNameplateMw": 600
+          }
+        ]
+      }
+    },
+    {
+      "pointId": "p5",
+      "axisValue": 2500,
+      "label": "+2,500 MW",
+      "overrides": {
+        "regions": [
+          {
+            "regionId": "NSW1",
+            "dataCentreNameplateMw": 1100
+          },
+          {
+            "regionId": "QLD1",
+            "dataCentreNameplateMw": 300
+          },
+          {
+            "regionId": "SA1",
+            "dataCentreNameplateMw": 300
+          },
+          {
+            "regionId": "TAS1",
+            "dataCentreNameplateMw": 100
+          },
+          {
+            "regionId": "VIC1",
+            "dataCentreNameplateMw": 700
+          }
+        ]
+      }
+    },
+    {
+      "pointId": "p6",
+      "axisValue": 3000,
+      "label": "+3,000 MW",
+      "overrides": {
+        "regions": [
+          {
+            "regionId": "NSW1",
+            "dataCentreNameplateMw": 1300
+          },
+          {
+            "regionId": "QLD1",
+            "dataCentreNameplateMw": 400
+          },
+          {
+            "regionId": "SA1",
+            "dataCentreNameplateMw": 300
+          },
+          {
+            "regionId": "TAS1",
+            "dataCentreNameplateMw": 100
+          },
+          {
+            "regionId": "VIC1",
+            "dataCentreNameplateMw": 900
+          }
+        ]
+      }
+    },
+    {
+      "pointId": "p7",
+      "axisValue": 3500,
+      "label": "+3,500 MW",
+      "overrides": {
+        "regions": [
+          {
+            "regionId": "NSW1",
+            "dataCentreNameplateMw": 1500
+          },
+          {
+            "regionId": "QLD1",
+            "dataCentreNameplateMw": 500
+          },
+          {
+            "regionId": "SA1",
+            "dataCentreNameplateMw": 400
+          },
+          {
+            "regionId": "TAS1",
+            "dataCentreNameplateMw": 100
+          },
+          {
+            "regionId": "VIC1",
+            "dataCentreNameplateMw": 1000
+          }
+        ]
+      }
+    },
+    {
+      "pointId": "p8",
+      "axisValue": 4000,
+      "label": "+4,000 MW",
+      "overrides": {
+        "regions": [
+          {
+            "regionId": "NSW1",
+            "dataCentreNameplateMw": 1700
+          },
+          {
+            "regionId": "QLD1",
+            "dataCentreNameplateMw": 500
+          },
+          {
+            "regionId": "SA1",
+            "dataCentreNameplateMw": 400
+          },
+          {
+            "regionId": "TAS1",
+            "dataCentreNameplateMw": 200
+          },
+          {
+            "regionId": "VIC1",
+            "dataCentreNameplateMw": 1200
+          }
+        ]
+      }
+    },
+    {
+      "pointId": "p9",
+      "axisValue": 4500,
+      "label": "+4,500 MW",
+      "overrides": {
+        "regions": [
+          {
+            "regionId": "NSW1",
+            "dataCentreNameplateMw": 1900
+          },
+          {
+            "regionId": "QLD1",
+            "dataCentreNameplateMw": 600
+          },
+          {
+            "regionId": "SA1",
+            "dataCentreNameplateMw": 500
+          },
+          {
+            "regionId": "TAS1",
+            "dataCentreNameplateMw": 200
+          },
+          {
+            "regionId": "VIC1",
+            "dataCentreNameplateMw": 1300
+          }
+        ]
+      }
+    },
+    {
+      "pointId": "p10",
+      "axisValue": 5000,
+      "label": "+5,000 MW",
+      "overrides": {
+        "regions": [
+          {
+            "regionId": "NSW1",
+            "dataCentreNameplateMw": 2100
+          },
+          {
+            "regionId": "QLD1",
+            "dataCentreNameplateMw": 700
+          },
+          {
+            "regionId": "SA1",
+            "dataCentreNameplateMw": 500
+          },
+          {
+            "regionId": "TAS1",
+            "dataCentreNameplateMw": 200
+          },
+          {
+            "regionId": "VIC1",
+            "dataCentreNameplateMw": 1500
+          }
+        ]
+      }
+    },
+    {
+      "pointId": "p11",
+      "axisValue": 5400,
+      "label": "+5,400 MW",
+      "overrides": {
+        "regions": [
+          {
+            "regionId": "NSW1",
+            "dataCentreNameplateMw": 2300
+          },
+          {
+            "regionId": "QLD1",
+            "dataCentreNameplateMw": 700
+          },
+          {
+            "regionId": "SA1",
+            "dataCentreNameplateMw": 600
+          },
+          {
+            "regionId": "TAS1",
+            "dataCentreNameplateMw": 200
+          },
+          {
+            "regionId": "VIC1",
+            "dataCentreNameplateMw": 1600
+          }
+        ]
+      }
+    },
+    {
+      "pointId": "p12",
+      "axisValue": 6000,
+      "label": "+6,000 MW",
+      "overrides": {
+        "regions": [
+          {
+            "regionId": "NSW1",
+            "dataCentreNameplateMw": 2600
+          },
+          {
+            "regionId": "QLD1",
+            "dataCentreNameplateMw": 800
+          },
+          {
+            "regionId": "SA1",
+            "dataCentreNameplateMw": 600
+          },
+          {
+            "regionId": "TAS1",
+            "dataCentreNameplateMw": 200
+          },
+          {
+            "regionId": "VIC1",
+            "dataCentreNameplateMw": 1800
+          }
+        ]
+      }
+    },
+    {
+      "pointId": "p13",
+      "axisValue": 6600,
+      "label": "+6,600 MW",
+      "overrides": {
+        "regions": [
+          {
+            "regionId": "NSW1",
+            "dataCentreNameplateMw": 2800
+          },
+          {
+            "regionId": "QLD1",
+            "dataCentreNameplateMw": 900
+          },
+          {
+            "regionId": "SA1",
+            "dataCentreNameplateMw": 700
+          },
+          {
+            "regionId": "TAS1",
+            "dataCentreNameplateMw": 300
+          },
+          {
+            "regionId": "VIC1",
+            "dataCentreNameplateMw": 1900
+          }
+        ]
+      }
+    },
+    {
+      "pointId": "p14",
+      "axisValue": 7000,
+      "label": "+7,000 MW",
+      "overrides": {
+        "regions": [
+          {
+            "regionId": "NSW1",
+            "dataCentreNameplateMw": 3000
+          },
+          {
+            "regionId": "QLD1",
+            "dataCentreNameplateMw": 900
+          },
+          {
+            "regionId": "SA1",
+            "dataCentreNameplateMw": 700
+          },
+          {
+            "regionId": "TAS1",
+            "dataCentreNameplateMw": 300
+          },
+          {
+            "regionId": "VIC1",
+            "dataCentreNameplateMw": 2100
+          }
+        ]
+      }
+    },
+    {
+      "pointId": "p15",
+      "axisValue": 7500,
+      "label": "+7,500 MW (committed pipeline)",
+      "overrides": {
+        "regions": [
+          {
+            "regionId": "NSW1",
+            "dataCentreNameplateMw": 3200
+          },
+          {
+            "regionId": "QLD1",
+            "dataCentreNameplateMw": 1000
+          },
+          {
+            "regionId": "SA1",
+            "dataCentreNameplateMw": 800
+          },
+          {
+            "regionId": "TAS1",
+            "dataCentreNameplateMw": 300
+          },
+          {
+            "regionId": "VIC1",
+            "dataCentreNameplateMw": 2200
+          }
+        ]
+      }
+    },
+    {
+      "pointId": "p16",
+      "axisValue": 8000,
+      "label": "+8,000 MW",
+      "overrides": {
+        "regions": [
+          {
+            "regionId": "NSW1",
+            "dataCentreNameplateMw": 3400
+          },
+          {
+            "regionId": "QLD1",
+            "dataCentreNameplateMw": 1100
+          },
+          {
+            "regionId": "SA1",
+            "dataCentreNameplateMw": 900
+          },
+          {
+            "regionId": "TAS1",
+            "dataCentreNameplateMw": 300
+          },
+          {
+            "regionId": "VIC1",
+            "dataCentreNameplateMw": 2300
+          }
+        ]
+      }
+    },
+    {
+      "pointId": "p17",
+      "axisValue": 8400,
+      "label": "+8,400 MW",
+      "overrides": {
+        "regions": [
+          {
+            "regionId": "NSW1",
+            "dataCentreNameplateMw": 3600
+          },
+          {
+            "regionId": "QLD1",
+            "dataCentreNameplateMw": 1100
+          },
+          {
+            "regionId": "SA1",
+            "dataCentreNameplateMw": 900
+          },
+          {
+            "regionId": "TAS1",
+            "dataCentreNameplateMw": 300
+          },
+          {
+            "regionId": "VIC1",
+            "dataCentreNameplateMw": 2500
+          }
+        ]
+      }
+    },
+    {
+      "pointId": "p18",
+      "axisValue": 9000,
+      "label": "+9,000 MW",
+      "overrides": {
+        "regions": [
+          {
+            "regionId": "NSW1",
+            "dataCentreNameplateMw": 3800
+          },
+          {
+            "regionId": "QLD1",
+            "dataCentreNameplateMw": 1200
+          },
+          {
+            "regionId": "SA1",
+            "dataCentreNameplateMw": 1000
+          },
+          {
+            "regionId": "TAS1",
+            "dataCentreNameplateMw": 400
+          },
+          {
+            "regionId": "VIC1",
+            "dataCentreNameplateMw": 2600
+          }
+        ]
+      }
+    },
+    {
+      "pointId": "p19",
+      "axisValue": 9600,
+      "label": "+9,600 MW",
+      "overrides": {
+        "regions": [
+          {
+            "regionId": "NSW1",
+            "dataCentreNameplateMw": 4100
+          },
+          {
+            "regionId": "QLD1",
+            "dataCentreNameplateMw": 1300
+          },
+          {
+            "regionId": "SA1",
+            "dataCentreNameplateMw": 1000
+          },
+          {
+            "regionId": "TAS1",
+            "dataCentreNameplateMw": 400
+          },
+          {
+            "regionId": "VIC1",
+            "dataCentreNameplateMw": 2800
+          }
+        ]
+      }
+    },
+    {
+      "pointId": "p20",
+      "axisValue": 10000,
+      "label": "+10,000 MW",
+      "overrides": {
+        "regions": [
+          {
+            "regionId": "NSW1",
+            "dataCentreNameplateMw": 4300
+          },
+          {
+            "regionId": "QLD1",
+            "dataCentreNameplateMw": 1300
+          },
+          {
+            "regionId": "SA1",
+            "dataCentreNameplateMw": 1100
+          },
+          {
+            "regionId": "TAS1",
+            "dataCentreNameplateMw": 400
+          },
+          {
+            "regionId": "VIC1",
+            "dataCentreNameplateMw": 2900
+          }
+        ]
+      }
+    },
+    {
+      "pointId": "p21",
+      "axisValue": 10500,
+      "label": "+10,500 MW",
+      "overrides": {
+        "regions": [
+          {
+            "regionId": "NSW1",
+            "dataCentreNameplateMw": 4500
+          },
+          {
+            "regionId": "QLD1",
+            "dataCentreNameplateMw": 1400
+          },
+          {
+            "regionId": "SA1",
+            "dataCentreNameplateMw": 1100
+          },
+          {
+            "regionId": "TAS1",
+            "dataCentreNameplateMw": 400
+          },
+          {
+            "regionId": "VIC1",
+            "dataCentreNameplateMw": 3100
+          }
+        ]
+      }
+    },
+    {
+      "pointId": "p22",
+      "axisValue": 11000,
+      "label": "+11,000 MW",
+      "overrides": {
+        "regions": [
+          {
+            "regionId": "NSW1",
+            "dataCentreNameplateMw": 4700
+          },
+          {
+            "regionId": "QLD1",
+            "dataCentreNameplateMw": 1500
+          },
+          {
+            "regionId": "SA1",
+            "dataCentreNameplateMw": 1200
+          },
+          {
+            "regionId": "TAS1",
+            "dataCentreNameplateMw": 400
+          },
+          {
+            "regionId": "VIC1",
+            "dataCentreNameplateMw": 3200
+          }
+        ]
+      }
+    },
+    {
+      "pointId": "p23",
+      "axisValue": 11500,
+      "label": "+11,500 MW",
+      "overrides": {
+        "regions": [
+          {
+            "regionId": "NSW1",
+            "dataCentreNameplateMw": 4900
+          },
+          {
+            "regionId": "QLD1",
+            "dataCentreNameplateMw": 1500
+          },
+          {
+            "regionId": "SA1",
+            "dataCentreNameplateMw": 1200
+          },
+          {
+            "regionId": "TAS1",
+            "dataCentreNameplateMw": 500
+          },
+          {
+            "regionId": "VIC1",
+            "dataCentreNameplateMw": 3400
+          }
+        ]
+      }
+    },
+    {
+      "pointId": "p24",
+      "axisValue": 12000,
+      "label": "+12,000 MW",
+      "overrides": {
+        "regions": [
+          {
+            "regionId": "NSW1",
+            "dataCentreNameplateMw": 5100
+          },
+          {
+            "regionId": "QLD1",
+            "dataCentreNameplateMw": 1600
+          },
+          {
+            "regionId": "SA1",
+            "dataCentreNameplateMw": 1300
+          },
+          {
+            "regionId": "TAS1",
+            "dataCentreNameplateMw": 500
+          },
+          {
+            "regionId": "VIC1",
+            "dataCentreNameplateMw": 3500
+          }
+        ]
+      }
+    }
+  ]
+}

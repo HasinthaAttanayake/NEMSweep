@@ -301,16 +301,19 @@ internal static class SweepArtifactExport
                 continue;
             }
 
-            AddInput(
-                inputs,
-                context.Paths.SolutionRoot,
-                ScenarioRunner.ResolveScenarioInputPath(context.Paths, settings.DemandFile),
-                "demand-data");
-            AddInput(
-                inputs,
-                context.Paths.SolutionRoot,
-                ScenarioRunner.ResolveScenarioInputPath(context.Paths, settings.WeatherFile),
-                "weather-data");
+            foreach (ScenarioRegionSettings region in settings.Regions)
+            {
+                AddInput(
+                    inputs,
+                    context.Paths.SolutionRoot,
+                    ScenarioRunner.ResolveScenarioInputPath(context.Paths, region.DemandFile),
+                    "demand-data");
+                AddInput(
+                    inputs,
+                    context.Paths.SolutionRoot,
+                    ScenarioRunner.ResolveScenarioInputPath(context.Paths, region.WeatherFile),
+                    "weather-data");
+            }
         }
 
         string resolvedDefinition = JsonFile.SerializeExact(definition);

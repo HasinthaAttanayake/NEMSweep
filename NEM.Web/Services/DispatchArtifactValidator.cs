@@ -142,10 +142,14 @@ public static class DispatchArtifactValidator
             }
         }
 
+        // Published *Mw fields are independently rounded to 1 decimal place (JsonFile.DecimalPlaces),
+        // so summing several links' rounded losses can drift from the system total's own rounding by
+        // up to half a published unit per term.
+        double lossLedgerTolerance = (0.05 * (result.Interconnectors.Length + 1)) + FlowToleranceMw;
         for (int interval = 0; interval < intervalCount; interval++)
         {
             double linkLosses = result.Interconnectors.Sum(link => link.LossesMw[interval]);
-            if (Math.Abs(result.DataSeries.TransmissionLossesMw[interval] - linkLosses) > FlowToleranceMw)
+            if (Math.Abs(result.DataSeries.TransmissionLossesMw[interval] - linkLosses) > lossLedgerTolerance)
             {
                 return "System transmission-loss series does not match its interconnector loss ledger.";
             }
