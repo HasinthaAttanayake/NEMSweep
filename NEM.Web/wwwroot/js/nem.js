@@ -14,12 +14,17 @@ export function revealIfOffScreen(element) {
         return;
     }
 
+    // The page header stays pinned (position: sticky) while the content scrolls beneath it. The
+    // element carries its own scroll-margin-top (see .scroll-reveal-target in app.css) sized to
+    // that header, so scrollIntoView's native alignment already lands below it rather than
+    // tucking the target's heading underneath it — no separate header measurement to race.
+    const margin = parseFloat(getComputedStyle(element).scrollMarginTop) || 0;
     const top = element.getBoundingClientRect().top;
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
 
     // Already at or near the top of the screen: scrolling under someone who can see the thing they
     // asked for is its own kind of wrong.
-    if (top >= 0 && top <= viewportHeight * 0.35) {
+    if (top >= margin && top <= margin + (viewportHeight * 0.35)) {
         return;
     }
 

@@ -100,7 +100,7 @@
                 @* The picker is a grid of eighteen tiles, so the chart it drives can sit a
                    screen below the tile that was clicked. The chart is brought into view when the
                    selection lands off screen. *@
-                <div @ref="_seriesChart">
+                <div @ref="_seriesChart" class="scroll-reveal-target">
                     <SweepChart Index="@_index"
                                 YAxis="@_axis"
                                 RegionId="@SelectedRegionId"

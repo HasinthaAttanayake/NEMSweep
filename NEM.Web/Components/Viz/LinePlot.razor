@@ -95,6 +95,16 @@
                 <SvgText Class="plot-axis-title" X="_box.Left + (_box.Width / 2)" Y="Height - 6"
                          Anchor="middle" Value="@XAxisTitle" />
             }
+            @if (!string.IsNullOrWhiteSpace(YAxisTitle))
+            {
+                <SvgText Class="plot-axis-title" X="-(_box.Top + (_box.Height / 2))" Y="16"
+                         Anchor="middle" Transform="rotate(-90)" Value="@YAxisTitle" />
+            }
+            @if (_secondary is not null && !string.IsNullOrWhiteSpace(SecondaryAxisTitle))
+            {
+                <SvgText Class="plot-axis-title plot-axis-title-secondary" X="_box.Top + (_box.Height / 2)" Y="-988"
+                         Anchor="middle" Transform="rotate(90)" Value="@SecondaryAxisTitle" />
+            }
         </svg>
     </div>
     <figcaption class="plot-legend">
@@ -125,6 +135,8 @@
     [Parameter] public string? YPrefix { get; set; }
     [Parameter] public string? SecondaryPrefix { get; set; }
     [Parameter] public string? XAxisTitle { get; set; }
+    [Parameter] public string? YAxisTitle { get; set; }
+    [Parameter] public string? SecondaryAxisTitle { get; set; }
     [Parameter] public double Height { get; set; } = 360;
     [Parameter] public bool IncludeZero { get; set; } = true;
     [Parameter] public bool ShowMarkers { get; set; } = true;
@@ -146,10 +158,14 @@
         _pointCount = Series.Count == 0 ? 0 : Series.Max(series => series.Values.Count);
         bool hasSecondary = Series.Any(series => series.UseSecondaryAxis);
         // Right-hand tick labels need the same room the left-hand ones get, and only when drawn.
+        // A rotated axis title claims a further slice on whichever side it is set.
+        double left = 76 + (string.IsNullOrWhiteSpace(YAxisTitle) ? 0 : 16);
+        double right = (hasSecondary ? 912 : 976)
+            - (hasSecondary && !string.IsNullOrWhiteSpace(SecondaryAxisTitle) ? 16 : 0);
         _box = new PlotBox(
-            76,
+            left,
             Annotations.Count > 0 ? 30 : 20,
-            hasSecondary ? 912 : 976,
+            right,
             Height - (string.IsNullOrWhiteSpace(XAxisTitle) ? 34 : 52));
 
         _primary = AxisFor(series => !series.UseSecondaryAxis) ?? PlotAxis.Nice(0, 1, includeZero: IncludeZero);
