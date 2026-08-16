@@ -299,12 +299,14 @@
                         Unit="MW">
                 <div class="dispatch-chart">
                     <svg viewBox="0 0 1000 440" role="img" aria-label="Stacked generation by technology against operational demand">
+                        <SvgText Class="plot-axis-title" X="-210" Y="18"
+                                 Anchor="middle" Transform="rotate(-90)" Value="MW" />
                         @for (int tick = 0; tick <= 4; tick++)
                         {
                             double value = _chartMaximumMw * tick / 4;
                             double y = ChartY(value);
-                            <line class="grid-line" x1="64" y1="@y" x2="984" y2="@y" stroke="#dce1e5" stroke-width="1" />
-                            <SvgText Class="plot-tick" X="56" Y="y + 4" Anchor="end"
+                            <line class="grid-line" x1="84" y1="@y" x2="984" y2="@y" stroke="#dce1e5" stroke-width="1" />
+                            <SvgText Class="plot-tick" X="76" Y="y + 4" Anchor="end"
                                      Value="@PlotFormat.Compact(value, 0)" />
                         }
                         @foreach (AreaLayer area in _areas)
@@ -356,20 +358,25 @@
                 {
                     <div class="dispatch-chart storage-chart">
                         <svg viewBox="0 0 1000 300" role="group" aria-label="Storage state of charge by technology">
+                            <SvgText Class="plot-axis-title" X="-153" Y="18"
+                                     Anchor="middle" Transform="rotate(-90)" Value="MWh" />
                             @* Gridlines carried no values, so the trace showed a shape without a
                                quantity: a reader could see storage moving but not how full it was. *@
                             @foreach (double tick in _storageAxis.Ticks)
                             {
                                 double y = StorageChartY(tick);
-                                <line class="grid-line" x1="64" y1="@y" x2="984" y2="@y" stroke="var(--color-border)" stroke-width="1" />
-                                <SvgText Class="plot-tick" X="56" Y="y + 4" Anchor="end"
+                                <line class="grid-line" x1="84" y1="@y" x2="984" y2="@y" stroke="var(--color-border)" stroke-width="1" />
+                                <SvgText Class="plot-tick" X="76" Y="y + 4" Anchor="end"
                                          Value="@PlotFormat.Tick(tick, _storageAxis)" />
                             }
                             @if (_storageSummary is { CapacityMwh: > 0 } capacity)
                             {
                                 double capacityY = StorageChartY(capacity.CapacityMwh);
-                                <line class="storage-capacity-rule" x1="64" y1="@capacityY" x2="984" y2="@capacityY" />
-                                <SvgText Class="storage-capacity-label" X="984" Y="capacityY - 6" Anchor="end"
+                                @* Clamped so a capacity near the axis maximum still leaves the label
+                                   inside the viewBox instead of rendering above it and being clipped. *@
+                                double capacityLabelY = Math.Max(capacityY - 6, StorageChartTop - 18);
+                                <line class="storage-capacity-rule" x1="84" y1="@capacityY" x2="984" y2="@capacityY" />
+                                <SvgText Class="storage-capacity-label" X="984" Y="capacityLabelY" Anchor="end"
                                          Value="@($"installed {PlotFormat.Compact(capacity.CapacityMwh)} MWh")" />
                             }
                             @foreach (StorageTrace trace in _comparisonStorageTraces)
@@ -452,13 +459,15 @@
                         Class="headroom-section">
                 <div class="dispatch-chart headroom-chart">
                     <svg viewBox="0 0 1000 300" role="img" aria-label="Unserved demand and curtailment">
+                        <SvgText Class="plot-axis-title" X="-153" Y="18"
+                                 Anchor="middle" Transform="rotate(-90)" Value="MW" />
                         @for (int tick = 0; tick <= 4; tick++)
                         {
                             double value = _headroomChartMaximumMw * tick / 4;
                             double y = HeadroomChartY(value);
-                            <line class="grid-line" x1="64" y1="@y" x2="984" y2="@y"
+                            <line class="grid-line" x1="84" y1="@y" x2="984" y2="@y"
                                   stroke="var(--color-border)" stroke-width="1" />
-                            <SvgText Class="plot-tick" X="56" Y="y + 4" Anchor="end"
+                            <SvgText Class="plot-tick" X="76" Y="y + 4" Anchor="end"
                                      Value="@PlotFormat.Compact(value, 0)" />
                         }
                         @foreach (HeadroomTrace trace in _comparisonHeadroomTraces)
@@ -584,11 +593,17 @@
 </main>
 
 @code {
-    private const double ChartLeft = 64;
+    // 20px more than the tick labels alone need, so the rotated axis-unit label has clearance to
+    // the left of the widest tick text instead of overlapping it at whichever row its vertical
+    // centre lands on.
+    private const double ChartLeft = 84;
     private const double ChartRight = 984;
     private const double ChartTop = 12;
     private const double ChartBottom = 408;
-    private const double StorageChartTop = 12;
+    // Taller than the other charts' top margin: the "installed" capacity label sits just above
+    // the capacity rule, and that rule usually sits near the axis maximum, so the label needs
+    // headroom of its own or it renders above the viewBox and is clipped by it.
+    private const double StorageChartTop = 30;
     private const double StorageChartBottom = 276;
     private static readonly string[] PreferredTechnologyOrder = ["Solar", "Wind", "Hydro", "Coal", "Gas"];
     private static readonly Dictionary<string, string> TechnologyColors = new(StringComparer.OrdinalIgnoreCase)

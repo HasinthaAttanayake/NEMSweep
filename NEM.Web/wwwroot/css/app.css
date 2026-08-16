@@ -55,6 +55,21 @@
     --breakpoint-narrow: 700px;
     --breakpoint-mobile: 640px;
     --breakpoint-small: 420px;
+    /* MainLayout's .top-row is only position: sticky from 641px up (see MainLayout.razor.css);
+       below that it scrolls away with the page, so nothing needs to compensate for it there. */
+    --sticky-header-height: 0px;
+}
+
+@media (min-width: 641px) {
+    :root {
+        --sticky-header-height: 3.5rem;
+    }
+}
+
+/* A target of revealIfOffScreen (nem.js): scrollIntoView honours scroll-margin-top natively, so
+   the reveal never has to separately measure the sticky header's height or race its layout. */
+.scroll-reveal-target {
+    scroll-margin-top: calc(var(--sticky-header-height) + 0.75rem);
 }
 
 html, body {
@@ -254,6 +269,10 @@ code {
     font-weight: 700;
     letter-spacing: 0.05em;
     text-transform: uppercase;
+}
+
+.plot-axis-title-secondary {
+    fill: var(--color-muted-generation);
 }
 
 .plot-line {
