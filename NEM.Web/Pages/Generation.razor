@@ -119,11 +119,10 @@
                         <tbody>
                             @foreach (TechnologyAggregate technology in _technologyAggregates)
                             {
-                                bool expandable = technology.Details.Count > 1;
-                                bool expanded = expandable && _expandedTechnologies.Contains(technology.TechnologyType);
+                                bool expanded = _expandedTechnologies.Contains(technology.TechnologyType);
                                 <tr>
                                     <td class="expand-col">
-                                        @if (expandable)
+                                        @if (technology.Details.Count > 0)
                                         {
                                             <button type="button" class="expand-toggle"
                                                     aria-expanded="@(expanded ? "true" : "false")"
@@ -167,13 +166,10 @@
                     <span>Columns A-Z</span>
                 </div>
                 <div class="source-search">
-                    <label>
-                        <span>Search</span>
-                        <input type="search"
-                               placeholder="Search any column…"
-                               value="@_sourceSearch"
-                               @oninput="OnSourceSearchChanged" />
-                    </label>
+                    <input type="search"
+                           placeholder="Search any column…"
+                           value="@_sourceSearch"
+                           @oninput="OnSourceSearchChanged" />
                     <span class="source-search-count">@_filteredRows.Count(RowMatchesSearch).ToString("N0") of @_filteredRows.Count.ToString("N0") rows</span>
                 </div>
                 <MudTable Items="_filteredRows" Filter="new Func<GenerationInformationRow, bool>(RowMatchesSearch)"
