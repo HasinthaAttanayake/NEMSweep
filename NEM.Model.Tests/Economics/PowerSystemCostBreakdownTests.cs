@@ -6,6 +6,7 @@ using NEM.Model.Series;
 using NEM.Model.Simulation;
 using NEM.Model.StorageSizing;
 using NEM.Model.Units;
+using NEM.Model.Weather;
 
 namespace NEM.Model.Tests.Economics;
 
@@ -243,32 +244,61 @@ public sealed class PowerSystemCostBreakdownTests
     }
 
     [Fact]
-    public void Calculate_ChargesInterconnectorCostAgainstItsDirectedCapacity()
+    public void Calculate_ChargesInterconnectorCostAgainstItsLineDistanceAndCapacity()
     {
         Scenario scenario = TwoRegionScenario(Interconnectors());
+        Money expectedTransmissionCost = OneLinkCost(capacityMw: 700);
+
         PowerSystemCostBreakdown breakdown = CalculateTwoRegion(scenario);
 
         breakdown.TotalAnnualisedTransmissionCost.Should().Be(
-            Money.FromAud(21_000m),
-            "700 MW at 1000/MW over 50 years at zero discount is 14000, plus 7000 fixed");
+            expectedTransmissionCost,
+            "cost scales with both the NSW1-VIC1 weather-site distance and the 700 MW directed capacity");
         breakdown.SystemLevelisedCostOfTransmission.Should().Be(
-            Money.FromAud(21_000m).Per(breakdown.DeliveredEnergy));
+            expectedTransmissionCost.Per(breakdown.DeliveredEnergy));
         breakdown.TotalAnnualisedCost.Should().Be(
             breakdown.TotalAnnualisedGenerationCost
             + breakdown.TotalAnnualisedStorageCost
-            + Money.FromAud(21_000m));
+            + expectedTransmissionCost);
     }
 
     [Fact]
     public void Calculate_ChargesReciprocalInterconnectorsIndependently()
     {
         Scenario scenario = TwoRegionScenario(Interconnectors(includeReverse: true));
+        Money expectedTransmissionCost = OneLinkCost(capacityMw: 700) + OneLinkCost(capacityMw: 400);
 
         PowerSystemCostBreakdown breakdown = CalculateTwoRegion(scenario);
 
         breakdown.TotalAnnualisedTransmissionCost.Should().Be(
-            Money.FromAud(33_000m),
-            "the 700 MW NSW1 to VIC1 and 400 MW VIC1 to NSW1 assets each carry their own cost");
+            expectedTransmissionCost,
+            "the NSW1 to VIC1 and VIC1 to NSW1 assets share a distance but each carry their own capacity and cost");
+    }
+
+    [Fact]
+    public void Calculate_RequiresBothInterconnectorEndpointsToCarryAResourceProfile()
+    {
+        Scenario scenario = TwoRegionScenario(Interconnectors());
+        DispatchOutcome nswOutcome = DispatchOutcomeFor("NSW1", deliveredMegawattHours: 1);
+        DispatchOutcome vicOutcome = DispatchOutcomeFor("VIC1", deliveredMegawattHours: 2);
+        var powerSystem = new PowerSystem(
+            new PowerSystemId("two-region-cost-system"),
+            scenario.Id,
+            [
+                new Region(
+                    "NSW1",
+                    [new GeneratingFleet(GenerationTechnology.Gas, Power.FromMegawatts(10))],
+                    nswOutcome.Demand),
+                RegionFor("VIC1", vicOutcome.Demand),
+            ],
+            [Link()]);
+
+        var act = () => PowerSystemCostCalculator.Calculate(
+            scenario,
+            powerSystem,
+            [nswOutcome, vicOutcome]);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*NSW1*resource profile*");
     }
 
     [Fact]
@@ -407,9 +437,29 @@ public sealed class PowerSystemCostBreakdownTests
             toRegionId,
             Power.FromMegawatts(capacityMw),
             new TransmissionCostParameters(
-                PowerCapacityCost.FromAudPerMwCapacity(1_000m),
-                AnnualPowerCapacityCost.FromAudPerMwYear(10m)),
-            technicalLifeYears: 50u);
+                DistancePowerCost.FromAudPerKmPerMw(CapitalCostAudPerKmPerMw),
+                AnnualDistancePowerCost.FromAudPerKmPerMwYear(FixedOperatingCostAudPerKmPerMwYear)),
+            technicalLifeYears: InterconnectorTechnicalLifeYears);
+
+    private const decimal CapitalCostAudPerKmPerMw = 1_000m;
+    private const decimal FixedOperatingCostAudPerKmPerMwYear = 10m;
+    private const uint InterconnectorTechnicalLifeYears = 50u;
+
+    private static readonly GeoCoordinate NswLocation = GeoCoordinate.FromDegrees(-33.9, 151.2);
+    private static readonly GeoCoordinate VicLocation = GeoCoordinate.FromDegrees(-37.8, 144.9);
+
+    /// <summary>Annualised cost of one NSW1-VIC1 link at the shared test cost assumptions.</summary>
+    private static Money OneLinkCost(double capacityMw)
+    {
+        Distance distance = NswLocation.DistanceTo(VicLocation);
+        Power capacity = Power.FromMegawatts(capacityMw);
+        return LevelisedCostCalculator.Annuitise(
+                DistancePowerCost.FromAudPerKmPerMw(CapitalCostAudPerKmPerMw).For(distance, capacity),
+                rate: 0m,
+                years: InterconnectorTechnicalLifeYears)
+            + AnnualDistancePowerCost.FromAudPerKmPerMwYear(FixedOperatingCostAudPerKmPerMwYear)
+                .For(distance, capacity, years: 1);
+    }
 
     private static DispatchOutcome TransferOutcome(
         string regionId,
@@ -598,7 +648,24 @@ public sealed class PowerSystemCostBreakdownTests
         new(
             regionId,
             [new GeneratingFleet(GenerationTechnology.Gas, Power.FromMegawatts(10))],
-            demand);
+            demand,
+            resourceProfile: ResourceProfileAt(LocationFor(regionId), demand));
+
+    private static GeoCoordinate LocationFor(string regionId) =>
+        string.Equals(regionId, "VIC1", StringComparison.OrdinalIgnoreCase) ? VicLocation : NswLocation;
+
+    private static RegionalResourceProfile ResourceProfileAt(GeoCoordinate location, FlowSeries demand)
+    {
+        double[] zeroes = new double[demand.Length];
+        return new RegionalResourceProfile(
+            TraceSeries.GlobalHorizontalRadiation(demand.Start, demand.Resolution, zeroes),
+            TraceSeries.DirectNormalRadiation(demand.Start, demand.Resolution, zeroes),
+            TraceSeries.DiffuseHorizontalRadiation(demand.Start, demand.Resolution, zeroes),
+            SolarZenithSeries.Calculate(
+                demand.Start, demand.Resolution, demand.Length, location.Latitude, location.Longitude),
+            TraceSeries.DryBulbTemperature(demand.Start, demand.Resolution, zeroes),
+            TraceSeries.WindSpeed(demand.Start, demand.Resolution, zeroes, measurementHeightMetres: 10));
+    }
 
     private static DispatchOutcome DispatchOutcomeFor(
         string regionId,

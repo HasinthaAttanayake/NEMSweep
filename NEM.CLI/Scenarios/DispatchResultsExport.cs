@@ -8,6 +8,7 @@ using NEM.Model.Scenarios;
 using NEM.Model.Series;
 using NEM.Model.Simulation;
 using NEM.Model.StorageSizing;
+using NEM.Model.Units;
 using DomainScenario = NEM.Model.Scenarios.Scenario;
 
 namespace NEM.CLI.Scenarios;
@@ -259,13 +260,23 @@ internal static class DispatchResultsExport
                     link.FromRegionId,
                     link.ToRegionId,
                     link.Capacity.Megawatts)).ToArray()),
-            systemOutcome.InterconnectorFlows.Select(flow => new DispatchInterconnectorDTO(
-                LinkId(flow.Interconnector.FromRegionId, flow.Interconnector.ToRegionId),
-                flow.Interconnector.FromRegionId,
-                flow.Interconnector.ToRegionId,
-                flow.Interconnector.Capacity.Megawatts,
-                ValuesOf(flow.Flow),
-                ValuesOf(flow.Losses))).ToArray());
+            systemOutcome.InterconnectorFlows.Select(flow =>
+            {
+                GeoCoordinate from = LocationOf(dispatch.PowerSystem, flow.Interconnector.FromRegionId);
+                GeoCoordinate to = LocationOf(dispatch.PowerSystem, flow.Interconnector.ToRegionId);
+                return new DispatchInterconnectorDTO(
+                    LinkId(flow.Interconnector.FromRegionId, flow.Interconnector.ToRegionId),
+                    flow.Interconnector.FromRegionId,
+                    flow.Interconnector.ToRegionId,
+                    flow.Interconnector.Capacity.Megawatts,
+                    ValuesOf(flow.Flow),
+                    ValuesOf(flow.Losses),
+                    from.DistanceTo(to).Kilometres,
+                    from.Latitude,
+                    from.Longitude,
+                    to.Latitude,
+                    to.Longitude);
+            }).ToArray());
         SystemDispatchOverviewDTO overview = new(
             ArtifactSchemaVersions.SystemDispatchOverview,
             system.RunId,
@@ -285,6 +296,23 @@ internal static class DispatchResultsExport
 
     private static string LinkId(string fromRegionId, string toRegionId) =>
         $"{fromRegionId.ToUpperInvariant()}->{toRegionId.ToUpperInvariant()}";
+
+    private static GeoCoordinate LocationOf(PowerSystem powerSystem, string regionId)
+    {
+        Region? region = powerSystem.Regions.FirstOrDefault(candidate =>
+            string.Equals(candidate.RegionId, regionId, StringComparison.OrdinalIgnoreCase));
+        if (region is null)
+        {
+            throw new InvalidOperationException(
+                $"Region '{regionId}' was not found in the power system.");
+        }
+
+        return (region.ResourceProfile
+            ?? throw new InvalidOperationException(
+                $"Region '{regionId}' requires a weather resource profile to report "
+                + "its interconnectors' line distance and location."))
+            .Location;
+    }
 
     private static double[] IncomingTransmissionLossesMw(
         SystemDispatchOutcome outcome,

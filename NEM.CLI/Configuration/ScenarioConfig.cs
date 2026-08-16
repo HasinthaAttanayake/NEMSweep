@@ -198,8 +198,8 @@ internal static class ScenarioConfig
             }
 
             ValidateNonNegative(interconnector.CapacityMw, "interconnectors", "capacityMw");
-            ValidateNonNegative(interconnector.CapitalCostAudPerMw, "interconnectors", "capitalCostAudPerMw");
-            ValidateNonNegative(interconnector.FixedOperatingCostAudPerMwYear, "interconnectors", "fixedOperatingCostAudPerMwYear");
+            ValidateNonNegative(interconnector.CapitalCostAudPerKmPerMw, "interconnectors", "capitalCostAudPerKmPerMw");
+            ValidateNonNegative(interconnector.FixedOperatingCostAudPerKmPerMwYear, "interconnectors", "fixedOperatingCostAudPerKmPerMwYear");
             if (interconnector.TechnicalLifeYears == 0)
             {
                 throw new FormatException("scenario.interconnectors technicalLifeYears must be nonzero.");
@@ -333,8 +333,8 @@ internal sealed record ScenarioInterconnectorSettings(
     [property: JsonRequired] string FromRegionId,
     [property: JsonRequired] string ToRegionId,
     [property: JsonRequired] double CapacityMw,
-    [property: JsonRequired] decimal CapitalCostAudPerMw,
-    [property: JsonRequired] decimal FixedOperatingCostAudPerMwYear,
+    [property: JsonRequired] decimal CapitalCostAudPerKmPerMw,
+    [property: JsonRequired] decimal FixedOperatingCostAudPerKmPerMwYear,
     [property: JsonRequired] uint TechnicalLifeYears);
 
 internal sealed record MonthlyCapacityFactorSettings(DateOnly Month, double CapacityFactor);

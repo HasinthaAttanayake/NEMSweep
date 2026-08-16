@@ -66,13 +66,23 @@ public sealed record DispatchSeriesDTO(
     [property: JsonRequired] double[] TransmissionLossesMw);
 
 /// <summary>Directed interconnector evidence retained in a system artifact.</summary>
+/// <remarks>
+/// <see cref="DistanceKm"/> is the great-circle distance between the endpoint regions' weather
+/// sites, used to cost the line by route length. The From/To latitude and longitude are each
+/// region's solar weather site, the location already carried by its resource profile.
+/// </remarks>
 public sealed record DispatchInterconnectorDTO(
     [property: JsonRequired] string Id,
     [property: JsonRequired] string FromRegionId,
     [property: JsonRequired] string ToRegionId,
     [property: JsonRequired] double CapacityMw,
     [property: JsonRequired] double[] FlowMw,
-    [property: JsonRequired] double[] LossesMw);
+    [property: JsonRequired] double[] LossesMw,
+    double DistanceKm = 0,
+    double FromLatitude = 0,
+    double FromLongitude = 0,
+    double ToLatitude = 0,
+    double ToLongitude = 0);
 
 public sealed record DispatchMetricsDTO(
     double DemandMwh,

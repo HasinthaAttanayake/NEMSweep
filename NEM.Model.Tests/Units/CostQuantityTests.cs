@@ -15,6 +15,8 @@ public sealed class CostQuantityTests
         EnergyCapacityCost.FromAudPerMwhCapacity(3.4m).AudPerMwhCapacity.Should().Be(3.4m);
         FuelPrice.FromAudPerGjThermal(9.01m).AudPerGjThermal.Should().Be(9.01m);
         AnnualPowerCapacityCost.FromAudPerMwYear(6.7m).AudPerMwYear.Should().Be(6.7m);
+        DistancePowerCost.FromAudPerKmPerMw(1.2m).AudPerKmPerMw.Should().Be(1.2m);
+        AnnualDistancePowerCost.FromAudPerKmPerMwYear(3.4m).AudPerKmPerMwYear.Should().Be(3.4m);
     }
 
     [Fact]
@@ -72,6 +74,26 @@ public sealed class CostQuantityTests
         Money annualCost = cost.For(Power.FromMegawatts(2), years: 3);
 
         annualCost.Should().Be(Money.FromAud(300_000m));
+    }
+
+    [Fact]
+    public void DistancePowerCost_ForDistanceAndCapacity_ReturnsMoney()
+    {
+        DistancePowerCost cost = DistancePowerCost.FromAudPerKmPerMw(1_000m);
+        Distance distance = Distance.FromKilometres(50);
+        Power capacity = Power.FromMegawatts(2);
+
+        cost.For(distance, capacity).Should().Be(Money.FromAud(100_000m));
+    }
+
+    [Fact]
+    public void AnnualDistancePowerCost_ForDistanceAndCapacityOverYears_ReturnsMoney()
+    {
+        AnnualDistancePowerCost cost = AnnualDistancePowerCost.FromAudPerKmPerMwYear(2_000m);
+
+        Money annualCost = cost.For(Distance.FromKilometres(50), Power.FromMegawatts(2), years: 3);
+
+        annualCost.Should().Be(Money.FromAud(600_000m));
     }
 
     [Fact]

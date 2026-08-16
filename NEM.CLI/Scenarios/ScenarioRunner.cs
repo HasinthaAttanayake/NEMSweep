@@ -345,10 +345,10 @@ internal static class ScenarioRunner
                     interconnector.ToRegionId,
                     Power.FromMegawatts(interconnector.CapacityMw),
                     new TransmissionCostParameters(
-                        PowerCapacityCost.FromAudPerMwCapacity(
-                            interconnector.CapitalCostAudPerMw),
-                        AnnualPowerCapacityCost.FromAudPerMwYear(
-                            interconnector.FixedOperatingCostAudPerMwYear)),
+                        DistancePowerCost.FromAudPerKmPerMw(
+                            interconnector.CapitalCostAudPerKmPerMw),
+                        AnnualDistancePowerCost.FromAudPerKmPerMwYear(
+                            interconnector.FixedOperatingCostAudPerKmPerMwYear)),
                     interconnector.TechnicalLifeYears)).ToArray());
     }
 
