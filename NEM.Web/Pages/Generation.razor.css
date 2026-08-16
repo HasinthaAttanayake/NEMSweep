@@ -61,9 +61,44 @@
 .aggregate-table th:first-child { text-align: left; }
 .aggregate-table thead th { background: var(--accent-soft); color: var(--color-generation-dark); font-size: .75rem; text-transform: uppercase; }
 
+.aggregate-table .expand-col { width: 2rem; padding: .75rem 0 .75rem .8rem; text-align: left; }
+.expand-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.4rem;
+    height: 1.4rem;
+    padding: 0;
+    border: 1px solid var(--color-border-control);
+    border-radius: 4px;
+    background: var(--color-surface);
+    color: var(--color-generation-dark);
+    font-size: .85rem;
+    line-height: 1;
+    cursor: pointer;
+}
+.expand-toggle:hover { background: var(--accent-soft); }
+.aggregate-detail-row { background: var(--color-surface-muted); }
+.aggregate-detail-row th { padding-left: 1.6rem; color: var(--color-muted-generation); font-weight: 600; }
+.aggregate-detail-row td { color: var(--color-muted-generation); }
+
+.source-search { display: flex; align-items: center; gap: 1rem; margin: 0 0 .75rem; }
+.source-search input {
+    min-width: 260px;
+    height: 38px;
+    padding: .45rem .7rem;
+    border: 1px solid var(--color-border-control);
+    border-radius: 4px;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font: inherit;
+}
+.source-search-count { color: var(--color-muted-generation); font-size: .78rem; }
+
 ::deep .mud-table-container { border: 1px solid var(--color-border-generation); }
 ::deep .mud-table-cell { min-width: 110px; white-space: nowrap; }
 ::deep .mud-table-head .mud-table-cell { background: var(--color-surface-table); color: var(--color-ink); font-weight: 800; }
+::deep .mud-table-sort-label { color: inherit; }
 ::deep .mud-table-pagination { flex-wrap: wrap; }
 ::deep .mud-table-pagination-actions { margin-left: auto; }
 
@@ -77,5 +112,7 @@
 
 @media (max-width: 640px) {
     .filters { grid-template-columns: 1fr; }
+    .source-search { flex-direction: column; align-items: stretch; }
+    .source-search input { min-width: 0; }
     .technology-legend { grid-template-columns: 1fr; }
 }

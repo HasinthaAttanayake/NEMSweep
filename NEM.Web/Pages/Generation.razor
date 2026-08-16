@@ -111,6 +111,7 @@
                     <table class="aggregate-table">
                         <thead>
                             <tr>
+                                <th class="expand-col"></th>
                                 <th>Technology</th><th>Units</th><th>Sites</th>
                                 <th>DC capacity (MW)</th><th>AC capacity (MW)</th><th>Storage (MWh)</th>
                             </tr>
@@ -118,7 +119,19 @@
                         <tbody>
                             @foreach (TechnologyAggregate technology in _technologyAggregates)
                             {
+                                bool expanded = _expandedTechnologies.Contains(technology.TechnologyType);
                                 <tr>
+                                    <td class="expand-col">
+                                        @if (technology.Details.Count > 0)
+                                        {
+                                            <button type="button" class="expand-toggle"
+                                                    aria-expanded="@(expanded ? "true" : "false")"
+                                                    aria-label="@($"{(expanded ? "Collapse" : "Expand")} {technology.TechnologyType} by detail")"
+                                                    @onclick="@(() => ToggleTechnology(technology.TechnologyType))">
+                                                @(expanded ? "−" : "+")
+                                            </button>
+                                        }
+                                    </td>
                                     <th>@technology.TechnologyType</th>
                                     <td>@technology.UnitCount.ToString("N0")</td>
                                     <td>@technology.SiteCount.ToString("N0")</td>
@@ -126,6 +139,21 @@
                                     <td>@technology.CapacityAcMw.ToString("N1")</td>
                                     <td>@technology.StorageMwh.ToString("N1")</td>
                                 </tr>
+                                @if (expanded)
+                                {
+                                    @foreach (TechnologyDetailAggregate detail in technology.Details)
+                                    {
+                                        <tr class="aggregate-detail-row">
+                                            <td class="expand-col"></td>
+                                            <th>@detail.Detail</th>
+                                            <td>@detail.UnitCount.ToString("N0")</td>
+                                            <td>@detail.SiteCount.ToString("N0")</td>
+                                            <td>@detail.CapacityDcMw.ToString("N1")</td>
+                                            <td>@detail.CapacityAcMw.ToString("N1")</td>
+                                            <td>@detail.StorageMwh.ToString("N1")</td>
+                                        </tr>
+                                    }
+                                }
                             }
                         </tbody>
                     </table>
@@ -137,15 +165,42 @@
                     <div><p class="section-index">04</p><h2>Filtered source table</h2></div>
                     <span>Columns A-Z</span>
                 </div>
-                <MudTable Items="_filteredRows" Dense="true" Hover="true" FixedHeader="true" Height="520px" RowsPerPage="25">
+                <div class="source-search">
+                    <input type="search"
+                           placeholder="Search any column…"
+                           value="@_sourceSearch"
+                           @oninput="OnSourceSearchChanged" />
+                    <span class="source-search-count">@_filteredRows.Count(RowMatchesSearch).ToString("N0") of @_filteredRows.Count.ToString("N0") rows</span>
+                </div>
+                <MudTable Items="_filteredRows" Filter="new Func<GenerationInformationRow, bool>(RowMatchesSearch)"
+                          Dense="true" Hover="true" FixedHeader="true" Height="520px" RowsPerPage="25">
                     <HeaderContent>
-                        <MudTh>Survey ID</MudTh><MudTh>Site</MudTh><MudTh>KCI ID</MudTh><MudTh>Owner</MudTh>
-                        <MudTh>Custodian</MudTh><MudTh>Region</MudTh><MudTh>Max site AC</MudTh><MudTh>Unit ID</MudTh>
-                        <MudTh>Unit</MudTh><MudTh>Technology</MudTh><MudTh>Detail</MudTh><MudTh>Gas fuel</MudTh>
-                        <MudTh>DUID</MudTh><MudTh>Dispatch</MudTh><MudTh>Unit count</MudTh><MudTh>Unit DC</MudTh>
-                        <MudTh>Unit AC</MudTh><MudTh>Agg DC</MudTh><MudTh>Agg AC</MudTh><MudTh>Agg storage</MudTh>
-                        <MudTh>Status</MudTh><MudTh>Commercial use</MudTh><MudTh>Closure year</MudTh><MudTh>Closure date</MudTh>
-                        <MudTh>Survey requested</MudTh><MudTh>Survey updated</MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.AemoSurveyId)">Survey ID</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.SiteName)">Site</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.AemoKciId ?? string.Empty)">KCI ID</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.SiteOwner ?? string.Empty)">Owner</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.Custodian ?? string.Empty)">Custodian</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.Region)">Region</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.MaxSiteCapacityAcMw ?? 0)">Max site AC</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.GenInfoUnitId)">Unit ID</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.UnitName ?? string.Empty)">Unit</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.TechnologyType)">Technology</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.TechnologyDetail ?? string.Empty)">Detail</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.GasTurbineFuelType ?? string.Empty)">Gas fuel</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.Duid ?? string.Empty)">DUID</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.DispatchType ?? string.Empty)">Dispatch</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.UnitCount ?? 0)">Unit count</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.UnitCapacityDcMw ?? 0)">Unit DC</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.UnitCapacityAcMw ?? 0)">Unit AC</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.AggregateNameplateCapacityDcMw ?? 0)">Agg DC</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.AggregateNameplateCapacityAcMw ?? 0)">Agg AC</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.AggregateNameplateStorageCapacityMwh ?? 0)">Agg storage</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.CommitmentStatus)">Status</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.FullCommercialUseDate ?? DateOnly.MinValue)">Commercial use</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.ExpectedClosureYear ?? 0)">Closure year</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.ClosureDate ?? DateOnly.MinValue)">Closure date</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.SurveyLastRequestedDate ?? DateOnly.MinValue)">Survey requested</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.SurveyLatestUpdateDate ?? DateOnly.MinValue)">Survey updated</MudTableSortLabel></MudTh>
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd>@context.AemoSurveyId</MudTd><MudTd>@context.SiteName</MudTd><MudTd>@context.AemoKciId</MudTd><MudTd>@context.SiteOwner</MudTd>
@@ -185,6 +240,8 @@
     private int _siteCount;
     private double _totalAcMw;
     private double _totalStorageMwh;
+    private HashSet<string> _expandedTechnologies = [];
+    private string _sourceSearch = string.Empty;
 
     private IReadOnlyList<MetricStripItem> GenerationMetrics =>
     [
@@ -266,7 +323,8 @@
                 group.Select(row => row.AemoSurveyId).Distinct().Count(),
                 RoundAggregate(group.Sum(row => row.AggregateNameplateCapacityDcMw ?? 0)),
                 RoundAggregate(group.Sum(row => row.AggregateNameplateCapacityAcMw ?? 0)),
-                RoundAggregate(group.Sum(row => row.AggregateNameplateStorageCapacityMwh ?? 0))))
+                RoundAggregate(group.Sum(row => row.AggregateNameplateStorageCapacityMwh ?? 0)),
+                BuildDetailAggregates(group)))
             .OrderByDescending(item => item.CapacityAcMw)
             .ToList();
 
@@ -310,6 +368,59 @@
     private double CapacityPercentage(double capacityMw) =>
         _totalAcMw == 0 ? 0 : capacityMw / _totalAcMw * 100;
 
+    private static List<TechnologyDetailAggregate> BuildDetailAggregates(IEnumerable<GenerationInformationRow> rows) =>
+        rows
+            .GroupBy(row => string.IsNullOrWhiteSpace(row.TechnologyDetail) ? "Unspecified" : row.TechnologyDetail!)
+            .Select(group => new TechnologyDetailAggregate(
+                group.Key,
+                group.Count(),
+                group.Select(row => row.AemoSurveyId).Distinct().Count(),
+                RoundAggregate(group.Sum(row => row.AggregateNameplateCapacityDcMw ?? 0)),
+                RoundAggregate(group.Sum(row => row.AggregateNameplateCapacityAcMw ?? 0)),
+                RoundAggregate(group.Sum(row => row.AggregateNameplateStorageCapacityMwh ?? 0))))
+            .OrderByDescending(item => item.CapacityAcMw)
+            .ToList();
+
+    private void ToggleTechnology(string technologyType)
+    {
+        if (!_expandedTechnologies.Remove(technologyType))
+        {
+            _expandedTechnologies.Add(technologyType);
+        }
+    }
+
+    private void OnSourceSearchChanged(ChangeEventArgs args)
+    {
+        _sourceSearch = args.Value?.ToString() ?? string.Empty;
+    }
+
+    /// <summary>
+    /// One search box standing in for a search per column: every field a reader might filter by is
+    /// folded into a single haystack, so a survey ID, a DUID and a closure year are all reachable
+    /// from the same input without twenty-six boxes crowding an already dense header.
+    /// </summary>
+    private bool RowMatchesSearch(GenerationInformationRow row)
+    {
+        if (string.IsNullOrWhiteSpace(_sourceSearch))
+        {
+            return true;
+        }
+
+        string[] fields =
+        [
+            row.AemoSurveyId, row.SiteName, row.AemoKciId ?? "", row.SiteOwner ?? "", row.Custodian ?? "",
+            row.Region, row.GenInfoUnitId, row.UnitName ?? "", row.TechnologyType, row.TechnologyDetail ?? "",
+            row.GasTurbineFuelType ?? "", row.Duid ?? "", row.DispatchType ?? "", row.CommitmentStatus,
+            FormatNumber(row.MaxSiteCapacityAcMw), FormatNumber(row.UnitCount), FormatNumber(row.UnitCapacityDcMw),
+            FormatNumber(row.UnitCapacityAcMw), FormatNumber(row.AggregateNameplateCapacityDcMw),
+            FormatNumber(row.AggregateNameplateCapacityAcMw), FormatNumber(row.AggregateNameplateStorageCapacityMwh),
+            row.ExpectedClosureYear?.ToString(CultureInfo.InvariantCulture) ?? "",
+            FormatDate(row.FullCommercialUseDate), FormatDate(row.ClosureDate),
+            FormatDate(row.SurveyLastRequestedDate), FormatDate(row.SurveyLatestUpdateDate),
+        ];
+        return fields.Any(field => field.Contains(_sourceSearch, StringComparison.OrdinalIgnoreCase));
+    }
+
     private static string TechnologyColor(string technologyType) => technologyType switch
     {
         "Coal" => "#3f474d",
@@ -323,6 +434,15 @@
 
     private sealed record TechnologyAggregate(
         string TechnologyType,
+        int UnitCount,
+        int SiteCount,
+        double CapacityDcMw,
+        double CapacityAcMw,
+        double StorageMwh,
+        List<TechnologyDetailAggregate> Details);
+
+    private sealed record TechnologyDetailAggregate(
+        string Detail,
         int UnitCount,
         int SiteCount,
         double CapacityDcMw,
