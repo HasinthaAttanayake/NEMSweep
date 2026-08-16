@@ -38,6 +38,11 @@ public sealed class SystemAndRegionDispatchResultsContractTests
         json.Should().Contain("\"capacityMw\"");
         json.Should().Contain("\"flowMw\"");
         json.Should().Contain("\"lossesMw\"");
+        json.Should().Contain("\"distanceKm\"");
+        json.Should().Contain("\"fromLatitude\"");
+        json.Should().Contain("\"fromLongitude\"");
+        json.Should().Contain("\"toLatitude\"");
+        json.Should().Contain("\"toLongitude\"");
         json.Should().Contain("\"finalEnergyMwh\"");
         json.Should().Contain("\"sha256\"");
     }
@@ -161,7 +166,12 @@ public sealed class SystemAndRegionDispatchResultsContractTests
                 "VIC1",
                 100,
                 [20, 0],
-                [1, 0.5])]);
+                [1, 0.5],
+                714.2,
+                -33.9,
+                151.2,
+                -37.8,
+                144.9)]);
     }
 
     private static RegionDispatchResultsDTO CreateRegionResult(DateTimeOffset start, string regionId) =>

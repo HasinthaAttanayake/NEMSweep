@@ -26,6 +26,10 @@ classDiagram
       TransmissionCostParameters costParameters
       uint technicalLifeYears
     }
+    class TransmissionCostParameters {
+      DistancePowerCost capitalCost
+      AnnualDistancePowerCost fixedOperatingCost
+    }
     class ScenarioGeneratingFleet {
       GenerationTechnology generationTechnology
       Power nameplateCapacity
@@ -100,6 +104,7 @@ classDiagram
 
     Scenario "1" *-- "1..*" ScenarioRegion
     Scenario "1" *-- "0..*" ScenarioInterconnector
+    ScenarioInterconnector "1" *-- "1" TransmissionCostParameters
     Scenario "1" *-- "1" CostBasis
     ScenarioRegion "1" *-- "1..*" ScenarioGeneratingFleet
     ScenarioRegion "1" *-- "0..*" ScenarioStorageFleet
@@ -193,6 +198,10 @@ classDiagram
   links. `ScenarioInterconnector` is the matching intent, hung off `Scenario`
   alongside `CostBasis` because it is cross-regional, and it carries
   `TransmissionCostParameters` and a technical life for that directed capacity.
+  `TransmissionCostParameters` costs a line in AUD/km/MW capex
+  (`DistancePowerCost`) and AUD/km/MW/year fixed opex
+  (`AnnualDistancePowerCost`): a line's cost scales with both route length and
+  transfer capacity. There is no variable term.
 - `Region` requires one or more generating fleets with distinct generation
   technologies and may own storage fleets with distinct storage technologies.
   Its `DemandProfile` owns the base demand and zero or more labelled
@@ -268,11 +277,15 @@ classDiagram
   contributions exactly reconcile to the published generation total, then the system
   components are divided once by total served energy.
   `PowerSystemCostBreakdown` and `RegionCostBreakdown` are value-only results,
-  not calculation services. Transmission is annuitised from scenario
-  directed interconnector capacity assumptions and charged once at system level, so
-  regional costs do not sum to the system total. A system result states whether
-  transmission economics were calculated; regional results state that transmission is
-  not modelled in their cost scope, even though they disclose incoming-link loss allocation.
+  not calculation services. Transmission is annuitised from scenario directed
+  interconnector line-distance cost assumptions and charged once at system level, so
+  regional costs do not sum to the system total. Line distance is the great-circle
+  distance between the two endpoint regions' weather sites (each region's
+  `RegionalResourceProfile.Location`, taken from its `SolarZenithSeries` latitude
+  and longitude), so an interconnector's endpoints must both carry a resource
+  profile. A system result states whether transmission economics were calculated;
+  regional results state that transmission is not modelled in their cost scope,
+  even though they disclose incoming-link loss allocation.
 - Exported run results cite scenario and power-system identities rather than
   serialising the domain object graph.
 

@@ -304,8 +304,8 @@ public sealed class ScenarioDerivationTests
             technicalLifeYears: 50u);
 
     private static TransmissionCostParameters ZeroTransmissionCosts() => new(
-        PowerCapacityCost.FromAudPerMwCapacity(0),
-        AnnualPowerCapacityCost.FromAudPerMwYear(0));
+        DistancePowerCost.FromAudPerKmPerMw(0),
+        AnnualDistancePowerCost.FromAudPerKmPerMwYear(0));
 
     private static StorageCostParameters ZeroStorageCosts() => new(
         PowerCapacityCost.FromAudPerMwCapacity(0),

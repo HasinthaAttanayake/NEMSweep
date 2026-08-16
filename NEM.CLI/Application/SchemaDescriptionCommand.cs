@@ -135,13 +135,13 @@ internal static class SchemaDescriptionCommand
             },
             "interconnector": {
               "type": "object", "additionalProperties": false,
-              "required": ["fromRegionId", "toRegionId", "capacityMw", "capitalCostAudPerMw", "fixedOperatingCostAudPerMwYear", "technicalLifeYears"],
+              "required": ["fromRegionId", "toRegionId", "capacityMw", "capitalCostAudPerKmPerMw", "fixedOperatingCostAudPerKmPerMwYear", "technicalLifeYears"],
               "properties": {
                 "fromRegionId": { "type": "string", "minLength": 1 },
                 "toRegionId": { "type": "string", "minLength": 1 },
                 "capacityMw": { "type": "number", "minimum": 0 },
-                "capitalCostAudPerMw": { "type": "number", "minimum": 0 },
-                "fixedOperatingCostAudPerMwYear": { "type": "number", "minimum": 0 },
+                "capitalCostAudPerKmPerMw": { "type": "number", "minimum": 0 },
+                "fixedOperatingCostAudPerKmPerMwYear": { "type": "number", "minimum": 0 },
                 "technicalLifeYears": { "type": "integer", "minimum": 1 }
               }
             }

@@ -246,7 +246,7 @@ public sealed class ScenarioRunnerMultiRegionTests
         public void WriteScenario()
         {
             string interconnectors = IncludeInterconnector
-                ? "\"interconnectors\": [{ \"fromRegionId\": \"NSW1\", \"toRegionId\": \"VIC1\", \"capacityMw\": 30, \"capitalCostAudPerMw\": 1000, \"fixedOperatingCostAudPerMwYear\": 10, \"technicalLifeYears\": 50 }],"
+                ? "\"interconnectors\": [{ \"fromRegionId\": \"NSW1\", \"toRegionId\": \"VIC1\", \"capacityMw\": 30, \"capitalCostAudPerKmPerMw\": 1000, \"fixedOperatingCostAudPerKmPerMwYear\": 10, \"technicalLifeYears\": 50 }],"
                 : string.Empty;
             File.WriteAllText(
             Path.Combine(RootPath, "scenario.json"),

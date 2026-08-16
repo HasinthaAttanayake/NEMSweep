@@ -1,4 +1,5 @@
 using NEM.Model.Series;
+using NEM.Model.Units;
 
 namespace NEM.Model.Weather
 {
@@ -52,6 +53,13 @@ namespace NEM.Model.Weather
         public SolarZenithSeries SolarZenith { get; }
         public TraceSeries DryBulbTemperature { get; }
         public TraceSeries WindSpeed { get; }
+
+        /// <summary>
+        /// The region's weather site, taken from <see cref="SolarZenith"/>. Used as the region's
+        /// representative point for deriving transmission line distance between regions.
+        /// </summary>
+        public GeoCoordinate Location =>
+            GeoCoordinate.FromDegrees(SolarZenith.Latitude, SolarZenith.Longitude);
 
         internal void RequireAligned(TimeSeries timeline) =>
             GlobalHorizontalRadiation.RequireAligned(timeline);

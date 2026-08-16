@@ -294,8 +294,8 @@ public sealed class ScenarioConfigTests
         ["fromRegionId"] = fromRegionId,
         ["toRegionId"] = toRegionId,
         ["capacityMw"] = 1_000,
-        ["capitalCostAudPerMw"] = 1_000,
-        ["fixedOperatingCostAudPerMwYear"] = 10,
+        ["capitalCostAudPerKmPerMw"] = 1_000,
+        ["fixedOperatingCostAudPerKmPerMwYear"] = 10,
         ["technicalLifeYears"] = 50,
     };
 
