@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using NEM.Model.Scenarios;
+using NEM.Model.Weather;
 
 namespace NEM.Model.Grid;
 
@@ -66,6 +67,27 @@ public sealed class PowerSystem
 
     public PowerSystem WithInterconnectors(IReadOnlyList<Interconnector>? interconnectors) =>
         new(Id, DerivedFromScenario, Regions, interconnectors);
+
+    /// <summary>
+    /// A region's weather resource profile, the only source of regional location in the model.
+    /// Shared by every reader that derives an interconnector's line distance or endpoint
+    /// coordinates from it, so a region missing weather data reports the same failure everywhere.
+    /// </summary>
+    public RegionalResourceProfile RequireResourceProfile(string regionId)
+    {
+        Region? region = Regions.FirstOrDefault(candidate =>
+            string.Equals(candidate.RegionId, regionId, StringComparison.OrdinalIgnoreCase));
+        if (region is null)
+        {
+            throw new InvalidOperationException(
+                $"Region '{regionId}' was not found in the power system.");
+        }
+
+        return region.ResourceProfile
+            ?? throw new InvalidOperationException(
+                $"Region '{regionId}' requires a weather resource profile to derive its "
+                + "interconnectors' line distance and endpoint location.");
+    }
 
     private static void ValidateInterconnectors(
         IReadOnlyList<Region> regions,

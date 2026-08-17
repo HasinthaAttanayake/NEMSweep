@@ -264,8 +264,10 @@ internal static class DispatchResultsExport
                     link.Capacity.Megawatts)).ToArray()),
             systemOutcome.InterconnectorFlows.Select(flow =>
             {
-                GeoCoordinate from = LocationOf(dispatch.PowerSystem, flow.Interconnector.FromRegionId);
-                GeoCoordinate to = LocationOf(dispatch.PowerSystem, flow.Interconnector.ToRegionId);
+                GeoCoordinate from = dispatch.PowerSystem
+                    .RequireResourceProfile(flow.Interconnector.FromRegionId).Location;
+                GeoCoordinate to = dispatch.PowerSystem
+                    .RequireResourceProfile(flow.Interconnector.ToRegionId).Location;
                 return new DispatchInterconnectorDTO(
                     LinkId(flow.Interconnector.FromRegionId, flow.Interconnector.ToRegionId),
                     flow.Interconnector.FromRegionId,
@@ -298,23 +300,6 @@ internal static class DispatchResultsExport
 
     private static string LinkId(string fromRegionId, string toRegionId) =>
         $"{fromRegionId.ToUpperInvariant()}->{toRegionId.ToUpperInvariant()}";
-
-    private static GeoCoordinate LocationOf(PowerSystem powerSystem, string regionId)
-    {
-        Region? region = powerSystem.Regions.FirstOrDefault(candidate =>
-            string.Equals(candidate.RegionId, regionId, StringComparison.OrdinalIgnoreCase));
-        if (region is null)
-        {
-            throw new InvalidOperationException(
-                $"Region '{regionId}' was not found in the power system.");
-        }
-
-        return (region.ResourceProfile
-            ?? throw new InvalidOperationException(
-                $"Region '{regionId}' requires a weather resource profile to report "
-                + "its interconnectors' line distance and location."))
-            .Location;
-    }
 
     private static double[] IncomingTransmissionLossesMw(
         SystemDispatchOutcome outcome,
