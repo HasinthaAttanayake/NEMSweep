@@ -43,6 +43,42 @@ public sealed class OperationalDemandParserTests
     }
 
     [Fact]
+    public void Read_ReportsClampedIntervalCountForRegion()
+    {
+        using var fixture = new DemandArchiveFixture();
+        fixture.AddRows(
+            "sa1.zip",
+            [
+                (PeriodStart + TimeSpan.FromMinutes(30), "SA1", -14),
+                (PeriodStart + TimeSpan.FromHours(1), "SA1", 500),
+            ]);
+
+        OperationalDemandData result = OperationalDemandParser.Read(
+            [fixture.PathFor("sa1.zip")], ["SA1"], PeriodStart, PeriodStart.AddHours(1))["SA1"];
+
+        result.ClampedIntervals.Should().Be(1);
+    }
+
+    [Fact]
+    public void Read_RejectsConflictingNegativeReadingsRatherThanAgreeingAfterClamping()
+    {
+        using var fixture = new DemandArchiveFixture();
+        fixture.AddRows(
+            "first.zip",
+            [(PeriodStart + TimeSpan.FromMinutes(30), "SA1", -14)]);
+        fixture.AddRows(
+            "second.zip",
+            [(PeriodStart + TimeSpan.FromMinutes(30), "SA1", -3)]);
+
+        var act = () => OperationalDemandParser.Read(
+            [fixture.PathFor("first.zip"), fixture.PathFor("second.zip")],
+            ["SA1"], PeriodStart, PeriodStart.AddMinutes(30));
+
+        act.Should().Throw<OperationalDemandDataQualityException>()
+            .WithMessage("*Conflicting operational demand*SA1*");
+    }
+
+    [Fact]
     public void Read_DropsIdenticalOverlapsAcrossHeaderLayouts()
     {
         using var fixture = new DemandArchiveFixture();

@@ -33,6 +33,14 @@ internal static class OperationalDemandCommand
             context.Output.WriteLine(
                 $"Period: {demandData.Demand.Start:o} to "
                 + $"{result.Scenario.PeriodEnd:o} (end exclusive).");
+            if (demandData.ClampedIntervals > 0)
+            {
+                context.Output.WriteLine(
+                    $"Clamped {demandData.ClampedIntervals} negative operational-demand "
+                    + $"interval{(demandData.ClampedIntervals == 1 ? "" : "s")} to 0 MW for "
+                    + $"{demandData.Region}.");
+            }
+
             context.Output.WriteLine($"Wrote demand data to: {Path.GetFullPath(regionOutputPath)}");
         }
 

@@ -9,7 +9,8 @@ namespace NEM.CLI.Demand;
 internal sealed record OperationalDemandData(
     string Region,
     FlowSeries Demand,
-    IReadOnlyList<string> SourceArchives);
+    IReadOnlyList<string> SourceArchives,
+    int ClampedIntervals = 0);
 
 internal sealed class OperationalDemandDataQualityException : Exception
 {
@@ -114,6 +115,7 @@ internal static class OperationalDemandParser
         foreach (string region in requestedRegions)
         {
             var values = new double[expectedLength];
+            int clampedIntervals = 0;
             for (int index = 0; index < expectedLength; index++)
             {
                 DateTimeOffset expectedInstant = periodStart + TimeSpan.FromTicks(Resolution.Ticks * index);
@@ -123,13 +125,25 @@ internal static class OperationalDemandParser
                         $"Operational demand for {region} is missing interval {expectedInstant:o}.");
                 }
 
-                values[index] = demandValue.Megawatts;
+                // Operational demand goes negative when rooftop solar exceeds underlying demand
+                // (a real, recurring condition in SA1); the model has no concept of negative demand.
+                // Clamped here, after the duplicate-conflict check above has compared raw readings,
+                // so two genuinely conflicting negative readings cannot be flattened into agreement.
+                double megawatts = demandValue.Megawatts;
+                if (megawatts < 0)
+                {
+                    megawatts = 0;
+                    clampedIntervals++;
+                }
+
+                values[index] = megawatts;
             }
 
             result.Add(region, new OperationalDemandData(
                 region,
                 new FlowSeries(periodStart, Resolution, values),
-                sourceArchives.Select(path => Path.GetFileName(path)!).ToArray()));
+                sourceArchives.Select(path => Path.GetFileName(path)!).ToArray(),
+                clampedIntervals));
         }
 
         return result;
@@ -247,10 +261,6 @@ internal static class OperationalDemandParser
                 throw new OperationalDemandDataQualityException(
                     $"{sourcePath}: invalid operational demand {megawatts} MW for {recordRegion} at {intervalStart:o}.");
             }
-
-            // Operational demand goes negative when rooftop solar exceeds underlying demand
-            // (a real, recurring condition in SA1); the model has no concept of negative demand.
-            megawatts = Math.Max(megawatts, 0);
 
             if (valuesByIntervalStart.TryGetValue(intervalStart, out DemandValue? existing))
             {
