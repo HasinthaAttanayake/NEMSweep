@@ -100,6 +100,7 @@
     private SizingSearch _search = SizingSearch.Empty;
     private List<PlotMarker> _markers = [];
     private bool _showAllPasses;
+    private StorageSizingOutcomeDTO? _renderedSizing;
 
     private IReadOnlyList<StorageSizingPassDTO> _passes => _search.Passes;
 
@@ -135,8 +136,17 @@
 
     protected override void OnParametersSet()
     {
+        // OnParametersSet fires on every parent re-render, not only when the trajectory itself
+        // changed (e.g. an unrelated selector on the host page). Resetting the collapse toggle
+        // unconditionally would throw away an expanded table for reasons unrelated to what it
+        // shows, so the reset is gated on the sizing data actually being a different result.
+        if (!ReferenceEquals(Sizing, _renderedSizing))
+        {
+            _showAllPasses = false;
+            _renderedSizing = Sizing;
+        }
+
         _search = SizingSearch.From(Sizing);
-        _showAllPasses = false;
         _markers = [.. _search.Passes.Select(pass => new PlotMarker(
             $"Pass {pass.Pass}",
             pass.EnergyCapacityMwh,
