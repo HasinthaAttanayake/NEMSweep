@@ -153,6 +153,36 @@ public sealed class ScenarioRunnerMultiRegionTests
     }
 
     [Fact]
+    public void Run_PublishesNonCompliantResultInsteadOfThrowingWhenSizingCannotMeetTarget()
+    {
+        double[] spikyDemand = Enumerable.Repeat(10d, 8_760).ToArray();
+        for (int hour = 0; hour < spikyDemand.Length; hour += 400)
+        {
+            spikyDemand[hour] = 300;
+        }
+
+        using var fixture = new RunnerFixture
+        {
+            NswDemandSeries = spikyDemand,
+            MaximumPowerMw = 50,
+            MaximumEnergyMwh = 200,
+        };
+        fixture.WriteScenario();
+        var context = new CliContext(fixture.Paths, fixture.RootPath, TextWriter.Null);
+
+        ScenarioCommand.Run(context, "scenario.json").Should().Be(0);
+
+        SystemDispatchResultsDTO system = JsonSerializer.Deserialize<SystemDispatchResultsDTO>(
+            File.ReadAllBytes(fixture.Paths.DispatchResultsPath),
+            JsonFile.ReadOptions)!;
+        system.Reliability.WithinTarget.Should().BeFalse();
+        system.StorageSizing.Outcome.Should().BeOneOf(
+            StorageSizingOutcome.StorageNoLongerImprovesReliability,
+            StorageSizingOutcome.BatteryCapacityLimitReached,
+            StorageSizingOutcome.PassLimitReached);
+    }
+
+    [Fact]
     public void WritePublication_DoesNotPublishPartialResultsWhenAWriteFails()
     {
         using var fixture = new RunnerFixture();
@@ -212,6 +242,10 @@ public sealed class ScenarioRunnerMultiRegionTests
         public double NswDataCentreNameplateMw { get; init; }
         public double VicDataCentreNameplateMw { get; init; }
         public bool IncludeInterconnector { get; init; }
+        public double[]? NswDemandSeries { get; init; }
+        public double MaximumPowerMw { get; init; } = 100;
+        public double MaximumEnergyMwh { get; init; } = 400;
+        public int MaximumPasses { get; init; } = 4;
 
         public ScenarioDispatchResult Run()
         {
@@ -245,6 +279,11 @@ public sealed class ScenarioRunnerMultiRegionTests
 
         public void WriteScenario()
         {
+            if (NswDemandSeries is not null)
+            {
+                WriteDemand("nsw1", "NSW1", fixtureStart, NswDemandSeries);
+            }
+
             string interconnectors = IncludeInterconnector
                 ? "\"interconnectors\": [{ \"fromRegionId\": \"NSW1\", \"toRegionId\": \"VIC1\", \"capacityMw\": 30, \"capitalCostAudPerKmPerMw\": 1000, \"fixedOperatingCostAudPerKmPerMwYear\": 10, \"technicalLifeYears\": 50 }],"
                 : string.Empty;
@@ -254,7 +293,7 @@ public sealed class ScenarioRunnerMultiRegionTests
             { "schemaVersion": 4, "id": "two-region", "name": "Two region", "costBasis": { "year": 2026, "realDiscountRate": 0.07 }, {{interconnectors}} "regions": [
               { "regionId": "NSW1", "demandFile": "demand-nsw1.json", "weatherFile": "weather-nsw1.json", "generatingFleets": [{ "technology": "Gas", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 } }], "storageFleets": [{ "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0, "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 }, "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 } }] },
               { "regionId": "VIC1", "demandFile": "demand-vic1.json", "weatherFile": "weather-vic1.json", "generatingFleets": [{ "technology": "Gas", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 } }], "storageFleets": [{ "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0, "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 }, "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 } }] }
-            ], "storageSizing": { "maximumPowerMw": 100, "maximumEnergyMwh": 400, "maximumPasses": 4 } }
+            ], "storageSizing": { "maximumPowerMw": {{MaximumPowerMw}}, "maximumEnergyMwh": {{MaximumEnergyMwh}}, "maximumPasses": {{MaximumPasses}} } }
             """);
         }
 
@@ -300,7 +339,10 @@ public sealed class ScenarioRunnerMultiRegionTests
                 weatherFile,
                 dataCentreNameplateMw);
 
-        private void WriteDemand(string name, string region, DateTimeOffset start, double value)
+        private void WriteDemand(string name, string region, DateTimeOffset start, double value) =>
+            WriteDemand(name, region, start, Enumerable.Repeat(value, 8_760).ToArray());
+
+        private void WriteDemand(string name, string region, DateTimeOffset start, double[] values)
         {
             File.WriteAllText(
                 Path.Combine(OutputRoot, $"demand-{name}.json"),
@@ -309,7 +351,7 @@ public sealed class ScenarioRunnerMultiRegionTests
                     new ContractsScenario("test", region, start, start.AddYears(1), TimeSpan.FromHours(1), "hourly"),
                     start.ToUniversalTime(),
                     new Sources(["source.zip"]),
-                    new Series(Enumerable.Repeat(value, 8_760).ToArray()))));
+                    new Series(values))));
         }
 
         private void WriteWeather(string name, string region)

@@ -221,12 +221,7 @@ internal static class ScenarioRunner
                 exception);
         }
 
-        return result.Status is StorageSizingStatus.TargetMet or StorageSizingStatus.EnergyLimited
-            ? result
-            : throw new ScenarioRunException(
-                SweepFailureStage.Sizing,
-                JsonNamingPolicy.CamelCase.ConvertName(result.Status.ToString()),
-                $"Storage sizing ended with {result.Status}: {result.TerminationEvidence}");
+        return result;
     }
 
     private static PowerSystemCostBreakdown Cost(

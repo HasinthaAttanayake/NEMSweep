@@ -41,7 +41,7 @@ internal sealed record DispatchPublication(
 
 internal static class DispatchResultsExport
 {
-    public static void WritePublication(
+    public static DispatchPublication WritePublication(
         DispatchPublicationRequest request,
         string resultsPath,
         Action<string, string>? writeText = null)
@@ -133,6 +133,8 @@ internal static class DispatchResultsExport
                 Directory.Delete(stagingDirectory, recursive: true);
             }
         }
+
+        return publication;
     }
 
     private static DispatchPublication CreatePublication(DispatchPublicationRequest request)

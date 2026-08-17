@@ -77,9 +77,10 @@ internal static class ScenarioCommand
             NEM.Model.Units.Energy.FromMegawattHours(sizing.MaximumEnergyMwh),
             sizing.TargetUsePercentage,
             sizing.MaximumPasses);
+        DispatchPublication publication;
         try
         {
-            DispatchResultsExport.WritePublication(
+            publication = DispatchResultsExport.WritePublication(
                 new DispatchPublicationRequest(
                     dispatch,
                     sizingOptions,
@@ -100,6 +101,14 @@ internal static class ScenarioCommand
             + $"{string.Join(", ", dispatch.PowerSystem.Regions.Select(region => region.RegionId))}.");
         context.Output.WriteLine(
             $"Wrote scenario results to: {Path.GetFullPath(context.Paths.DispatchResultsPath)}");
+        if (!publication.System.Reliability.WithinTarget)
+        {
+            context.Output.WriteLine(
+                "WARNING: reliability target not met "
+                + $"(achieved {publication.System.Reliability.AchievedUsePercentageOfDemand:F4}% unserved energy, "
+                + $"target {publication.System.Reliability.TargetUsePercentageOfDemand:F4}%).");
+        }
+
         return 0;
     }
 
@@ -118,9 +127,10 @@ internal static class ScenarioCommand
             NEM.Model.Units.Energy.FromMegawattHours(sizing.MaximumEnergyMwh),
             sizing.TargetUsePercentage,
             sizing.MaximumPasses);
+        DispatchPublication publication;
         try
         {
-            DispatchResultsExport.WritePublication(
+            publication = DispatchResultsExport.WritePublication(
                 new DispatchPublicationRequest(
                     dispatch,
                     sizingOptions,
@@ -135,6 +145,14 @@ internal static class ScenarioCommand
                 "resultsUnwritable",
                 exception.Message,
                 exception);
+        }
+
+        if (!publication.System.Reliability.WithinTarget)
+        {
+            context.Output.WriteLine(
+                "WARNING: reliability target not met "
+                + $"(achieved {publication.System.Reliability.AchievedUsePercentageOfDemand:F4}% unserved energy, "
+                + $"target {publication.System.Reliability.TargetUsePercentageOfDemand:F4}%).");
         }
 
         return 0;
