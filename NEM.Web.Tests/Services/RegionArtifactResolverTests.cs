@@ -76,7 +76,7 @@ public sealed class RegionArtifactResolverTests
     }
 
     [Fact]
-    public void TryResolveWeatherPaths_RejectsARegionMissingFromDataSources()
+    public void TryResolveWeatherPaths_SkipsARegionMissingFromDataSourcesAndResolvesTheRest()
     {
         var dataSourcesByRegion = new Dictionary<string, DispatchSourcesDTO>
         {
@@ -86,12 +86,51 @@ public sealed class RegionArtifactResolverTests
         bool resolved = RegionArtifactResolver.TryResolveWeatherPaths(
             ["NSW1", "QLD1"],
             dataSourcesByRegion,
+            out IReadOnlyList<string> regionIds,
+            out IReadOnlyDictionary<string, string> weatherPathsByRegion,
+            out string? validationMessage);
+
+        resolved.Should().BeTrue();
+        validationMessage.Should().BeNull();
+        regionIds.Should().Equal("NSW1");
+        weatherPathsByRegion.Should().ContainKey("NSW1");
+        weatherPathsByRegion.Should().NotContainKey("QLD1");
+    }
+
+    [Fact]
+    public void TryResolveWeatherPaths_RejectsWhenNoRegionResolves()
+    {
+        var dataSourcesByRegion = new Dictionary<string, DispatchSourcesDTO>();
+
+        bool resolved = RegionArtifactResolver.TryResolveWeatherPaths(
+            ["NSW1", "QLD1"],
+            dataSourcesByRegion,
             out _,
             out _,
             out string? validationMessage);
 
         resolved.Should().BeFalse();
-        validationMessage.Should().Contain("without a valid weather artifact reference");
+        validationMessage.Should().Contain("None of the system's regions");
+    }
+
+    [Fact]
+    public void TryResolveWeatherPaths_RejectsACaseVariantDuplicateRegion()
+    {
+        var dataSourcesByRegion = new Dictionary<string, DispatchSourcesDTO>
+        {
+            ["NSW1"] = Sources("weather-nsw1.json"),
+            ["nsw1"] = Sources("weather-nsw1.json"),
+        };
+
+        bool resolved = RegionArtifactResolver.TryResolveWeatherPaths(
+            ["NSW1", "nsw1"],
+            dataSourcesByRegion,
+            out _,
+            out _,
+            out string? validationMessage);
+
+        resolved.Should().BeFalse();
+        validationMessage.Should().Contain("more than once");
     }
 
     [Fact]
