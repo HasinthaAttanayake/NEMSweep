@@ -32,7 +32,7 @@ public static class ArtifactSchemaVersions
     public const int RegionDispatchOverview = 1;
 
     /// <summary>Sweep index (<c>sweeps/{sweepId}/index.json</c>).</summary>
-    public const int SweepIndex = 8;
+    public const int SweepIndex = 9;
 
     /// <summary>Sweep manifest (<c>sweeps/index.json</c>).</summary>
     public const int SweepManifest = 1;

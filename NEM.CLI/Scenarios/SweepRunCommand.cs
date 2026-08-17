@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 using NEM.CLI.Application;
@@ -11,6 +12,7 @@ internal static class SweepRunCommand
 {
     public static int Run(CliContext context, string definitionPath)
     {
+        var runStopwatch = Stopwatch.StartNew();
         SweepRunMetadata runMetadata = SweepArtifactExport.CaptureRunMetadata(context.Paths.SolutionRoot);
         SweepDefinition definition = SweepFanOutCommand.WriteConfigs(
             context,
@@ -46,9 +48,11 @@ internal static class SweepRunCommand
             context.Output.WriteLine(
                 $"Running sweep point {point.PointId} ({definition.Axis.Label}={axisValue} {definition.Axis.Unit}).");
             int referencedSeriesPathCount = referencedSeriesPaths.Count;
+            var pointStopwatch = Stopwatch.StartNew();
             try
             {
                 ScenarioCommand.Run(context, configPath, resultPath, $"{point.PointId}-");
+                pointStopwatch.Stop();
                 SystemDispatchResultsDTO systemResult = JsonSerializer.Deserialize<SystemDispatchResultsDTO>(
                     File.ReadAllBytes(resultPath),
                     JsonFile.ReadOptions)
@@ -118,11 +122,13 @@ internal static class SweepRunCommand
                     null,
                     regionScalars.ToArray(),
                     regionDetails.ToArray(),
-                    $"points/{point.PointId}-overview.json"));
+                    $"points/{point.PointId}-overview.json",
+                    pointStopwatch.Elapsed.TotalMilliseconds));
                 context.Output.WriteLine($"Sweep point {point.PointId}: succeeded.");
             }
             catch (Exception exception)
             {
+                pointStopwatch.Stop();
                 referencedSeriesPaths.RemoveRange(
                     referencedSeriesPathCount,
                     referencedSeriesPaths.Count - referencedSeriesPathCount);
@@ -151,7 +157,8 @@ internal static class SweepRunCommand
                     null,
                     null,
                     null,
-                    failure));
+                    failure,
+                    DurationMs: pointStopwatch.Elapsed.TotalMilliseconds));
                 (context.Error ?? TextWriter.Null).WriteLine(
                     $"Sweep point {point.PointId}: failed: {failure.Message} "
                     + $"(stage {failure.Stage}, code {failure.Code})");
@@ -164,7 +171,10 @@ internal static class SweepRunCommand
             definition,
             resolvedDefinitionPath,
             configPaths,
-            runMetadata);
+            runMetadata) with
+        {
+            TotalDurationMs = runStopwatch.Elapsed.TotalMilliseconds,
+        };
         JsonFile.Write(
             new SweepIndexDTO(
                 ArtifactSchemaVersions.SweepIndex,

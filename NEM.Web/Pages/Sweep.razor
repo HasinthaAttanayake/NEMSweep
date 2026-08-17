@@ -137,6 +137,7 @@
             <ProvenanceFooter CommitSha="@_index.Provenance.GitCommitSha"
                               CommitUrl="@CommitUrl"
                               IsDirty="@_index.Provenance.WorkingTreeDirty"
+                              DurationMs="@_index.Provenance.TotalDurationMs"
                               Inputs="@ProvenanceInputs"
                               Region="@(_index.Scope is null ? null : string.Join(", ", _index.Scope.RegionIds))"
                               Period="@(_index.Scope is null ? null : Period(_index.Scope))"

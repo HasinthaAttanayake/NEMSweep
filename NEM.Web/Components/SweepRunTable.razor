@@ -24,6 +24,7 @@
                     <th scope="col" class="sticky-column">Run</th>
                     <th scope="col">@Index.Axis.Label<small>@Index.Axis.Unit</small></th>
                     <th scope="col">Outcome</th>
+                    <th scope="col">Run time</th>
                     <th scope="col">Reliability<small>vs target</small></th>
                     <th scope="col">Storage sizing</th>
                     <th scope="col">@AnnualCostLabel<small>AUD, derived</small></th>
@@ -52,6 +53,7 @@
                                 </span>
                             }
                         </td>
+                        <td>@Duration(point)</td>
                         <td>
                             @if (point.Reliability is null)
                             {
@@ -138,6 +140,7 @@
         "Run",
         $"{Index.Axis.Label} ({Index.Axis.Unit})",
         "Outcome",
+        "Run time (s)",
         "Reliability",
         "Storage sizing",
         $"{AnnualCostLabel} (AUD, derived)",
@@ -156,6 +159,7 @@
                 point.Status == SweepPointStatus.Succeeded
                     ? "Completed"
                     : $"{StageLabel(point.Failure?.Stage)} constraint: {point.Failure?.Message}",
+                point.DurationMs is null ? string.Empty : Number(point.DurationMs.Value / 1000),
                 point.Reliability is null ? string.Empty : point.Reliability.WithinTarget ? "Within" : "Outside",
                 point.StorageSizing is null ? string.Empty : SizingLabel(point.StorageSizing),
                 scalars is null
@@ -187,6 +191,20 @@
         return scalars is null
             ? "—"
             : PlotFormat.MoneyTotal(scalars.SlcoeAudPerMwh * (decimal)scalars.EnergyServedMwh);
+    }
+
+    /// <summary>Whole seconds under a minute, whole minutes and seconds above it.</summary>
+    private static string Duration(SweepIndexPointDTO point)
+    {
+        if (point.DurationMs is null)
+        {
+            return "—";
+        }
+
+        TimeSpan duration = TimeSpan.FromMilliseconds(point.DurationMs.Value);
+        return duration.TotalMinutes >= 1
+            ? $"{(int)duration.TotalMinutes}m {duration.Seconds}s"
+            : $"{duration.TotalSeconds:F1}s";
     }
 
     private static string SizingLabel(StorageSizingOutcomeDTO? sizing) => sizing?.Outcome switch

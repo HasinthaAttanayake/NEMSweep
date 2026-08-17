@@ -85,6 +85,31 @@ public sealed class SweepRunTests
     }
 
     [Fact]
+    public void Run_RecordsPerPointAndTotalDurationInIndex()
+    {
+        using var fixture = new SweepRunFixture();
+        fixture.WriteDefinition("""
+            [{ "pointId": "p0", "axisValue": 0, "label": "Base", "overrides": {} },
+             { "pointId": "p1", "axisValue": 1, "label": "Changed", "overrides": { "name": "Changed scenario" } }]
+            """);
+
+        SweepRunCommand.Run(fixture.CreateContext(TextWriter.Null), "sweeps/test-sweep.json").Should().Be(0);
+
+        JsonObject index = ReadIndex(fixture);
+        double totalDurationMs = index["provenance"]!["totalDurationMs"]!.GetValue<double>();
+        totalDurationMs.Should().BeGreaterThan(0);
+        double sumOfPointDurations = 0;
+        foreach (JsonNode? point in index["points"]!.AsArray())
+        {
+            double pointDurationMs = point!["durationMs"]!.GetValue<double>();
+            pointDurationMs.Should().BeGreaterThan(0);
+            sumOfPointDurations += pointDurationMs;
+        }
+
+        sumOfPointDurations.Should().BeLessThanOrEqualTo(totalDurationMs);
+    }
+
+    [Fact]
     public void Run_DeletesSeriesFilesNoPointReferences()
     {
         using var fixture = new SweepRunFixture();
@@ -386,6 +411,19 @@ public sealed class SweepRunTests
         return Encoding.UTF8.GetBytes(JsonFile.Serialize(result));
     }
 
+    /// <summary>Strips wall-clock run-timing figures, which genuinely vary run to run.</summary>
+    private static byte[] NormalizedIndexBytes(string path)
+    {
+        JsonObject index = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+        index["provenance"]!.AsObject().Remove("totalDurationMs");
+        foreach (JsonNode? point in index["points"]!.AsArray())
+        {
+            point!.AsObject().Remove("durationMs");
+        }
+
+        return Encoding.UTF8.GetBytes(JsonFile.Serialize(index));
+    }
+
     private static void RestoreExternalizedBaseDemand(string pointResultPath, JsonObject result)
     {
         JsonObject demand = result["dataSeries"]!["demand"]!.AsObject();
@@ -407,7 +445,9 @@ public sealed class SweepRunTests
                 path => path.Contains($"{Path.DirectorySeparatorChar}points{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
                     && !path.EndsWith(".status.json", StringComparison.Ordinal)
                     ? NormalizedResultBytes(path)
-                    : File.ReadAllBytes(path),
+                    : path.EndsWith("index.json", StringComparison.Ordinal)
+                        ? NormalizedIndexBytes(path)
+                        : File.ReadAllBytes(path),
                 StringComparer.Ordinal);
     }
 
