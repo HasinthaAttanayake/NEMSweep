@@ -140384,7 +140384,7 @@
     "withinTarget": true
   },
   "resolution": "01:00:00",
-  "runId": "098f3e15039045b1a76da84578af9819",
+  "runId": "4cd0433c9a044c319a7207cfcc3e9ec6",
   "schemaVersion": 8,
   "storageSizing": {
     "energyLimitedEvidence": null,
@@ -140594,7 +140594,7 @@
         "unservedHours": 8
       },
       {
-        "energyCapacityMwh": 11717,
+        "energyCapacityMwh": 11718,
         "pass": 29,
         "powerCapacityMw": 2082,
         "unservedEnergyMwh": 1357.7,

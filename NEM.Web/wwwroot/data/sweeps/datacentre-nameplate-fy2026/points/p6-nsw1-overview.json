@@ -188,7 +188,7 @@
     "withinTarget": true
   },
   "resolution": "01:00:00",
-  "runId": "593b22113cf8455fa3b54617e5a059e2",
+  "runId": "2e5da3ecf45243d287bf919118005fba",
   "schemaVersion": 1,
   "storageSizing": {
     "energyLimitedEvidence": null,
@@ -603,92 +603,92 @@
       {
         "energyCapacityMwh": 44133.6,
         "pass": 58,
-        "powerCapacityMw": 4248,
-        "unservedEnergyMwh": 103.7,
+        "powerCapacityMw": 4249,
+        "unservedEnergyMwh": 102.7,
         "unservedHours": 1
       },
       {
         "energyCapacityMwh": 44133.6,
         "pass": 59,
-        "powerCapacityMw": 2595,
-        "unservedEnergyMwh": 13484.1,
+        "powerCapacityMw": 2596,
+        "unservedEnergyMwh": 13459.1,
         "unservedHours": 25
       },
       {
         "energyCapacityMwh": 44133.6,
         "pass": 60,
-        "powerCapacityMw": 3421,
-        "unservedEnergyMwh": 1957.2,
+        "powerCapacityMw": 3422,
+        "unservedEnergyMwh": 1951.2,
         "unservedHours": 6
       },
       {
         "energyCapacityMwh": 44133.6,
         "pass": 61,
-        "powerCapacityMw": 3834,
-        "unservedEnergyMwh": 709.7,
+        "powerCapacityMw": 3835,
+        "unservedEnergyMwh": 707.7,
         "unservedHours": 2
       },
       {
         "energyCapacityMwh": 44133.6,
         "pass": 62,
-        "powerCapacityMw": 3627,
-        "unservedEnergyMwh": 1123.7,
+        "powerCapacityMw": 3628,
+        "unservedEnergyMwh": 1121.7,
         "unservedHours": 2
       },
       {
         "energyCapacityMwh": 44133.6,
         "pass": 63,
-        "powerCapacityMw": 3524,
-        "unservedEnergyMwh": 1401,
+        "powerCapacityMw": 3525,
+        "unservedEnergyMwh": 1396,
         "unservedHours": 5
       },
       {
         "energyCapacityMwh": 44133.6,
         "pass": 64,
-        "powerCapacityMw": 3472,
-        "unservedEnergyMwh": 1661,
+        "powerCapacityMw": 3473,
+        "unservedEnergyMwh": 1656,
         "unservedHours": 5
       },
       {
         "energyCapacityMwh": 44133.6,
         "pass": 65,
-        "powerCapacityMw": 3498,
-        "unservedEnergyMwh": 1531,
+        "powerCapacityMw": 3499,
+        "unservedEnergyMwh": 1526,
         "unservedHours": 5
       },
       {
         "energyCapacityMwh": 44133.6,
         "pass": 66,
-        "powerCapacityMw": 3485,
-        "unservedEnergyMwh": 1596,
+        "powerCapacityMw": 3486,
+        "unservedEnergyMwh": 1591,
         "unservedHours": 5
       },
       {
         "energyCapacityMwh": 44133.6,
         "pass": 67,
-        "powerCapacityMw": 3491,
-        "unservedEnergyMwh": 1566,
-        "unservedHours": 5
-      },
-      {
-        "energyCapacityMwh": 44133.6,
-        "pass": 68,
-        "powerCapacityMw": 3494,
-        "unservedEnergyMwh": 1551,
-        "unservedHours": 5
-      },
-      {
-        "energyCapacityMwh": 44133.6,
-        "pass": 69,
         "powerCapacityMw": 3492,
         "unservedEnergyMwh": 1561,
         "unservedHours": 5
       },
       {
         "energyCapacityMwh": 44133.6,
-        "pass": 70,
+        "pass": 68,
+        "powerCapacityMw": 3495,
+        "unservedEnergyMwh": 1546,
+        "unservedHours": 5
+      },
+      {
+        "energyCapacityMwh": 44133.6,
+        "pass": 69,
         "powerCapacityMw": 3493,
         "unservedEnergyMwh": 1556,
+        "unservedHours": 5
+      },
+      {
+        "energyCapacityMwh": 44133.6,
+        "pass": 70,
+        "powerCapacityMw": 3494,
+        "unservedEnergyMwh": 1551,
         "unservedHours": 5
       },
       {
@@ -699,101 +699,101 @@
         "unservedHours": 17
       },
       {
-        "energyCapacityMwh": 36593,
+        "energyCapacityMwh": 36594,
         "pass": 72,
         "powerCapacityMw": 3494,
-        "unservedEnergyMwh": 2341.5,
+        "unservedEnergyMwh": 2340.5,
         "unservedHours": 7
       },
       {
-        "energyCapacityMwh": 40363,
+        "energyCapacityMwh": 40364,
         "pass": 73,
         "powerCapacityMw": 3494,
         "unservedEnergyMwh": 1551,
         "unservedHours": 5
       },
       {
-        "energyCapacityMwh": 38478,
+        "energyCapacityMwh": 38479,
         "pass": 74,
         "powerCapacityMw": 3494,
         "unservedEnergyMwh": 1551,
         "unservedHours": 5
       },
       {
-        "energyCapacityMwh": 37535,
+        "energyCapacityMwh": 37536,
         "pass": 75,
         "powerCapacityMw": 3494,
         "unservedEnergyMwh": 1616.2,
         "unservedHours": 6
       },
       {
-        "energyCapacityMwh": 38006,
+        "energyCapacityMwh": 38007,
         "pass": 76,
         "powerCapacityMw": 3494,
         "unservedEnergyMwh": 1551,
         "unservedHours": 5
       },
       {
-        "energyCapacityMwh": 37770,
+        "energyCapacityMwh": 37771,
         "pass": 77,
         "powerCapacityMw": 3494,
         "unservedEnergyMwh": 1551,
         "unservedHours": 5
       },
       {
-        "energyCapacityMwh": 37652,
+        "energyCapacityMwh": 37653,
         "pass": 78,
         "powerCapacityMw": 3494,
         "unservedEnergyMwh": 1551,
         "unservedHours": 5
       },
       {
-        "energyCapacityMwh": 37593,
+        "energyCapacityMwh": 37594,
         "pass": 79,
         "powerCapacityMw": 3494,
-        "unservedEnergyMwh": 1588.5,
+        "unservedEnergyMwh": 1587.5,
         "unservedHours": 6
       },
       {
-        "energyCapacityMwh": 37622,
+        "energyCapacityMwh": 37623,
         "pass": 80,
         "powerCapacityMw": 3494,
-        "unservedEnergyMwh": 1559.5,
+        "unservedEnergyMwh": 1558.5,
         "unservedHours": 6
       },
       {
-        "energyCapacityMwh": 37637,
+        "energyCapacityMwh": 37638,
         "pass": 81,
         "powerCapacityMw": 3494,
         "unservedEnergyMwh": 1551,
         "unservedHours": 5
       },
       {
-        "energyCapacityMwh": 37629,
+        "energyCapacityMwh": 37630,
         "pass": 82,
         "powerCapacityMw": 3494,
-        "unservedEnergyMwh": 1552.5,
+        "unservedEnergyMwh": 1551.5,
         "unservedHours": 6
       },
       {
-        "energyCapacityMwh": 37625,
+        "energyCapacityMwh": 37626,
         "pass": 83,
         "powerCapacityMw": 3494,
-        "unservedEnergyMwh": 1556.5,
-        "unservedHours": 6
-      },
-      {
-        "energyCapacityMwh": 37627,
-        "pass": 84,
-        "powerCapacityMw": 3494,
-        "unservedEnergyMwh": 1554.5,
+        "unservedEnergyMwh": 1555.5,
         "unservedHours": 6
       },
       {
         "energyCapacityMwh": 37628,
-        "pass": 85,
+        "pass": 84,
         "powerCapacityMw": 3494,
         "unservedEnergyMwh": 1553.5,
+        "unservedHours": 6
+      },
+      {
+        "energyCapacityMwh": 37629,
+        "pass": 85,
+        "powerCapacityMw": 3494,
+        "unservedEnergyMwh": 1552.5,
         "unservedHours": 6
       },
       {

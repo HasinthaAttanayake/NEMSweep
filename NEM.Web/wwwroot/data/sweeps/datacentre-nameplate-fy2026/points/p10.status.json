@@ -1,10 +1,6 @@
 {
   "axisValue": 5000,
-  "failure": {
-    "code": "storageNoLongerImprovesReliability",
-    "message": "Storage sizing ended with StorageNoLongerImprovesReliability: Larger Battery candidates did not materially reduce unserved energy for region NSW1: 166179.441 MWh remains unserved across 146 hours with a peak shortfall of 4773.800 MW. Tested 10000 MW / 100000 MWh.",
-    "stage": "sizing"
-  },
+  "failure": null,
   "pointId": "p10",
-  "status": "failed"
+  "status": "succeeded"
 }

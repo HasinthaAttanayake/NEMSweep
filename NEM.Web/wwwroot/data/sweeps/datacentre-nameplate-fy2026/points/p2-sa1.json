@@ -114075,7 +114075,7 @@
     "withinTarget": true
   },
   "resolution": "01:00:00",
-  "runId": "7fbee56b1d384d89b7157fa5ca21d906",
+  "runId": "5a3f643dea4a4d758b7aad33141bf1c2",
   "schemaVersion": 8,
   "storageSizing": {
     "energyLimitedEvidence": null,
@@ -114086,7 +114086,7 @@
     "maximumEnergyMwh": 100000,
     "maximumPowerMw": 10000,
     "outcome": "resized",
-    "passesUsed": 96,
+    "passesUsed": 95,
     "trajectory": [
       {
         "energyCapacityMwh": 1328.9,
@@ -114749,13 +114749,6 @@
       {
         "energyCapacityMwh": 3364,
         "pass": 95,
-        "powerCapacityMw": 841,
-        "unservedEnergyMwh": 0,
-        "unservedHours": 0
-      },
-      {
-        "energyCapacityMwh": 3364,
-        "pass": 96,
         "powerCapacityMw": 841,
         "unservedEnergyMwh": 0,
         "unservedHours": 0
