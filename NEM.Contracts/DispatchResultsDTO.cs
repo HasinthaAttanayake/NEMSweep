@@ -78,11 +78,11 @@ public sealed record DispatchInterconnectorDTO(
     [property: JsonRequired] double CapacityMw,
     [property: JsonRequired] double[] FlowMw,
     [property: JsonRequired] double[] LossesMw,
-    double DistanceKm = 0,
-    double FromLatitude = 0,
-    double FromLongitude = 0,
-    double ToLatitude = 0,
-    double ToLongitude = 0);
+    [property: JsonRequired] double DistanceKm = 0,
+    [property: JsonRequired] double FromLatitude = 0,
+    [property: JsonRequired] double FromLongitude = 0,
+    [property: JsonRequired] double ToLatitude = 0,
+    [property: JsonRequired] double ToLongitude = 0);
 
 public sealed record DispatchMetricsDTO(
     double DemandMwh,

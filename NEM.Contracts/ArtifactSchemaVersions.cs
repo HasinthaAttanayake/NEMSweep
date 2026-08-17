@@ -20,7 +20,7 @@ public static class ArtifactSchemaVersions
     public const int DispatchResults = 12;
 
     /// <summary>Whole-system dispatch results artifact.</summary>
-    public const int SystemDispatchResults = 10;
+    public const int SystemDispatchResults = 11;
 
     /// <summary>Compact whole-system dispatch overview (<c>results-overview.json</c>).</summary>
     public const int SystemDispatchOverview = 2;

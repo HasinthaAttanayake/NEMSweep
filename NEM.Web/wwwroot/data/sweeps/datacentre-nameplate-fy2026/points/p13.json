@@ -317201,7 +317201,7 @@
   },
   "resolution": "01:00:00",
   "runId": "3da9977e8dd242d3955a66780748053f",
-  "schemaVersion": 10,
+  "schemaVersion": 11,
   "storageSizing": {
     "energyLimitedEvidence": null,
     "finalEnergyMwh": 108870.4,
