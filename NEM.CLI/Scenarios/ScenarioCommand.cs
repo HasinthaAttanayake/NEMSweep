@@ -101,14 +101,7 @@ internal static class ScenarioCommand
             + $"{string.Join(", ", dispatch.PowerSystem.Regions.Select(region => region.RegionId))}.");
         context.Output.WriteLine(
             $"Wrote scenario results to: {Path.GetFullPath(context.Paths.DispatchResultsPath)}");
-        if (!publication.System.Reliability.WithinTarget)
-        {
-            context.Output.WriteLine(
-                "WARNING: reliability target not met "
-                + $"(achieved {publication.System.Reliability.AchievedUsePercentageOfDemand:F4}% unserved energy, "
-                + $"target {publication.System.Reliability.TargetUsePercentageOfDemand:F4}%).");
-        }
-
+        WarnIfOutsideReliabilityTarget(context, publication);
         return 0;
     }
 
@@ -147,6 +140,14 @@ internal static class ScenarioCommand
                 exception);
         }
 
+        WarnIfOutsideReliabilityTarget(context, publication);
+        return 0;
+    }
+
+    /// <summary>Warns when a publication's system-wide reliability target was not met, so the
+    /// wording cannot drift between the two publication paths that check it.</summary>
+    private static void WarnIfOutsideReliabilityTarget(CliContext context, DispatchPublication publication)
+    {
         if (!publication.System.Reliability.WithinTarget)
         {
             context.Output.WriteLine(
@@ -154,8 +155,6 @@ internal static class ScenarioCommand
                 + $"(achieved {publication.System.Reliability.AchievedUsePercentageOfDemand:F4}% unserved energy, "
                 + $"target {publication.System.Reliability.TargetUsePercentageOfDemand:F4}%).");
         }
-
-        return 0;
     }
 
     /// <summary>Writes the results artifact, attributing any failure to the export stage.</summary>
