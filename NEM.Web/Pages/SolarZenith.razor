@@ -22,12 +22,29 @@
             }
         </div>
 
-        <label class="date-field">
-            <span>Date</span>
-            <input type="date"
-                   value="@_selectedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)"
-                   @onchange="OnDateChanged" />
-        </label>
+        <div class="zenith-controls">
+            @if (_regionOptions.Count > 1)
+            {
+                <MudSelect T="string"
+                           Label="Region"
+                           Value="_selectedRegion"
+                           ValueChanged="OnRegionChanged"
+                           Variant="Variant.Outlined"
+                           Class="region-select">
+                    @foreach (string region in _regionOptions)
+                    {
+                        <MudSelectItem T="string" Value="region">@RegionNames.Full(region)</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+
+            <label class="date-field">
+                <span>Date</span>
+                <input type="date"
+                       value="@_selectedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)"
+                       @onchange="OnDateChanged" />
+            </label>
+        </div>
     </header>
 
     <ArtifactLoadStateView State="_loadState">
@@ -80,29 +97,79 @@
     private List<ChartSeries<double>> _zenithSeries = [];
     private double _minimumZenith;
     private string _minimumTime = string.Empty;
+    private List<string> _regionOptions = [];
+    private Dictionary<string, string> _weatherPathsByRegion = new(StringComparer.OrdinalIgnoreCase);
+    private string _selectedRegion = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            // The per-region weather artifacts superseded the single weather-data.json, which is
-            // still on disk at the previous schema version and no longer loads.
-            ArtifactLoadResult<WeatherDataDTO> loadResult =
-                await ArtifactLoader.LoadAsync<WeatherDataDTO>("data/weather-nsw1.json");
-            if (!loadResult.IsSuccess)
+            ArtifactLoadResult<SystemDispatchOverviewDTO> overviewResult =
+                await ArtifactLoader.LoadAsync<SystemDispatchOverviewDTO>("data/results-overview.json");
+            if (!overviewResult.IsSuccess)
             {
-                _loadState = loadResult.State;
+                _loadState = overviewResult.State;
                 return;
             }
 
-            _weather = loadResult.Value!;
-            BuildChart();
-            _loadState = loadResult.State;
+            if (!RegionArtifactResolver.TryResolveWeatherPaths(
+                    overviewResult.Value!.RegionIds,
+                    overviewResult.Value.DataSourcesByRegion,
+                    out IReadOnlyList<string> regionOptions,
+                    out IReadOnlyDictionary<string, string> weatherPathsByRegion,
+                    out string? validationMessage))
+            {
+                _loadState = ArtifactLoadState.InvalidData(validationMessage!);
+                return;
+            }
+
+            _regionOptions = regionOptions.ToList();
+            _weatherPathsByRegion = new Dictionary<string, string>(
+                weatherPathsByRegion, StringComparer.OrdinalIgnoreCase);
+            _selectedRegion = _regionOptions[0];
+            await LoadWeatherAsync(_weatherPathsByRegion[_selectedRegion], _selectedRegion);
         }
         catch (Exception exception)
         {
             _loadState = ArtifactLoadState.Failed($"Error loading weather data: {exception.Message}");
         }
+    }
+
+    private async Task OnRegionChanged(string region)
+    {
+        if (!_weatherPathsByRegion.TryGetValue(region, out string? weatherPath)
+            || string.Equals(region, _selectedRegion, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _selectedRegion = region;
+        _loadState = ArtifactLoadState.Loading();
+        await LoadWeatherAsync(weatherPath, region);
+    }
+
+    private async Task LoadWeatherAsync(string path, string expectedRegion)
+    {
+        ArtifactLoadResult<WeatherDataDTO> loadResult =
+            await ArtifactLoader.LoadAsync<WeatherDataDTO>(path);
+        if (!loadResult.IsSuccess)
+        {
+            _loadState = loadResult.State;
+            return;
+        }
+
+        WeatherDataDTO weather = loadResult.Value!;
+        if (!string.Equals(weather.RegionId, expectedRegion, StringComparison.OrdinalIgnoreCase))
+        {
+            _loadState = ArtifactLoadState.InvalidData(
+                $"Weather artifact region {weather.RegionId} does not match selected region {expectedRegion}.");
+            return;
+        }
+
+        _weather = weather;
+        BuildChart();
+        _loadState = loadResult.State;
     }
 
     private void OnDateChanged(ChangeEventArgs args)
