@@ -194,18 +194,8 @@
     }
 
     /// <summary>Whole seconds under a minute, whole minutes and seconds above it.</summary>
-    private static string Duration(SweepIndexPointDTO point)
-    {
-        if (point.DurationMs is null)
-        {
-            return "—";
-        }
-
-        TimeSpan duration = TimeSpan.FromMilliseconds(point.DurationMs.Value);
-        return duration.TotalMinutes >= 1
-            ? $"{(int)duration.TotalMinutes}m {duration.Seconds}s"
-            : $"{duration.TotalSeconds:F1}s";
-    }
+    private static string Duration(SweepIndexPointDTO point) =>
+        point.DurationMs is null ? "—" : PlotFormat.Duration(point.DurationMs.Value);
 
     private static string SizingLabel(StorageSizingOutcomeDTO? sizing) => sizing?.Outcome switch
     {

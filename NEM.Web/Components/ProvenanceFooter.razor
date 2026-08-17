@@ -15,7 +15,7 @@
         }
         @if (DurationMs is not null)
         {
-            <div><span>Run took</span><strong>@FormatDuration(DurationMs.Value)</strong></div>
+            <div><span>Run took</span><strong>@PlotFormat.Duration(DurationMs.Value)</strong></div>
         }
         @foreach (ProvenanceInputFile input in Inputs.Where(input => !string.IsNullOrWhiteSpace(input.FileName)))
         {
@@ -57,12 +57,4 @@
         || !string.IsNullOrWhiteSpace(Period)
         || !string.IsNullOrWhiteSpace(Resolution);
 
-    /// <summary>Whole seconds under a minute, whole minutes and seconds above it.</summary>
-    private static string FormatDuration(double durationMs)
-    {
-        TimeSpan duration = TimeSpan.FromMilliseconds(durationMs);
-        return duration.TotalMinutes >= 1
-            ? $"{(int)duration.TotalMinutes}m {duration.Seconds}s"
-            : $"{duration.TotalSeconds:F1}s";
-    }
 }

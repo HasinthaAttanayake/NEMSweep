@@ -204,6 +204,46 @@ public sealed class SweepAnalysisTests
     }
 
     [Fact]
+    public void Build_StatesWhenRunsWithinTargetTakeFarLongerThanRunsOutsideIt()
+    {
+        SweepAnalysis analysis = Analyse(
+            Run("p0", "Baseline", 0, achievedUse: 0) with { DurationMs = 120_000 },
+            Run("p1", "+500 MW", 500, achievedUse: 0) with { DurationMs = 100_000 },
+            Run("p2", "+4,500 MW", 4500, achievedUse: 0.01) with { DurationMs = 16_000 },
+            Run("p3", "+5,000 MW", 5000, achievedUse: 0.01) with { DurationMs = 17_000 });
+
+        Finding finding = analysis.Findings.Should()
+            .ContainSingle(finding => finding.Headline.Contains("far longer")).Subject;
+        finding.Headline.Should().StartWith("Runs that reach the reliability target");
+        finding.Tone.Should().Be(FindingTone.Neutral);
+        finding.Metric.Should().Be("6.7×");
+    }
+
+    [Fact]
+    public void Build_ClaimsNoDurationFindingWhenTheGapIsSmall()
+    {
+        SweepAnalysis analysis = Analyse(
+            Run("p0", "Baseline", 0, achievedUse: 0) with { DurationMs = 20_000 },
+            Run("p1", "+500 MW", 500, achievedUse: 0) with { DurationMs = 22_000 },
+            Run("p2", "+4,500 MW", 4500, achievedUse: 0.01) with { DurationMs = 18_000 },
+            Run("p3", "+5,000 MW", 5000, achievedUse: 0.01) with { DurationMs = 19_000 });
+
+        analysis.Findings.Should().NotContain(finding => finding.Headline.Contains("far longer"));
+    }
+
+    [Fact]
+    public void Build_ClaimsNoDurationFindingWhenTheIndexPredatesRunTiming()
+    {
+        SweepAnalysis analysis = Analyse(
+            Run("p0", "Baseline", 0, achievedUse: 0),
+            Run("p1", "+500 MW", 500, achievedUse: 0),
+            Run("p2", "+4,500 MW", 4500, achievedUse: 0.01),
+            Run("p3", "+5,000 MW", 5000, achievedUse: 0.01));
+
+        analysis.Findings.Should().NotContain(finding => finding.Headline.Contains("far longer"));
+    }
+
+    [Fact]
     public void Build_ReadsRegionalScalarsWhenARegionIsSelected()
     {
         SweepIndexPointDTO point = Run("p0", "Baseline", 0, slcoe: 158.46m) with
