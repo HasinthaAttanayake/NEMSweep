@@ -248,8 +248,8 @@ internal sealed class StorageSizingSearch
     private bool RefinePower(string regionId, double minimumPowerMw)
     {
         StorageFleet battery = RequireBattery(_candidate, regionId);
-        double lowerMw = minimumPowerMw - 1;
-        double upperMw = battery.PowerCapacity.Megawatts;
+        double lowerMw = Math.Floor(minimumPowerMw) - 1;
+        double upperMw = Math.Ceiling(battery.PowerCapacity.Megawatts);
         while (upperMw - lowerMw > 1)
         {
             double probeMw = Math.Floor((lowerMw + upperMw) / 2);
@@ -287,8 +287,8 @@ internal sealed class StorageSizingSearch
     {
         StorageFleet battery = RequireBattery(_candidate, regionId);
         double durationFloorMwh = battery.PowerCapacity.Megawatts * MinimumDuration.TotalHours;
-        double lowerMwh = Math.Max(minimumEnergyMwh, durationFloorMwh) - 1;
-        double upperMwh = battery.StorageCapacity.MegawattHours;
+        double lowerMwh = Math.Floor(Math.Max(minimumEnergyMwh, durationFloorMwh)) - 1;
+        double upperMwh = Math.Ceiling(battery.StorageCapacity.MegawattHours);
         while (upperMwh - lowerMwh > 1)
         {
             double probeMwh = Math.Floor((lowerMwh + upperMwh) / 2);
