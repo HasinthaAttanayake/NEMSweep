@@ -43,18 +43,32 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @for (int index = 0; index < _passes.Count; index++)
+                    @foreach (PassRow row in VisibleRows())
                     {
-                        StorageSizingPassDTO pass = _passes[index];
-                        StorageSizingPassDTO? previous = index == 0 ? null : _passes[index - 1];
-                        <tr class="@(index == _passes.Count - 1 ? "row-derived" : null)">
-                            <th scope="row">@pass.Pass</th>
-                            <td>@pass.EnergyCapacityMwh.ToString("N0") MWh</td>
-                            <td>@pass.PowerCapacityMw.ToString("N0") MW</td>
-                            <td>@pass.UnservedEnergyMwh.ToString("N1") MWh</td>
-                            <td>@pass.UnservedHours.ToString("N0")</td>
-                            <td>@ChangeText(pass, previous)</td>
-                        </tr>
+                        @if (row.HiddenCount is { } hiddenCount)
+                        {
+                            <tr class="row-collapsed">
+                                <td colspan="6">
+                                    <button type="button" class="show-all-passes" @onclick="ShowAllPasses">
+                                        Show @hiddenCount hidden @(hiddenCount == 1 ? "pass" : "passes") (@_passes.Count total)
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            int index = row.Index!.Value;
+                            StorageSizingPassDTO pass = _passes[index];
+                            StorageSizingPassDTO? previous = index == 0 ? null : _passes[index - 1];
+                            <tr class="@(index == _passes.Count - 1 ? "row-derived" : null)">
+                                <th scope="row">@pass.Pass</th>
+                                <td>@pass.EnergyCapacityMwh.ToString("N0") MWh</td>
+                                <td>@pass.PowerCapacityMw.ToString("N0") MW</td>
+                                <td>@pass.UnservedEnergyMwh.ToString("N1") MWh</td>
+                                <td>@pass.UnservedHours.ToString("N0")</td>
+                                <td>@ChangeText(pass, previous)</td>
+                            </tr>
+                        }
                     }
                 </tbody>
             </table>
@@ -73,10 +87,42 @@
     /// <summary>Distinguishes headings when several of these appear on one page.</summary>
     [Parameter, EditorRequired] public string Id { get; set; } = string.Empty;
 
+    /// <summary>Passes shown at each edge of a collapsed table, before the reader asks for the rest.</summary>
+    private const int EdgeRowCount = 20;
+
+    /// <summary>
+    /// Below this, showing everything is shorter than showing a toggle. Set well above twice
+    /// <see cref="EdgeRowCount"/> so a table just over the edge-row total does not collapse to hide
+    /// a handful of rows.
+    /// </summary>
+    private const int CollapseThreshold = 50;
+
     private SizingSearch _search = SizingSearch.Empty;
     private List<PlotMarker> _markers = [];
+    private bool _showAllPasses;
 
     private IReadOnlyList<StorageSizingPassDTO> _passes => _search.Passes;
+
+    private bool IsCollapsible => _passes.Count > CollapseThreshold;
+
+    /// <summary>One row of the table: either a pass to render, or a fold hiding the passes between two shown ones.</summary>
+    private readonly record struct PassRow(int? Index, int? HiddenCount);
+
+    private IEnumerable<PassRow> VisibleRows()
+    {
+        if (!IsCollapsible || _showAllPasses)
+        {
+            return Enumerable.Range(0, _passes.Count).Select(index => new PassRow(index, null));
+        }
+
+        int hidden = _passes.Count - (2 * EdgeRowCount);
+        return Enumerable.Range(0, EdgeRowCount).Select(index => new PassRow(index, null))
+            .Append(new PassRow(null, hidden))
+            .Concat(Enumerable.Range(_passes.Count - EdgeRowCount, EdgeRowCount)
+                .Select(index => new PassRow(index, null)));
+    }
+
+    private void ShowAllPasses() => _showAllPasses = true;
 
     /// <summary>
     /// Whether the search actually reached the target, as opposed to stopping because growth
@@ -90,6 +136,7 @@
     protected override void OnParametersSet()
     {
         _search = SizingSearch.From(Sizing);
+        _showAllPasses = false;
         _markers = [.. _search.Passes.Select(pass => new PlotMarker(
             $"Pass {pass.Pass}",
             pass.EnergyCapacityMwh,
