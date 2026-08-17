@@ -164,7 +164,6 @@ public sealed record SweepAnalysis(
         AddStorageOnset(analysis, findings);
         AddConstraints(analysis, findings);
         AddReliabilityBinding(analysis, findings);
-        AddDurationTrend(analysis, findings);
         // Highest priority first, so a page showing only the first few shows the ones that matter.
         return [.. findings.OrderByDescending(finding => finding.Priority)];
     }
@@ -484,62 +483,6 @@ public sealed record SweepAnalysis(
             atTarget.Length.ToString("N0"),
             $"of {analysis.Runs.Count:N0} runs at the limit",
             Priority: 55));
-    }
-
-    /// <summary>
-    /// Runs that reach the reliability target keep refining the battery down to the compliant
-    /// frontier; runs that can't reach it exit as soon as growth stops helping. Those two searches
-    /// cost very different amounts of dispatch compute, and that difference is invisible in every
-    /// other published figure — a run that fails looks the same size as one that succeeds until its
-    /// own duration is read.
-    /// </summary>
-    private static void AddDurationTrend(SweepAnalysis analysis, List<Finding> findings)
-    {
-        SweepRun[] withinTarget = [.. analysis.Runs.Where(run =>
-            run.Point.DurationMs is not null && run.Point.Reliability?.WithinTarget == true)];
-        SweepRun[] outsideTarget = [.. analysis.Runs.Where(run =>
-            run.Point.DurationMs is not null && run.Point.Reliability?.WithinTarget == false)];
-        if (withinTarget.Length < 2 || outsideTarget.Length < 2)
-        {
-            return;
-        }
-
-        double meanWithinMs = withinTarget.Average(run => run.Point.DurationMs!.Value);
-        double meanOutsideMs = outsideTarget.Average(run => run.Point.DurationMs!.Value);
-        if (meanWithinMs <= 0 || meanOutsideMs <= 0)
-        {
-            return;
-        }
-
-        double ratio = meanWithinMs >= meanOutsideMs
-            ? meanWithinMs / meanOutsideMs
-            : meanOutsideMs / meanWithinMs;
-        // A gap under half again as long either way is not worth a finding of its own — sizing
-        // runs vary for reasons other than this split.
-        if (ratio < 1.5)
-        {
-            return;
-        }
-
-        bool withinIsSlower = meanWithinMs > meanOutsideMs;
-        findings.Add(new Finding(
-            withinIsSlower
-                ? "Runs that reach the reliability target take far longer than the ones that don't"
-                : "Runs that miss the reliability target take far longer than the ones that reach it",
-            $"The {withinTarget.Length} runs within target average "
-            + $"{PlotFormat.Duration(meanWithinMs)} of dispatch passes; the {outsideTarget.Length} runs "
-            + $"outside it average {PlotFormat.Duration(meanOutsideMs)}. "
-            + (withinIsSlower
-                ? "A run that meets the standard keeps refining the battery down to the compliant "
-                    + "frontier; a run that can't reach it exits as soon as growth stops helping, so it "
-                    + "costs far less compute to fail than to succeed."
-                : "A run that can't meet the standard keeps growing the battery until it hits its "
-                    + "configured limits; a run that already meets the standard stops as soon as it "
-                    + "does."),
-            FindingTone.Neutral,
-            $"{ratio:N1}×",
-            withinIsSlower ? "slower within target" : "slower outside target",
-            Priority: 45));
     }
 
     private static double PercentageChange(double from, double to) =>
