@@ -208,21 +208,16 @@ internal static class EpwParser
 
     public static RegionalResourceProfile ReadTimeSeries(EpwFile epw)
     {
-        double[] globalHorizontalRadiation = epw.Rows
-            .Select(row => row.GlobalHorizontalRadiation)
-            .ToArray();
-        double[] directNormalRadiation = epw.Rows
-            .Select(row => row.DirectNormalRadiation)
-            .ToArray();
-        double[] diffuseHorizontalRadiation = epw.Rows
-            .Select(row => row.DiffuseHorizontalRadiation)
-            .ToArray();
-        double[] dryBulbTemperature = epw.Rows
-            .Select(row => row.DryBulbTemperature)
-            .ToArray();
-        double[] windSpeed = epw.Rows
-            .Select(row => row.WindSpeed)
-            .ToArray();
+        double[] globalHorizontalRadiation = ShiftToNemTime(
+            epw.Rows.Select(row => row.GlobalHorizontalRadiation).ToArray(), epw.Header.TimeZone);
+        double[] directNormalRadiation = ShiftToNemTime(
+            epw.Rows.Select(row => row.DirectNormalRadiation).ToArray(), epw.Header.TimeZone);
+        double[] diffuseHorizontalRadiation = ShiftToNemTime(
+            epw.Rows.Select(row => row.DiffuseHorizontalRadiation).ToArray(), epw.Header.TimeZone);
+        double[] dryBulbTemperature = ShiftToNemTime(
+            epw.Rows.Select(row => row.DryBulbTemperature).ToArray(), epw.Header.TimeZone);
+        double[] windSpeed = ShiftToNemTime(
+            epw.Rows.Select(row => row.WindSpeed).ToArray(), epw.Header.TimeZone);
 
         TraceSeries globalHorizontalRadiationSeries = TraceSeries.GlobalHorizontalRadiation(
             SyntheticNonLeapStart,
@@ -345,11 +340,38 @@ internal static class EpwParser
             }
         }
 
-        if (epw.Header.TimeZone != 10)
+        if (epw.Header.TimeZone != 10 && epw.Header.TimeZone != 9.5)
         {
             throw new FormatException(
-                $"LOCATION TimeZone must be 10 for NEM time; got {epw.Header.TimeZone}.");
+                $"LOCATION TimeZone must be 10 (AEST) or 9.5 (ACST) for NEM time; got {epw.Header.TimeZone}.");
         }
+    }
+
+    /// <summary>
+    /// Interpolates an hourly civil-time series onto the NEM-market-time (AEST) grid. South
+    /// Australia's stations record in ACST (9.5), half an hour behind market time; every other NEM
+    /// region already reports at 10. A no-op when the source is already at 10.
+    /// </summary>
+    private static double[] ShiftToNemTime(double[] values, double sourceTimeZone)
+    {
+        double shiftHours = NemOffset.TotalHours - sourceTimeZone;
+        if (shiftHours == 0)
+        {
+            return values;
+        }
+
+        int length = values.Length;
+        int steps = (int)Math.Floor(shiftHours);
+        double fraction = shiftHours - steps;
+        var shifted = new double[length];
+        for (int index = 0; index < length; index++)
+        {
+            int laterIndex = (((index - steps) % length) + length) % length;
+            int earlierIndex = ((laterIndex - 1) + length) % length;
+            shifted[index] = (fraction * values[earlierIndex]) + ((1 - fraction) * values[laterIndex]);
+        }
+
+        return shifted;
     }
 
     private static IReadOnlyList<EpwGap> FindGaps(IReadOnlyList<EpwRow> rows)

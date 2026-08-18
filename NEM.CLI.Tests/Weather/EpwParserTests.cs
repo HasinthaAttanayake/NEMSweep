@@ -428,6 +428,25 @@ public sealed class EpwParserTests
     }
 
     [Fact]
+    public void ReadTimeSeries_InterpolatesHalfHourAcstOffsetOntoNemTimeGrid()
+    {
+        var header = new EpwHeader("Port Augusta", "956660", -32.5, 137.7, 9.5, false, 1, 1, 9);
+        double[] dryBulbByHour = [0, 10, 20, 30];
+        var rows = dryBulbByHour
+            .Select((value, index) => new EpwRow(
+                DefaultSourceYear, 1, 1, index + 1, CompleteMeasuredFlags(), value, 0, 0, 0, 0))
+            .ToArray();
+        var epw = new EpwFile(header, rows);
+
+        RegionalResourceProfile weather = EpwParser.ReadTimeSeries(epw);
+
+        weather.DryBulbTemperature[0].Should().Be(15);
+        weather.DryBulbTemperature[1].Should().Be(5);
+        weather.DryBulbTemperature[2].Should().Be(15);
+        weather.DryBulbTemperature[3].Should().Be(25);
+    }
+
+    [Fact]
     public void ReadProvenance_RecordsUnknownWithoutThrowing_WhenFlagsAreTruncated()
     {
         string path = WriteFullYearFixture(
