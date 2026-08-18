@@ -440,7 +440,7 @@ public sealed class SystemDispatchOutcome
             {
                 if (flow.Flow[index].Megawatts < -BalanceTolerance
                     || flow.Losses[index].Megawatts < -BalanceTolerance
-                    || flow.Flow[index] > link.Capacity
+                    || flow.Flow[index].Megawatts > link.Capacity.Megawatts + BalanceTolerance
                     || flow.Losses[index].Megawatts
                         > flow.Flow[index].Megawatts + BalanceTolerance)
                 {
