@@ -87,7 +87,8 @@ public sealed class ArtifactLoaderTests
             Serialize(ArtifactFixtures.SystemResults() with { SchemaVersion = 1 }));
 
         result.State.Status.Should().Be(ArtifactLoadStatus.InvalidData);
-            result.State.Message.Should().Be("Artifact schema 1 is not supported; expected schema 10.");
+        result.State.Message.Should().Be(
+            $"Artifact schema 1 is not supported; expected schema {ArtifactSchemaVersions.SystemDispatchResults}.");
     }
 
     [Fact]

@@ -18,7 +18,8 @@
             <MixBar Segments="@Cost.CostSegments()"
                     Label="Annual generation cost"
                     AriaLabel="@($"{Scope} generation cost by technology")"
-                    Detail="@PlotFormat.MoneyTotal(Cost.TotalAnnualisedCostAud)" />
+                    Detail="@PlotFormat.MoneyTotal(Cost.TotalAnnualisedCostAud)"
+                    Money="true" />
             <MixBar Segments="@Cost.EnergySegments()"
                     Label="Delivered energy"
                     AriaLabel="@($"{Scope} delivered generation by technology")"

@@ -203,6 +203,15 @@ public static class PlotFormat
     public static string Signed(double value, string format = "N1") =>
         (value > 0 ? "+" : string.Empty) + value.ToString(format, CultureInfo.CurrentCulture);
 
+    /// <summary>A duration in whole seconds under a minute, whole minutes and seconds above it.</summary>
+    public static string Duration(double milliseconds)
+    {
+        TimeSpan duration = TimeSpan.FromMilliseconds(milliseconds);
+        return duration.TotalMinutes >= 1
+            ? $"{(int)duration.TotalMinutes}m {duration.Seconds}s"
+            : $"{duration.TotalSeconds.ToString("F1", CultureInfo.CurrentCulture)}s";
+    }
+
     /// <summary>An axis tick label at the precision the axis step needs.</summary>
     public static string Tick(double value, PlotAxis axis, string? prefix = null, bool compact = true)
     {
