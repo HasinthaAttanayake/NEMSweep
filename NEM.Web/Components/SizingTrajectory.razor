@@ -15,7 +15,11 @@
     <section class="sizing-trajectory" aria-labelledby="@($"{Id}-heading")">
         <div class="section-heading">
             <p class="section-label">Sizing evidence</p>
-            <h2 id="@($"{Id}-heading")">What it took to reach @Scope's reliability target</h2>
+            <h2 id="@($"{Id}-heading")">
+                @(MetTarget
+                    ? $"What it took to reach {Scope}'s reliability target"
+                    : $"What the search tried for {Scope}'s reliability target")
+            </h2>
             <p>@Summary</p>
         </div>
 
@@ -39,18 +43,32 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @for (int index = 0; index < _passes.Count; index++)
+                    @foreach (PassRow row in VisibleRows())
                     {
-                        StorageSizingPassDTO pass = _passes[index];
-                        StorageSizingPassDTO? previous = index == 0 ? null : _passes[index - 1];
-                        <tr class="@(index == _passes.Count - 1 ? "row-derived" : null)">
-                            <th scope="row">@pass.Pass</th>
-                            <td>@pass.EnergyCapacityMwh.ToString("N0") MWh</td>
-                            <td>@pass.PowerCapacityMw.ToString("N0") MW</td>
-                            <td>@pass.UnservedEnergyMwh.ToString("N1") MWh</td>
-                            <td>@pass.UnservedHours.ToString("N0")</td>
-                            <td>@ChangeText(pass, previous)</td>
-                        </tr>
+                        @if (row.HiddenCount is { } hiddenCount)
+                        {
+                            <tr class="row-collapsed">
+                                <td colspan="6">
+                                    <button type="button" class="show-all-passes" @onclick="ShowAllPasses">
+                                        Show @hiddenCount hidden @(hiddenCount == 1 ? "pass" : "passes") (@_passes.Count total)
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            int index = row.Index!.Value;
+                            StorageSizingPassDTO pass = _passes[index];
+                            StorageSizingPassDTO? previous = index == 0 ? null : _passes[index - 1];
+                            <tr class="@(index == _passes.Count - 1 ? "row-derived" : null)">
+                                <th scope="row">@pass.Pass</th>
+                                <td>@pass.EnergyCapacityMwh.ToString("N0") MWh</td>
+                                <td>@pass.PowerCapacityMw.ToString("N0") MW</td>
+                                <td>@pass.UnservedEnergyMwh.ToString("N1") MWh</td>
+                                <td>@pass.UnservedHours.ToString("N0")</td>
+                                <td>@ChangeText(pass, previous)</td>
+                            </tr>
+                        }
                     }
                 </tbody>
             </table>
@@ -69,13 +87,65 @@
     /// <summary>Distinguishes headings when several of these appear on one page.</summary>
     [Parameter, EditorRequired] public string Id { get; set; } = string.Empty;
 
+    /// <summary>Passes shown at each edge of a collapsed table, before the reader asks for the rest.</summary>
+    private const int EdgeRowCount = 20;
+
+    /// <summary>
+    /// Below this, showing everything is shorter than showing a toggle. Set well above twice
+    /// <see cref="EdgeRowCount"/> so a table just over the edge-row total does not collapse to hide
+    /// a handful of rows.
+    /// </summary>
+    private const int CollapseThreshold = 50;
+
     private SizingSearch _search = SizingSearch.Empty;
     private List<PlotMarker> _markers = [];
+    private bool _showAllPasses;
+    private StorageSizingOutcomeDTO? _renderedSizing;
 
     private IReadOnlyList<StorageSizingPassDTO> _passes => _search.Passes;
 
+    private bool IsCollapsible => _passes.Count > CollapseThreshold;
+
+    /// <summary>One row of the table: either a pass to render, or a fold hiding the passes between two shown ones.</summary>
+    private readonly record struct PassRow(int? Index, int? HiddenCount);
+
+    private IEnumerable<PassRow> VisibleRows()
+    {
+        if (!IsCollapsible || _showAllPasses)
+        {
+            return Enumerable.Range(0, _passes.Count).Select(index => new PassRow(index, null));
+        }
+
+        int hidden = _passes.Count - (2 * EdgeRowCount);
+        return Enumerable.Range(0, EdgeRowCount).Select(index => new PassRow(index, null))
+            .Append(new PassRow(null, hidden))
+            .Concat(Enumerable.Range(_passes.Count - EdgeRowCount, EdgeRowCount)
+                .Select(index => new PassRow(index, null)));
+    }
+
+    private void ShowAllPasses() => _showAllPasses = true;
+
+    /// <summary>
+    /// Whether the search actually reached the target, as opposed to stopping because growth
+    /// stopped helping, a capacity limit, or the pass budget. Storage capacity can grow in either
+    /// case, so "did it grow" is not the same question as "did it work" — the trajectory's prose has
+    /// to answer the second one, not the first.
+    /// </summary>
+    private bool MetTarget =>
+        Sizing.Outcome is StorageSizingOutcome.NotRequired or StorageSizingOutcome.Resized;
+
     protected override void OnParametersSet()
     {
+        // OnParametersSet fires on every parent re-render, not only when the trajectory itself
+        // changed (e.g. an unrelated selector on the host page). Resetting the collapse toggle
+        // unconditionally would throw away an expanded table for reasons unrelated to what it
+        // shows, so the reset is gated on the sizing data actually being a different result.
+        if (!ReferenceEquals(Sizing, _renderedSizing))
+        {
+            _showAllPasses = false;
+            _renderedSizing = Sizing;
+        }
+
         _search = SizingSearch.From(Sizing);
         _markers = [.. _search.Passes.Select(pass => new PlotMarker(
             $"Pass {pass.Pass}",
@@ -97,6 +167,17 @@
         {
             StorageSizingPassDTO first = _search.First;
             StorageSizingPassDTO last = _search.Last;
+
+            if (!MetTarget)
+            {
+                return _search.GrewStorage
+                    ? $"The loop grew {Scope} from {first.EnergyCapacityMwh:N0} MWh to "
+                        + $"{last.EnergyCapacityMwh:N0} MWh of storage across {_passes.Count} dispatch "
+                        + $"{(_passes.Count == 1 ? "pass" : "passes")} but did not reach the target: "
+                        + $"{last.UnservedEnergyMwh:N1} MWh remained unserved."
+                    : $"The loop dispatched {Scope} {_passes.Count} times without adding storage and did "
+                        + $"not reach the target: {last.UnservedEnergyMwh:N1} MWh remained unserved.";
+            }
 
             if (!_search.GrewStorage)
             {
@@ -123,8 +204,12 @@
         {
             if (!_search.GrewStorage)
             {
-                return "Every pass ran the same fleet, so this is a check that the target held "
-                    + "rather than a search for the capacity that reaches it.";
+                return MetTarget
+                    ? "Every pass ran the same fleet, so this is a check that the target held "
+                        + "rather than a search for the capacity that reaches it."
+                    : "Every pass ran the same fleet without reaching the target, so this is a check "
+                        + "that a bigger battery would not have helped rather than a search that found "
+                        + "one.";
             }
 
             // A pass that repeats a capacity already reached is a probe the search dispatched and
@@ -134,11 +219,13 @@
                 ? string.Empty
                 : $" {repeated} of the {_passes.Count} passes re-ran a capacity the search had "
                     + "already reached, which is a probe it did not accept rather than a step it took.";
+            string closing = MetTarget
+                ? "a flat tail means storage had stopped paying for itself before the target was met."
+                : "a flat tail means storage had stopped paying for itself before the search gave up.";
 
             return $"Averaged over the search, each megawatt-hour of storage added removed "
                 + $"{_search.UnservedRemovedPerMwhAdded:N3} MWh of unserved energy. The curve is what matters more than the "
-                + $"average: a steep fall means reliability was cheap to buy, a flat tail means "
-                + $"storage had stopped paying for itself before the target was met.{probes}";
+                + $"average: a steep fall means reliability was cheap to buy, {closing}{probes}";
         }
     }
 

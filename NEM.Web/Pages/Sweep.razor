@@ -60,19 +60,27 @@
                traversable rather than relying on the reader scrolling to discover it. *@
             <nav class="sweep-sections" aria-label="Sections on this page">
                 <a href="@SectionHref("findings")">Findings</a>
+                <a href="@SectionHref("runs")">All runs</a>
                 @if (_analysis.Runs.Count > 1)
                 {
                     <a href="@SectionHref("headline")">Cost headline</a>
                     <a href="@SectionHref("tradeoff-heading")">Trade-offs</a>
                 }
                 <a href="@SectionHref("series-heading")">Every measure</a>
-                <a href="@SectionHref("runs")">All runs</a>
             </nav>
 
             <div id="findings"></div>
             <FindingCards Findings="@_analysis.Findings"
                           Heading="What this sweep shows"
-                          Description="Derived from the sweep index alone. Each finding names the runs it is drawn from, so it can be checked against the table at the foot of this page." />
+                          Description="Derived from the sweep index alone. Each finding names the runs it is drawn from, so it can be checked against the table below." />
+
+            <SweepOutcomeSummary Index="_index" />
+
+            <div id="runs"></div>
+            <SweepRunTable Index="@_index"
+                           RegionId="@SelectedRegionId"
+                           AnnualCostLabel="@_analysis.AnnualCostLabel"
+                           HighlightPointId="@_analysis.CheapestUnitCost?.Point.PointId" />
 
             @if (_analysis.Runs.Count > 1)
             {
@@ -110,14 +118,6 @@
                 </div>
             </section>
 
-            <SweepOutcomeSummary Index="_index" />
-
-            <div id="runs"></div>
-            <SweepRunTable Index="@_index"
-                           RegionId="@SelectedRegionId"
-                           AnnualCostLabel="@_analysis.AnnualCostLabel"
-                           HighlightPointId="@_analysis.CheapestUnitCost?.Point.PointId" />
-
             @if (_index.Scope is not null)
             {
                 @* The scope carries one weather basis. A sweep covering several regions is
@@ -137,6 +137,7 @@
             <ProvenanceFooter CommitSha="@_index.Provenance.GitCommitSha"
                               CommitUrl="@CommitUrl"
                               IsDirty="@_index.Provenance.WorkingTreeDirty"
+                              DurationMs="@_index.Provenance.TotalDurationMs"
                               Inputs="@ProvenanceInputs"
                               Region="@(_index.Scope is null ? null : string.Join(", ", _index.Scope.RegionIds))"
                               Period="@(_index.Scope is null ? null : Period(_index.Scope))"

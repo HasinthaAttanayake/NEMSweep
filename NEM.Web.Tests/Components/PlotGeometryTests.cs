@@ -154,6 +154,17 @@ public sealed class PlotGeometryTests
         PlotFormat.Share(0.3798).Should().Be("38.0%");
     }
 
+    [Theory]
+    [InlineData(500, "0.5s")]
+    [InlineData(26_569.68, "26.6s")]
+    [InlineData(65_502.67, "1m 5s")]
+    [InlineData(953_300.92, "15m 53s")]
+    public void Duration_UsesWholeSecondsUnderAMinuteAndMinutesAndSecondsAbove(
+        double milliseconds, string expected)
+    {
+        PlotFormat.Duration(milliseconds).Should().Be(expected);
+    }
+
     /// <summary>
     /// The nice-step family includes 2.5, so a step can be 0.25. Taking the precision from the
     /// step's magnitude gave one decimal, labelling consecutive ticks 0.2 and 0.3.

@@ -28,10 +28,23 @@
 }
 
 
+/* Same scroll-shadow technique as the shared .table-wrap (see app.css) - this table doesn't use
+   that class since it needs its own sticky-column handling, but the same wide-table-on-mobile
+   problem applies. */
 .run-table-scroll {
     width: 100%;
     max-width: 100%;
     overflow-x: auto;
+    background-color: var(--color-surface);
+    background-image:
+        linear-gradient(to right, var(--color-surface) 50%, transparent),
+        linear-gradient(to left, var(--color-surface) 50%, transparent),
+        linear-gradient(to right, rgba(23, 33, 43, 0.15), transparent),
+        linear-gradient(to left, rgba(23, 33, 43, 0.15), transparent);
+    background-position: left, right, left, right;
+    background-repeat: no-repeat;
+    background-size: 24px 100%, 24px 100%, 10px 100%, 10px 100%;
+    background-attachment: local, local, scroll, scroll;
 }
 
 .run-table {

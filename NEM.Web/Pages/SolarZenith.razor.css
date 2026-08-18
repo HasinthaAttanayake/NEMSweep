@@ -39,6 +39,17 @@
     color: var(--color-muted);
 }
 
+.zenith-controls {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.75rem;
+}
+
+.region-select {
+    width: 190px;
+    flex: 0 0 auto;
+}
+
 .date-field {
     display: grid;
     gap: 0.35rem;
@@ -139,6 +150,12 @@
         gap: 1rem;
     }
 
+    .zenith-controls {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .region-select,
     .date-field input {
         width: 100%;
     }

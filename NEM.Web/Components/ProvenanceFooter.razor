@@ -13,6 +13,10 @@
         {
             <div><span>Generated</span><strong>@RunDate.Value.ToString("dd MMM yyyy, HH:mm 'UTC'")</strong></div>
         }
+        @if (DurationMs is not null)
+        {
+            <div><span>Run took</span><strong>@PlotFormat.Duration(DurationMs.Value)</strong></div>
+        }
         @foreach (ProvenanceInputFile input in Inputs.Where(input => !string.IsNullOrWhiteSpace(input.FileName)))
         {
             <div><span>@(string.IsNullOrWhiteSpace(input.Purpose) ? "Input" : input.Purpose)</span><strong>@input.FileName</strong>@if (!string.IsNullOrWhiteSpace(input.Sha256)) { <small>@input.Sha256</small> }</div>
@@ -37,6 +41,7 @@
     [Parameter] public string? CommitUrl { get; set; }
     [Parameter] public bool? IsDirty { get; set; }
     [Parameter] public DateTimeOffset? RunDate { get; set; }
+    [Parameter] public double? DurationMs { get; set; }
     [Parameter] public IReadOnlyList<ProvenanceInputFile> Inputs { get; set; } = [];
     [Parameter] public string? Region { get; set; }
     [Parameter] public string? Period { get; set; }
@@ -46,8 +51,10 @@
     private bool HasValues => !string.IsNullOrWhiteSpace(CommitSha)
         || IsDirty is not null
         || RunDate is not null
+        || DurationMs is not null
         || Inputs.Any(input => !string.IsNullOrWhiteSpace(input.FileName))
         || !string.IsNullOrWhiteSpace(Region)
         || !string.IsNullOrWhiteSpace(Period)
         || !string.IsNullOrWhiteSpace(Resolution);
+
 }
