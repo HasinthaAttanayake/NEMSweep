@@ -568,10 +568,26 @@ code {
    here beats three that drift apart. A wide table scrolls inside its own box rather than widening
    the page. */
 
+/* A wide table's own right border sits hundreds of pixels off screen at first scroll, so the box
+   reads as cut off rather than as a table with more columns to reach. These four layers (the
+   classic scroll-shadow technique) paint a soft edge that fades out once there is nothing further
+   to scroll toward it: two gradients scroll with the content to mask the shadow at each true end,
+   two stay fixed to the viewport to draw it everywhere else. No JS: the site keeps its scripting to
+   the one module in nem.js, and a decorative cue is exactly the kind of thing that shouldn't need it. */
 .table-wrap {
     margin-top: 1.25rem;
     overflow-x: auto;
     border-block: 1px solid var(--color-border);
+    background-color: var(--color-surface);
+    background-image:
+        linear-gradient(to right, var(--color-surface) 50%, transparent),
+        linear-gradient(to left, var(--color-surface) 50%, transparent),
+        linear-gradient(to right, rgba(23, 33, 43, 0.15), transparent),
+        linear-gradient(to left, rgba(23, 33, 43, 0.15), transparent);
+    background-position: left, right, left, right;
+    background-repeat: no-repeat;
+    background-size: 24px 100%, 24px 100%, 10px 100%, 10px 100%;
+    background-attachment: local, local, scroll, scroll;
 }
 
 .data-table {
@@ -589,9 +605,22 @@ code {
     text-align: right;
 }
 
+/* The row label stays visible while a narrow viewport scrolls across a wide row of figures —
+   every one of these tables identifies its row in the first column (Technology, Link, Pass), so a
+   generic :first-child rule reaches every table this stylesheet defines without each caller having
+   to mark its own label column. */
 .data-table th:first-child,
 .data-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
     text-align: left;
+    background: var(--color-surface);
+}
+
+.data-table thead th:first-child {
+    z-index: 2;
+    background: var(--color-surface-table);
 }
 
 .data-table thead th {
@@ -607,6 +636,14 @@ code {
 }
 
 .data-table .row-system {
+    background: var(--color-surface-table);
+}
+
+/* The sticky first cell paints its own opaque background over whatever the row sets, so a tinted
+   row needs its tint restated there or the one cell that's always on screen is the one that loses
+   the tint. */
+.data-table .row-system td:first-child,
+.data-table .row-system th:first-child {
     background: var(--color-surface-table);
 }
 
