@@ -283,9 +283,42 @@ classDiagram
   distance between the two endpoint regions' weather sites (each region's
   `RegionalResourceProfile.Location`, taken from its `SolarZenithSeries` latitude
   and longitude), so an interconnector's endpoints must both carry a resource
-  profile. A system result states whether transmission economics were calculated;
+  profile. This makes `NEM.Model.Economics` depend on `NEM.Model.Weather`: a
+  scenario that is otherwise fully specified economically now throws unless every
+  interconnector endpoint carries weather data. That dependency should go back out
+  if regional location ever gets a home of its own (a `Region.Location`, or an
+  explicit route length on the scenario interconnector). A system result states
+  whether transmission economics were calculated;
   regional results state that transmission is not modelled in their cost scope,
   even though they disclose incoming-link loss allocation.
+- The transmission distance model carries two known approximations, both kept
+  deliberately rather than fixed, because the alternative (a real per-route
+  distance table) is more precision than the rest of the cost model supports.
+  **Route length is a proxy, and it runs long.** The distance is measured
+  between each region's *solar* weather site — chosen for renewable resource
+  quality, not for where a transmission line terminates — so corridors whose
+  resource sites sit far from the interconnector's real endpoints are
+  overstated against the actual NEM route:
+
+  | Link | Model | Actual route |
+  |---|---|---|
+  | VIC1–SA1 | 784 km | Heywood, ~275 km |
+  | VIC1–NSW1 | 732 km | VNI, ~300 km |
+  | NSW1–QLD1 | 964 km | QNI corridor, ~500 km |
+  | TAS1–VIC1 | 360 km | Basslink, ~370 km |
+  | NSW1–SA1 | 1,020 km | EnergyConnect, ~900 km |
+
+  **Reciprocal links each carry the full route length** (see the
+  `TransmissionCostParameters` remarks): every corridor is declared as two
+  directed interconnectors, each costed independently at the corridor's full
+  distance, so the same kilometre of conductor is paid for twice — once per
+  direction. Charging each of the 5 physical corridors once at its larger
+  directed rating gives 3,954,000 km·MW against the 7,035,547 km·MW actually
+  charged across all 10 directed links, so this convention alone accounts for
+  roughly 1.8× of the published transmission cost. The two approximations
+  compound: swapping a region's solar EPW file silently changes system
+  transmission cost, because the resource site is the only source of regional
+  location.
 - Exported run results cite scenario and power-system identities rather than
   serialising the domain object graph.
 
