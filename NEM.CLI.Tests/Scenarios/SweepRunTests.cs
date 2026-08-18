@@ -85,6 +85,31 @@ public sealed class SweepRunTests
     }
 
     [Fact]
+    public void Run_RecordsPerPointAndTotalDurationInIndex()
+    {
+        using var fixture = new SweepRunFixture();
+        fixture.WriteDefinition("""
+            [{ "pointId": "p0", "axisValue": 0, "label": "Base", "overrides": {} },
+             { "pointId": "p1", "axisValue": 1, "label": "Changed", "overrides": { "name": "Changed scenario" } }]
+            """);
+
+        SweepRunCommand.Run(fixture.CreateContext(TextWriter.Null), "sweeps/test-sweep.json").Should().Be(0);
+
+        JsonObject index = ReadIndex(fixture);
+        double totalDurationMs = index["provenance"]!["totalDurationMs"]!.GetValue<double>();
+        totalDurationMs.Should().BeGreaterThan(0);
+        double sumOfPointDurations = 0;
+        foreach (JsonNode? point in index["points"]!.AsArray())
+        {
+            double pointDurationMs = point!["durationMs"]!.GetValue<double>();
+            pointDurationMs.Should().BeGreaterThan(0);
+            sumOfPointDurations += pointDurationMs;
+        }
+
+        sumOfPointDurations.Should().BeLessThanOrEqualTo(totalDurationMs);
+    }
+
+    [Fact]
     public void Run_DeletesSeriesFilesNoPointReferences()
     {
         using var fixture = new SweepRunFixture();
@@ -216,6 +241,35 @@ public sealed class SweepRunTests
 
         first.InputFiles.Single(input => input.Purpose == "demand-data").Sha256.Should().NotBe(
             second.InputFiles.Single(input => input.Purpose == "demand-data").Sha256);
+    }
+
+    [Fact]
+    public void CreateProvenance_ListsDemandAndWeatherInputsForEveryRegion()
+    {
+        using var fixture = new SweepRunFixture();
+        fixture.WriteTwoRegionBaseline();
+        fixture.WriteDefinition("""[{ "pointId": "p0", "axisValue": 0, "label": "Base", "overrides": {} }]""");
+        CliContext context = fixture.CreateContext(TextWriter.Null);
+        SweepDefinition definition = SweepFanOutCommand.WriteConfigs(
+            context,
+            "sweeps/test-sweep.json",
+            validateGeneratedConfigs: false);
+        string configPath = Path.Combine(
+            fixture.RootPath,
+            "sweeps",
+            "test-sweep",
+            "configs",
+            "p0.json");
+
+        SweepProvenanceDTO provenance = SweepArtifactExport.CreateProvenance(
+            context,
+            definition,
+            fixture.DefinitionPath,
+            [configPath],
+            new SweepRunMetadata("test", false));
+
+        provenance.InputFiles.Count(input => input.Purpose == "demand-data").Should().Be(2);
+        provenance.InputFiles.Count(input => input.Purpose == "weather-data").Should().Be(2);
     }
 
     [Fact]
@@ -357,6 +411,19 @@ public sealed class SweepRunTests
         return Encoding.UTF8.GetBytes(JsonFile.Serialize(result));
     }
 
+    /// <summary>Strips wall-clock run-timing figures, which genuinely vary run to run.</summary>
+    private static byte[] NormalizedIndexBytes(string path)
+    {
+        JsonObject index = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+        index["provenance"]!.AsObject().Remove("totalDurationMs");
+        foreach (JsonNode? point in index["points"]!.AsArray())
+        {
+            point!.AsObject().Remove("durationMs");
+        }
+
+        return Encoding.UTF8.GetBytes(JsonFile.Serialize(index));
+    }
+
     private static void RestoreExternalizedBaseDemand(string pointResultPath, JsonObject result)
     {
         JsonObject demand = result["dataSeries"]!["demand"]!.AsObject();
@@ -378,7 +445,9 @@ public sealed class SweepRunTests
                 path => path.Contains($"{Path.DirectorySeparatorChar}points{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
                     && !path.EndsWith(".status.json", StringComparison.Ordinal)
                     ? NormalizedResultBytes(path)
-                    : File.ReadAllBytes(path),
+                    : path.EndsWith("index.json", StringComparison.Ordinal)
+                        ? NormalizedIndexBytes(path)
+                        : File.ReadAllBytes(path),
                 StringComparer.Ordinal);
     }
 
@@ -423,7 +492,7 @@ public sealed class SweepRunTests
                         10,
                         zeroes))));
             File.WriteAllText(Path.Combine(RootPath, "scenarios", "baseline.json"), """
-            { "schemaVersion": 3, "id": "baseline", "name": "Baseline", "costBasis": { "year": 2026, "realDiscountRate": 0.07 }, "storageSizing": { "maximumPowerMw": 100, "maximumEnergyMwh": 400 }, "regions": [{ "regionId": "NSW1", "demandFile": "demand.json", "weatherFile": "weather.json", "generatingFleets": [{ "technology": "Gas", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 } }], "storageFleets": [{ "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0, "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 }, "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 } }] }] }
+            { "schemaVersion": 4, "id": "baseline", "name": "Baseline", "costBasis": { "year": 2026, "realDiscountRate": 0.07 }, "storageSizing": { "maximumPowerMw": 100, "maximumEnergyMwh": 400 }, "regions": [{ "regionId": "NSW1", "demandFile": "demand.json", "weatherFile": "weather.json", "generatingFleets": [{ "technology": "Gas", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 } }], "storageFleets": [{ "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0, "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 }, "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 } }] }] }
             """);
             Paths = RepositoryPaths.Discover(RootPath);
         }
@@ -463,6 +532,19 @@ public sealed class SweepRunTests
             $$"""
             { "schemaVersion": 1, "sweepId": "test-sweep", "name": "Test sweep", "axis": { "label": "Capacity", "unit": "MW" }, "baselineConfigPath": "scenarios/baseline.json", "points": {{points}} }
             """);
+
+        public void WriteTwoRegionBaseline()
+        {
+            File.Copy(
+                Path.Combine(RootPath, "demand.json"),
+                Path.Combine(RootPath, "demand-vic1.json"));
+            File.Copy(
+                Path.Combine(RootPath, "weather.json"),
+                Path.Combine(RootPath, "weather-vic1.json"));
+            File.WriteAllText(Path.Combine(RootPath, "scenarios", "baseline.json"), """
+            { "schemaVersion": 4, "id": "baseline", "name": "Baseline", "costBasis": { "year": 2026, "realDiscountRate": 0.07 }, "storageSizing": { "maximumPowerMw": 100, "maximumEnergyMwh": 400 }, "regions": [{ "regionId": "NSW1", "demandFile": "demand.json", "weatherFile": "weather.json", "generatingFleets": [{ "technology": "Gas", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 } }], "storageFleets": [{ "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0, "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 }, "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 } }] }, { "regionId": "VIC1", "demandFile": "demand-vic1.json", "weatherFile": "weather-vic1.json", "generatingFleets": [{ "technology": "Gas", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 } }], "storageFleets": [{ "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0, "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 }, "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 } }] }] }
+            """);
+        }
 
         public void MoveInputsToConfiguredOutputRoot()
         {

@@ -32,7 +32,8 @@ public sealed record SweepProvenanceDTO(
     bool WorkingTreeDirty,
     string ResolvedDefinitionSha256,
     SweepInputFileDTO[] InputFiles,
-    Dictionary<string, int> SchemaVersions);
+    Dictionary<string, int> SchemaVersions,
+    double? TotalDurationMs = null);
 
 public sealed record SweepInputFileDTO(
     string Path,
@@ -53,7 +54,8 @@ public sealed record SweepIndexPointDTO(
     SweepPointFailureDTO? Failure,
     SweepPointRegionScalarsDTO[]? RegionScalars = null,
     SweepPointRegionDetailDTO[]? RegionDetails = null,
-    string? OverviewPath = null);
+    string? OverviewPath = null,
+    double? DurationMs = null);
 
 public sealed record SweepPointRegionScalarsDTO(
     string RegionId,

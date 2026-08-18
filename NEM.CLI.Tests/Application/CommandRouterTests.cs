@@ -117,7 +117,7 @@ public sealed class CommandRouterTests
                         Path.Combine(fixture.RootPath, "scenarios", "Local scenario.json"),
                         """
                         {
-                            "schemaVersion": 3,
+                            "schemaVersion": 4,
                             "id": "test-scenario",
                             "name": "Test scenario",
                             "costBasis": { "year": 2026, "realDiscountRate": 0.07 },

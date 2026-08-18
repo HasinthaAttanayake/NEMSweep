@@ -28,7 +28,11 @@ internal static class ValidateInputsCommand
         foreach (OperationalDemandData demand in validated.DemandByRegion.Values)
         {
             context.Output.WriteLine(
-                $"Demand {demand.Region}: valid ({demand.Demand.Length} half-hour intervals).");
+                $"Demand {demand.Region}: valid ({demand.Demand.Length} half-hour intervals)."
+                + (demand.ClampedIntervals > 0
+                    ? $" {demand.ClampedIntervals} negative interval"
+                        + $"{(demand.ClampedIntervals == 1 ? "" : "s")} clamped to 0 MW."
+                    : string.Empty));
         }
 
         foreach ((string region, WeatherDataDTO _) in validated.WeatherByRegion)
