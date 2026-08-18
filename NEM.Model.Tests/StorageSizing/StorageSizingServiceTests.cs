@@ -240,6 +240,27 @@ public sealed class StorageSizingServiceTests
     }
 
     [Fact]
+    public void Size_RefinementWithFractionalGrowthCeiling_TerminatesWithinBudgetInsteadOfStalling()
+    {
+        // The growth phase clamps to a fractional maximumPowerMw (45.3), and only that exact
+        // ceiling clears the 45.1 MW peak demand; every integer probe below it fails. Refinement's
+        // bisection must still converge instead of getting stuck re-testing the same integer probe
+        // forever (regression for the frontier-refinement stall described in NEM-076).
+        PowerSystem system = SolarSystem(
+            "NSW1",
+            demandMw: [0, 0, 0, 0, 0, 0, 0, 0, 0, 45.1],
+            directNormalRadiation: [2_000, 2_000, 2_000, 2_000, 2_000, 2_000, 2_000, 2_000, 2_000, 0]);
+
+        StorageSizingRunResult result = StorageSizingService.Size(
+            system,
+            Options(maximumPowerMw: 45.3, maximumEnergyMwh: 1000, maximumPasses: 30));
+
+        result.Status.Should().Be(StorageSizingStatus.TargetMet);
+        result.DispatchPassCount.Should().BeLessThan(20);
+        result.Regions.Single().Reliability.UnservedEnergy.Should().Be(Energy.Zero);
+    }
+
+    [Fact]
     public void Options_RejectMaximumEnergyThatCannotSupportFourHourMaximumPower()
     {
         var act = () => Options(maximumPowerMw: 100, maximumEnergyMwh: 399);

@@ -169,25 +169,9 @@ public static class PowerSystemCostCalculator
         PowerSystem powerSystem,
         ScenarioInterconnector interconnector)
     {
-        RegionalResourceProfile from = ResourceProfileFor(powerSystem, interconnector.FromRegionId);
-        RegionalResourceProfile to = ResourceProfileFor(powerSystem, interconnector.ToRegionId);
+        RegionalResourceProfile from = powerSystem.RequireResourceProfile(interconnector.FromRegionId);
+        RegionalResourceProfile to = powerSystem.RequireResourceProfile(interconnector.ToRegionId);
         return from.Location.DistanceTo(to.Location);
-    }
-
-    private static RegionalResourceProfile ResourceProfileFor(PowerSystem powerSystem, string regionId)
-    {
-        Region? region = powerSystem.Regions.FirstOrDefault(candidate =>
-            string.Equals(candidate.RegionId, regionId, StringComparison.OrdinalIgnoreCase));
-        if (region is null)
-        {
-            throw new InvalidOperationException(
-                $"Region '{regionId}' was not found in the power system.");
-        }
-
-        return region.ResourceProfile
-            ?? throw new InvalidOperationException(
-                $"Region '{regionId}' requires a weather resource profile to derive "
-                + "transmission line distance for its interconnectors.");
     }
 
     /// <summary>Directed endpoint identity normalised only for case-insensitive region matching.</summary>
