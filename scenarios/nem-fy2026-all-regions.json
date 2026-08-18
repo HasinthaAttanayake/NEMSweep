@@ -1,0 +1,737 @@
+{
+  "schemaVersion": 4,
+  "id": "nem-fy2026-all-regions",
+  "name": "NEM FY2026 all regions",
+  "costBasis": {
+    "year": 2026,
+    "realDiscountRate": 0.07
+  },
+  "storageSizing": {
+    "maximumPowerMw": 10000,
+    "maximumEnergyMwh": 100000,
+    "targetUsePercentage": 0.002,
+    "maximumPasses": 512,
+    "reliabilityStandardName": "NEM reliability standard"
+  },
+  "interconnectors": [
+    {
+      "fromRegionId": "NSW1",
+      "toRegionId": "QLD1",
+      "capacityMw": 957,
+      "capitalCostAudPerKmPerMw": 3860,
+      "fixedOperatingCostAudPerKmPerMwYear": 38.6,
+      "technicalLifeYears": 50
+    },
+    {
+      "fromRegionId": "QLD1",
+      "toRegionId": "NSW1",
+      "capacityMw": 1610,
+      "capitalCostAudPerKmPerMw": 3860,
+      "fixedOperatingCostAudPerKmPerMwYear": 38.6,
+      "technicalLifeYears": 50
+    },
+    {
+      "fromRegionId": "VIC1",
+      "toRegionId": "NSW1",
+      "capacityMw": 1700,
+      "capitalCostAudPerKmPerMw": 3860,
+      "fixedOperatingCostAudPerKmPerMwYear": 38.6,
+      "technicalLifeYears": 50
+    },
+    {
+      "fromRegionId": "NSW1",
+      "toRegionId": "VIC1",
+      "capacityMw": 1900,
+      "capitalCostAudPerKmPerMw": 3860,
+      "fixedOperatingCostAudPerKmPerMwYear": 38.6,
+      "technicalLifeYears": 50
+    },
+    {
+      "fromRegionId": "TAS1",
+      "toRegionId": "VIC1",
+      "capacityMw": 594,
+      "capitalCostAudPerKmPerMw": 3860,
+      "fixedOperatingCostAudPerKmPerMwYear": 38.6,
+      "technicalLifeYears": 50
+    },
+    {
+      "fromRegionId": "VIC1",
+      "toRegionId": "TAS1",
+      "capacityMw": 478,
+      "capitalCostAudPerKmPerMw": 3860,
+      "fixedOperatingCostAudPerKmPerMwYear": 38.6,
+      "technicalLifeYears": 50
+    },
+    {
+      "fromRegionId": "VIC1",
+      "toRegionId": "SA1",
+      "capacityMw": 820,
+      "capitalCostAudPerKmPerMw": 3860,
+      "fixedOperatingCostAudPerKmPerMwYear": 38.6,
+      "technicalLifeYears": 50
+    },
+    {
+      "fromRegionId": "SA1",
+      "toRegionId": "VIC1",
+      "capacityMw": 750,
+      "capitalCostAudPerKmPerMw": 3860,
+      "fixedOperatingCostAudPerKmPerMwYear": 38.6,
+      "technicalLifeYears": 50
+    },
+    {
+      "fromRegionId": "NSW1",
+      "toRegionId": "SA1",
+      "capacityMw": 150,
+      "capitalCostAudPerKmPerMw": 3860,
+      "fixedOperatingCostAudPerKmPerMwYear": 38.6,
+      "technicalLifeYears": 50
+    },
+    {
+      "fromRegionId": "SA1",
+      "toRegionId": "NSW1",
+      "capacityMw": 150,
+      "capitalCostAudPerKmPerMw": 3860,
+      "fixedOperatingCostAudPerKmPerMwYear": 38.6,
+      "technicalLifeYears": 50
+    }
+  ],
+  "regions": [
+    {
+      "regionId": "NSW1",
+      "demandFile": "demand-nsw1.json",
+      "weatherFile": "weather-nsw1.json",
+      "storageFleets": [
+        {
+          "technology": "Battery",
+          "initialEnergyCapacityMwh": 5516.7,
+          "initialPowerCapacityMw": 944.3,
+          "costParameters": {
+            "powerCapitalCostAudPerMw": 470000,
+            "energyCapitalCostAudPerMwh": 250000,
+            "fixedOperatingCostAudPerMwYear": 15000
+          },
+          "technologyProfile": {
+            "technicalLifeYears": 20,
+            "roundTripEfficiency": 0.87
+          }
+        },
+        {
+          "technology": "PumpedHydro",
+          "initialEnergyCapacityMwh": 9680.0,
+          "initialPowerCapacityMw": 247.0,
+          "costParameters": {
+            "powerCapitalCostAudPerMw": 3903000,
+            "energyCapitalCostAudPerMwh": 69792,
+            "fixedOperatingCostAudPerMwYear": 20000
+          },
+          "technologyProfile": {
+            "technicalLifeYears": 80,
+            "roundTripEfficiency": 0.8
+          }
+        }
+      ],
+      "generatingFleets": [
+        {
+          "technology": "Solar",
+          "nameplateCapacityMw": 5356.2,
+          "costParameters": {
+            "capitalCostAudPerMw": 1516000,
+            "fixedOperatingCostAudPerMwYear": 12000,
+            "variableOperatingCostAudPerMwh": 0,
+            "fuelPriceAudPerGj": 0
+          },
+          "technologyProfile": {
+            "heatRateGjPerMwh": 0,
+            "technicalLifeYears": 30
+          }
+        },
+        {
+          "technology": "Wind",
+          "nameplateCapacityMw": 2430.0,
+          "costParameters": {
+            "capitalCostAudPerMw": 3248000,
+            "fixedOperatingCostAudPerMwYear": 29000,
+            "variableOperatingCostAudPerMwh": 0,
+            "fuelPriceAudPerGj": 0
+          },
+          "technologyProfile": {
+            "heatRateGjPerMwh": 0,
+            "technicalLifeYears": 25
+          }
+        },
+        {
+          "technology": "Hydro",
+          "nameplateCapacityMw": 2290.0,
+          "costParameters": {
+            "capitalCostAudPerMw": 3884000,
+            "fixedOperatingCostAudPerMwYear": 30000,
+            "variableOperatingCostAudPerMwh": 0,
+            "fuelPriceAudPerGj": 0
+          },
+          "technologyProfile": {
+            "heatRateGjPerMwh": 0,
+            "technicalLifeYears": 80
+          },
+          "monthlyCapacityFactors": [
+            {
+              "month": "2025-07-01",
+              "capacityFactor": 0.09536282375678666
+            },
+            {
+              "month": "2025-08-01",
+              "capacityFactor": 0.10710304694817772
+            },
+            {
+              "month": "2025-09-01",
+              "capacityFactor": 0.08931152279595322
+            },
+            {
+              "month": "2025-10-01",
+              "capacityFactor": 0.10791892888476357
+            },
+            {
+              "month": "2025-11-01",
+              "capacityFactor": 0.09934634082249376
+            },
+            {
+              "month": "2025-12-01",
+              "capacityFactor": 0.10514281112651044
+            },
+            {
+              "month": "2026-01-01",
+              "capacityFactor": 0.06835395289500341
+            },
+            {
+              "month": "2026-02-01",
+              "capacityFactor": 0.08905109146536029
+            },
+            {
+              "month": "2026-03-01",
+              "capacityFactor": 0.07438830046494674
+            },
+            {
+              "month": "2026-04-01",
+              "capacityFactor": 0.08490999868611221
+            },
+            {
+              "month": "2026-05-01",
+              "capacityFactor": 0.1228167211294349
+            },
+            {
+              "month": "2026-06-01",
+              "capacityFactor": 0.19643717426531773
+            }
+          ]
+        },
+        {
+          "technology": "Coal",
+          "nameplateCapacityMw": 4765.0,
+          "costParameters": {
+            "capitalCostAudPerMw": 6946000,
+            "fixedOperatingCostAudPerMwYear": 64851,
+            "variableOperatingCostAudPerMwh": 4.68,
+            "fuelPriceAudPerGj": 4.175
+          },
+          "technologyProfile": {
+            "heatRateGjPerMwh": 8.547,
+            "technicalLifeYears": 30
+          }
+        },
+        {
+          "technology": "Gas",
+          "nameplateCapacityMw": 2441.2,
+          "costParameters": {
+            "capitalCostAudPerMw": 2640000,
+            "fixedOperatingCostAudPerMwYear": 36000,
+            "variableOperatingCostAudPerMwh": 5,
+            "fuelPriceAudPerGj": 15.313
+          },
+          "technologyProfile": {
+            "heatRateGjPerMwh": 7.073,
+            "technicalLifeYears": 25
+          }
+        }
+      ]
+    },
+    {
+      "regionId": "QLD1",
+      "demandFile": "demand-qld1.json",
+      "weatherFile": "weather-qld1.json",
+      "storageFleets": [
+        {
+          "technology": "Battery",
+          "initialEnergyCapacityMwh": 4298.2,
+          "initialPowerCapacityMw": 2145.8,
+          "costParameters": {
+            "powerCapitalCostAudPerMw": 470000,
+            "energyCapitalCostAudPerMwh": 250000,
+            "fixedOperatingCostAudPerMwYear": 15000
+          },
+          "technologyProfile": {
+            "technicalLifeYears": 20,
+            "roundTripEfficiency": 0.87
+          }
+        },
+        {
+          "technology": "PumpedHydro",
+          "initialEnergyCapacityMwh": 6000.0,
+          "initialPowerCapacityMw": 570.0,
+          "costParameters": {
+            "powerCapitalCostAudPerMw": 2674000,
+            "energyCapitalCostAudPerMwh": 121000,
+            "fixedOperatingCostAudPerMwYear": 20000
+          },
+          "technologyProfile": {
+            "technicalLifeYears": 80,
+            "roundTripEfficiency": 0.8
+          }
+        }
+      ],
+      "generatingFleets": [
+        {
+          "technology": "Coal",
+          "nameplateCapacityMw": 6450.0,
+          "costParameters": {
+            "capitalCostAudPerMw": 6946000,
+            "fixedOperatingCostAudPerMwYear": 64851,
+            "variableOperatingCostAudPerMwh": 4.68,
+            "fuelPriceAudPerGj": 4.175
+          },
+          "technologyProfile": {
+            "heatRateGjPerMwh": 8.547,
+            "technicalLifeYears": 30
+          }
+        },
+        {
+          "technology": "Gas",
+          "nameplateCapacityMw": 3665.4,
+          "costParameters": {
+            "capitalCostAudPerMw": 2640000,
+            "fixedOperatingCostAudPerMwYear": 36000,
+            "variableOperatingCostAudPerMwh": 5,
+            "fuelPriceAudPerGj": 15.313
+          },
+          "technologyProfile": {
+            "heatRateGjPerMwh": 7.073,
+            "technicalLifeYears": 25
+          }
+        },
+        {
+          "technology": "Solar",
+          "nameplateCapacityMw": 3457.6,
+          "costParameters": {
+            "capitalCostAudPerMw": 1516000,
+            "fixedOperatingCostAudPerMwYear": 12000,
+            "variableOperatingCostAudPerMwh": 0,
+            "fuelPriceAudPerGj": 0
+          },
+          "technologyProfile": {
+            "heatRateGjPerMwh": 0,
+            "technicalLifeYears": 30
+          }
+        },
+        {
+          "technology": "Wind",
+          "nameplateCapacityMw": 1006.5,
+          "costParameters": {
+            "capitalCostAudPerMw": 3248000,
+            "fixedOperatingCostAudPerMwYear": 29000,
+            "variableOperatingCostAudPerMwh": 0,
+            "fuelPriceAudPerGj": 0
+          },
+          "technologyProfile": {
+            "heatRateGjPerMwh": 0,
+            "technicalLifeYears": 25
+          }
+        },
+        {
+          "technology": "Hydro",
+          "nameplateCapacityMw": 200.0,
+          "costParameters": {
+            "capitalCostAudPerMw": 3884000,
+            "fixedOperatingCostAudPerMwYear": 30000,
+            "variableOperatingCostAudPerMwh": 0,
+            "fuelPriceAudPerGj": 0
+          },
+          "technologyProfile": {
+            "heatRateGjPerMwh": 0,
+            "technicalLifeYears": 80
+          },
+          "monthlyCapacityFactors": [
+            {
+              "month": "2025-07-01",
+              "capacityFactor": 0.2553467386670456
+            },
+            {
+              "month": "2025-08-01",
+              "capacityFactor": 0.23560362488749942
+            },
+            {
+              "month": "2025-09-01",
+              "capacityFactor": 0.2540114109153206
+            },
+            {
+              "month": "2025-10-01",
+              "capacityFactor": 0.24742728909099523
+            },
+            {
+              "month": "2025-11-01",
+              "capacityFactor": 0.23680326113558492
+            },
+            {
+              "month": "2025-12-01",
+              "capacityFactor": 0.20401834351759748
+            },
+            {
+              "month": "2026-01-01",
+              "capacityFactor": 0.28495215764293497
+            },
+            {
+              "month": "2026-02-01",
+              "capacityFactor": 0.2631822621669813
+            },
+            {
+              "month": "2026-03-01",
+              "capacityFactor": 0.28794970631424377
+            },
+            {
+              "month": "2026-04-01",
+              "capacityFactor": 0.32923014561918745
+            },
+            {
+              "month": "2026-05-01",
+              "capacityFactor": 0.225278735019658
+            },
+            {
+              "month": "2026-06-01",
+              "capacityFactor": 0.20795093000489476
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "regionId": "SA1",
+      "demandFile": "demand-sa1.json",
+      "weatherFile": "weather-sa1.json",
+      "storageFleets": [
+        {
+          "technology": "Battery",
+          "initialEnergyCapacityMwh": 1328.9,
+          "initialPowerCapacityMw": 841.0,
+          "costParameters": {
+            "powerCapitalCostAudPerMw": 470000,
+            "energyCapitalCostAudPerMwh": 250000,
+            "fixedOperatingCostAudPerMwYear": 15000
+          },
+          "technologyProfile": {
+            "technicalLifeYears": 20,
+            "roundTripEfficiency": 0.87
+          }
+        }
+      ],
+      "generatingFleets": [
+        {
+          "technology": "Wind",
+          "nameplateCapacityMw": 2524.0,
+          "costParameters": {
+            "capitalCostAudPerMw": 3248000,
+            "fixedOperatingCostAudPerMwYear": 29000,
+            "variableOperatingCostAudPerMwh": 0,
+            "fuelPriceAudPerGj": 0
+          },
+          "technologyProfile": {
+            "heatRateGjPerMwh": 0,
+            "technicalLifeYears": 25
+          }
+        },
+        {
+          "technology": "Gas",
+          "nameplateCapacityMw": 1961.2,
+          "costParameters": {
+            "capitalCostAudPerMw": 2640000,
+            "fixedOperatingCostAudPerMwYear": 36000,
+            "variableOperatingCostAudPerMwh": 5,
+            "fuelPriceAudPerGj": 15.313
+          },
+          "technologyProfile": {
+            "heatRateGjPerMwh": 7.073,
+            "technicalLifeYears": 25
+          }
+        },
+        {
+          "technology": "Solar",
+          "nameplateCapacityMw": 514.4,
+          "costParameters": {
+            "capitalCostAudPerMw": 1516000,
+            "fixedOperatingCostAudPerMwYear": 12000,
+            "variableOperatingCostAudPerMwh": 0,
+            "fuelPriceAudPerGj": 0
+          },
+          "technologyProfile": {
+            "heatRateGjPerMwh": 0,
+            "technicalLifeYears": 30
+          }
+        }
+      ]
+    },
+    {
+      "regionId": "TAS1",
+      "demandFile": "demand-tas1.json",
+      "weatherFile": "weather-tas1.json",
+      "storageFleets": [
+        {
+          "technology": "Battery",
+          "initialEnergyCapacityMwh": 0,
+          "initialPowerCapacityMw": 0,
+          "costParameters": {
+            "powerCapitalCostAudPerMw": 470000,
+            "energyCapitalCostAudPerMwh": 250000,
+            "fixedOperatingCostAudPerMwYear": 15000
+          },
+          "technologyProfile": {
+            "technicalLifeYears": 20,
+            "roundTripEfficiency": 0.87
+          }
+        }
+      ],
+      "generatingFleets": [
+        {
+          "technology": "Hydro",
+          "nameplateCapacityMw": 2232.7,
+          "costParameters": {
+            "capitalCostAudPerMw": 3884000,
+            "fixedOperatingCostAudPerMwYear": 30000,
+            "variableOperatingCostAudPerMwh": 0,
+            "fuelPriceAudPerGj": 0
+          },
+          "technologyProfile": {
+            "heatRateGjPerMwh": 0,
+            "technicalLifeYears": 80
+          },
+          "monthlyCapacityFactors": [
+            {
+              "month": "2025-07-01",
+              "capacityFactor": 0.4189921937419904
+            },
+            {
+              "month": "2025-08-01",
+              "capacityFactor": 0.3751244334575381
+            },
+            {
+              "month": "2025-09-01",
+              "capacityFactor": 0.4028505596114321
+            },
+            {
+              "month": "2025-10-01",
+              "capacityFactor": 0.3854607782370639
+            },
+            {
+              "month": "2025-11-01",
+              "capacityFactor": 0.36937713679998807
+            },
+            {
+              "month": "2025-12-01",
+              "capacityFactor": 0.31464146549021366
+            },
+            {
+              "month": "2026-01-01",
+              "capacityFactor": 0.3327436138606471
+            },
+            {
+              "month": "2026-02-01",
+              "capacityFactor": 0.3335967342551299
+            },
+            {
+              "month": "2026-03-01",
+              "capacityFactor": 0.3615794271943272
+            },
+            {
+              "month": "2026-04-01",
+              "capacityFactor": 0.36316890859597
+            },
+            {
+              "month": "2026-05-01",
+              "capacityFactor": 0.42838339808448334
+            },
+            {
+              "month": "2026-06-01",
+              "capacityFactor": 0.468416416595751
+            }
+          ]
+        },
+        {
+          "technology": "Wind",
+          "nameplateCapacityMw": 561.6,
+          "costParameters": {
+            "capitalCostAudPerMw": 3248000,
+            "fixedOperatingCostAudPerMwYear": 29000,
+            "variableOperatingCostAudPerMwh": 0,
+            "fuelPriceAudPerGj": 0
+          },
+          "technologyProfile": {
+            "heatRateGjPerMwh": 0,
+            "technicalLifeYears": 25
+          }
+        },
+        {
+          "technology": "Gas",
+          "nameplateCapacityMw": 386.0,
+          "costParameters": {
+            "capitalCostAudPerMw": 2640000,
+            "fixedOperatingCostAudPerMwYear": 36000,
+            "variableOperatingCostAudPerMwh": 5,
+            "fuelPriceAudPerGj": 15.313
+          },
+          "technologyProfile": {
+            "heatRateGjPerMwh": 7.073,
+            "technicalLifeYears": 25
+          }
+        }
+      ]
+    },
+    {
+      "regionId": "VIC1",
+      "demandFile": "demand-vic1.json",
+      "weatherFile": "weather-vic1.json",
+      "storageFleets": [
+        {
+          "technology": "Battery",
+          "initialEnergyCapacityMwh": 3243.3,
+          "initialPowerCapacityMw": 1693.1,
+          "costParameters": {
+            "powerCapitalCostAudPerMw": 470000,
+            "energyCapitalCostAudPerMwh": 250000,
+            "fixedOperatingCostAudPerMwYear": 15000
+          },
+          "technologyProfile": {
+            "technicalLifeYears": 20,
+            "roundTripEfficiency": 0.87
+          }
+        }
+      ],
+      "generatingFleets": [
+        {
+          "technology": "Wind",
+          "nameplateCapacityMw": 5256.5,
+          "costParameters": {
+            "capitalCostAudPerMw": 3248000,
+            "fixedOperatingCostAudPerMwYear": 29000,
+            "variableOperatingCostAudPerMwh": 0,
+            "fuelPriceAudPerGj": 0
+          },
+          "technologyProfile": {
+            "heatRateGjPerMwh": 0,
+            "technicalLifeYears": 25
+          }
+        },
+        {
+          "technology": "Coal",
+          "nameplateCapacityMw": 3410.0,
+          "costParameters": {
+            "capitalCostAudPerMw": 10725000,
+            "fixedOperatingCostAudPerMwYear": 69000,
+            "variableOperatingCostAudPerMwh": 5.27,
+            "fuelPriceAudPerGj": 0.64
+          },
+          "technologyProfile": {
+            "heatRateGjPerMwh": 11.337,
+            "technicalLifeYears": 30
+          }
+        },
+        {
+          "technology": "Gas",
+          "nameplateCapacityMw": 2414.3,
+          "costParameters": {
+            "capitalCostAudPerMw": 2640000,
+            "fixedOperatingCostAudPerMwYear": 36000,
+            "variableOperatingCostAudPerMwh": 5,
+            "fuelPriceAudPerGj": 15.313
+          },
+          "technologyProfile": {
+            "heatRateGjPerMwh": 7.073,
+            "technicalLifeYears": 25
+          }
+        },
+        {
+          "technology": "Hydro",
+          "nameplateCapacityMw": 2238.2,
+          "costParameters": {
+            "capitalCostAudPerMw": 3884000,
+            "fixedOperatingCostAudPerMwYear": 30000,
+            "variableOperatingCostAudPerMwh": 0,
+            "fuelPriceAudPerGj": 0
+          },
+          "technologyProfile": {
+            "heatRateGjPerMwh": 0,
+            "technicalLifeYears": 80
+          },
+          "monthlyCapacityFactors": [
+            {
+              "month": "2025-07-01",
+              "capacityFactor": 0.08588217206222915
+            },
+            {
+              "month": "2025-08-01",
+              "capacityFactor": 0.1125596971182027
+            },
+            {
+              "month": "2025-09-01",
+              "capacityFactor": 0.10749304934961772
+            },
+            {
+              "month": "2025-10-01",
+              "capacityFactor": 0.10586328999586804
+            },
+            {
+              "month": "2025-11-01",
+              "capacityFactor": 0.06775022341376229
+            },
+            {
+              "month": "2025-12-01",
+              "capacityFactor": 0.08575004564367186
+            },
+            {
+              "month": "2026-01-01",
+              "capacityFactor": 0.09887860705122661
+            },
+            {
+              "month": "2026-02-01",
+              "capacityFactor": 0.1424794672113707
+            },
+            {
+              "month": "2026-03-01",
+              "capacityFactor": 0.10770104836307379
+            },
+            {
+              "month": "2026-04-01",
+              "capacityFactor": 0.07391892562804091
+            },
+            {
+              "month": "2026-05-01",
+              "capacityFactor": 0.17095356837422046
+            },
+            {
+              "month": "2026-06-01",
+              "capacityFactor": 0.19878860093337306
+            }
+          ]
+        },
+        {
+          "technology": "Solar",
+          "nameplateCapacityMw": 1268.4,
+          "costParameters": {
+            "capitalCostAudPerMw": 1516000,
+            "fixedOperatingCostAudPerMwYear": 12000,
+            "variableOperatingCostAudPerMwh": 0,
+            "fuelPriceAudPerGj": 0
+          },
+          "technologyProfile": {
+            "heatRateGjPerMwh": 0,
+            "technicalLifeYears": 30
+          }
+        }
+      ]
+    }
+  ]
+}
