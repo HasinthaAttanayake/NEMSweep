@@ -18,6 +18,15 @@ namespace NEM.Model.Simulation
     /// <summary>
     /// Represents a generation fleet's incremental dispatch capacity and short-run marginal cost
     /// for one dispatch interval. Cost is expressed in AUD per MWh generated.
+    ///
+    /// For conventional Hydro, <see cref="IncrementalGenerationHeadroom"/> is deliberately NOT
+    /// the fleet's full remaining monthly budget: it is capped to whatever of this interval's
+    /// causally-paced allowance (see <see cref="HydroReservationState"/>) hasn't already been
+    /// dispatched to local demand, and it never includes Hydro's reserve share at all (that
+    /// share is reachable only after storage, via <see cref="RegionalDispatchRun.DispatchHydroFallback"/>,
+    /// never through a policy decision). A policy that requests incremental generation from
+    /// Hydro is choosing to substitute it for local demand this interval, not drawing on budget
+    /// saved for a future peak.
     /// </summary>
     public readonly record struct GenerationFleetSnapshot(
         GenerationTechnology GenerationTechnology,

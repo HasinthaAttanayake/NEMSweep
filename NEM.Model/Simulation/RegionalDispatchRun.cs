@@ -11,6 +11,8 @@ internal sealed class RegionalDispatchRun
     private readonly FlowSeries _demand;
     private readonly TimeSpan _resolution;
     private readonly GeneratingFleet[] _generatingFleets;
+    private readonly GeneratingFleet? _hydroFleet;
+    private readonly HydroReservationState? _hydroReservation;
     private readonly Dictionary<GenerationTechnology, FlowSeries> _availableByTechnology;
     private readonly Dictionary<GenerationTechnology, GenerationBudgetState> _budgetByTechnology;
     private readonly Dictionary<GenerationTechnology, double[]> _generationMwByTechnology;
@@ -26,6 +28,8 @@ internal sealed class RegionalDispatchRun
     private int _currentIndex = -1;
     private DateTimeOffset _currentInstant;
     private Power _intervalDeficit;
+    private Power _currentResidualDemand;
+    private Power _hydroPacedCap;
 
     public RegionalDispatchRun(
         Region region,
@@ -35,16 +39,20 @@ internal sealed class RegionalDispatchRun
         _storagePolicy = storagePolicy;
         _demand = region.Demand.TotalDemand;
         _resolution = _demand.Resolution;
-        _generatingFleets = region.GeneratingFleets
-            .OrderBy(fleet => fleet.ShortRunMarginalCost)
-            .ThenBy(fleet => fleet.GenerationTechnology)
-            .ToArray();
+        _generatingFleets = GenerationMeritOrder.Sort(region.GeneratingFleets).ToArray();
+        _hydroFleet = _generatingFleets.SingleOrDefault(
+            fleet => fleet.GenerationTechnology == GenerationTechnology.Hydro);
+        _hydroReservation = _hydroFleet is null ? null : new HydroReservationState();
         _availableByTechnology = _generatingFleets.ToDictionary(
             fleet => fleet.GenerationTechnology,
             fleet => fleet.AvailableCapacityFor(region.ResourceProfile, _demand));
         _budgetByTechnology = _generatingFleets.ToDictionary(
             fleet => fleet.GenerationTechnology,
-            fleet => new GenerationBudgetState(fleet));
+            fleet => new GenerationBudgetState(
+                fleet,
+                fleet.GenerationTechnology == GenerationTechnology.Hydro
+                    ? HydroReservationState.ReserveFraction
+                    : 0));
         _generationMwByTechnology = CreateGenerationSeries();
         _curtailmentMwByTechnology = CreateGenerationSeries();
         _chargeMwByTechnology = CreateGenerationSeries();
@@ -52,7 +60,7 @@ internal sealed class RegionalDispatchRun
             fleet => fleet.StorageTechnology);
         _storageLevelByTechnology = region.StorageFleets.ToDictionary(
             fleet => fleet.StorageTechnology,
-            _ => Energy.Zero);
+            fleet => fleet.SeedEnergy);
         _stateOfChargeMwhByTechnology = region.StorageFleets.ToDictionary(
             fleet => fleet.StorageTechnology,
             _ => new double[_demand.Length]);
@@ -65,6 +73,16 @@ internal sealed class RegionalDispatchRun
     /// <summary>Quantities below this are treated as zero when reconciling transfers.</summary>
     private const double Tolerance = 1e-9;
 
+    /// <summary>
+    /// How much of a month must remain for Hydro's reserve share to still be worth holding
+    /// back as a last-resort backstop. Expressed as a duration rather than an interval count
+    /// so the behaviour is identical at hourly and sub-hourly resolution. Three days is long
+    /// enough for the pacer to place the released energy on real peaks - even a fleet
+    /// reserving 10% of a month runs well under nameplate over 72 hours - without giving up
+    /// the backstop for a materially long stretch of the month.
+    /// </summary>
+    private static readonly TimeSpan ReserveReleaseWindow = TimeSpan.FromDays(3);
+
     public string RegionId => _region.RegionId;
 
     public int Length => _demand.Length;
@@ -74,7 +92,19 @@ internal sealed class RegionalDispatchRun
 
     /// <summary>
     /// Opens an interval. Records the opening state of charge, which is what the outcome
-    /// reports, and must be called before any other step for that interval.
+    /// reports, and must be called before any other step for that interval. Also computes
+    /// this interval's residual demand (demand net of intermittent renewables) and Hydro's
+    /// paced offtake cap once, up front: residual demand is the only causal signal
+    /// <see cref="HydroReservationState"/> is allowed to see, and both are then reused
+    /// unchanged for the rest of the interval (generation, exports, storage charging) so
+    /// every phase paces Hydro against the same allowance.
+    ///
+    /// The cap must be settled here rather than recomputed per phase. Recomputing it later
+    /// in the interval would price it against a paced pool this interval's own local dispatch
+    /// has already drawn down, and against a trailing window this interval's own
+    /// <see cref="HydroReservationState.Observe"/> has already joined - so exports and storage
+    /// charging would silently see a smaller allowance than local demand did, for no modelled
+    /// reason.
     /// </summary>
     public void BeginInterval(int index)
     {
@@ -83,10 +113,66 @@ internal sealed class RegionalDispatchRun
         _currentIndex = index;
         _currentInstant = _demand.InstantAt(index);
         _intervalDeficit = Power.Zero;
+        _currentResidualDemand = ResidualDemandExcludingIntermittents(index);
+        ReleaseHydroReserveIfMonthIsEnding();
+        _hydroPacedCap = HydroPacedCap();
         RecordStateOfCharge(index);
     }
 
-    /// <summary>Dispatches generation in merit order and returns the unmet demand.</summary>
+    /// <summary>
+    /// Hands Hydro's unspent reserve share to the pacer once too little of the month remains
+    /// for a last-resort backstop to be worth holding. Unspent reserve expires at the month
+    /// boundary (see <see cref="GenerationBudgetState.ReleaseUnspentReserve"/>), so past this
+    /// point holding it only guarantees the energy is wasted, while releasing it lets the
+    /// pacer spend it on the window's highest residual-demand hours. The trade is a genuine
+    /// one - the final <see cref="ReserveReleaseWindow"/> of each month has no reserve-funded
+    /// backstop left - but the released energy re-enters merit order ahead of storage, so it
+    /// meets those hours' demand earlier rather than later. NEM-076.
+    /// </summary>
+    private void ReleaseHydroReserveIfMonthIsEnding()
+    {
+        if (_hydroFleet is null)
+        {
+            return;
+        }
+
+        int intervalsLeft = IntervalsLeftInMonth(_currentInstant, _resolution);
+        if (intervalsLeft > ReserveReleaseWindow / _resolution)
+        {
+            return;
+        }
+
+        _budgetByTechnology[_hydroFleet.GenerationTechnology]
+            .ReleaseUnspentReserve(_currentInstant);
+    }
+
+    /// <summary>
+    /// This interval's paced offtake cap for conventional Hydro, or <see cref="Power.Zero"/>
+    /// where the region has no Hydro fleet. Evaluated once per interval from
+    /// <see cref="BeginInterval"/>; every consumer reads the stored value.
+    /// </summary>
+    private Power HydroPacedCap()
+    {
+        if (_hydroFleet is null || _hydroReservation is null)
+        {
+            return Power.Zero;
+        }
+
+        GenerationTechnology technology = _hydroFleet.GenerationTechnology;
+        return _hydroReservation.OfftakeCap(
+            _hydroFleet.NameplateCapacity,
+            _budgetByTechnology[technology].PacedRemaining(_currentInstant),
+            IntervalsLeftInMonth(_currentInstant, _resolution),
+            _currentResidualDemand,
+            _resolution);
+    }
+
+    /// <summary>
+    /// Dispatches generation in merit order and returns the unmet demand. Conventional
+    /// Hydro's request is paced against its monthly budget by
+    /// <see cref="HydroReservationState"/> rather than dispatched greedily - see
+    /// <see cref="DispatchGeneration(int, DateTimeOffset)"/>.
+    /// </summary>
     public Power DispatchGeneration()
     {
         RequireOpenInterval();
@@ -98,7 +184,10 @@ internal sealed class RegionalDispatchRun
     /// Power this region could deliver to another region: renewable output already being
     /// spilled, plus headroom on dispatchable plant that could be started to serve an
     /// export. Pumped hydro is excluded because it is storage, and storage is decided
-    /// after transfer.
+    /// after transfer. Conventional Hydro's incremental headroom here is paced exactly like
+    /// its local dispatch (see <see cref="IncrementalHeadroom"/>) - serving an export can
+    /// substitute for local demand this interval, but never draws on budget beyond what
+    /// pacing would have allowed locally anyway.
     /// </summary>
     public Power ExportableSurplus()
     {
@@ -174,7 +263,8 @@ internal sealed class RegionalDispatchRun
 
     /// <summary>
     /// Runs the storage policy against whatever deficit or surplus remains after transfer,
-    /// and books the leftover deficit as unserved energy.
+    /// dispatches Hydro's reserve share as a final backstop against whatever deficit storage
+    /// could not cover, and books the leftover deficit as unserved energy.
     /// </summary>
     public void CompleteInterval()
     {
@@ -182,16 +272,49 @@ internal sealed class RegionalDispatchRun
         Power surplus = Power.FromMegawatts(
             _curtailmentMwByTechnology.Values.Sum(values => values[_currentIndex]));
         StorageDecision decision = _storagePolicy.Decide(
-            CreateStorageContext(_currentIndex, _currentInstant, _intervalDeficit, surplus))
+            CreateStorageContext(_intervalDeficit, surplus))
             ?? throw new InvalidOperationException("Storage policy returned no decision.");
 
-        _unservedMw[_currentIndex] = ExecuteStorage(
+        Power remainingDeficit = ExecuteStorage(
             _currentIndex,
             _currentInstant,
             _intervalDeficit,
             surplus,
-            decision).Megawatts;
+            decision);
+        remainingDeficit = DispatchHydroFallback(_currentIndex, remainingDeficit);
+
+        _unservedMw[_currentIndex] = remainingDeficit.Megawatts;
         _currentIndex = -1;
+    }
+
+    /// <summary>
+    /// Dispatches conventional Hydro's RESERVE share (see <see cref="GenerationBudgetState"/>,
+    /// <see cref="HydroReservationState.ReserveFraction"/>) as a final, local-only backstop
+    /// for whatever deficit storage could not cover this interval. By the time this runs,
+    /// generation, transfer, and storage have already completed for the interval, so this
+    /// energy can never be exported or used to charge storage. This is the true last-resort
+    /// share; the other 90% of the budget is paced through normal merit-order dispatch (see
+    /// <see cref="DispatchGeneration(int, DateTimeOffset)"/>) rather than held back
+    /// entirely - see <see cref="StorageSeedPolicy"/> for the paired storage-seed assumption.
+    /// NEM-076.
+    /// </summary>
+    private Power DispatchHydroFallback(int index, Power remainingDeficit)
+    {
+        if (_hydroFleet is null || remainingDeficit <= Power.Zero)
+        {
+            return remainingDeficit;
+        }
+
+        GenerationTechnology technology = _hydroFleet.GenerationTechnology;
+        GenerationBudgetState budget = _budgetByTechnology[technology];
+        Power generated = Power.FromMegawatts(_generationMwByTechnology[technology][index]);
+        Power available = _availableByTechnology[technology][index];
+        Power requested = Power.Min(
+            remainingDeficit,
+            budget.ReserveHeadroom(available, generated, _currentInstant, _resolution));
+        Power delivered = budget.TakeReserve(requested, _currentInstant, _resolution);
+        _generationMwByTechnology[technology][index] += delivered.Megawatts;
+        return remainingDeficit - delivered;
     }
 
     private void RequireOpenInterval()
@@ -203,12 +326,39 @@ internal sealed class RegionalDispatchRun
         }
     }
 
-    private Power IncrementalHeadroom(GenerationTechnology technology) =>
-        _budgetByTechnology[technology].Headroom(
+    /// <summary>
+    /// Incremental generation headroom available this interval - used for exports and
+    /// storage's incremental-generation charging. For conventional Hydro this is capped to
+    /// whatever of this interval's paced allowance (see <see cref="HydroReservationState"/>)
+    /// hasn't already been dispatched locally, not the full remaining paced-pool budget. That
+    /// is a deliberate choice, not an oversight: without it, an export or a battery charge
+    /// could drain budget paced for a future local peak, since neither is metered against
+    /// residual demand the way local dispatch is. The allowance is the one settled in
+    /// <see cref="BeginInterval"/>, so exports and storage charging see exactly what local
+    /// demand saw. The reserve share
+    /// (<see cref="GenerationBudgetState.ReserveHeadroom"/>) is never included here at all -
+    /// it is reachable only from <see cref="DispatchHydroFallback"/>, after storage.
+    /// </summary>
+    private Power IncrementalHeadroom(GenerationTechnology technology)
+    {
+        Power rawHeadroom = _budgetByTechnology[technology].Headroom(
             _availableByTechnology[technology][_currentIndex],
             Power.FromMegawatts(_generationMwByTechnology[technology][_currentIndex]),
             _currentInstant,
             _resolution);
+
+        if (technology != GenerationTechnology.Hydro || _hydroReservation is null)
+        {
+            return rawHeadroom;
+        }
+
+        Power alreadyDispatched = Power.FromMegawatts(
+            _generationMwByTechnology[technology][_currentIndex]);
+        Power remainingPacedThisInterval = Power.Max(
+            Power.Zero,
+            _hydroPacedCap - alreadyDispatched);
+        return Power.Min(rawHeadroom, remainingPacedThisInterval);
+    }
 
     /// <summary>
     /// Moves spilled renewable output into exports, cheapest first. Generation is
@@ -289,6 +439,45 @@ internal sealed class RegionalDispatchRun
             fleet => fleet.GenerationTechnology,
             _ => new double[_demand.Length]);
 
+    /// <summary>
+    /// This interval's demand net of intermittent-renewable availability - the only signal
+    /// <see cref="HydroReservationState"/> is allowed to see. Computed once per interval in
+    /// <see cref="BeginInterval"/>, before any generation is dispatched, so it never depends
+    /// on dispatch order or on anything beyond the interval itself.
+    /// </summary>
+    private Power ResidualDemandExcludingIntermittents(int index)
+    {
+        Power residual = _demand[index];
+        foreach (GeneratingFleet fleet in _generatingFleets)
+        {
+            if (fleet.IsIntermittentRenewable)
+            {
+                residual -= _availableByTechnology[fleet.GenerationTechnology][index];
+            }
+        }
+
+        return Power.Max(Power.Zero, residual);
+    }
+
+    /// <summary>Whole intervals remaining in <paramref name="instant"/>'s calendar month, including it.</summary>
+    private static int IntervalsLeftInMonth(DateTimeOffset instant, TimeSpan resolution)
+    {
+        var monthEndExclusive = new DateTimeOffset(
+            instant.Year, instant.Month, 1, 0, 0, 0, instant.Offset).AddMonths(1);
+        TimeSpan remaining = monthEndExclusive - instant;
+        return (int)Math.Round(remaining / resolution);
+    }
+
+    /// <summary>
+    /// Dispatches generation in merit order against local demand. Conventional Hydro's
+    /// request is capped by <see cref="HydroReservationState"/> at
+    /// <c>max(0, residualDemand - T)</c> for a threshold T paced against its remaining
+    /// monthly budget (see <see cref="ResidualDemandExcludingIntermittents"/>,
+    /// <see cref="HydroReservationState.OfftakeCap"/>) - a deliberate, causal departure from
+    /// pure merit-order greed for this one technology, not a change to the ordering itself.
+    /// The current interval's residual demand is recorded via <see cref="HydroReservationState.Observe"/>
+    /// at the end, for future intervals' pacing only.
+    /// </summary>
     private Power DispatchGeneration(int index, DateTimeOffset instant)
     {
         Power remainingDemand = _demand[index];
@@ -297,8 +486,15 @@ internal sealed class RegionalDispatchRun
             GenerationTechnology technology = fleet.GenerationTechnology;
             Power available = _availableByTechnology[technology][index];
             GenerationBudgetState budget = _budgetByTechnology[technology];
+            Power demandCap = Power.Max(Power.Zero, remainingDemand);
+
+            if (technology == GenerationTechnology.Hydro && _hydroReservation is not null)
+            {
+                demandCap = Power.Min(demandCap, _hydroPacedCap);
+            }
+
             Power requested = Power.Min(
-                Power.Max(Power.Zero, remainingDemand),
+                demandCap,
                 budget.Headroom(available, Power.Zero, instant, _resolution));
             Power delivered = budget.Take(requested, instant, _resolution);
 
@@ -311,14 +507,17 @@ internal sealed class RegionalDispatchRun
             remainingDemand -= delivered;
         }
 
+        _hydroReservation?.Observe(_currentResidualDemand);
         return remainingDemand;
     }
 
-    private DispatchContext CreateStorageContext(
-        int index,
-        DateTimeOffset instant,
-        Power remainingDemand,
-        Power surplus)
+    /// <summary>
+    /// Snapshots the open interval for the storage policy. Reads the interval's own state
+    /// directly (<see cref="IncrementalHeadroom"/> and the storage levels are already scoped
+    /// to it), so it takes no index or instant - passing one that disagreed with the open
+    /// interval would have been silently ignored.
+    /// </summary>
+    private DispatchContext CreateStorageContext(Power remainingDemand, Power surplus)
     {
         Power residual = remainingDemand > Power.Zero
             ? remainingDemand
@@ -339,12 +538,7 @@ internal sealed class RegionalDispatchRun
                 fleet.GenerationTechnology,
                 fleet.IsIntermittentRenewable
                     ? Power.Zero
-                    : _budgetByTechnology[fleet.GenerationTechnology].Headroom(
-                        _availableByTechnology[fleet.GenerationTechnology][index],
-                        Power.FromMegawatts(
-                            _generationMwByTechnology[fleet.GenerationTechnology][index]),
-                        instant,
-                        _resolution),
+                    : IncrementalHeadroom(fleet.GenerationTechnology),
                 fleet.ShortRunMarginalCost))
             .ToArray();
 
@@ -459,15 +653,9 @@ internal sealed class RegionalDispatchRun
                 $"Storage policy named unknown generation source {sourceTechnology}.");
         }
 
-        Power generated = Power.FromMegawatts(
-            _generationMwByTechnology[sourceTechnology][index]);
         Power sourceHeadroom = sourceFleet.IsIntermittentRenewable
             ? Power.Zero
-            : _budgetByTechnology[sourceTechnology].Headroom(
-                _availableByTechnology[sourceTechnology][index],
-                generated,
-                instant,
-                _resolution);
+            : IncrementalHeadroom(sourceTechnology);
         requestedCharge = Power.Min(requestedCharge, sourceHeadroom);
         if (requestedCharge == Power.Zero)
         {

@@ -135,7 +135,7 @@ namespace NEM.Model.Tests.Grid
         public void WithBatteryStorage_IntroducesBatteryAndPreservesDemandAndFixedStorage()
         {
             FlowSeries additiveDemand = HourlyFlow(20);
-            var pumpedHydro = Storage(StorageTechnology.PumpedHydro);
+            var pumpedHydro = Storage(StorageTechnology.PumpedHydro, seedEnergyMwh: 80);
             var region = new Region(
                 "NSW1",
                 [Fleet(GenerationTechnology.Coal)],
@@ -157,6 +157,27 @@ namespace NEM.Model.Tests.Grid
             sized.Demand.BaseDemand.Should().BeSameAs(region.Demand.BaseDemand);
             sized.Demand.AdditiveComponents.Should().ContainEquivalentOf(
                 new DemandComponent("DataCentre", additiveDemand));
+            StorageFleet pumpedHydroAfterSizing = sized.StorageFleets.Single(
+                fleet => fleet.StorageTechnology == StorageTechnology.PumpedHydro);
+            pumpedHydroAfterSizing.Should().BeSameAs(pumpedHydro);
+            pumpedHydroAfterSizing.SeedEnergy.Should().Be(Energy.FromMegawattHours(80));
+        }
+
+        [Fact]
+        public void WithBatteryStorage_IntroducingBatteryFromScratch_SeedsAtZero()
+        {
+            var region = new Region(
+                "NSW1",
+                [Fleet(GenerationTechnology.Coal)],
+                HourlyFlow(100),
+                storageTechnologyProfiles: BatteryProfiles());
+
+            Region sized = region.WithBatteryStorage(
+                Energy.FromMegawattHours(120),
+                Power.FromMegawatts(30));
+
+            sized.StorageFleets.Should().ContainSingle()
+                .Which.SeedEnergy.Should().Be(Energy.Zero);
         }
 
         [Fact]
@@ -177,6 +198,29 @@ namespace NEM.Model.Tests.Grid
             sized.StorageFleets[0].Should().NotBeSameAs(existingBattery);
             sized.StorageFleets[0].StorageCapacity.Should().Be(Energy.FromMegawattHours(240));
             sized.StorageFleets[0].PowerCapacity.Should().Be(Power.FromMegawatts(60));
+        }
+
+        [Fact]
+        public void WithBatteryStorage_CarriesForwardExistingBatterySeedEnergyUnchanged()
+        {
+            var existingBattery = Storage(StorageTechnology.Battery, seedEnergyMwh: 50);
+            var region = new Region(
+                "NSW1",
+                [Fleet(GenerationTechnology.Coal)],
+                HourlyFlow(100),
+                storageFleets: [existingBattery]);
+
+            Region grown = region.WithBatteryStorage(
+                Energy.FromMegawattHours(240),
+                Power.FromMegawatts(60));
+            Region grownAgain = grown.WithBatteryStorage(
+                Energy.FromMegawattHours(480),
+                Power.FromMegawatts(120));
+
+            grown.StorageFleets.Should().ContainSingle()
+                .Which.SeedEnergy.Should().Be(Energy.FromMegawattHours(50));
+            grownAgain.StorageFleets.Should().ContainSingle()
+                .Which.SeedEnergy.Should().Be(Energy.FromMegawattHours(50));
         }
 
         [Fact]
@@ -202,12 +246,13 @@ namespace NEM.Model.Tests.Grid
         private static GeneratingFleet Fleet(GenerationTechnology technology) =>
             new(technology, Power.FromMegawatts(100));
 
-        private static StorageFleet Storage(StorageTechnology technology) =>
+        private static StorageFleet Storage(StorageTechnology technology, double seedEnergyMwh = 0) =>
             new(
                 technology,
                 Energy.FromMegawattHours(100),
                 Power.FromMegawatts(50),
-                BatteryProfile());
+                BatteryProfile(),
+                Energy.FromMegawattHours(seedEnergyMwh));
 
         private static StorageTechnologyProfile BatteryProfile() => new(15u, 0.87);
 

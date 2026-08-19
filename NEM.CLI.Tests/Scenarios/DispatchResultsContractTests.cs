@@ -275,7 +275,8 @@ public sealed class DispatchResultsContractTests
                             StorageTechnology.Battery,
                             Energy.FromMegawattHours(120),
                             Power.FromMegawatts(30),
-                            new StorageTechnologyProfile(15u, 0.87)),
+                            new StorageTechnologyProfile(15u, 0.87),
+                            Energy.Zero),
                     ]
                     : [])]);
 

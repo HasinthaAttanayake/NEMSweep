@@ -4,11 +4,20 @@ namespace NEM.Model.Grid
 {
     public sealed class StorageFleet
     {
+        /// <param name="seedEnergy">
+        /// Energy this fleet opens a dispatch run with. Required, not defaulted: a silent
+        /// default (even one that looked like a sensible fallback) is exactly the cold-start
+        /// bug <see cref="StorageSeedPolicy"/> exists to fix, so every construction site must
+        /// state its intent - <see cref="StorageSeedPolicy.SeedFor"/> for an installed fleet,
+        /// <c>Energy.Zero</c> where a seed genuinely isn't wanted (e.g. a test isolating other
+        /// behaviour).
+        /// </param>
         public StorageFleet(
             StorageTechnology storageTechnology,
             Energy storageCapacity,
             Power powerCapacity,
-            StorageTechnologyProfile technologyProfile)
+            StorageTechnologyProfile technologyProfile,
+            Energy seedEnergy)
         {
             ArgumentNullException.ThrowIfNull(technologyProfile);
             if (storageCapacity <= Energy.Zero)
@@ -27,10 +36,19 @@ namespace NEM.Model.Grid
                     "Power capacity must be positive.");
             }
 
+            if (seedEnergy < Energy.Zero || seedEnergy > storageCapacity)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(seedEnergy),
+                    seedEnergy.MegawattHours,
+                    "Seed energy must be within storage capacity.");
+            }
+
             StorageTechnology = storageTechnology;
             StorageCapacity = storageCapacity;
             PowerCapacity = powerCapacity;
             TechnologyProfile = technologyProfile;
+            SeedEnergy = seedEnergy;
         }
 
         /// <summary>Storage duration determined by this fleet's energy and power capacities.</summary>
@@ -40,6 +58,12 @@ namespace NEM.Model.Grid
         public Energy StorageCapacity { get; }
         public Power PowerCapacity { get; }
         public StorageTechnologyProfile TechnologyProfile { get; }
+        /// <summary>
+        /// Assumed energy level this fleet opens a dispatch run with. Zero unless set from
+        /// installed capacity via <see cref="StorageSeedPolicy"/>; see that type for the
+        /// assumption. Fixed at construction and never recomputed as capacity is resized.
+        /// </summary>
+        public Energy SeedEnergy { get; }
 
         /// <summary>
         /// Advances storage over an interval. Positive requested flow discharges to the

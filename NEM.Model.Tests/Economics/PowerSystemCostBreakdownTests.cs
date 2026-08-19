@@ -507,7 +507,8 @@ public sealed class PowerSystemCostBreakdownTests
                 StorageTechnology.Battery,
                 storageEnergy.Value,
                 storagePower.Value,
-                new StorageTechnologyProfile(15u, 0.87))];
+                new StorageTechnologyProfile(15u, 0.87),
+                Energy.Zero)];
         var system = new PowerSystem(
             new PowerSystemId("cost-breakdown-system"),
             new ScenarioId("cost-breakdown-scenario"),

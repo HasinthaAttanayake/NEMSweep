@@ -130,13 +130,26 @@ namespace NEM.Model.Grid
                     $"Region {RegionId} has no configured Battery technology profile.");
             }
 
+            // Seed energy is fixed at whatever the Battery already carries (Energy.Zero if
+            // this region has never had one) - resizing must never change it. See
+            // StorageSeedPolicy for why. Clamped to the new capacity: growth never needs this
+            // (StorageSizingSearch never refines below installed capacity today), but nothing
+            // enforces that dependency, and refinement shrinking capacity below the seed would
+            // otherwise leave the fleet opening above 100% state of charge.
+            Energy seedEnergy = Energy.Min(
+                StorageFleets
+                    .SingleOrDefault(fleet => fleet.StorageTechnology == StorageTechnology.Battery)
+                    ?.SeedEnergy ?? Energy.Zero,
+                storageCapacity);
+
             StorageFleet[] storageFleets = StorageFleets
                 .Where(fleet => fleet.StorageTechnology != StorageTechnology.Battery)
                 .Append(new StorageFleet(
                     StorageTechnology.Battery,
                     storageCapacity,
                     powerCapacity,
-                    technologyProfile))
+                    technologyProfile,
+                    seedEnergy))
                 .ToArray();
 
             return new Region(

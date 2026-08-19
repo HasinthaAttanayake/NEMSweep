@@ -19,11 +19,17 @@ namespace NEM.Model.Tests.Simulation
         [Fact]
         public void Dispatch_HandComputedThreeHourCase_MatchesExactly()
         {
+            // Hydro is deliberately excluded from this fleet set: its request is paced against
+            // a calendar-month budget by HydroReservationState (see that type and
+            // GenerationMeritOrderTests), so its output over just 3 hours depends on the
+            // pacer's bisection/warm-up arithmetic, not simple by-hand merit-order division -
+            // see HydroReservationStateTests and Dispatch_PacedHydro_* below for that. This
+            // test stays focused on straightforward merit-order arithmetic for the rest of the
+            // fleet.
             GeneratingFleet[] fleets =
             [
                 Fleet(GenerationTechnology.Gas, 50),
                 Fleet(GenerationTechnology.Coal, 40),
-                Fleet(GenerationTechnology.Hydro, 30),
                 Fleet(GenerationTechnology.Wind, 10),
                 Fleet(GenerationTechnology.Solar, 20),
             ];
@@ -39,13 +45,12 @@ namespace NEM.Model.Tests.Simulation
             outcome.RegionId.Should().Be("NSW1");
             AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Solar], 20, 20, 20);
             AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Wind], 10, 10, 10);
-            AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Hydro], 0, 30, 30);
-            AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Coal], 0, 15, 40);
-            AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Gas], 0, 0, 50);
+            AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Coal], 0, 40, 40);
+            AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Gas], 0, 5, 50);
             AssertSeries(outcome.PerFleetCurtailment[GenerationTechnology.Solar], 10, 0, 0);
             AssertSeries(outcome.PerFleetCurtailment[GenerationTechnology.Wind], 10, 0, 0);
             AssertSeries(outcome.Curtailment, 20, 0, 0);
-            AssertSeries(outcome.Unserved, 0, 0, 30);
+            AssertSeries(outcome.Unserved, 0, 0, 60);
         }
 
         [Fact]
@@ -101,11 +106,15 @@ namespace NEM.Model.Tests.Simulation
         [InlineData(2026)]
         public void Dispatch_FullMonth_PreservesIntervalEnergyBalance(int seed)
         {
+            // Hydro is deliberately excluded: HydroReservationState paces its request against
+            // a calendar-month budget (see that type), so recomputing its expected output here
+            // would mean re-implementing the pacer's bisection/warm-up logic rather than
+            // testing merit-order balance - covered separately by HydroReservationStateTests
+            // and the full-year utilisation test below.
             GeneratingFleet[] fleets =
             [
                 Fleet(GenerationTechnology.Gas, 1_500),
                 Fleet(GenerationTechnology.Coal, 1_250),
-                Fleet(GenerationTechnology.Hydro, 1_000),
                 Fleet(GenerationTechnology.Wind, 750),
                 Fleet(GenerationTechnology.Solar, 500),
             ];
@@ -132,9 +141,7 @@ namespace NEM.Model.Tests.Simulation
                 double generation = 0;
                 double expectedCurtailment = 0;
 
-                foreach (GeneratingFleet fleet in fleets
-                    .OrderBy(fleet => fleet.ShortRunMarginalCost)
-                    .ThenBy(fleet => fleet.GenerationTechnology))
+                foreach (GeneratingFleet fleet in GenerationMeritOrder.Sort(fleets))
                 {
                     double fleetOutput = outcome.PerFleetGeneration[fleet.GenerationTechnology][hour].Megawatts;
                     double available = availableByFleet[fleet.GenerationTechnology][hour].Megawatts;
@@ -321,8 +328,8 @@ namespace NEM.Model.Tests.Simulation
 
             DispatchOutcome outcome = Dispatch(region);
 
-            outcome.PerFleetGeneration[GenerationTechnology.Hydro].Integrate()
-                .Should().Be(Energy.FromMegawattHours(1_200));
+            outcome.PerFleetGeneration[GenerationTechnology.Hydro].Integrate().MegawattHours
+                .Should().BeApproximately(1_200, 1e-6);
         }
 
         [Fact]
@@ -448,6 +455,28 @@ namespace NEM.Model.Tests.Simulation
                 .Should().Be(Energy.Zero);
             outcome.StateOfChargeByTechnology[StorageTechnology.Battery][1]
                 .Should().Be(Energy.FromMegawattHours(17.4));
+        }
+
+        [Fact]
+        public void Dispatch_SeededStorage_OpensIntervalZeroAtSeedLevelNotZero()
+        {
+            FlowSeries demand = HourlyFlowAt(NemStart.AddHours(12), 0);
+            var seededBattery = new StorageFleet(
+                StorageTechnology.Battery,
+                Energy.FromMegawattHours(100),
+                Power.FromMegawatts(20),
+                new StorageTechnologyProfile(15u, 0.87),
+                Energy.FromMegawattHours(40));
+            var region = new Region(
+                "NSW1",
+                [Fleet(GenerationTechnology.Coal, 100)],
+                demand,
+                storageFleets: [seededBattery]);
+
+            DispatchOutcome outcome = Dispatch(region);
+
+            outcome.StateOfChargeByTechnology[StorageTechnology.Battery][0]
+                .Should().Be(Energy.FromMegawattHours(40));
         }
 
         [Fact]
@@ -629,20 +658,23 @@ namespace NEM.Model.Tests.Simulation
         }
 
         [Fact]
-        public void Dispatch_IncrementalHydroChargingConsumesMonthlyEnergyBudget()
+        public void Dispatch_PolicyNamesHydroAsIncrementalChargeSource_ChargesUpToPacedAllowance()
         {
-            FlowSeries demand = HourlyFlow(0, 10);
-            const double hydroCapacityMw = 10;
+            // Hydro's incremental headroom is capped to the SAME per-interval pace as local
+            // dispatch (see RegionalDispatchRun.IncrementalHeadroom), not excluded outright.
+            // Giving Hydro a higher SRMC than Coal means Coal covers all of this interval's
+            // local demand before Hydro's turn, so Hydro's local dispatch is 0 even though its
+            // paced allowance for the interval (computed from residual demand alone - Coal's
+            // contribution is invisible to it) is comfortably above the requested charge.
+            FlowSeries demand = HourlyFlowAt(NemStart.AddHours(12), 20);
             var hydro = new GeneratingFleet(
                 GenerationTechnology.Hydro,
-                Power.FromMegawatts(hydroCapacityMw),
-                new Dictionary<DateOnly, double>
-                {
-                    [new DateOnly(2026, 7, 1)] = 10.0 / (hydroCapacityMw * 31 * 24),
-                });
+                Power.FromMegawatts(100),
+                new Dictionary<DateOnly, double> { [new DateOnly(2026, 7, 1)] = 1 },
+                shortRunMarginalCost: GenerationEnergyCost.FromAudPerMwhGenerated(50));
             var region = new Region(
                 "NSW1",
-                [hydro],
+                [Fleet(GenerationTechnology.Coal, 100, shortRunMarginalCostAudPerMwh: 1), hydro],
                 demand,
                 storageFleets: [Battery(storageCapacityMwh: 20, powerCapacityMw: 10)]);
             var policy = new IncrementalGenerationChargingPolicy(
@@ -651,10 +683,190 @@ namespace NEM.Model.Tests.Simulation
 
             DispatchOutcome outcome = Dispatch(region, policy);
 
-            AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Hydro], 10, 0);
-            AssertSeries(outcome.Charge, 10, 0);
-            outcome.Discharge[1].Megawatts.Should().BeApproximately(8.7, 1e-10);
-            outcome.Unserved[1].Megawatts.Should().BeApproximately(1.3, 1e-10);
+            AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Coal], 20);
+            AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Hydro], 10);
+            AssertSeries(outcome.Charge, 10);
+            AssertSeries(outcome.Unserved, 0);
+        }
+
+        [Fact]
+        public void Dispatch_HydroFallback_ReserveCoversWhateverPacedDispatchAndStorageCouldNot()
+        {
+            // A 744 MWh July budget makes the paced share's warm-up pace a clean 0.9 MW
+            // (90% * 744 MWh / 744 intervals left in the month at hour 0 - see
+            // HydroReservationState). Demand (20 MW) exceeds paced dispatch (0.9 MW) plus the
+            // fully-charged battery's discharge headroom (5 MW), so the 4.4% reserve share
+            // (74.4 MWh, effectively unconstrained for one hour) closes the rest via
+            // RegionalDispatchRun.DispatchHydroFallback - the true last-resort backstop this
+            // change preserves from the sort-based version.
+            FlowSeries demand = HourlyFlow(20);
+            var hydro = new GeneratingFleet(
+                GenerationTechnology.Hydro,
+                Power.FromMegawatts(100),
+                new Dictionary<DateOnly, double> { [new DateOnly(2026, 7, 1)] = 744.0 / (100 * 31 * 24) });
+            var region = new Region(
+                "NSW1",
+                [hydro],
+                demand,
+                storageFleets: [SeededBattery(storageCapacityMwh: 20, powerCapacityMw: 5)]);
+
+            DispatchOutcome outcome = Dispatch(region);
+
+            outcome.PerFleetGeneration[GenerationTechnology.Hydro][0].Megawatts
+                .Should().BeApproximately(15, 1e-9);
+            AssertSeries(outcome.Discharge, 5);
+            AssertSeries(outcome.Unserved, 0);
+        }
+
+        [Fact]
+        public void Dispatch_HydroFallback_ReserveNotTouchedWhenPacedDispatchAndStorageAreEnough()
+        {
+            FlowSeries demand = HourlyFlow(5);
+            var hydro = new GeneratingFleet(
+                GenerationTechnology.Hydro,
+                Power.FromMegawatts(100),
+                new Dictionary<DateOnly, double> { [new DateOnly(2026, 7, 1)] = 744.0 / (100 * 31 * 24) });
+            var region = new Region(
+                "NSW1",
+                [hydro],
+                demand,
+                storageFleets: [SeededBattery(storageCapacityMwh: 20, powerCapacityMw: 5)]);
+
+            DispatchOutcome outcome = Dispatch(region);
+
+            // If the reserve had contributed anything, Hydro's total would exceed the 0.9 MW
+            // paced (warm-up-pace-bound) share alone.
+            AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Hydro], 0.9);
+            AssertSeries(outcome.Discharge, 4.1);
+            AssertSeries(outcome.Unserved, 0);
+        }
+
+        [Fact]
+        public void Dispatch_FullMonth_HydroDeliversMostOfItsBudgetWhenDemandIsPersistent()
+        {
+            // The regression test for the finding that made this change necessary: nothing
+            // previously asserted that a budgeted fleet actually USES a reasonable share of
+            // its monthly budget, only that it never exceeds it - so dispatching Hydro
+            // strictly after storage (an earlier version of this change) silently stranded
+            // ~93% of it and nothing caught that. A modest budget against persistently-high
+            // demand (NSW1/QLD1/VIC1's hydro is a peaking reserve at well under 5% of demand -
+            // see docs/domain-model.md) means the pacer always has somewhere to spend it, so
+            // utilisation should end up close to 100%, not near zero. NEM-076.
+            var random = new Random(4);
+            double[] demand = Enumerable.Range(0, HoursInJuly)
+                .Select(_ => 200.0 + random.Next(0, 100))
+                .ToArray();
+            const double hydroCapacityMw = 50;
+            const double capacityFactor = 0.3;
+            var hydro = new GeneratingFleet(
+                GenerationTechnology.Hydro,
+                Power.FromMegawatts(hydroCapacityMw),
+                new Dictionary<DateOnly, double> { [new DateOnly(2026, 7, 1)] = capacityFactor });
+            var region = new Region(
+                "NSW1",
+                [hydro, Fleet(GenerationTechnology.Gas, 400)],
+                HourlyFlow(demand));
+
+            DispatchOutcome outcome = Dispatch(region);
+
+            double allocatedBudgetMwh = hydroCapacityMw * HoursInJuly * capacityFactor;
+            double deliveredMwh = outcome.PerFleetGeneration[GenerationTechnology.Hydro]
+                .Integrate().MegawattHours;
+
+            // Ample Gas backup means the deficit never reaches DispatchHydroFallback, so only
+            // the 90% paced pool is ever spent (and not quite fully, since the bisection still
+            // leaves some slack) - utilisation lands around 90%, not the ~7% the stranding bug
+            // this test guards against would produce.
+            (deliveredMwh / allocatedBudgetMwh).Should().BeGreaterThan(
+                0.85,
+                "the pacer should spend most of a modest budget when demand is "
+                + "persistently available to absorb it");
+        }
+
+        [Fact]
+        public void Dispatch_HydroPacing_DecisionAtEachHourIsUnaffectedByLaterHoursDemand()
+        {
+            // Strict causality: RegionalDispatchRun must call HydroReservationState.Observe
+            // AFTER an interval's own dispatch decision, never before - otherwise a later
+            // hour's demand could leak into an earlier hour's pacing, which would be
+            // foresight. Two runs that agree up to hour 50 and diverge wildly after it must
+            // produce byte-identical Hydro dispatch for every hour before the divergence.
+            var random = new Random(99);
+            double[] baseDemand = Enumerable.Range(0, 100)
+                .Select(_ => (double)random.Next(0, 60))
+                .ToArray();
+            double[] demandA = (double[])baseDemand.Clone();
+            double[] demandB = (double[])baseDemand.Clone();
+            for (int hour = 50; hour < demandB.Length; hour++)
+            {
+                demandB[hour] = 1_000;
+            }
+
+            DispatchOutcome outcomeA = Dispatch(HydroOnlyRegion(demandA, TimeSpan.FromHours(1)));
+            DispatchOutcome outcomeB = Dispatch(HydroOnlyRegion(demandB, TimeSpan.FromHours(1)));
+
+            for (int hour = 0; hour < 50; hour++)
+            {
+                outcomeA.PerFleetGeneration[GenerationTechnology.Hydro][hour].Megawatts.Should().Be(
+                    outcomeB.PerFleetGeneration[GenerationTechnology.Hydro][hour].Megawatts,
+                    $"hour {hour} must not depend on demand at or after hour 50");
+            }
+        }
+
+        [Fact]
+        public void Dispatch_HydroPacing_DeliversComparableEnergyAtHourlyAndHalfHourlyResolution()
+        {
+            // The pacer's trailing window is a fixed number of INTERVALS (336), so at 30-minute
+            // resolution it only spans 7 days of history instead of 14 - the reviewer's own
+            // simulation found this insensitive to within ~2% for window lengths from 168 to
+            // 720, so "comparable" (a tolerance), not "identical", is the right bar here.
+            var random = new Random(2024);
+            double[] hourlyDemand = Enumerable.Range(0, HoursInJuly)
+                .Select(_ => (double)random.Next(0, 60))
+                .ToArray();
+            double[] halfHourlyDemand = hourlyDemand
+                .SelectMany(megawatts => new[] { megawatts, megawatts })
+                .ToArray();
+
+            DispatchOutcome hourlyOutcome = Dispatch(
+                HydroOnlyRegion(hourlyDemand, TimeSpan.FromHours(1)));
+            DispatchOutcome halfHourlyOutcome = Dispatch(
+                HydroOnlyRegion(halfHourlyDemand, TimeSpan.FromMinutes(30)));
+
+            double hourlyMwh = hourlyOutcome.PerFleetGeneration[GenerationTechnology.Hydro]
+                .Integrate().MegawattHours;
+            double halfHourlyMwh = halfHourlyOutcome.PerFleetGeneration[GenerationTechnology.Hydro]
+                .Integrate().MegawattHours;
+
+            (halfHourlyMwh / hourlyMwh).Should().BeApproximately(1.0, 0.05);
+        }
+
+        [Fact]
+        public void Dispatch_RegionWithoutHydro_IsUnaffectedByThePacer()
+        {
+            FlowSeries demand = HourlyFlow(50);
+            var region = new Region(
+                "NSW1",
+                [Fleet(GenerationTechnology.Coal, 30), Fleet(GenerationTechnology.Gas, 30)],
+                demand);
+
+            DispatchOutcome outcome = Dispatch(region);
+
+            AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Coal], 30);
+            AssertSeries(outcome.PerFleetGeneration[GenerationTechnology.Gas], 20);
+            AssertSeries(outcome.Unserved, 0);
+        }
+
+        private static Region HydroOnlyRegion(double[] demandMw, TimeSpan resolution)
+        {
+            var hydro = new GeneratingFleet(
+                GenerationTechnology.Hydro,
+                Power.FromMegawatts(60),
+                new Dictionary<DateOnly, double> { [new DateOnly(2026, 7, 1)] = 0.3 });
+            return new Region(
+                "NSW1",
+                [hydro],
+                new FlowSeries(NemStart, resolution, demandMw));
         }
 
         [Fact]
@@ -1108,7 +1320,17 @@ namespace NEM.Model.Tests.Simulation
                 StorageTechnology.Battery,
                 Energy.FromMegawattHours(storageCapacityMwh),
                 Power.FromMegawatts(powerCapacityMw),
-                new StorageTechnologyProfile(15u, 0.87));
+                new StorageTechnologyProfile(15u, 0.87),
+                Energy.Zero);
+
+        /// <summary>A Battery fleet seeded fully charged, so it has discharge headroom from hour 0.</summary>
+        private static StorageFleet SeededBattery(double storageCapacityMwh, double powerCapacityMw) =>
+            new(
+                StorageTechnology.Battery,
+                Energy.FromMegawattHours(storageCapacityMwh),
+                Power.FromMegawatts(powerCapacityMw),
+                new StorageTechnologyProfile(15u, 0.87),
+                Energy.FromMegawattHours(storageCapacityMwh));
 
         private static FlowSeries HourlyFlow(params double[] megawatts) =>
             new(NemStart, TimeSpan.FromHours(1), megawatts);

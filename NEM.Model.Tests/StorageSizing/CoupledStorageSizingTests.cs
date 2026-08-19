@@ -186,7 +186,8 @@ public sealed class CoupledStorageSizingTests
                     StorageTechnology.Battery,
                     Energy.FromMegawattHours(battery.Value.EnergyMwh),
                     Power.FromMegawatts(battery.Value.PowerMw),
-                    new StorageTechnologyProfile(15u, 0.87))],
+                    new StorageTechnologyProfile(15u, 0.87),
+                    Energy.Zero)],
             storageTechnologyProfiles: new Dictionary<StorageTechnology, StorageTechnologyProfile>
             {
                 [StorageTechnology.Battery] = new StorageTechnologyProfile(15u, 0.87),

@@ -152,8 +152,10 @@ public sealed class ScenarioDerivationTests
                 ["NSW1"] = new(Start, TimeSpan.FromHours(1), [80]),
             });
 
-        system.Regions.Single().StorageFleets.Should().ContainSingle().Which
-            .StorageTechnology.Should().Be(StorageTechnology.PumpedHydro);
+        StorageFleet pumpedHydro = system.Regions.Single().StorageFleets.Should().ContainSingle()
+            .Which;
+        pumpedHydro.StorageTechnology.Should().Be(StorageTechnology.PumpedHydro);
+        pumpedHydro.SeedEnergy.Should().Be(Energy.FromMegawattHours(640));
         system.Regions.Single().StorageTechnologyProfiles[StorageTechnology.Battery]
             .Should().Be(new StorageTechnologyProfile(15u, 0.87));
     }

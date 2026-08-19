@@ -171,6 +171,52 @@ public sealed class InterRegionalDispatchTests
     }
 
     [Fact]
+    public void Dispatch_HydroExport_CappedToSamePacedAllowanceAsLocalDispatch()
+    {
+        // Hydro rejoins the export pool (see RegionalDispatchRun.ExportableSurplus /
+        // IncrementalHeadroom) rather than being excluded outright, but its incremental
+        // headroom here is capped to the SAME per-interval pace as local dispatch. Giving it a
+        // higher SRMC than Coal means Coal covers all of AAA1's own local demand first, so
+        // Hydro's paced allowance for the interval (computed from residual demand alone -
+        // Coal's contribution is invisible to it) is entirely free for the export - but the
+        // export still can't reach past that allowance into Hydro's full remaining budget.
+        FlowSeries demand = HourlyFlow(20);
+        var hydro = new GeneratingFleet(
+            GenerationTechnology.Hydro,
+            Power.FromMegawatts(100),
+            new Dictionary<DateOnly, double> { [new DateOnly(2026, 7, 1)] = 1 },
+            shortRunMarginalCost: GenerationEnergyCost.FromAudPerMwhGenerated(50));
+        var source = new Region(
+            "AAA1",
+            [Fleet(GenerationTechnology.Coal, 50, shortRunMarginalCostAudPerMwh: 1), hydro],
+            demand);
+        Region deficit = CoalRegion("BBB1", capacityMw: 0, demandMw: [50]);
+
+        SystemDispatchRunResult result = Dispatcher.DispatchSystem(System(
+            [source, deficit],
+            [Link("AAA1", "BBB1", capacityMw: 1_000)]));
+
+        DispatchOutcome exporter = result.RegionalOutcomes[0];
+        DispatchOutcome importer = result.RegionalOutcomes[1];
+        exporter.PerFleetGeneration[GenerationTechnology.Coal][0].Megawatts.Should().BeApproximately(
+            50,
+            Tolerance,
+            "20 MW local load plus 30 MW headroom started to serve the export");
+        exporter.PerFleetGeneration[GenerationTechnology.Hydro][0].Megawatts.Should().BeApproximately(
+            20,
+            Tolerance,
+            "no local demand left for Hydro, but its paced allowance covers the rest of the export");
+        exporter.Exports[0].Megawatts.Should().BeApproximately(
+            50,
+            Tolerance,
+            "Coal's 30 MW headroom plus Hydro's 20 MW paced allowance");
+        importer.Unserved[0].Megawatts.Should().BeGreaterThan(
+            0,
+            "the export is capped to Hydro's paced allowance, not its full remaining budget, "
+            + "so BBB1's 50 MW deficit isn't fully closed");
+    }
+
+    [Fact]
     public void Dispatch_LargestDeficitIsServedFirstWhenSurplusIsScarce()
     {
         Region source = CoalRegion("AAA1", capacityMw: 60, demandMw: [10]);

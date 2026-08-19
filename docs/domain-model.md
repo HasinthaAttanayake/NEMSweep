@@ -212,14 +212,39 @@ classDiagram
   dispatches each owned region, producing one `DispatchOutcome` per region. Each
   outcome includes its `ReliabilityMetrics`. A per-region `RegionalDispatchRun`
   owns mutable execution state, including generation budgets and storage levels.
-  It orders generating fleets by short-run marginal cost and then technology for
-  deterministic ties, builds an immutable storage-policy context for each
-  interval, and executes policy intent through fleet physics.
+  It orders generating fleets by short-run marginal cost, then by technology to
+  break ties deterministically (`GenerationMeritOrder`); conventional Hydro sorts
+  into this order like any other technology and is not excluded from it. Unlike
+  every other technology it carries a monthly energy budget (`GenerationBudgetState`)
+  rather than a fuel cost, so 90% of that budget (the "paced" pool) is
+  metered by `HydroReservationState`: a causal threshold controller that caps
+  Hydro's request each interval at `max(0, residualDemand - T)`, where T is
+  solved by bisection each interval so that, applied over a trailing 336-interval
+  window of past residual-demand observations, it would have spent exactly the
+  budget affordable per interval over the intervals left in the month. This
+  self-calibrates to whatever the demand distribution looks like (a sort-based
+  "dispatch last" rule tried first and stranded ~93% of the budget instead of
+  rationing it - see NEM-076). The remaining 10% (the "reserve" pool) is held
+  back entirely from normal merit-order dispatch and spent only by
+  `RegionalDispatchRun.DispatchHydroFallback`, a true last-resort backstop that
+  runs after that region's own storage, against whatever local deficit storage
+  could not cover. Neither pool carries into the next month, so once less than
+  three days of the month remain the unspent reserve is released into the paced
+  pool (`GenerationBudgetState.ReleaseUnspentReserve`): past that point holding it
+  no longer buys cover, it only guarantees the energy expires unused. Both the
+  paced cap and the release are settled once per interval in
+  `BeginInterval`, so local dispatch, exports, and storage charging all price
+  Hydro against the same allowance. `RegionalDispatchRun` builds an immutable
+  storage-policy context for each interval, and executes policy intent through
+  fleet physics.
 - `SystemDispatchRun` owns the horizon. The **interval is the outer loop and the
   region the inner loop**, so every region is at the same hour at the same time
   and surplus in one can serve a deficit in another. Order within an interval is
-  generation, then inter-regional transfer, then storage. Each region's own
-  sequence of operations is unchanged by the inversion, so a system with no
+  generation (including Hydro's paced share, in normal merit-order position),
+  then inter-regional transfer, then storage - and, immediately after that
+  region's own storage, that region's own Hydro reserve fallback, which is
+  strictly local and never visible to transfer. Each region's own sequence of
+  operations is otherwise unchanged by the inversion, so a system with no
   interconnectors produces results identical to dispatching each region alone.
 - `InterRegionalTransfer` is the only place the domain meets the graph. It maps
   regional surplus and deficit onto nodes, delegates to the pure algorithms in
@@ -229,6 +254,12 @@ classDiagram
   never inside the search, which is what keeps it a standard max-flow problem.
   Exports draw on curtailment first and then start dispatchable plant in merit
   order; pumped hydro is excluded because storage is decided after transfer.
+  Conventional Hydro is not excluded - its incremental headroom for an export is
+  capped to the same per-interval pace as local dispatch (see
+  `RegionalDispatchRun.IncrementalHeadroom`), so an export can substitute for
+  local demand this interval but never draws on budget paced for a future local
+  peak. Hydro's reserve share is never exportable at all: it is reachable only
+  from `DispatchHydroFallback`, after transfer has already run for the interval.
 - `IStoragePolicy` owns storage intent and fleet ordering. It receives scalar
   snapshots rather than mutable fleet objects and does not own state of charge,
   execute storage physics, or book unserved demand and curtailment.
@@ -396,7 +427,9 @@ Per-fleet delivered and charge series are consistent bookkeeping allocations,
 not physical attributions. `RegionalDispatchRun` produces these allocations
 as storage operations execute; `DispatchOutcome` stores the supplied immutable
 series and enforces their invariants. Surplus charging is booked to each fleet
-by the amount its curtailment is reduced, following dispatch merit order.
+by the amount its curtailment is reduced, following dispatch merit order (see
+`GenerationMeritOrder`; in practice this only ever touches Solar/Wind, since
+every other technology's curtailment is always zero).
 Incremental-generation charging is booked to its named source fleet. Per-fleet
 delivered generation is the remainder after curtailment and charge. These rules
 close each interval exactly without reconstructing allocations from regional
@@ -509,8 +542,14 @@ Discharge removes and delivers stored MWh one-for-one, so a charge-discharge
 cycle loses `(1 - efficiency)` of the grid energy used to charge it. Round-trip
 efficiency is constrained to the inclusive range from zero to one.
 
-`Dispatcher` initializes each storage fleet at zero MWh for a dispatch run and
-threads the returned state of charge into the next interval. `DispatchOutcome`
+`Dispatcher` initializes each storage fleet at its `StorageFleet.SeedEnergy` for a
+dispatch run and threads the returned state of charge into the next interval.
+Seed energy is zero unless the scenario declared installed capacity for that
+fleet, in which case `StorageSeedPolicy` assumes an opening balance of 80% of
+installed capacity for PumpedHydro and 50% for every other technology (see
+`StorageSeedPolicy`, NEM-076). The seed is fixed from installed capacity at
+scenario load and is never recomputed as storage sizing grows a fleet, so
+sizing can never earn itself free energy by growing. `DispatchOutcome`
 records one interval-beginning `StockSeries` per storage technology. The
 dispatcher constructs a fresh `DispatchContext` after generation has been
 dispatched to demand and before storage operates. The context contains signed

@@ -99,7 +99,8 @@ public sealed class StorageMonotonicityTests
                     StorageTechnology.Battery,
                     Energy.FromMegawattHours(energyMwh),
                     Power.FromMegawatts(powerMw),
-                    new StorageTechnologyProfile(15u, 0.87)),
+                    new StorageTechnologyProfile(15u, 0.87),
+                    Energy.Zero),
             ]);
         var system = new PowerSystem(
             new PowerSystemId("test-system"),
@@ -137,7 +138,8 @@ public sealed class StorageMonotonicityTests
                     StorageTechnology.Battery,
                     Energy.FromMegawattHours(energyMwh),
                     Power.FromMegawatts(powerMw),
-                    new StorageTechnologyProfile(15u, 0.87)),
+                    new StorageTechnologyProfile(15u, 0.87),
+                    Energy.Zero),
             ]);
         var system = new PowerSystem(
             new PowerSystemId("dispatchable-charging-monotonicity"),
