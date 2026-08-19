@@ -25,6 +25,32 @@ public static class RegionNames
     public static string Full(string regionId) =>
         NemRegions.IsKnown(regionId) ? $"{State(regionId)} ({regionId})" : regionId;
 
-    /// <summary>A short form for chart labels and table headers, where the identifier is enough.</summary>
-    public static string Short(string regionId) => regionId;
+    /// <summary>
+    /// State names in a sentence, as "New South Wales, Queensland and Victoria". Joining on "and"
+    /// alone strung five states together with four of them, which is not how the list is read
+    /// aloud.
+    /// </summary>
+    public static string StateList(IEnumerable<string> regionIds) =>
+        Readable(regionIds.Select(State));
+
+    /// <summary>State names with their identifiers in a sentence, as "Victoria (VIC1) and ...".</summary>
+    public static string FullList(IEnumerable<string> regionIds) =>
+        Readable(regionIds.Select(Full));
+
+    /// <summary>
+    /// Names in a readable list, so three names read as "A, B and C" rather than "A, B, C" or
+    /// "A and B and C".
+    /// </summary>
+    public static string Readable(IEnumerable<string> names)
+    {
+        ArgumentNullException.ThrowIfNull(names);
+
+        string[] values = [.. names];
+        return values.Length switch
+        {
+            0 => string.Empty,
+            1 => values[0],
+            _ => $"{string.Join(", ", values[..^1])} and {values[^1]}",
+        };
+    }
 }

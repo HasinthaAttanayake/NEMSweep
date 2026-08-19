@@ -43,7 +43,7 @@ public sealed record ModelState(
                 "Regions simulated together",
                 result.RegionIds.Length == 1
                     ? $"{RegionNames.State(result.RegionIds[0])} alone"
-                    : string.Join(" and ", result.RegionIds.Select(RegionNames.State))
+                    : RegionNames.StateList(result.RegionIds)
                         + ", dispatched as one system with regional results kept separately",
                 result.RegionIds.Length > 0),
             new(

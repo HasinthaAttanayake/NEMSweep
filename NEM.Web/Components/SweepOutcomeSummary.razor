@@ -26,15 +26,20 @@
                 </strong>
                 <p>
                     Target @FormatPercentage(_reliability[0].TargetUsePercentageOfDemand) of demand unserved@(StandardSuffix).
-                    Worst completed run reached @FormatPercentage(_reliability.Max(basis => basis.AchievedUsePercentageOfDemand)).
+                    Worst completed run reached @FormatPercentage(_worstAchieved)@(ScopeSuffix).
                 </p>
             </div>
         }
 
         @if (_sizing.Count > 0)
         {
+            @* The index publishes a sizing outcome for the system and not per region, so this card
+               does not move with the region picker and names its scope when the rest of the page
+               has moved. *@
             <div class="outcome-card">
-                <span class="outcome-label">Storage sizing</span>
+                <span class="outcome-label">
+                    Storage sizing@(RegionId is null ? string.Empty : " · whole system")
+                </span>
                 <strong>@SizingHeadline</strong>
                 <p>@SizingDetail</p>
             </div>
@@ -81,6 +86,13 @@
 @code {
     [Parameter, EditorRequired] public SweepIndexDTO Index { get; set; } = default!;
 
+    /// <summary>
+    /// The region the page is showing, or null for the whole system. Reliability is read at this
+    /// scope; the sizing card stays system-wide, because the index publishes a sizing outcome for
+    /// the system only, and says so.
+    /// </summary>
+    [Parameter] public string? RegionId { get; set; }
+
     private sealed record FailureGroup(
         SweepFailureStage Stage,
         string Code,
@@ -91,7 +103,8 @@
     private List<SweepIndexPointDTO> _succeeded = [];
     private List<SweepIndexPointDTO> _failed = [];
     private List<ReliabilityBasisDTO> _reliability = [];
-    private List<ReliabilityBasisDTO> _outsideTarget = [];
+    private List<SweepIndexPointDTO> _outsideTarget = [];
+    private double _worstAchieved;
     private List<StorageSizingOutcomeDTO> _sizing = [];
     private List<FailureGroup> _failureGroups = [];
     private (double LastSucceeded, double FirstFailed)? _boundary;
@@ -104,7 +117,17 @@
         _failed = Index.Points.Where(point => point.Status == SweepPointStatus.Failed).ToList();
         _reliability = _succeeded.Where(point => point.Reliability is not null)
             .Select(point => point.Reliability!).ToList();
-        _outsideTarget = _reliability.Where(basis => !basis.WithinTarget).ToList();
+        // Judged at the selected scope, like every other figure on the page: the index carries one
+        // verdict and it is the system's.
+        _outsideTarget = _succeeded.Where(point => SweepChartData.WithinReliabilityTarget(
+            point.Reliability,
+            SweepChartData.SelectScalars(point, RegionId)) == false).ToList();
+        _worstAchieved = _succeeded
+            .Select(point => SweepChartData.SelectScalars(point, RegionId))
+            .Where(scalars => scalars is not null)
+            .Select(scalars => scalars!.UnservedEnergyPercentageOfDemand)
+            .DefaultIfEmpty(0)
+            .Max();
         _sizing = _succeeded.Where(point => point.StorageSizing is not null)
             .Select(point => point.StorageSizing!).ToList();
 
@@ -144,6 +167,10 @@
         ? $" ({name})"
         : string.Empty;
 
+    private string ScopeSuffix => RegionId is null
+        ? string.Empty
+        : $" in {RegionNames.Full(RegionId)}";
+
     private string SizingHeadline
     {
         get
@@ -156,6 +183,14 @@
                 return energyLimited == 1
                     ? "1 energy-limited"
                     : $"{energyLimited} energy-limited";
+            }
+
+            // A run the loop could not size to the target is not a run that needed no storage, and
+            // counting only the resized ones reported the two together as though they agreed.
+            int stoppedShort = _sizing.Count(outcome => StoppedShort(outcome.Outcome));
+            if (stoppedShort > 0)
+            {
+                return $"Stopped short on {stoppedShort} of {_sizing.Count}";
             }
 
             return resized switch
@@ -198,7 +233,10 @@
                     + (energyLimited.Length == 1 ? "run." : "runs.");
             }
 
-            if (resized == 0)
+            StorageSizingOutcomeDTO[] stoppedShort = _sizing
+                .Where(outcome => StoppedShort(outcome.Outcome))
+                .ToArray();
+            if (resized == 0 && stoppedShort.Length == 0)
             {
                 double energy = _sizing[0].FinalEnergyMwh;
                 double power = _sizing[0].FinalPowerMw;
@@ -206,12 +244,58 @@
                     + $"{SweepValueFormat.Short(power)} MW — met the target unchanged on every completed run.";
             }
 
-            double largest = _sizing.Max(outcome => outcome.FinalEnergyMwh);
-            return $"The sizing loop grew storage on {resized} completed "
-                + $"{(resized == 1 ? "run" : "runs")}, to at most {SweepValueFormat.Short(largest)} MWh "
-                + $"against a {SweepValueFormat.Short(_sizing[0].MaximumEnergyMwh)} MWh ceiling.";
+            // The maximum has to come from the resized runs themselves. Taking it across every
+            // outcome attributed a fleet from a run the loop had given up on to the runs it grew.
+            string grew = resized == 0
+                ? string.Empty
+                : $"The sizing loop grew storage on {resized} completed "
+                    + $"{(resized == 1 ? "run" : "runs")}, from "
+                    + $"{SweepValueFormat.Short(_sizing[0].InitialEnergyMwh)} MWh installed to at most "
+                    + $"{SweepValueFormat.Short(_sizing
+                        .Where(outcome => outcome.Outcome == StorageSizingOutcome.Resized)
+                        .Max(outcome => outcome.FinalEnergyMwh))} MWh, against a "
+                    + $"{SweepValueFormat.Short(_sizing[0].MaximumEnergyMwh)} MWh ceiling.";
+            if (stoppedShort.Length == 0)
+            {
+                return grew;
+            }
+
+            string stalled = $"On {stoppedShort.Length} completed "
+                + $"{(stoppedShort.Length == 1 ? "run" : "runs")} it stopped before the target: "
+                + $"{StoppedShortReason(stoppedShort)}.";
+            return grew.Length == 0 ? stalled : $"{grew} {stalled}";
         }
     }
+
+    /// <summary>
+    /// Outcomes where the loop finished without reaching the reliability target. They are not
+    /// failures — the run produced results — but they are not a fleet that met the standard either.
+    /// </summary>
+    private static bool StoppedShort(StorageSizingOutcome outcome) => outcome
+        is StorageSizingOutcome.StorageNoLongerImprovesReliability
+        or StorageSizingOutcome.BatteryCapacityLimitReached
+        or StorageSizingOutcome.PassLimitReached;
+
+    private static string StoppedShortReason(IReadOnlyCollection<StorageSizingOutcomeDTO> stoppedShort)
+    {
+        StorageSizingOutcome[] reasons = stoppedShort
+            .Select(outcome => outcome.Outcome)
+            .Distinct()
+            .ToArray();
+        return reasons.Length == 1
+            ? Reason(reasons[0])
+            : string.Join("; ", reasons.Select(Reason));
+    }
+
+    private static string Reason(StorageSizingOutcome outcome) => outcome switch
+    {
+        StorageSizingOutcome.StorageNoLongerImprovesReliability =>
+            "more storage no longer reduced unserved energy",
+        StorageSizingOutcome.BatteryCapacityLimitReached =>
+            "the configured Battery capacity limit was reached",
+        StorageSizingOutcome.PassLimitReached => "the dispatch-pass limit was reached",
+        _ => "the loop ended without meeting the target",
+    };
 
     private static string StageLabel(SweepFailureStage stage) => stage switch
     {

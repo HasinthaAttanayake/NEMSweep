@@ -204,6 +204,92 @@ public sealed class SweepAnalysisTests
     }
 
     [Fact]
+    public void Build_DoesNotReadRunsPastTheTargetAsSittingOnIt()
+    {
+        SweepAnalysis analysis = Analyse(
+            Run("p0", "Baseline", 0, achievedUse: 0),
+            Run("p1", "+5,000 MW", 5000, achievedUse: 0.1506),
+            Run("p2", "+9,000 MW", 9000, achievedUse: 2.0787),
+            Run("p3", "+12,000 MW", 12000, achievedUse: 5.9253));
+
+        analysis.Findings.Should().NotContain(finding =>
+            finding.Headline.Contains("sit exactly on the reliability target"));
+    }
+
+    [Fact]
+    public void Build_NamesTheRunFromWhichTheReliabilityStandardIsMissed()
+    {
+        SweepAnalysis analysis = Analyse(
+            Run("p0", "Baseline", 0, achievedUse: 0),
+            Run("p1", "+5,000 MW", 5000, achievedUse: 0.1506, unserved: 346_919.4),
+            Run("p2", "+12,000 MW", 12000, achievedUse: 5.9253, unserved: 17_287_805.1));
+
+        Finding finding = analysis.Findings.Should().ContainSingle(finding =>
+            finding.Headline.Contains("cannot meet the reliability standard")).Subject;
+
+        finding.Headline.Should().Be("2 of 3 runs cannot meet the reliability standard");
+        finding.Detail.Should().Contain("From +5,000 MW onwards");
+        finding.Detail.Should().Contain("+12,000 MW is the furthest outside it, at 5.93%");
+        finding.Detail.Should().Contain("0.002% target");
+        finding.Tone.Should().Be(FindingTone.Constraint);
+        // The shortfall has to outrank the cost findings: every one of them quotes a cost per
+        // megawatt-hour drawn from a run that did not serve its load.
+        analysis.Findings[0].Should().Be(finding);
+    }
+
+    [Fact]
+    public void Build_CountsMissedRunsWithoutClaimingABoundaryWhenTheSweepRecovers()
+    {
+        SweepAnalysis analysis = Analyse(
+            Run("p0", "Baseline", 0, achievedUse: 0),
+            Run("p1", "+5,000 MW", 5000, achievedUse: 0.1506),
+            Run("p2", "+9,000 MW", 9000, achievedUse: 0));
+
+        Finding finding = analysis.Findings.Should().ContainSingle(finding =>
+            finding.Headline.Contains("cannot meet the reliability standard")).Subject;
+
+        finding.Detail.Should().StartWith("1 run ends outside the standard.");
+        finding.Detail.Should().NotContain("onwards");
+    }
+
+    [Fact]
+    public void Build_ClaimsNoReliabilityShortfallWhenEveryRunMeetsTheStandard()
+    {
+        SweepAnalysis analysis = Analyse(
+            Run("p0", "Baseline", 0, achievedUse: 0),
+            Run("p1", "+5,000 MW", 5000, achievedUse: 0.001));
+
+        analysis.Findings.Should().NotContain(finding =>
+            finding.Headline.Contains("reliability standard"));
+    }
+
+    /// <summary>
+    /// The binding finding reads the same scope as everything else on the page. Taking the achieved
+    /// value from the index's basis reported a region as pinned to the standard on the strength of
+    /// the system's result.
+    /// </summary>
+    [Fact]
+    public void Build_JudgesTheBindingTargetAtTheSelectedScope()
+    {
+        SweepIndexPointDTO[] points =
+        [
+            .. new[] { ("p0", "Baseline", 0d), ("p1", "+4,000 MW", 4000d), ("p2", "+4,500 MW", 4500d) }
+                .Select(run => Run(run.Item1, run.Item2, run.Item3, achievedUse: 0.002) with
+                {
+                    RegionScalars = [new SweepPointRegionScalarsDTO("QLD1", Scalars())],
+                }),
+        ];
+
+        SweepAnalysis system = SweepAnalysis.Build(Index(points));
+        SweepAnalysis region = SweepAnalysis.Build(Index(points), "QLD1");
+
+        system.Findings.Should().ContainSingle(finding =>
+            finding.Headline.Contains("sit exactly on the reliability target"));
+        region.Findings.Should().NotContain(finding =>
+            finding.Headline.Contains("sit exactly on the reliability target"));
+    }
+
+    [Fact]
     public void Build_ReadsRegionalScalarsWhenARegionIsSelected()
     {
         SweepIndexPointDTO point = Run("p0", "Baseline", 0, slcoe: 158.46m) with
@@ -219,6 +305,28 @@ public sealed class SweepAnalysisTests
 
         system.Runs.Single().Scalars.SlcoeAudPerMwh.Should().Be(158.46m);
         region.Runs.Single().Scalars.SlcoeAudPerMwh.Should().Be(145.47m);
+    }
+
+    /// <summary>
+    /// The index records one reliability verdict, and it is the system's. A region that served all
+    /// of its load sits inside a system that did not, and must not be told it missed the standard.
+    /// </summary>
+    [Fact]
+    public void Build_ReadsTheReliabilityShortfallFromTheSelectedRegionRatherThanTheSystem()
+    {
+        SweepIndexPointDTO point = Run("p0", "Baseline", 0, achievedUse: 5.9253, unserved: 17_287_805.1)
+            with
+            {
+                RegionScalars = [new SweepPointRegionScalarsDTO("QLD1", Scalars())],
+            };
+
+        SweepAnalysis system = SweepAnalysis.Build(Index(point));
+        SweepAnalysis region = SweepAnalysis.Build(Index(point), "QLD1");
+
+        system.Findings.Should().ContainSingle(finding =>
+            finding.Headline.Contains("reliability standard"));
+        region.Findings.Should().NotContain(finding =>
+            finding.Headline.Contains("reliability standard"));
     }
 
     [Fact]
@@ -247,14 +355,25 @@ public sealed class SweepAnalysisTests
         double delivered = 1_000_000,
         double? renewableShare = null,
         double curtailed = 0,
-        double achievedUse = 0) => new(
+        double achievedUse = 0,
+        double unserved = 0) => new(
         pointId,
         label,
         axisValue,
         SweepPointStatus.Succeeded,
         $"points/{pointId}.json",
         $"configs/{pointId}.json",
-        Scalars(slcoe, generationSlcoe, storageSlcoe, demand, energyServed, delivered, renewableShare, curtailed),
+        Scalars(
+            slcoe,
+            generationSlcoe,
+            storageSlcoe,
+            demand,
+            energyServed,
+            delivered,
+            renewableShare,
+            curtailed,
+            unserved,
+            achievedUse),
         new ReliabilityBasisDTO(0.002, achievedUse, achievedUse <= 0.002, "NEM reliability standard"),
         ArtifactFixtures.Sizing(),
         new IntervalPointersDTO(null, null, 0),
@@ -289,7 +408,9 @@ public sealed class SweepAnalysisTests
         double energyServed = 1_000_000,
         double delivered = 1_000_000,
         double? renewableShare = null,
-        double curtailed = 0) => new(
+        double curtailed = 0,
+        double unserved = 0,
+        double unservedShare = 0) => new(
         SlcoeAudPerMwh: slcoe,
         GenerationSlcoeAudPerMwh: generationSlcoe,
         StorageSlcoeAudPerMwh: storageSlcoe,
@@ -300,8 +421,8 @@ public sealed class SweepAnalysisTests
         AchievedRenewableShareNative: null,
         StoragePowerMw: 940,
         StorageEnergyMwh: 5515,
-        UnservedEnergyMwh: 0,
-        UnservedEnergyPercentageOfDemand: 0,
+        UnservedEnergyMwh: unserved,
+        UnservedEnergyPercentageOfDemand: unservedShare,
         UnservedHours: 0,
         HoursServedFraction: 1,
         PeakUnservedPowerMw: 0,
