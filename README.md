@@ -24,12 +24,18 @@ NemSim is being developed to explore:
 
 The currently validated and published layers are:
 
-- **Operational demand:** New South Wales actual operational demand by financial
-  year, month, or day.
+- **Operational demand:** actual operational demand by financial year, month, or
+  day, for each of the five mainland NEM regions.
 - **Weather resources:** solar radiation, wind, temperature, solar geometry, and
   modelled solar and wind generation.
-- **Baseline dispatch:** hourly merit-order generation by technology against New
-  South Wales operational demand, including curtailment and reliability metrics.
+- **Generation fleet:** installed capacity and source units by technology.
+- **Baseline dispatch:** hourly merit-order generation by technology against
+  operational demand, including curtailment and reliability metrics.
+- **Whole-system dispatch:** the five regions dispatched together over directed
+  interconnectors, with losses metered per link, transmission costed, and
+  storage sized across the regions to a reliability standard.
+- **Scenario sweeps:** one input varied across a series of runs with the rest of
+  the scenario held constant, published with every run's results and provenance.
 
 New views will be published as the sequential build reaches each part of the
 model. Follow progress on the [NEM Sim Development Board](https://github.com/users/HasinthaAttanayake/projects/11).
@@ -133,21 +139,21 @@ Run a scenario using a specific scenario configuration with:
 
 ```powershell
 dotnet run --project .\NEM.CLI\NEM.CLI.csproj -- `
-  --run-scenario .\scenarios\nsw1-baseline-dispatch.json
+  --run-scenario .\scenarios\nem-fy2026-all-regions.json
 ```
 
 Fan out a sweep definition into its point configurations with:
 
 ```powershell
 dotnet run --project .\NEM.CLI\NEM.CLI.csproj -- `
-  --fan-out-sweep .\sweeps\datacentre-nameplate-nsw1-fy2026.json
+  --fan-out-sweep .\sweeps\datacentre-nameplate-fy2026.json
 ```
 
 Run all points in a sweep definition with:
 
 ```powershell
 dotnet run --project .\NEM.CLI\NEM.CLI.csproj -- `
-  --run-sweep .\sweeps\datacentre-nameplate-nsw1-fy2026.json
+  --run-sweep .\sweeps\datacentre-nameplate-fy2026.json
 ```
 
 Print the deterministic JSON Schema for either supported input format to

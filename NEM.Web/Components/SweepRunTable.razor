@@ -55,14 +55,14 @@
                         </td>
                         <td>@Duration(point)</td>
                         <td>
-                            @if (point.Reliability is null)
+                            @if (WithinTarget(point) is not { } within)
                             {
                                 <span>—</span>
                             }
                             else
                             {
-                                <span class="@(point.Reliability.WithinTarget ? "within-target" : "outside-target")">
-                                    @(point.Reliability.WithinTarget ? "Within" : "Outside")
+                                <span class="@(within ? "within-target" : "outside-target")">
+                                    @(within ? "Within" : "Outside")
                                 </span>
                             }
                         </td>
@@ -121,6 +121,15 @@
         }
     }
 
+    /// <summary>
+    /// Reliability for the selected scope. Every other cell in the row switches with the region
+    /// picker, so a column that kept reporting the system's verdict told a region that served all
+    /// of its load that it had missed the standard.
+    /// </summary>
+    private bool? WithinTarget(SweepIndexPointDTO point) => SweepChartData.WithinReliabilityTarget(
+        point.Reliability,
+        SweepChartData.SelectScalars(point, RegionId));
+
     private string Scalar(SweepIndexPointDTO point, SweepChartYAxis column)
     {
         SweepPointScalarResultsDTO? scalars = SweepChartData.SelectScalars(point, RegionId);
@@ -160,7 +169,7 @@
                     ? "Completed"
                     : $"{StageLabel(point.Failure?.Stage)} constraint: {point.Failure?.Message}",
                 point.DurationMs is null ? string.Empty : Number(point.DurationMs.Value / 1000),
-                point.Reliability is null ? string.Empty : point.Reliability.WithinTarget ? "Within" : "Outside",
+                WithinTarget(point) is not { } within ? string.Empty : within ? "Within" : "Outside",
                 point.StorageSizing is null ? string.Empty : SizingLabel(point.StorageSizing),
                 scalars is null
                     ? string.Empty

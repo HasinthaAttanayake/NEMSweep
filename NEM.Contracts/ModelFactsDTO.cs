@@ -20,6 +20,14 @@ public sealed record ReliabilityBasisDTO(
 /// What the storage sizing loop did. Distinguishes "the installed fleet already met the target"
 /// from "the fleet was grown", so a flat storage series can be labelled as a result.
 /// </summary>
+/// <remarks>
+/// Every capacity here is at the scope of the artifact carrying it. On a region artifact these are
+/// that region's figures against the limit the loop was given for it; on a whole-system artifact
+/// they are summed across the regions, and <see cref="MaximumEnergyMwh"/> and
+/// <see cref="MaximumPowerMw"/> are summed with them. The limit the loop actually enforces is a
+/// per-region one, so a system artifact that passed it through unsummed reported a total against a
+/// ceiling a fifth of its size — a fleet inside its limit read as one past it.
+/// </remarks>
 public sealed record StorageSizingOutcomeDTO(
     StorageSizingOutcome Outcome,
     double InitialEnergyMwh,

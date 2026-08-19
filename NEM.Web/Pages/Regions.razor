@@ -418,7 +418,7 @@
 
     private string ScopeRegions => _analysis is null
         ? string.Empty
-        : string.Join(", ", _analysis.Result.RegionIds.Select(RegionNames.Full));
+        : RegionNames.FullList(_analysis.Result.RegionIds);
 
     private string Period => _result is null
         ? string.Empty

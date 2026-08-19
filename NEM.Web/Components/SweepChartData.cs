@@ -96,6 +96,27 @@ public sealed record SweepChartData(
                 StringComparison.OrdinalIgnoreCase))
             ?.Scalars;
     }
+
+    /// <summary>
+    /// Whether a scope met the reliability standard its run was sized against, or null when the run
+    /// published neither a basis nor scalars to judge it by.
+    /// </summary>
+    /// <remarks>
+    /// A sweep point records one verdict and it is the system's. The target is the standard and is
+    /// the same at either scope, but what was achieved is not: Queensland served all of its load in
+    /// every run of the published sweep while the system did not, so reading the system's verdict
+    /// into a Queensland view marked every one of those runs as a miss.
+    /// </remarks>
+    public static bool? WithinReliabilityTarget(
+        ReliabilityBasisDTO? reliability,
+        SweepPointScalarResultsDTO? scalars) => reliability switch
+        {
+            null => null,
+            { TargetUsePercentageOfDemand: <= 0 } => reliability.WithinTarget,
+            _ => scalars is null
+                ? null
+                : scalars.UnservedEnergyPercentageOfDemand <= reliability.TargetUsePercentageOfDemand,
+        };
 }
 
 /// <summary>

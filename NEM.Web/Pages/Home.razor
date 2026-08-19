@@ -294,7 +294,7 @@
 
     private string ScopeSentence => _system is null
         ? string.Empty
-        : $"{string.Join(" and ", _system.RegionIds.Select(RegionNames.State))}, "
+        : $"{RegionNames.StateList(_system.RegionIds)}, "
             + $"{_system.PeriodStart:MMM yyyy} to {_system.PeriodEnd.AddTicks(-1):MMM yyyy}, "
             + $"simulated at {_system.Resolution.TotalHours:N0}-hour resolution against a typical "
             + "meteorological year.";

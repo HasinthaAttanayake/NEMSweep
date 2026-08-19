@@ -1,3 +1,4 @@
+using System.Globalization;
 using NEM.Contracts;
 using NEM.Web.Components;
 using NEM.Web.Components.Viz;
@@ -33,6 +34,14 @@ public sealed record SweepRun(SweepIndexPointDTO Point, SweepPointScalarResultsD
     public double StorageCostShare => Scalars.SlcoeAudPerMwh <= 0
         ? 0
         : (double)(Scalars.StorageSlcoeAudPerMwh / Scalars.SlcoeAudPerMwh);
+
+    /// <summary>
+    /// Whether this scope missed the reliability standard the run was sized against, judged at the
+    /// scope these scalars describe rather than from the index's system-wide verdict. See
+    /// <see cref="SweepChartData.WithinReliabilityTarget"/>.
+    /// </summary>
+    public bool OutsideReliabilityTarget =>
+        SweepChartData.WithinReliabilityTarget(Point.Reliability, Scalars) == false;
 }
 
 /// <summary>An interior extremum in a series: the run the curve turns at, and how far it turned.</summary>
@@ -163,6 +172,7 @@ public sealed record SweepAnalysis(
         AddRenewableShare(analysis, findings);
         AddStorageOnset(analysis, findings);
         AddConstraints(analysis, findings);
+        AddReliabilityShortfall(analysis, findings);
         AddReliabilityBinding(analysis, findings);
         // Highest priority first, so a page showing only the first few shows the ones that matter.
         return [.. findings.OrderByDescending(finding => finding.Priority)];
@@ -404,9 +414,9 @@ public sealed record SweepAnalysis(
             return;
         }
 
-        SweepRun first = analysis.Runs[onset];
-        SweepRun last = analysis.Runs[onset - 1];
-        StorageSizingOutcomeDTO sizing = first.Point.StorageSizing!;
+        SweepRun needsBuild = analysis.Runs[onset];
+        SweepRun lastWithoutBuild = analysis.Runs[onset - 1];
+        StorageSizingOutcomeDTO sizing = needsBuild.Point.StorageSizing!;
         double addedMwh = sizing.FinalEnergyMwh - sizing.InitialEnergyMwh;
         double addedMw = sizing.FinalPowerMw - sizing.InitialPowerMw;
         int resizedRuns = analysis.Runs.Count(run =>
@@ -416,15 +426,15 @@ public sealed record SweepAnalysis(
             ? $" and {PlotFormat.Compact(addedMw)} MW of power"
             : " with no additional power";
         findings.Add(new Finding(
-            $"New storage becomes necessary at {first.Label}",
-            $"Every run up to {last.Label} met the reliability target with the storage already "
-            + $"installed. {first.Label} is the first that does not: the sizing loop adds "
+            $"New storage becomes necessary at {needsBuild.Label}",
+            $"Every run up to {lastWithoutBuild.Label} met the reliability target with the storage "
+            + $"already installed. {needsBuild.Label} is the first that does not: the sizing loop adds "
             + $"{PlotFormat.Compact(addedMwh)} MWh{power}, and "
             + (resizedRuns == analysis.Runs.Count - onset
                 ? "every run beyond it needs more again."
                 : $"{resizedRuns} runs in the sweep need building."),
             FindingTone.Constraint,
-            $"{first.AxisValue:N0}",
+            $"{needsBuild.AxisValue:N0}",
             $"{analysis.AxisUnit} before new build",
             Priority: 88));
     }
@@ -461,13 +471,72 @@ public sealed record SweepAnalysis(
             Priority: 90));
     }
 
+    /// <summary>
+    /// Runs that end outside the reliability standard. Every other finding on the page quotes a cost
+    /// per megawatt-hour the same way whether or not the run behind it served its load, so a sweep
+    /// that runs past the point where storage still helps has to say so before it says anything
+    /// about cost.
+    /// </summary>
+    /// <remarks>
+    /// Every figure here is read from the selected scope's own scalars — see
+    /// <see cref="SweepRun.OutsideReliabilityTarget"/> — so the sentence cannot pair one scope's
+    /// percentage with the other's megawatt-hours.
+    /// </remarks>
+    private static void AddReliabilityShortfall(SweepAnalysis analysis, List<Finding> findings)
+    {
+        SweepRun[] missed = [.. analysis.Runs.Where(run => run.OutsideReliabilityTarget)];
+        if (missed.Length == 0)
+        {
+            return;
+        }
+
+        SweepRun worst = missed.MaxBy(run => run.Scalars.UnservedEnergyPercentageOfDemand)!;
+        double target = worst.Point.Reliability!.TargetUsePercentageOfDemand;
+        // "From here onwards" is only true when the misses reach the end of the sweep. A sweep that
+        // recovers past one bad run gets a count instead of a boundary it does not have.
+        bool toTheEnd = analysis.Runs
+            .SkipWhile(run => run != missed[0])
+            .All(run => run.OutsideReliabilityTarget);
+        findings.Add(new Finding(
+            missed.Length == analysis.Runs.Count
+                ? $"No run in this sweep meets the reliability standard for {analysis.ScopeName}"
+                : $"{missed.Length} of {analysis.Runs.Count} runs cannot meet the reliability standard",
+            (toTheEnd && missed.Length < analysis.Runs.Count
+                ? $"From {missed[0].Label} onwards, every run ends outside the standard. "
+                : $"{missed.Length} {(missed.Length == 1 ? "run ends" : "runs end")} outside the "
+                    + "standard. ")
+            + $"{worst.Label} is the furthest outside it, at "
+            + $"{Percentage(worst.Scalars.UnservedEnergyPercentageOfDemand)} of demand unserved "
+            + $"against a {Percentage(target)} target — "
+            + $"{PlotFormat.Compact(worst.Scalars.UnservedEnergyMwh)} MWh. The cost figures for those "
+            + $"runs are the cost of {analysis.ScopeName} not serving its load.",
+            FindingTone.Constraint,
+            missed.Length.ToString("N0"),
+            $"of {analysis.Runs.Count:N0} runs outside the standard",
+            Priority: 105));
+    }
+
+    /// <summary>
+    /// Runs the sizing loop landed exactly on the standard rather than below it.
+    /// </summary>
+    /// <remarks>
+    /// Read at the selected scope, for the same reason
+    /// <see cref="AddReliabilityShortfall"/> is: the target is the standard and is shared, but what
+    /// was achieved is the system's in the index and a region's on a regional view. Taking the
+    /// achieved value from the basis put a region on the system's curve, so a region nowhere near
+    /// the standard could be reported as pinned to it.
+    /// </remarks>
     private static void AddReliabilityBinding(SweepAnalysis analysis, List<Finding> findings)
     {
+        // A run sits on the target only when the sizing loop landed it there. Without the upper
+        // bound this also collected every run that blew straight through the target, and reported
+        // runs at 5.93% unserved as sitting exactly on a 0.002% standard.
         SweepRun[] atTarget = [.. analysis.Runs.Where(run =>
-            run.Point.Reliability is { } reliability
-            && reliability.TargetUsePercentageOfDemand > 0
-            && reliability.AchievedUsePercentageOfDemand
-                >= reliability.TargetUsePercentageOfDemand * 0.999)];
+            run.Point.Reliability is { TargetUsePercentageOfDemand: > 0 } reliability
+            && run.Scalars.UnservedEnergyPercentageOfDemand
+                >= reliability.TargetUsePercentageOfDemand * 0.999
+            && run.Scalars.UnservedEnergyPercentageOfDemand
+                <= reliability.TargetUsePercentageOfDemand * 1.001)];
         if (atTarget.Length < 2)
         {
             return;
@@ -484,6 +553,14 @@ public sealed record SweepAnalysis(
             $"of {analysis.Runs.Count:N0} runs at the limit",
             Priority: 55));
     }
+
+    /// <summary>
+    /// Unserved-energy figures span four orders of magnitude — a 0.002% target beside an achieved
+    /// 5.93% — so a fixed decimal count either rounds the target away or pads the achieved value.
+    /// </summary>
+    private static string Percentage(double value) => value == 0
+        ? "0%"
+        : $"{value.ToString(value >= 0.01 ? "N2" : "G3", CultureInfo.CurrentCulture)}%";
 
     private static double PercentageChange(double from, double to) =>
         from == 0 ? 0 : 100 * (to - from) / Math.Abs(from);

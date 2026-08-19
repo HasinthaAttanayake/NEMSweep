@@ -24,6 +24,40 @@ public sealed class SweepChartDataTests
             Enumerable.Range(0, pointCount).Select(index => (double)index));
     }
 
+    /// <summary>
+    /// A sweep point records one reliability verdict and it is the system's, so every scope-aware
+    /// view has to judge its own scope: a region that served all of its load inside a system that
+    /// did not must not be marked as having missed the standard.
+    /// </summary>
+    [Fact]
+    public void WithinReliabilityTarget_JudgesTheScopeRatherThanTheSystemVerdict()
+    {
+        ReliabilityBasisDTO systemMissed = new(0.002, 5.93, false, "NEM reliability standard");
+
+        SweepChartData.WithinReliabilityTarget(systemMissed, Unserved(5.93)).Should().BeFalse();
+        SweepChartData.WithinReliabilityTarget(systemMissed, Unserved(0)).Should().BeTrue();
+        SweepChartData.WithinReliabilityTarget(systemMissed, Unserved(0.002)).Should().BeTrue();
+    }
+
+    [Fact]
+    public void WithinReliabilityTarget_IsUnknownWithoutABasisOrScalarsForTheScope()
+    {
+        SweepChartData.WithinReliabilityTarget(null, Unserved(0)).Should().BeNull();
+        SweepChartData.WithinReliabilityTarget(ArtifactFixtures.Reliability(), null).Should().BeNull();
+    }
+
+    /// <summary>A target of zero cannot be judged from a share, so the published verdict stands.</summary>
+    [Fact]
+    public void WithinReliabilityTarget_FallsBackToThePublishedVerdictWhenThereIsNoTarget()
+    {
+        ReliabilityBasisDTO noTarget = new(0, 0.5, false, "None");
+
+        SweepChartData.WithinReliabilityTarget(noTarget, Unserved(0)).Should().BeFalse();
+    }
+
+    private static SweepPointScalarResultsDTO Unserved(double percentageOfDemand) =>
+        ArtifactFixtures.Scalars() with { UnservedEnergyPercentageOfDemand = percentageOfDemand };
+
     [Fact]
     public void Build_ExcludesAConstrainedPointAndKeepsItsStageAndCode()
     {

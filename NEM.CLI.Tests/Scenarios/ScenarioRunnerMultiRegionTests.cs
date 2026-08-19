@@ -182,6 +182,38 @@ public sealed class ScenarioRunnerMultiRegionTests
             StorageSizingOutcome.PassLimitReached);
     }
 
+    /// <summary>
+    /// The sizing loop enforces its limit on each region separately, so a system artifact whose
+    /// capacities are summed across the regions has to sum the ceiling with them. Publishing the
+    /// per-region limit beside a two-region total put a fleet inside its limit past its ceiling.
+    /// </summary>
+    [Fact]
+    public void Run_SumsTheStorageSizingCeilingAcrossRegionsOnTheSystemArtifact()
+    {
+        using var fixture = new RunnerFixture();
+        fixture.WriteScenario();
+        var context = new CliContext(fixture.Paths, fixture.RootPath, TextWriter.Null);
+
+        ScenarioCommand.Run(context, "scenario.json").Should().Be(0);
+
+        SystemDispatchResultsDTO system = JsonSerializer.Deserialize<SystemDispatchResultsDTO>(
+            File.ReadAllBytes(fixture.Paths.DispatchResultsPath),
+            JsonFile.ReadOptions)!;
+        system.RegionIds.Should().Equal("NSW1", "VIC1");
+        system.StorageSizing.MaximumPowerMw.Should().Be(200);
+        system.StorageSizing.MaximumEnergyMwh.Should().Be(800);
+        system.StorageSizing.FinalPowerMw.Should().BeLessThanOrEqualTo(system.StorageSizing.MaximumPowerMw);
+        system.StorageSizing.FinalEnergyMwh.Should().BeLessThanOrEqualTo(system.StorageSizing.MaximumEnergyMwh);
+
+        RegionDispatchResultsDTO region = JsonSerializer.Deserialize<RegionDispatchResultsDTO>(
+            File.ReadAllBytes(Path.Combine(
+                Path.GetDirectoryName(fixture.Paths.DispatchResultsPath)!,
+                "results-nsw1.json")),
+            JsonFile.ReadOptions)!;
+        region.StorageSizing.MaximumPowerMw.Should().Be(100);
+        region.StorageSizing.MaximumEnergyMwh.Should().Be(400);
+    }
+
     [Fact]
     public void WritePublication_DoesNotPublishPartialResultsWhenAWriteFails()
     {

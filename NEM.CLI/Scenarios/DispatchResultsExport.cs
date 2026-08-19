@@ -389,14 +389,18 @@ internal static class DispatchResultsExport
         StorageSizingRunResult sizingResult)
     {
         InstalledBatteryAssessment[] installed = sizingResult.InstalledBatteryAssessments.ToArray();
+        // The loop enforces its limit on each region separately, so the ceiling for a total summed
+        // across the regions is the per-region limit summed the same way. Passing it through
+        // unsummed put a five-region total beside a one-region ceiling and read as a breach.
+        int regionCount = sizingResult.Regions.Count;
         return new StorageSizingOutcomeDTO(
             OutcomeFor(sizingResult.Status, sizingResult.Regions.Any(region => region.BatterySizing.WasChanged)),
             installed.Sum(assessment => assessment.BatteryCapacity.EnergyCapacity.MegawattHours),
             installed.Sum(assessment => assessment.BatteryCapacity.PowerCapacity.Megawatts),
             sizingResult.Regions.Sum(region => region.BatterySizing.EnergyCapacity.MegawattHours),
             sizingResult.Regions.Sum(region => region.BatterySizing.PowerCapacity.Megawatts),
-            request.SizingOptions.MaximumEnergy.MegawattHours,
-            request.SizingOptions.MaximumPower.Megawatts,
+            request.SizingOptions.MaximumEnergy.MegawattHours * regionCount,
+            request.SizingOptions.MaximumPower.Megawatts * regionCount,
             sizingResult.DispatchPassCount,
             EvidenceFor(sizingResult.EnergyLimitedAssessment),
             sizingResult.Trajectory.Select(pass => new StorageSizingPassDTO(

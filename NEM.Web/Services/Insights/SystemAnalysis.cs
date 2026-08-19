@@ -403,7 +403,8 @@ public sealed record SystemAnalysis(
         }
 
         RegionProfile grown = resized.MaxBy(region => region.StorageGrowthMwh)!;
-        string held = Join(analysis.Regions.Where(region => !region.WasResized).Select(region => region.State));
+        string held = RegionNames.Readable(
+            analysis.Regions.Where(region => !region.WasResized).Select(region => region.State));
         double addedMwh = resized.Sum(region => region.StorageGrowthMwh);
 
         // With one region resized the finding names it; with several it has to name all of them, or
@@ -416,7 +417,8 @@ public sealed record SystemAnalysis(
                 + $"{PlotFormat.Compact(grown.StorageSizing.InitialEnergyMwh)} MWh to "
                 + $"{PlotFormat.Compact(grown.StorageSizing.FinalEnergyMwh)} MWh to reach the "
                 + $"reliability target, while {held} met the target with the fleet already installed."
-            : $"The sizing loop grew storage in {Join(resized.Select(region => region.State))} to reach "
+            : $"The sizing loop grew storage in {RegionNames.Readable(resized.Select(region => region.State))} "
+                + "to reach "
                 + $"the reliability target, adding {PlotFormat.Compact(addedMwh)} MWh in total and most "
                 + $"of it in {grown.State}. {held} met the target with the fleet already installed.";
 
@@ -469,18 +471,6 @@ public sealed record SystemAnalysis(
             PlotFormat.Money(dearest.LevelisedContributionAudPerMwh),
             $"AUD/MWh from {dearest.Technology.ToLowerInvariant()}",
             Priority: 80));
-    }
-
-    /// <summary>Names in a readable list, so three regions read as "A, B and C" rather than "A, B, C".</summary>
-    private static string Join(IEnumerable<string> names)
-    {
-        string[] values = [.. names];
-        return values.Length switch
-        {
-            0 => string.Empty,
-            1 => values[0],
-            _ => $"{string.Join(", ", values[..^1])} and {values[^1]}",
-        };
     }
 
     private static double SystemAllowanceUsed(SystemAnalysis analysis) =>
