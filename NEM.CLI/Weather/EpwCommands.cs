@@ -33,7 +33,7 @@ internal static class EpwCommands
             Path.GetFileName(windSourcePath));
         EpwProvenance.WriteJson(report, context.Paths.WeatherProvenancePath);
         EpwWeatherExport.WriteJson(weatherData, context.Paths.WeatherDataPath(regionId));
-        context.Output.WriteLine(JsonFile.Serialize(report));
+        context.Output.WriteLine(JsonFile.SerializeReadable(report));
         context.Output.WriteLine(
             $"Daylight DNI shares total: {report.DaylightDniSourceShares.Values.Sum():F2}%");
         context.Output.WriteLine(

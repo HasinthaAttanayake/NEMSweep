@@ -17,23 +17,40 @@ internal static class JsonFile
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
     };
 
+    /// <summary>
+    /// How a published artifact is written. Indentation is roughly seventy percent of the bytes in
+    /// one of these — a quarter of a gigabyte across a sweep — spent on whitespace that nothing
+    /// reads: the CLI writes them, the site fetches them, and no one edits them by hand. It also
+    /// puts every value on its own line, which turns a rerun into millions of changed lines and is
+    /// what stops a diff being reviewable at all.
+    /// </summary>
     private static JsonSerializerOptions WriteOptions { get; } = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = false,
+    };
+
+    /// <summary>
+    /// The same JSON laid out for a person: the scenario config a sweep fans out to each point, the
+    /// schema the CLI prints, the report it writes to the console. These are small and are read.
+    /// </summary>
+    private static JsonSerializerOptions ReadableWriteOptions { get; } = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = true,
     };
 
-    public static string Serialize<T>(T value)
-    {
-        JsonNode node = JsonSerializer.SerializeToNode(value, WriteOptions)
-            ?? throw new InvalidOperationException("JSON serialization produced no value.");
-        return Canonicalize(node, propertyName: null).ToJsonString(WriteOptions);
-    }
+    public static string Serialize<T>(T value) =>
+        Canonicalized(value).ToJsonString(WriteOptions);
+
+    /// <summary>Canonicalised and rounded exactly as <see cref="Serialize"/>, but laid out.</summary>
+    public static string SerializeReadable<T>(T value) =>
+        Canonicalized(value).ToJsonString(ReadableWriteOptions);
 
     public static string SerializeExact(JsonNode value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        return CanonicalizeExact(value).ToJsonString(WriteOptions);
+        return CanonicalizeExact(value).ToJsonString(ReadableWriteOptions);
     }
 
     public static string SerializeExact<T>(T value)
@@ -41,6 +58,13 @@ internal static class JsonFile
         JsonNode node = JsonSerializer.SerializeToNode(value, WriteOptions)
             ?? throw new InvalidOperationException("JSON serialization produced no value.");
         return SerializeExact(node);
+    }
+
+    private static JsonNode Canonicalized<T>(T value)
+    {
+        JsonNode node = JsonSerializer.SerializeToNode(value, WriteOptions)
+            ?? throw new InvalidOperationException("JSON serialization produced no value.");
+        return Canonicalize(node, propertyName: null);
     }
 
     public static void Write<T>(T value, string path)
