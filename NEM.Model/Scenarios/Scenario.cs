@@ -273,7 +273,8 @@ public sealed class ScenarioStorageFleet
             Technology,
             InitialEnergyCapacity,
             InitialPowerCapacity,
-            TechnologyProfile);
+            TechnologyProfile,
+            StorageSeedPolicy.SeedFor(Technology, InitialEnergyCapacity));
 }
 
 public sealed class ScenarioGeneratingFleet

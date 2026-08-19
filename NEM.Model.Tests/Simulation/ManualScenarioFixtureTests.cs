@@ -46,7 +46,8 @@ public sealed class ManualScenarioFixtureTests
                     StorageTechnology.Battery,
                     Energy.FromMegawattHours(fixture.Battery.EnergyCapacityMwh),
                     Power.FromMegawatts(fixture.Battery.PowerCapacityMw),
-                    new StorageTechnologyProfile(15u, 0.87)),
+                    new StorageTechnologyProfile(15u, 0.87),
+                    Energy.Zero),
             ];
         var region = new Region(
             "NSW1",

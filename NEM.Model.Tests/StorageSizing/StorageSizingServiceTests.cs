@@ -105,6 +105,44 @@ public sealed class StorageSizingServiceTests
     }
 
     [Fact]
+    public void Size_SeededInstalledBattery_PreservesSeedAcrossGrowthAndRefinementPasses()
+    {
+        // Seed is small enough that the installed battery still falls short of the target
+        // (charging is power-capped to ~27.84 MWh in the single available hour, so a 1 MWh
+        // seed still leaves ~1.16 MWh unserved) - growth and refinement must still run, and
+        // must carry the seed forward unchanged rather than dropping or recomputing it.
+        FlowSeries demand = Flow([0, 30]);
+        var installedBattery = new StorageFleet(
+            StorageTechnology.Battery,
+            Energy.FromMegawattHours(128),
+            Power.FromMegawatts(32),
+            BatteryProfile(),
+            Energy.FromMegawattHours(1));
+        var region = new Region(
+            "NSW1",
+            [new GeneratingFleet(GenerationTechnology.Solar, Power.FromMegawatts(100))],
+            demand,
+            resourceProfile: StorageMonotonicityTests.Resources(demand, [2_000, 0]),
+            storageFleets: [installedBattery],
+            storageTechnologyProfiles: BatteryProfiles());
+        var system = new PowerSystem(
+            new PowerSystemId("seeded-battery-system"),
+            new ScenarioId("test-scenario"),
+            [region]);
+
+        StorageSizingRunResult result = StorageSizingService.Size(
+            system,
+            Options(maximumPowerMw: 100, maximumEnergyMwh: 400));
+
+        result.Status.Should().Be(StorageSizingStatus.TargetMet);
+        var sizing = result.Regions.Single().BatterySizing;
+        sizing.WasChanged.Should().BeTrue();
+        StorageFleet finalBattery = result.PowerSystem.Regions.Single().StorageFleets.Single(
+            fleet => fleet.StorageTechnology == StorageTechnology.Battery);
+        finalBattery.SeedEnergy.Should().Be(Energy.FromMegawattHours(1));
+    }
+
+    [Fact]
     public void Size_EnergyConstrainedCase_GrowsAndRefinesEnergyAtMinimumPower()
     {
         double[] demand = Enumerable.Repeat(0.0, 8)

@@ -29,7 +29,8 @@ namespace NEM.Model.Tests.Grid
                 StorageTechnology.Battery,
                 Energy.FromMegawattHours(200),
                 Power.FromMegawatts(50),
-                new StorageTechnologyProfile(15u, 0.5));
+                new StorageTechnologyProfile(15u, 0.5),
+                Energy.Zero);
 
             StorageOutcome outcome = fleet.Operate(
                 Energy.Zero,
@@ -159,7 +160,8 @@ namespace NEM.Model.Tests.Grid
                 StorageTechnology.PumpedHydro,
                 Energy.FromMegawattHours(120),
                 Power.FromMegawatts(10),
-                pumpedHydro);
+                pumpedHydro,
+                Energy.Zero);
 
             battery.RoundTripEfficiency.Should().Be(0.87);
             pumpedHydro.RoundTripEfficiency.Should().Be(0.78);
@@ -206,11 +208,74 @@ namespace NEM.Model.Tests.Grid
                 .WithParameterName("technicalLifeYears");
         }
 
+        [Fact]
+        public void Constructor_DefaultsSeedEnergyToZero()
+        {
+            var fleet = Battery(storageCapacityMwh: 100, powerCapacityMw: 20);
+
+            fleet.SeedEnergy.Should().Be(Energy.Zero);
+        }
+
+        [Fact]
+        public void Constructor_AcceptsExplicitSeedEnergyWithinCapacity()
+        {
+            var fleet = new StorageFleet(
+                StorageTechnology.Battery,
+                Energy.FromMegawattHours(100),
+                Power.FromMegawatts(20),
+                new StorageTechnologyProfile(15u, 0.87),
+                Energy.FromMegawattHours(50));
+
+            fleet.SeedEnergy.Should().Be(Energy.FromMegawattHours(50));
+        }
+
+        [Fact]
+        public void Constructor_AllowsSeedEnergyEqualToStorageCapacity()
+        {
+            var fleet = new StorageFleet(
+                StorageTechnology.Battery,
+                Energy.FromMegawattHours(100),
+                Power.FromMegawatts(20),
+                new StorageTechnologyProfile(15u, 0.87),
+                Energy.FromMegawattHours(100));
+
+            fleet.SeedEnergy.Should().Be(fleet.StorageCapacity);
+        }
+
+        [Fact]
+        public void Constructor_RejectsNegativeSeedEnergy()
+        {
+            var act = () => new StorageFleet(
+                StorageTechnology.Battery,
+                Energy.FromMegawattHours(100),
+                Power.FromMegawatts(20),
+                new StorageTechnologyProfile(15u, 0.87),
+                Energy.FromMegawattHours(-1));
+
+            act.Should().Throw<ArgumentOutOfRangeException>()
+                .WithParameterName("seedEnergy");
+        }
+
+        [Fact]
+        public void Constructor_RejectsSeedEnergyAboveStorageCapacity()
+        {
+            var act = () => new StorageFleet(
+                StorageTechnology.Battery,
+                Energy.FromMegawattHours(100),
+                Power.FromMegawatts(20),
+                new StorageTechnologyProfile(15u, 0.87),
+                Energy.FromMegawattHours(101));
+
+            act.Should().Throw<ArgumentOutOfRangeException>()
+                .WithParameterName("seedEnergy");
+        }
+
         private static StorageFleet Battery(double storageCapacityMwh, double powerCapacityMw) =>
             new(
                 StorageTechnology.Battery,
                 Energy.FromMegawattHours(storageCapacityMwh),
                 Power.FromMegawatts(powerCapacityMw),
-                new StorageTechnologyProfile(15u, 0.87));
+                new StorageTechnologyProfile(15u, 0.87),
+                Energy.Zero);
     }
 }
