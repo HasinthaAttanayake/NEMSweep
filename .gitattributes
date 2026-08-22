@@ -1,6 +1,6 @@
 # Published artifacts. NEM.CLI writes these; nobody edits them by hand, and a rerun rewrites
 # millions of lines across a few hundred files. Left to itself GitHub tries to diff all of it,
-# gives up ("this diff is taking too long to generate"), and then renders nothing at all — the
+# gives up ("this diff is taking too long to generate"), and then renders nothing at all, the
 # handful of source files in the same pull request included.
 #
 # -diff compares them by hash instead of by content, so the source diff survives a data refresh.
@@ -9,3 +9,8 @@
 # `git diff --text` still produces a real diff locally when one is genuinely wanted; the artifacts
 # are plain JSON and the tooling that reads them is unaffected by anything declared here.
 NEM.Web/wwwroot/data/**/*.json -diff linguist-generated=true
+
+# Shell scripts run on Linux build agents (Cloudflare Pages runs NEM.Web/build.sh and
+# docs/build.sh). A CRLF checkout on Windows must not reach the index, or the shebang line
+# carries a stray carriage return and the script fails to execute.
+*.sh text eol=lf

@@ -5,15 +5,22 @@ using NEM.Model.Units;
 
 namespace NEM.Model.Simulation;
 
-/// <summary>Realised directed flow and loss on one interconnector over the run.</summary>
-/// <param name="Interconnector">The link these series belong to.</param>
-/// <param name="Flow">
-/// Non-negative scheduled transfer from the link's sending region to its receiving region,
-/// metered at the sending end.
-/// </param>
-/// <param name="Losses">Energy consumed by losses on this link.</param>
+/// <summary>
+/// Realised directed flow and loss on one interconnector over the run. One of these exists per
+/// directed link, so a reciprocal corridor produces two.
+/// </summary>
 public sealed record InterconnectorFlow
 {
+    /// <summary>Validates and creates directional evidence for one link.</summary>
+    /// <param name="interconnector">The link these series belong to.</param>
+    /// <param name="flow">
+    /// Non-negative scheduled transfer in MW from the link's sending region to its receiving
+    /// region, metered at the sending end.
+    /// </param>
+    /// <param name="losses">
+    /// Power lost on this link, in MW: the part of <paramref name="flow"/> that does not arrive.
+    /// Must be aligned with <paramref name="flow"/> and never greater than it.
+    /// </param>
     public InterconnectorFlow(
         Interconnector interconnector,
         FlowSeries flow,
@@ -35,7 +42,7 @@ public sealed record InterconnectorFlow
     /// <summary>Non-negative scheduled flow from the interconnector's sending region.</summary>
     public FlowSeries Flow { get; }
 
-    /// <summary>Non-negative loss attributed to this interconnector.</summary>
+    /// <summary>Non-negative power lost on this interconnector, in MW.</summary>
     public FlowSeries Losses { get; }
 }
 

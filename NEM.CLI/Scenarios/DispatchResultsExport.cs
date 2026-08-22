@@ -577,10 +577,8 @@ internal static class DispatchResultsExport
         foreach ((GenerationTechnology technology, FlowSeries availableGeneration) in
                  outcome.PerFleetGeneration.OrderBy(entry => entry.Key))
         {
-            /// <summary>
-            /// PerFleetDelivered is canonical delivered-to-load; generation minus curtailment also
-            /// includes generation booked to storage charging.
-            /// </summary>
+            // PerFleetDelivered is the canonical delivered-generation series; generation minus
+            // curtailment also includes generation booked to storage charging.
             FlowSeries deliveredGeneration = outcome.PerFleetDelivered[technology];
             deliveredGenerationByTechnology.Add(technology.ToString(), deliveredGeneration);
         }

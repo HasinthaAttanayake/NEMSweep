@@ -302,3 +302,9 @@ dist/
 
 # Local Claude Code launch configuration.
 .claude/launch.json
+
+# docfx documentation site. `_site` is the rendered output and `api` is metadata generated from
+# XML documentation comments; both are rebuilt from source by docs/build.sh.
+docs/_site/
+docs/api/*.yml
+docs/api/.manifest

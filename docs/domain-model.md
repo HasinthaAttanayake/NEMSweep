@@ -93,6 +93,7 @@ classDiagram
     class StorageDecision
     class StorageIntent
     class StorageOutcome
+    class SystemDispatchRun
     class RegionalDispatchRun
     class GenerationBudgetState
     class StorageSizingService
@@ -119,7 +120,8 @@ classDiagram
     Region "1" *-- "0..*" StorageFleet
     Region "1" *-- "1" DemandProfile
     Dispatcher --> PowerSystem : consumes
-    Dispatcher --> RegionalDispatchRun : creates per region
+    Dispatcher --> SystemDispatchRun : delegates the horizon
+    SystemDispatchRun --> RegionalDispatchRun : creates per region
     RegionalDispatchRun --> GenerationBudgetState : owns per fleet
     Dispatcher --> IStoragePolicy : invokes per interval
     Dispatcher --> DispatchContext : constructs
@@ -326,8 +328,8 @@ classDiagram
   deliberately rather than fixed, because the alternative (a real per-route
   distance table) is more precision than the rest of the cost model supports.
   **Route length is a proxy, and it runs long.** The distance is measured
-  between each region's *solar* weather site — chosen for renewable resource
-  quality, not for where a transmission line terminates — so corridors whose
+  between each region's *solar* weather site, chosen for renewable resource
+  quality rather than for where a transmission line terminates, so corridors whose
   resource sites sit far from the interconnector's real endpoints are
   overstated against the actual NEM route:
 
@@ -342,7 +344,7 @@ classDiagram
   **Reciprocal links each carry the full route length** (see the
   `TransmissionCostParameters` remarks): every corridor is declared as two
   directed interconnectors, each costed independently at the corridor's full
-  distance, so the same kilometre of conductor is paid for twice — once per
+  distance, so the same kilometre of conductor is paid for twice, once per
   direction. Charging each of the 5 physical corridors once at its larger
   directed rating gives 3,954,000 km·MW against the 7,035,547 km·MW actually
   charged across all 10 directed links, so this convention alone accounts for
@@ -492,12 +494,13 @@ commercial maximum Battery power, maximum Battery energy, and pass bound. New
 or undersized Battery storage is first raised to 30 MW and 120 MWh. Every sized
 candidate preserves a minimum four-hour duration.
 
-After the floor, total USE divided by current Battery energy and peak unserved
-power divided by current Battery power steer monotone geometric growth. Storage
-dispatch is stepwise. For a region outside its USE target, each growth iteration
-evaluates feasible larger Battery energy, power (with the four-hour duration
-floor), and combined candidates. It selects the candidate with the greatest
-material USE reduction. When none improves USE, the search returns
+After the floor, growth is geometric: each iteration offers the region's current
+Battery power doubled, its current energy doubled, and both doubled together,
+each clamped to the configured maxima and to the four-hour duration floor. The
+reliability metrics do not set the growth factor; they choose between the
+resulting probes. Every candidate is dispatched across the whole system, and the
+search takes the one that materially reduces USE by the most, breaking ties on
+peak unserved power. When none improves USE, the search returns
 `StorageNoLongerImprovesReliability`; this identifies solver stagnation and does
 not claim whether generation timing or storage policy is the underlying cause.
 Explicit MW, MWh, and pass bounds also provide termination; reaching a capacity

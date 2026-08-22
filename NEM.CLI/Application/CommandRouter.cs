@@ -1,15 +1,29 @@
+using System.Reflection;
 using NEM.CLI.Demand;
 using NEM.CLI.Generation;
 using NEM.CLI.Infrastructure;
 using NEM.CLI.Ingest;
 using NEM.CLI.Scenarios;
 using NEM.CLI.Weather;
+using NEM.Contracts;
 
 namespace NEM.CLI.Application;
 
+/// <summary>
+/// Maps a command line onto one command handler. Every command is a flag literal followed by zero
+/// to three positional arguments; there is no options parser, because the surface is small enough
+/// that a pattern match over the argument array is easier to read than a framework.
+/// </summary>
+/// <remarks>
+/// Exit codes are the contract callers script against: <c>0</c> success, <c>1</c> a command that
+/// ran and failed, <c>2</c> a command line this router could not route. Requesting help is a
+/// success, so <c>--help</c> writes usage to standard output and returns <c>0</c>, while an
+/// unrecognised command line writes the same usage to standard error and returns <c>2</c>.
+/// </remarks>
 internal sealed class CommandRouter
 {
     private readonly CliContext _context;
+    private readonly TextWriter _output;
     private readonly TextWriter _error;
 
     public CommandRouter(
@@ -19,15 +33,19 @@ internal sealed class CommandRouter
         TextWriter error)
     {
         _context = new CliContext(paths, settingsDirectory, output, error);
+        _output = output;
         _error = error;
     }
 
+    /// <summary>Routes one command line and returns the process exit code.</summary>
     public int Run(string[] args)
     {
         try
         {
             return args switch
             {
+                ["--help"] or ["-h"] or ["--usage"] => PrintUsage(_output, 0),
+                ["--version"] => PrintVersion(),
                 ["--run-scenario"] => ScenarioCommand.Run(_context),
                 ["--run-scenario", var scenarioConfigPath] => ScenarioCommand.Run(_context, scenarioConfigPath),
                 ["--fan-out-sweep", var definitionPath] => SweepFanOutCommand.Run(_context, definitionPath),
@@ -38,21 +56,22 @@ internal sealed class CommandRouter
                 ["--validate-inputs", var bundlePath] => ValidateInputsCommand.Run(_context, bundlePath),
                 ["--ingest"] => IngestCommand.Run(_context),
                 ["--ingest", var bundlePath] => IngestCommand.Run(_context, bundlePath),
+                ["--import-demand"] =>
+                    OperationalDemandCommand.Run(_context, string.Empty),
+                ["--import-demand", var outputDirectory] =>
+                    OperationalDemandCommand.Run(_context, outputDirectory),
                 ["--generation-information", var path] =>
                     GenerationInformationCommand.Run(_context, path),
                 ["--epw-report", var regionId, var solarPath] =>
-                    EpwCommands.WriteReport(_context, regionId, solarPath),
+                    EpwCommands.WriteReport(_context, RequireKnownRegion(regionId), solarPath),
                 ["--epw-report", var regionId, var solarPath, var windPath] =>
-                    EpwCommands.WriteReport(_context, regionId, solarPath, windPath),
+                    EpwCommands.WriteReport(_context, RequireKnownRegion(regionId), solarPath, windPath),
                 ["--epw-series", var path] => EpwCommands.PrintSeries(_context, path),
                 ["--epw-validate", var path] => EpwCommands.Validate(_context, path),
                 ["--epw-gaps", var path] => EpwCommands.PrintGaps(_context, path),
                 ["--epw-rows", var path] => EpwCommands.PrintRows(_context, path),
                 ["--epw-header", var path] => EpwCommands.PrintHeader(_context, path),
-                [] => OperationalDemandCommand.Run(_context, _context.Paths.DemandDataPath),
-                [var outputPath] when !outputPath.StartsWith('-') =>
-                    OperationalDemandCommand.Run(_context, outputPath),
-                _ => PrintUsage(),
+                _ => PrintUsage(_error, 2),
             };
         }
         catch (Exception exception)
@@ -62,19 +81,57 @@ internal sealed class CommandRouter
         }
     }
 
-    private int PrintUsage()
+    /// <summary>
+    /// Rejects a region argument that is not one of the five NEM regions. Region identity is a bare
+    /// string throughout the pipeline, so a typo here would otherwise publish a
+    /// <c>weather-{typo}.json</c> artifact that nothing ever reads.
+    /// </summary>
+    private static string RequireKnownRegion(string regionId) =>
+        NemRegions.IsKnown(regionId)
+            ? regionId
+            : throw new ArgumentException(
+                $"Region '{regionId}' is not a NEM region. Expected one of: "
+                + $"{string.Join(", ", NemRegions.All.Order(StringComparer.Ordinal))}.");
+
+    private int PrintVersion()
     {
-        _error.WriteLine("Usage:");
-        _error.WriteLine("  NEM.CLI --run-scenario [scenario-config.json]");
-        _error.WriteLine("  NEM.CLI --fan-out-sweep <sweep-definition.json>");
-        _error.WriteLine("  NEM.CLI --run-sweep <sweep-definition.json>");
-        _error.WriteLine("  NEM.CLI --describe-schema <scenario|sweep>");
-        _error.WriteLine("  NEM.CLI --validate-inputs [input-bundle]");
-        _error.WriteLine("  NEM.CLI --ingest [input-bundle]");
-        _error.WriteLine("  NEM.CLI --generation-information <workbook.xlsx>");
-        _error.WriteLine("  NEM.CLI --epw-report <region> <solar.epw> [wind.epw]");
-        _error.WriteLine("  NEM.CLI [demand-output.json]");
-        return 2;
+        Assembly assembly = typeof(CommandRouter).Assembly;
+        string version = assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+            ?? assembly.GetName().Version?.ToString()
+            ?? "unknown";
+        _output.WriteLine($"NEM.CLI {version}");
+        return 0;
+    }
+
+    private static int PrintUsage(TextWriter writer, int exitCode)
+    {
+        writer.WriteLine("Usage:");
+        writer.WriteLine("  NEM.CLI --help");
+        writer.WriteLine("  NEM.CLI --version");
+        writer.WriteLine();
+        writer.WriteLine("  Scenario and sweep runs:");
+        writer.WriteLine("  NEM.CLI --run-scenario [scenario-config.json]");
+        writer.WriteLine("  NEM.CLI --fan-out-sweep <sweep-definition.json>");
+        writer.WriteLine("  NEM.CLI --run-sweep <sweep-definition.json>");
+        writer.WriteLine("  NEM.CLI --describe-schema <scenario|sweep>");
+        writer.WriteLine();
+        writer.WriteLine("  Input bundles:");
+        writer.WriteLine("  NEM.CLI --validate-inputs [input-bundle]");
+        writer.WriteLine("  NEM.CLI --ingest [input-bundle]");
+        writer.WriteLine();
+        writer.WriteLine("  Single-source imports (all covered by --ingest):");
+        writer.WriteLine("  NEM.CLI --import-demand [output-directory]");
+        writer.WriteLine("  NEM.CLI --generation-information <workbook.xlsx>");
+        writer.WriteLine("  NEM.CLI --epw-report <region> <solar.epw> [wind.epw]");
+        writer.WriteLine();
+        writer.WriteLine("  EPW diagnostics:");
+        writer.WriteLine("  NEM.CLI --epw-series <file.epw>");
+        writer.WriteLine("  NEM.CLI --epw-validate <file.epw>");
+        writer.WriteLine("  NEM.CLI --epw-gaps <file.epw>");
+        writer.WriteLine("  NEM.CLI --epw-rows <file.epw>");
+        writer.WriteLine("  NEM.CLI --epw-header <file.epw>");
+        return exitCode;
     }
 
     private static string OperationName(string[] args) => args.FirstOrDefault() switch
@@ -85,6 +142,7 @@ internal sealed class CommandRouter
         "--describe-schema" => "Schema description",
         "--validate-inputs" => "Input validation",
         "--ingest" => "Input ingest",
+        "--import-demand" => "Operational-demand import",
         "--generation-information" => "Generation-information import",
         "--epw-report" => "EPW report",
         "--epw-series" => "EPW series",
@@ -92,6 +150,6 @@ internal sealed class CommandRouter
         "--epw-gaps" => "EPW gap analysis",
         "--epw-rows" => "EPW row report",
         "--epw-header" => "EPW header report",
-        _ => "Operational-demand import",
+        _ => "Command",
     };
 }

@@ -16,14 +16,38 @@ namespace NEM.Model.Generation.Wind
     /// </summary>
     public static class WindPowerCurve
     {
+        /// <summary>Nameplate capacity of the reference turbine the curve is digitised from.</summary>
         public static Power ReferenceTurbineCapacity { get; } = Power.FromMegawatts(3.4);
 
+        /// <summary>
+        /// Air density the manufacturer curve is specified at. Stated because no air-density
+        /// correction is applied: a site materially denser or thinner than this will be modelled
+        /// slightly wrong.
+        /// </summary>
         public const double ReferenceAirDensityKilogramsPerCubicMetre = 1.225;
+
+        /// <summary>Hub height assumed when settings do not override it.</summary>
         public const double DefaultHubHeightMetres = 120.0;
+
+        /// <summary>
+        /// Wind-shear exponent assumed when settings do not override it, used to extrapolate the
+        /// measured wind speed from its measurement height up to hub height.
+        /// </summary>
         public const double DefaultShearExponent = 0.2;
+
+        /// <summary>Speed below which the turbine produces nothing.</summary>
         public const double CutInWindSpeedMetresPerSecond = 2.5;
+
+        /// <summary>
+        /// Speed from which the turbine produces its full rating, holding that rating up to the
+        /// cut-out speed. Above cut-out the turbine shuts down and output falls to zero.
+        /// </summary>
         public const double RatedWindSpeedMetresPerSecond = 11.0;
+
+        /// <summary>Lowest cut-out speed the brochure permits; a lower setting is rejected.</summary>
         public const double MinimumCutOutWindSpeedMetresPerSecond = 20.0;
+
+        /// <summary>Speed above which the turbine shuts down, when settings do not override it.</summary>
         public const double DefaultCutOutWindSpeedMetresPerSecond =
             MinimumCutOutWindSpeedMetresPerSecond;
 
@@ -46,6 +70,18 @@ namespace NEM.Model.Generation.Wind
             (11.0, 1.0),
         ];
 
+        /// <summary>
+        /// Extrapolates a measured wind-speed trace to hub height using the power law
+        /// <c>v_hub = v_measured * (h_hub / h_measured) ^ shear</c>.
+        /// </summary>
+        /// <param name="measuredWindSpeed">
+        /// A wind-speed trace in metres per second that carries its measurement height.
+        /// </param>
+        /// <param name="settings">Hub height and shear exponent, or null for the defaults.</param>
+        /// <returns>A wind-speed trace tagged with the hub height it was corrected to.</returns>
+        /// <exception cref="ArgumentException">
+        /// The trace is not in metres per second, or carries no measurement height.
+        /// </exception>
         public static TraceSeries CorrectToHubHeight(
             TraceSeries measuredWindSpeed,
             WindPowerCurveSettings? settings = null)
@@ -71,6 +107,19 @@ namespace NEM.Model.Generation.Wind
                 settings.HubHeightMetres);
         }
 
+        /// <summary>
+        /// Converts a measured wind-speed trace into a generation series for an installed fleet.
+        /// Corrects to hub height, reads the reference curve by piecewise-linear interpolation, and
+        /// scales the resulting capacity factor by installed capacity.
+        /// </summary>
+        /// <param name="measuredWindSpeed">A wind-speed trace with its measurement height.</param>
+        /// <param name="installedCapacity">Fleet nameplate capacity in MW. Must not be negative.</param>
+        /// <param name="settings">Curve settings, or null for the defaults.</param>
+        /// <returns>Generation in MW over the trace's timeline.</returns>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// Installed capacity is negative, or the cut-out speed is below
+        /// <see cref="MinimumCutOutWindSpeedMetresPerSecond"/>.
+        /// </exception>
         public static FlowSeries Calculate(
             TraceSeries measuredWindSpeed,
             Power installedCapacity,

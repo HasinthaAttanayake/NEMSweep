@@ -13,6 +13,37 @@ public sealed class StorageSizingRunResult
 {
     private const double FlowTolerance = 1e-9;
 
+    /// <summary>Validates and creates a whole-system Battery sizing result.</summary>
+    /// <param name="powerSystem">Final candidate power system evaluated by the search.</param>
+    /// <param name="regions">
+    /// Final sizing and dispatch evidence for each region, corresponding exactly to
+    /// <paramref name="powerSystem"/>'s regions.
+    /// </param>
+    /// <param name="installedBatteryAssessments">Assessment of the Battery capacities installed before the search began.</param>
+    /// <param name="dispatchPassCount">Number of whole-system dispatch passes performed. Must not be negative.</param>
+    /// <param name="status">Terminal status of the sizing search.</param>
+    /// <param name="terminationEvidence">Human-readable evidence explaining the terminal status.</param>
+    /// <param name="energyLimitedAssessment">
+    /// Whole-system generation-availability evidence when the result is energy-limited; null otherwise.
+    /// Must cite <paramref name="powerSystem"/>'s identity when supplied.
+    /// </param>
+    /// <param name="interconnectorFlows">
+    /// Final solver evidence for each interconnector, one entry per link in
+    /// <paramref name="powerSystem"/>, matching endpoints and directed capacity with non-negative
+    /// flow and loss values.
+    /// </param>
+    /// <param name="trajectory">
+    /// Every successful whole-system dispatch attempted by the search, one entry per dispatch pass
+    /// when supplied.
+    /// </param>
+    /// <exception cref="ArgumentException">
+    /// A regional result is null or does not correspond to a final system region by generation
+    /// technology or demand timeline, an installed assessment is null, the energy-limited
+    /// assessment cites a different power system, the trajectory length does not match the pass
+    /// count, or interconnector flows do not match the final system topology or its non-negative
+    /// flow/loss limits.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="dispatchPassCount"/> is negative.</exception>
     public StorageSizingRunResult(
         PowerSystem powerSystem,
         IReadOnlyList<RegionalSizingResult> regions,

@@ -7,8 +7,38 @@ using NEM.Model.Weather;
 
 namespace NEM.Model.Economics;
 
+/// <summary>
+/// Prices a dispatched system for one modelled year: annuitised capital plus one year of operating
+/// cost for every generation, storage and transmission asset, divided by the energy actually served.
+/// </summary>
+/// <remarks>
+/// <para>
+/// This is the cost of building and running the system, not a retail electricity bill. It excludes
+/// retail margin, network distribution beyond the modelled interconnectors, taxes, and market
+/// settlement. The figures are modelled estimates, not audited accounts.
+/// </para>
+/// <para>
+/// Storage asset cost does not add charging energy, because gross-generation variable operating
+/// cost and fuel already price the generation used to charge, and therefore already include
+/// round-trip losses. The storage component is annualised storage asset cost over the same served
+/// energy denominator; it is not a standalone levelised cost of storage.
+/// </para>
+/// <para>
+/// Transmission is annuitised from each directed interconnector's cost assumptions and charged once
+/// at system level, so regional costs deliberately do not sum to the system total. Route length is
+/// the great-circle distance between the endpoint regions' weather sites, which is why costing a
+/// linked system requires every interconnector endpoint to carry a resource profile.
+/// </para>
+/// </remarks>
 public static class PowerSystemCostCalculator
 {
+    /// <summary>
+    /// Prices the final system a storage sizing run settled on, using that run's own dispatch
+    /// evidence.
+    /// </summary>
+    /// <param name="scenario">The scenario supplying cost assumptions and the cost basis.</param>
+    /// <param name="runResult">A completed sizing run, including the capacity it introduced.</param>
+    /// <returns>System and per-region annual costs and their levelised costs.</returns>
     public static PowerSystemCostBreakdown Calculate(
         Scenario scenario,
         StorageSizingRunResult runResult)
@@ -20,6 +50,21 @@ public static class PowerSystemCostCalculator
             runResult.Regions.Select(region => region.DispatchOutcome).ToArray());
     }
 
+    /// <summary>Prices a realised system against the dispatch evidence produced for it.</summary>
+    /// <param name="scenario">
+    /// The scenario supplying cost assumptions and the cost basis. Must cover exactly one year, and
+    /// must carry matching assumptions for every realised storage fleet, including capacity storage
+    /// sizing introduced.
+    /// </param>
+    /// <param name="powerSystem">The realised system whose assets are being priced.</param>
+    /// <param name="dispatchOutcomes">
+    /// Exactly one outcome per system region, aligned to that region's demand.
+    /// </param>
+    /// <returns>System and per-region annual costs and their levelised costs.</returns>
+    /// <exception cref="ArgumentException">
+    /// The scenario, system and outcomes do not correspond, or a realised storage fleet has no
+    /// matching scenario assumptions.
+    /// </exception>
     public static PowerSystemCostBreakdown Calculate(
         Scenario scenario,
         PowerSystem powerSystem,

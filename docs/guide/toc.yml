@@ -1,0 +1,12 @@
+- name: Getting started
+  href: index.md
+- name: CLI reference
+  href: cli.md
+- name: Input bundles
+  href: input-bundles.md
+- name: Scenario configuration
+  href: scenarios.md
+- name: Sweeps
+  href: sweeps.md
+- name: Outputs and provenance
+  href: outputs.md

@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using NEM.CLI.Infrastructure;
+using NEM.Contracts;
 
 namespace NEM.CLI.Configuration;
 
@@ -37,9 +38,11 @@ internal sealed record SweepDefinition(
 
     private void Validate(RepositoryPaths paths)
     {
-        if (SchemaVersion != 1)
+        if (SchemaVersion != ArtifactSchemaVersions.SweepDefinition)
         {
-            throw new FormatException($"Sweep '{SweepId}': schema version {SchemaVersion} is not supported; expected 1.");
+            throw new FormatException(
+                $"Sweep '{SweepId}': schema version {SchemaVersion} is not supported; "
+                + $"expected {ArtifactSchemaVersions.SweepDefinition}.");
         }
 
         if (string.IsNullOrWhiteSpace(SweepId) || !SafeId.IsMatch(SweepId))

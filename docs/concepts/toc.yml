@@ -1,0 +1,12 @@
+- name: What the model does
+  href: index.md
+- name: Dispatch
+  href: dispatch.md
+- name: Storage sizing
+  href: storage-sizing.md
+- name: Economics
+  href: economics.md
+- name: Transmission
+  href: transmission.md
+- name: Domain model reference
+  href: ../domain-model.md

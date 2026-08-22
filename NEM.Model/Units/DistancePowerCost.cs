@@ -6,10 +6,12 @@ namespace NEM.Model.Units;
 /// </summary>
 public readonly record struct DistancePowerCost
 {
+    /// <summary>The rate in AUD per kilometre per MW of transfer capacity.</summary>
     public decimal AudPerKmPerMw { get; }
 
     private DistancePowerCost(decimal audPerKmPerMw) => AudPerKmPerMw = audPerKmPerMw;
 
+    /// <summary>Creates a <see cref="DistancePowerCost"/> from a rate in AUD/km/MW.</summary>
     public static DistancePowerCost FromAudPerKmPerMw(decimal audPerKmPerMw) => new(audPerKmPerMw);
 
     /// <summary>Cost of a line: AUD = AUD/km/MW × km built × MW of capacity.</summary>
