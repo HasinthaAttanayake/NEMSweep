@@ -6,6 +6,17 @@ namespace NEM.Model.Weather
     /// <summary>Aligned weather and solar-position traces representing a NEM region.</summary>
     public sealed class RegionalResourceProfile
     {
+        /// <summary>
+        /// Creates a <see cref="RegionalResourceProfile"/> from six traces that must all share
+        /// the same start, resolution, and length. Each trace must carry the unit its parameter
+        /// name implies, and <paramref name="solarZenith"/> is required (not null).
+        /// </summary>
+        /// <param name="globalHorizontalRadiation">Global horizontal radiation trace (Wh/m²).</param>
+        /// <param name="directNormalRadiation">Direct normal radiation trace (Wh/m²).</param>
+        /// <param name="diffuseHorizontalRadiation">Diffuse horizontal radiation trace (Wh/m²).</param>
+        /// <param name="solarZenith">Geometric solar zenith angles for the region.</param>
+        /// <param name="dryBulbTemperature">Dry-bulb temperature trace (degrees Celsius).</param>
+        /// <param name="windSpeed">Wind speed trace (m/s).</param>
         public RegionalResourceProfile(
             TraceSeries globalHorizontalRadiation,
             TraceSeries directNormalRadiation,
@@ -47,11 +58,22 @@ namespace NEM.Model.Weather
             WindSpeed = windSpeed;
         }
 
+        /// <summary>Global horizontal radiation trace (Wh/m²).</summary>
         public TraceSeries GlobalHorizontalRadiation { get; }
+
+        /// <summary>Direct normal radiation trace (Wh/m²).</summary>
         public TraceSeries DirectNormalRadiation { get; }
+
+        /// <summary>Diffuse horizontal radiation trace (Wh/m²).</summary>
         public TraceSeries DiffuseHorizontalRadiation { get; }
+
+        /// <summary>Geometric solar zenith angles for the region, aligned with the other traces.</summary>
         public SolarZenithSeries SolarZenith { get; }
+
+        /// <summary>Dry-bulb temperature trace (degrees Celsius).</summary>
         public TraceSeries DryBulbTemperature { get; }
+
+        /// <summary>Wind speed trace (m/s).</summary>
         public TraceSeries WindSpeed { get; }
 
         /// <summary>

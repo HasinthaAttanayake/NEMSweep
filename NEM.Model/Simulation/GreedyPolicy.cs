@@ -11,6 +11,16 @@ namespace NEM.Model.Simulation
     /// </summary>
     public sealed class GreedyPolicy : IStoragePolicy
     {
+        /// <summary>
+        /// Requests discharge for a deficit, or surplus-only charging for a surplus, from
+        /// Battery first and pumped hydro second, stopping once the residual is fully covered or
+        /// fleet headroom runs out.
+        /// </summary>
+        /// <param name="context">An immutable snapshot of the current interval.</param>
+        /// <returns>
+        /// Zero or more discharge or surplus-charge intents, or <see cref="StorageDecision.None"/>
+        /// when the residual is zero or no fleet has headroom.
+        /// </returns>
         public StorageDecision Decide(DispatchContext context)
         {
             if (context.Residual == Power.Zero)

@@ -6,7 +6,7 @@ namespace NEM.CLI.Demand;
 
 internal static class OperationalDemandCommand
 {
-    public static int Run(CliContext context, string outputPath)
+    public static int Run(CliContext context, string outputDirectoryPath)
     {
         CliSettings settings = context.LoadSettings();
         string inputBundleRoot = context.Paths.ResolveConfiguredPath(settings.InputBundleRoot);
@@ -16,8 +16,9 @@ internal static class OperationalDemandCommand
             inputBundle.Manifest.Regions,
             inputBundle.Manifest.Period.Start,
             inputBundle.Manifest.Period.End);
-        string outputDirectory = Path.GetDirectoryName(Path.GetFullPath(outputPath))
-            ?? context.Paths.ResolveConfiguredPath(settings.OutputRoot);
+        string outputDirectory = string.IsNullOrWhiteSpace(outputDirectoryPath)
+            ? context.Paths.ResolveConfiguredPath(settings.OutputRoot)
+            : Path.GetFullPath(outputDirectoryPath);
         Directory.CreateDirectory(outputDirectory);
 
         foreach (OperationalDemandData demandData in demandByRegion.Values)

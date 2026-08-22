@@ -12,6 +12,30 @@ namespace NEM.Model.Grid
         private readonly IReadOnlyDictionary<DateOnly, double>? _monthlyCapacityFactors;
         private readonly WindPowerCurveSettings _windPowerCurveSettings;
 
+        /// <summary>Validates and creates a generating fleet.</summary>
+        /// <param name="generationTechnology">The generation technology this fleet represents.</param>
+        /// <param name="nameplateCapacity">Installed nameplate capacity in MW. Must not be negative.</param>
+        /// <param name="monthlyCapacityFactors">
+        /// Monthly energy budget as a capacity factor, keyed by the first day of each month.
+        /// Required for Hydro and rejected for every other technology.
+        /// </param>
+        /// <param name="windPowerCurveSettings">
+        /// Wind power-curve settings. Only valid for a Wind fleet; defaults to
+        /// <see cref="WindPowerCurveSettings.Default"/> when a Wind fleet omits it.
+        /// </param>
+        /// <param name="shortRunMarginalCost">
+        /// Cost of the fleet's next MWh generated, in AUD/MWh generated. Derived by
+        /// <see cref="NEM.Model.Scenarios.GenerationCostParameters.ShortRunMarginalCostFor"/> at
+        /// scenario realisation rather than declared independently here.
+        /// </param>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// Nameplate capacity is negative, or a monthly capacity factor is outside zero to one.
+        /// </exception>
+        /// <exception cref="ArgumentException">
+        /// Wind power-curve settings are supplied for a non-Wind fleet, monthly capacity factors
+        /// are missing for Hydro or supplied for a non-Hydro fleet, the collection is empty, or a
+        /// key is not the first day of a month.
+        /// </exception>
         public GeneratingFleet(
             GenerationTechnology generationTechnology,
             Power nameplateCapacity,
@@ -85,11 +109,18 @@ namespace NEM.Model.Grid
             _windPowerCurveSettings = windPowerCurveSettings ?? WindPowerCurveSettings.Default;
         }
 
+        /// <summary>The generation technology this fleet represents.</summary>
         public GenerationTechnology GenerationTechnology { get; }
+        /// <summary>Installed nameplate capacity in MW.</summary>
         public Power NameplateCapacity { get; }
+        /// <summary>Cost of this fleet's next MWh generated, in AUD/MWh generated.</summary>
         public GenerationEnergyCost ShortRunMarginalCost { get; }
         internal IReadOnlyDictionary<DateOnly, double>? MonthlyCapacityFactors =>
             _monthlyCapacityFactors;
+        /// <summary>
+        /// Whether this fleet's output depends on an intermittent weather resource (Solar or
+        /// Wind) rather than being fully controllable subject to fuel or budget constraints.
+        /// </summary>
         public bool IsIntermittentRenewable => GenerationTechnology is GenerationTechnology.Solar or GenerationTechnology.Wind; // TODO: move to TechnologyProfile as appropriate
 
         internal FlowSeries AvailableCapacityFor(

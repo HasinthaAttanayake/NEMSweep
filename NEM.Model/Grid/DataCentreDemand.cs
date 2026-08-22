@@ -22,6 +22,18 @@ public static class DataCentreDemand
     /// </summary>
     public const double LoadFactor = 1.0;
 
+    /// <summary>Expands a data-centre nameplate into a flat demand component series.</summary>
+    /// <param name="nameplate">Data-centre nameplate power in MW. Must not be negative.</param>
+    /// <param name="start">Series start, in NEM market time (UTC+10).</param>
+    /// <param name="resolution">Interval length of the returned series.</param>
+    /// <param name="intervalCount">Number of intervals to generate. Must be positive.</param>
+    /// <returns>
+    /// A flat series at <paramref name="nameplate"/> multiplied by <see cref="LoadFactor"/> for
+    /// every interval, rather than a duty-cycle shape.
+    /// </returns>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Nameplate is negative, or <paramref name="intervalCount"/> is not positive.
+    /// </exception>
     public static FlowSeries Expand(
         Power nameplate,
         DateTimeOffset start,

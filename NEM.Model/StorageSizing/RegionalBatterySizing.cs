@@ -5,6 +5,15 @@ namespace NEM.Model.StorageSizing;
 /// <summary>Total installed Battery capacity selected or assessed for one region.</summary>
 public sealed record RegionalBatterySizing
 {
+    /// <summary>Validates and creates a regional Battery sizing.</summary>
+    /// <param name="regionId">Identifies the region whose Battery capacity is described.</param>
+    /// <param name="energyCapacity">Total installed Battery energy capacity in MWh. Must be zero or positive.</param>
+    /// <param name="powerCapacity">Total installed Battery power capacity in MW. Must be zero or positive.</param>
+    /// <param name="wasChanged">Whether the sizing search changed capacity from the installed baseline.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Either capacity is negative.</exception>
+    /// <exception cref="ArgumentException">
+    /// One capacity is zero while the other is positive; a fleet is either fully installed or absent.
+    /// </exception>
     public RegionalBatterySizing(
         string regionId,
         Energy energyCapacity,

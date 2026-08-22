@@ -4,6 +4,11 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- The published docs site is generated from these comments, so a gap is a build break:
+         CS1591 a missing comment, CS1572/CS1573 param tags out of step with the signature,
+         CS1574 a cross-reference that will not resolve. -->
+    <WarningsAsErrors>$(WarningsAsErrors);CS1572;CS1573;CS1574;CS1591</WarningsAsErrors>
   </PropertyGroup>
 
 </Project>

@@ -4,8 +4,41 @@ using NEM.Model.Weather;
 
 namespace NEM.Model.Scenarios;
 
+/// <summary>
+/// The pure transformation from scenario intent to a realised
+/// <see cref="NEM.Model.Grid.PowerSystem"/>. It is the boundary between what a user asked for and
+/// what the model will actually dispatch.
+/// </summary>
+/// <remarks>
+/// The service has no I/O and no knowledge of files: the caller supplies demand and weather already
+/// parsed. That is what keeps <see cref="NEM.Model.Simulation.Dispatcher"/> scenario-blind and lets
+/// storage sizing rebuild candidate systems without becoming scenario-aware.
+/// </remarks>
 public static class ScenarioDerivation
 {
+    /// <summary>Realises a power system from scenario intent plus aligned regional inputs.</summary>
+    /// <param name="scenario">The intent to realise.</param>
+    /// <param name="baseDemandByRegion">
+    /// Exactly one base demand series per scenario region, keyed case-insensitively, covering
+    /// exactly the scenario period. Resampled to hourly resolution.
+    /// </param>
+    /// <param name="resourceProfilesByRegion">
+    /// Optional weather resources per region, aligned to the same timeline. Required for any region
+    /// with intermittent generation, and for any region that is an interconnector endpoint, because
+    /// a region's resource profile is the model's only source of its location.
+    /// </param>
+    /// <param name="additiveDemandComponentsByRegion">
+    /// Optional named demand flows added on top of base demand, for example a data-centre load.
+    /// Each must be non-negative and exactly aligned with that region's base demand.
+    /// </param>
+    /// <returns>
+    /// The realised system. Storage plans with positive capacity become fleets; zero-capacity plans
+    /// are omitted, but their assumptions are retained on the region so storage sizing can use them.
+    /// </returns>
+    /// <exception cref="ArgumentException">
+    /// The demand does not cover exactly the scenario period and regions, or an optional input is
+    /// not aligned with base demand.
+    /// </exception>
     public static PowerSystem Derive(
         Scenario scenario,
         IReadOnlyDictionary<string, FlowSeries> baseDemandByRegion,

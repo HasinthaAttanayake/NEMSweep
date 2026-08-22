@@ -2,6 +2,7 @@ using AwesomeAssertions;
 using NEM.CLI.Application;
 using NEM.CLI.Configuration;
 using NEM.CLI.Infrastructure;
+using NEM.Contracts;
 using System.Text.Json;
 
 namespace NEM.CLI.Tests.Application;
@@ -36,6 +37,111 @@ public sealed class CommandRouterTests
         exitCode.Should().Be(2);
         error.ToString().Should().Contain("Usage:");
         output.ToString().Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("--help")]
+    [InlineData("-h")]
+    public void Run_PrintsUsageToOutputAndSucceedsWhenHelpIsRequested(string flag)
+    {
+        using var fixture = new CliFixture();
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var application = new CommandRouter(fixture.Paths, fixture.RootPath, output, error);
+
+        int exitCode = application.Run([flag]);
+
+        exitCode.Should().Be(0);
+        output.ToString().Should().Contain("Usage:").And.Contain("--run-scenario");
+        error.ToString().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Run_ListsEveryRoutedCommandInUsage()
+    {
+        using var fixture = new CliFixture();
+        using var output = new StringWriter();
+        var application = new CommandRouter(fixture.Paths, fixture.RootPath, output, TextWriter.Null);
+
+        application.Run(["--help"]).Should().Be(0);
+
+        string usage = output.ToString();
+        string[] routed =
+        [
+            "--version", "--run-scenario", "--fan-out-sweep", "--run-sweep", "--describe-schema",
+            "--validate-inputs", "--ingest", "--import-demand", "--generation-information",
+            "--epw-report", "--epw-series", "--epw-validate", "--epw-gaps", "--epw-rows",
+            "--epw-header",
+        ];
+        foreach (string command in routed)
+        {
+            usage.Should().Contain(command);
+        }
+    }
+
+    [Fact]
+    public void Run_ReportsAVersion()
+    {
+        using var fixture = new CliFixture();
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var application = new CommandRouter(fixture.Paths, fixture.RootPath, output, error);
+
+        application.Run(["--version"]).Should().Be(0);
+
+        output.ToString().Should().StartWith("NEM.CLI ");
+        error.ToString().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Run_RejectsABarePathInsteadOfSilentlyImportingDemand()
+    {
+        using var fixture = new CliFixture();
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var application = new CommandRouter(fixture.Paths, fixture.RootPath, output, error);
+
+        int exitCode = application.Run(["scenarios/nem-fy2026-all-regions.json"]);
+
+        exitCode.Should().Be(2);
+        error.ToString().Should().Contain("Usage:");
+        output.ToString().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void EpwReport_RejectsARegionThatIsNotANemRegion()
+    {
+        using var fixture = new CliFixture();
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var application = new CommandRouter(fixture.Paths, fixture.RootPath, output, error);
+
+        int exitCode = application.Run(["--epw-report", "NSW", "solar.epw"]);
+
+        exitCode.Should().Be(1);
+        error.ToString().Should().Contain("is not a NEM region");
+    }
+
+    [Theory]
+    [InlineData("scenario", ArtifactSchemaVersions.ScenarioConfig)]
+    [InlineData("sweep", ArtifactSchemaVersions.SweepDefinition)]
+    public void DescribeSchema_PublishesTheSchemaVersionTheValidatorAccepts(
+        string format,
+        int expectedVersion)
+    {
+        using var fixture = new CliFixture();
+        using var output = new StringWriter();
+        var application = new CommandRouter(fixture.Paths, fixture.RootPath, output, TextWriter.Null);
+
+        application.Run(["--describe-schema", format]).Should().Be(0);
+
+        using JsonDocument document = JsonDocument.Parse(output.ToString());
+        document.RootElement
+            .GetProperty("properties")
+            .GetProperty("schemaVersion")
+            .GetProperty("const")
+            .GetInt32()
+            .Should().Be(expectedVersion);
     }
 
     [Fact]

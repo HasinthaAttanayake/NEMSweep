@@ -9,12 +9,33 @@ namespace NEM.Model.Grid
     /// </summary>
     public sealed class DemandProfile
     {
+        /// <summary>The grid model's fixed hourly resolution for demand series.</summary>
         public static TimeSpan Resolution { get; } = TimeSpan.FromHours(1);
 
+        /// <summary>
+        /// Base demand plus the element-wise sum of every additive component. This is the only
+        /// demand series consumed by dispatch.
+        /// </summary>
         public FlowSeries TotalDemand { get; }
+        /// <summary>The region's underlying demand, before any additive components.</summary>
         public FlowSeries BaseDemand { get; }
+        /// <summary>Zero or more non-negative, uniquely named demand flows added to base demand.</summary>
         public IReadOnlyList<DemandComponent> AdditiveComponents { get; }
 
+        /// <summary>Validates and creates a demand profile.</summary>
+        /// <param name="baseDemand">Base demand series, resampled to hourly resolution.</param>
+        /// <param name="additiveComponents">
+        /// Optional components, each non-negative, uniquely named case-insensitively, and exactly
+        /// aligned with <paramref name="baseDemand"/> once resampled to hourly resolution.
+        /// </param>
+        /// <exception cref="ArgumentException">
+        /// A component's name is duplicated, or its resampled series does not align with base
+        /// demand.
+        /// </exception>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// A component is negative at some interval, or total demand (base plus components) is
+        /// negative at some interval.
+        /// </exception>
         public DemandProfile(
             FlowSeries baseDemand,
             IReadOnlyList<DemandComponent>? additiveComponents = null)

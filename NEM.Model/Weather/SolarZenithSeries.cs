@@ -21,12 +21,25 @@ namespace NEM.Model.Weather
             Longitude = longitude;
         }
 
+        /// <summary>Latitude in decimal degrees used to calculate this series.</summary>
         public double Latitude { get; }
 
+        /// <summary>Longitude in decimal degrees used to calculate this series.</summary>
         public double Longitude { get; }
 
+        /// <summary>Solar zenith angle at <paramref name="index"/>.</summary>
         public SolarZenith this[int index] => SolarZenith.FromDegrees(RawValue(index));
 
+        /// <summary>
+        /// Calculates solar zenith angles for every interval midpoint between
+        /// <paramref name="start"/> and <paramref name="length"/> intervals later, at
+        /// <paramref name="resolution"/>, for the given location.
+        /// </summary>
+        /// <param name="start">Start of the first interval.</param>
+        /// <param name="resolution">Interval duration; must be positive.</param>
+        /// <param name="length">Number of intervals to calculate; must be positive.</param>
+        /// <param name="latitude">Latitude in degrees; must be finite and within [-90, +90].</param>
+        /// <param name="longitude">Longitude in degrees; must be finite and within [-180, +180].</param>
         public static SolarZenithSeries Calculate(
             DateTimeOffset start,
             TimeSpan resolution,

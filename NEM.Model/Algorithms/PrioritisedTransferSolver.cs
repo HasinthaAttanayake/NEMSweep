@@ -29,6 +29,12 @@ internal sealed record TransferDelivery(
 /// it. Unlike <paramref name="SentPerEdge"/> this decays along a route, so the two differ
 /// on any route longer than one hop.
 /// </param>
+/// <param name="DeliveredPerSink">
+/// What each sink actually received, in sink order, measured at the receiving end.
+/// </param>
+/// <param name="Deliveries">Every source-to-sink delivery the solve committed, route by route.</param>
+/// <param name="TotalSent">Total flow committed at sending ends across every route.</param>
+/// <param name="TotalDelivered">Total flow that arrived across every route.</param>
 internal sealed record TransferResult(
     IReadOnlyList<double> SentPerEdge,
     IReadOnlyList<double> LostPerEdge,
@@ -48,8 +54,8 @@ internal sealed record TransferResult(
 /// <remarks>
 /// Each sink is served in turn by a full max-flow solve from a virtual super-source over
 /// the sources' remaining capacity. Committed flow is then subtracted from edge capacity
-/// and the next sink starts from a fresh network of what is left — no residual reverse
-/// edges cross a stage boundary, so a lower-priority sink can never claw back flow
+/// and the next sink starts from a fresh network of what is left. No residual reverse
+/// edge crosses a stage boundary, so a lower-priority sink can never claw back flow
 /// already committed to a higher-priority one. That is the priority guarantee, and it is
 /// also why the outcome is deliberately not a global optimum.
 /// <para>

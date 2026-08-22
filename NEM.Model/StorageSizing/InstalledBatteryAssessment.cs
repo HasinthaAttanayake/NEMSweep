@@ -7,6 +7,14 @@ namespace NEM.Model.StorageSizing;
 /// </summary>
 public sealed record InstalledBatteryAssessment
 {
+    /// <summary>Validates and creates an installed-capacity assessment.</summary>
+    /// <param name="dispatchOutcome">Dispatch outcome with the originally installed Battery capacity.</param>
+    /// <param name="batteryCapacity">Originally installed total Battery capacity.</param>
+    /// <param name="meetsTarget">Whether the installed capacity meets the configured reliability target.</param>
+    /// <param name="evidence">Human-readable evidence for the target assessment.</param>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="dispatchOutcome"/> and <paramref name="batteryCapacity"/> describe different regions.
+    /// </exception>
     public InstalledBatteryAssessment(
         DispatchOutcome dispatchOutcome,
         RegionalBatterySizing batteryCapacity,

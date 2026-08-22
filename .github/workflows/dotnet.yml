@@ -15,3 +15,21 @@ jobs:
 
     - name: Test
       run: dotnet test --configuration Release
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Restore tools
+      run: dotnet tool restore
+
+    # Fails on a broken cross-reference or a TOC entry with no page behind it, so the docs site
+    # cannot ship a dead link. Cloudflare Pages runs docs/build.sh, which invokes the same command.
+    - name: Build documentation site
+      run: dotnet docfx docs/docfx.json --warningsAsErrors

@@ -10,6 +10,10 @@ namespace NEM.Model.Generation.Solar
     /// </summary>
     public sealed class GlobalTiltedIrradiationSeries : TimeSeries
     {
+        /// <summary>
+        /// Fraction of ground-reflected irradiance assumed to reach the tilted array. A fixed
+        /// generic-ground value rather than a site-specific measurement.
+        /// </summary>
         public const double GroundAlbedo = 0.2;
 
         private GlobalTiltedIrradiationSeries(
@@ -20,9 +24,24 @@ namespace NEM.Model.Generation.Solar
         {
         }
 
+        /// <summary>Irradiation received during the interval at <paramref name="index"/>.</summary>
+        /// <param name="index">Zero-based interval index.</param>
         public Irradiation this[int index] =>
             Irradiation.FromWattHoursPerSquareMetre(RawValue(index));
 
+        /// <summary>
+        /// Calculates global tilted irradiation on a dual-axis tracking array (always normal to
+        /// the sun) from horizontal and direct-normal radiation components and solar zenith angle.
+        /// </summary>
+        /// <param name="globalHorizontalRadiation">Global horizontal radiation trace, in Wh/m² per interval.</param>
+        /// <param name="directNormalRadiation">Direct normal radiation trace, in Wh/m² per interval.</param>
+        /// <param name="diffuseHorizontalRadiation">Diffuse horizontal radiation trace, in Wh/m² per interval.</param>
+        /// <param name="solarZenith">Solar zenith angle series; irradiation is zero when the zenith is 90 degrees or more.</param>
+        /// <returns>Global tilted irradiation in Wh/m² per interval.</returns>
+        /// <exception cref="ArgumentException">
+        /// A radiation series is not in its expected trace unit, or the series are not aligned.
+        /// </exception>
+        /// <exception cref="ArgumentOutOfRangeException">A radiation value is negative.</exception>
         public static GlobalTiltedIrradiationSeries Calculate(
             TraceSeries globalHorizontalRadiation,
             TraceSeries directNormalRadiation,

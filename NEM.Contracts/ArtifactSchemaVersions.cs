@@ -40,6 +40,9 @@ public static class ArtifactSchemaVersions
     /// <summary>Sweep definition, the CLI-side input a sweep run is resolved from.</summary>
     public const int SweepDefinition = 1;
 
+    /// <summary>Scenario configuration, the CLI-side input a scenario run is resolved from.</summary>
+    public const int ScenarioConfig = 4;
+
     /// <summary>Externalised regular series (<c>sweeps/{sweepId}/series/*.json</c>).</summary>
     public const int RegularSeries = 1;
 }
