@@ -35,9 +35,11 @@ internal static class ScenarioConfig
     private static void Validate(ScenarioSettings scenario)
     {
         ArgumentNullException.ThrowIfNull(scenario);
-        if (scenario.SchemaVersion != 4)
+        if (scenario.SchemaVersion != ArtifactSchemaVersions.ScenarioConfig)
         {
-            throw new FormatException($"Scenario config schema version found {scenario.SchemaVersion}; expected 4.");
+            throw new FormatException(
+                $"Scenario config schema version found {scenario.SchemaVersion}; "
+                + $"expected {ArtifactSchemaVersions.ScenarioConfig}.");
         }
 
         ArgumentException.ThrowIfNullOrWhiteSpace(scenario.Id);

@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using NEM.CLI.Infrastructure;
+using NEM.Contracts;
 
 namespace NEM.CLI.Application;
 
@@ -18,7 +19,7 @@ internal static class SchemaDescriptionCommand
         return 0;
     }
 
-    private const string ScenarioSchema = """
+    private static readonly string ScenarioSchema = $$"""
         {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "https://nemsim.dev/schemas/scenario-config.schema.json",
@@ -27,7 +28,7 @@ internal static class SchemaDescriptionCommand
           "additionalProperties": false,
           "required": ["schemaVersion", "id", "name", "costBasis", "regions", "storageSizing"],
           "properties": {
-            "schemaVersion": { "const": 3 },
+            "schemaVersion": { "const": {{ArtifactSchemaVersions.ScenarioConfig}} },
             "id": { "type": "string", "minLength": 1 },
             "name": { "type": "string", "minLength": 1 },
             "costBasis": { "$ref": "#/$defs/costBasis" },
@@ -149,7 +150,7 @@ internal static class SchemaDescriptionCommand
         }
         """;
 
-    private const string SweepSchema = """
+    private static readonly string SweepSchema = $$"""
         {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "https://nemsim.dev/schemas/sweep-definition.schema.json",
@@ -158,7 +159,7 @@ internal static class SchemaDescriptionCommand
           "additionalProperties": false,
           "required": ["schemaVersion", "sweepId", "name", "axis", "baselineConfigPath", "points"],
           "properties": {
-            "schemaVersion": { "const": 1 },
+            "schemaVersion": { "const": {{ArtifactSchemaVersions.SweepDefinition}} },
             "sweepId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
             "name": { "type": "string", "minLength": 1 },
             "axis": {
