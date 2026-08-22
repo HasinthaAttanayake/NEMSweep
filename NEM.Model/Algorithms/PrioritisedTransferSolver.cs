@@ -29,6 +29,12 @@ internal sealed record TransferDelivery(
 /// it. Unlike <paramref name="SentPerEdge"/> this decays along a route, so the two differ
 /// on any route longer than one hop.
 /// </param>
+/// <param name="DeliveredPerSink">
+/// What each sink actually received, in sink order, measured at the receiving end.
+/// </param>
+/// <param name="Deliveries">Every source-to-sink delivery the solve committed, route by route.</param>
+/// <param name="TotalSent">Total flow committed at sending ends across every route.</param>
+/// <param name="TotalDelivered">Total flow that arrived across every route.</param>
 internal sealed record TransferResult(
     IReadOnlyList<double> SentPerEdge,
     IReadOnlyList<double> LostPerEdge,

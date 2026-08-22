@@ -12,6 +12,17 @@ namespace NEM.Model.Simulation
     /// </summary>
     public sealed class GreedySurplusAndIncrementalGenerationChargingPolicy : IStoragePolicy
     {
+        /// <summary>
+        /// For a deficit, requests discharge from Battery first and pumped hydro second. For a
+        /// balanced or surplus interval, allocates surplus to charging first, then requests
+        /// incremental Coal and Gas generation (in ascending short-run marginal cost order) to
+        /// fill remaining charge headroom.
+        /// </summary>
+        /// <param name="context">An immutable snapshot of the current interval.</param>
+        /// <returns>
+        /// Zero or more discharge, surplus-charge, or incremental-generation charge intents, or
+        /// <see cref="StorageDecision.None"/> when no fleet has headroom.
+        /// </returns>
         public StorageDecision Decide(DispatchContext context)
         {
             return context.Residual > Power.Zero

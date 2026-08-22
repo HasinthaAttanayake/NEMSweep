@@ -26,6 +26,7 @@ namespace NEM.Model.Series
             return Combine(other, static (a, b) => a + b);
         }
 
+        /// <summary>Adds a constant power (MW) to every value.</summary>
         public FlowSeries Add(Power constant)
         {
             return Map(v => v + constant.Megawatts);
@@ -38,6 +39,7 @@ namespace NEM.Model.Series
             return Combine(other, static (a, b) => a - b);
         }
 
+        /// <summary>Subtracts a constant power (MW) from every value.</summary>
         public FlowSeries Subtract(Power constant)
         {
             return Map(v => v - constant.Megawatts);

@@ -14,6 +14,7 @@ namespace NEM.Model.Units
     /// </summary>
     public readonly record struct Energy : IComparable<Energy>
     {
+        /// <summary>The value in megawatt-hours. Signed.</summary>
         public double MegawattHours { get; }
 
         private Energy(double megawattHours) => MegawattHours = megawattHours;
@@ -49,15 +50,19 @@ namespace NEM.Model.Units
             return FromMegawattHours(power.Megawatts * interval.TotalHours);
         }
 
+        /// <summary>Sums two energies. Valid across both space and time.</summary>
         public static Energy operator +(Energy a, Energy b)
             => FromMegawattHours(a.MegawattHours + b.MegawattHours);
 
+        /// <summary>Subtracts one energy from another.</summary>
         public static Energy operator -(Energy a, Energy b)
             => FromMegawattHours(a.MegawattHours - b.MegawattHours);
 
+        /// <summary>Scales an energy by a dimensionless factor.</summary>
         public static Energy operator *(Energy energy, double factor)
             => FromMegawattHours(energy.MegawattHours * factor);
 
+        /// <summary>Scales an energy by a dimensionless factor.</summary>
         public static Energy operator *(double factor, Energy energy)
             => FromMegawattHours(energy.MegawattHours * factor);
 
@@ -116,14 +121,25 @@ namespace NEM.Model.Units
             return numerator.MegawattHours / denominator.MegawattHours;
         }
 
+        /// <summary>Whether the left energy is less than the right.</summary>
         public static bool operator <(Energy a, Energy b) => a.MegawattHours < b.MegawattHours;
+
+        /// <summary>Whether the left energy is greater than the right.</summary>
         public static bool operator >(Energy a, Energy b) => a.MegawattHours > b.MegawattHours;
+
+        /// <summary>Whether the left energy is less than or equal to the right.</summary>
         public static bool operator <=(Energy a, Energy b) => a.MegawattHours <= b.MegawattHours;
+
+        /// <summary>Whether the left energy is greater than or equal to the right.</summary>
         public static bool operator >=(Energy a, Energy b) => a.MegawattHours >= b.MegawattHours;
 
+        /// <summary>Orders this energy against another by megawatt-hours.</summary>
         public int CompareTo(Energy other) => MegawattHours.CompareTo(other.MegawattHours);
 
+        /// <summary>The lesser of two energies.</summary>
         public static Energy Min(Energy a, Energy b) => a.MegawattHours <= b.MegawattHours ? a : b;
+
+        /// <summary>The greater of two energies.</summary>
         public static Energy Max(Energy a, Energy b) => a.MegawattHours >= b.MegawattHours ? a : b;
 
         private static void RequirePositive(TimeSpan interval, string paramName)

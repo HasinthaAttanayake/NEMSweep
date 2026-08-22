@@ -94,6 +94,12 @@ namespace NEM.Model.Weather
                 start, resolution, wattHoursPerSquareMetre, TraceUnit.DirectNormalRadiationWattHoursPerSquareMetre, null);
         }
 
+        /// <summary>
+        /// A Global Horizontal Radiation trace (Wh/m²), already integrated
+        /// over the hour. No measurement height applies. Named for the component, not the
+        /// bare unit, so a Direct Normal or Diffuse Horizontal field cannot be passed
+        /// where Global Horizontal is required.
+        /// </summary>
         public static TraceSeries GlobalHorizontalRadiation(
             DateTimeOffset start,
             TimeSpan resolution,
@@ -103,6 +109,12 @@ namespace NEM.Model.Weather
                 start, resolution, wattHoursPerSquareMetre, TraceUnit.GlobalHorizontalRadiationWattHoursPerSquareMetre, null);
         }
 
+        /// <summary>
+        /// A Diffuse Horizontal Radiation trace (Wh/m²), already integrated
+        /// over the hour. No measurement height applies. Named for the component, not the
+        /// bare unit, so a Global Horizontal or Direct Normal field cannot be passed
+        /// where Diffuse Horizontal is required.
+        /// </summary>
         public static TraceSeries DiffuseHorizontalRadiation(
             DateTimeOffset start,
             TimeSpan resolution,
@@ -112,6 +124,7 @@ namespace NEM.Model.Weather
                 start, resolution, wattHoursPerSquareMetre, TraceUnit.DiffuseHorizontalRadiationWattHoursPerSquareMetre, null);
         }
 
+        /// <summary>A dry-bulb temperature trace (degrees Celsius). No measurement height applies.</summary>
         public static TraceSeries DryBulbTemperature(
             DateTimeOffset start,
             TimeSpan resolution,

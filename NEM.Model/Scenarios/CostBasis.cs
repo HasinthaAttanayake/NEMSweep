@@ -11,6 +11,14 @@ namespace NEM.Model.Scenarios;
 /// </summary>
 public sealed record CostBasis
 {
+    /// <summary>Validates and creates a cost basis.</summary>
+    /// <param name="year">The calendar year whose real Australian dollars are represented.</param>
+    /// <param name="realDiscountRate">
+    /// The dimensionless real discount rate as a fraction, so 0.07 means 7%. Must be greater than -1.
+    /// </param>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="year"/> is outside 1-9999, or <paramref name="realDiscountRate"/> is -1 or less.
+    /// </exception>
     public CostBasis(int year, decimal realDiscountRate)
     {
         if (year is < 1 or > 9999)

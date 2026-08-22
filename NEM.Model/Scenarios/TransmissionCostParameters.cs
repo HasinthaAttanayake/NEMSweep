@@ -16,6 +16,10 @@ namespace NEM.Model.Scenarios;
 /// </remarks>
 public sealed record TransmissionCostParameters
 {
+    /// <summary>Validates and creates transmission cost parameters.</summary>
+    /// <param name="capitalCost">Overnight capital cost per km of route length, per MW of capacity.</param>
+    /// <param name="fixedOperatingCost">Annual fixed operating cost per km of route length, per MW of capacity.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Either cost component is negative.</exception>
     public TransmissionCostParameters(
         DistancePowerCost capitalCost,
         AnnualDistancePowerCost fixedOperatingCost)

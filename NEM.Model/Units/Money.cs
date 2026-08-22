@@ -26,15 +26,19 @@ namespace NEM.Model.Units
         /// <summary>Creates a monetary amount from Australian dollars.</summary>
         public static Money FromAud(decimal aud) => new(aud);
 
+        /// <summary>Sums two monetary amounts.</summary>
         public static Money operator +(Money left, Money right)
             => FromAud(left.Aud + right.Aud);
 
+        /// <summary>Subtracts one monetary amount from another.</summary>
         public static Money operator -(Money left, Money right)
             => FromAud(left.Aud - right.Aud);
 
+        /// <summary>Scales a monetary amount by a dimensionless factor.</summary>
         public static Money operator *(Money money, decimal factor)
             => FromAud(money.Aud * factor);
 
+        /// <summary>Scales a monetary amount by a dimensionless factor.</summary>
         public static Money operator *(decimal factor, Money money) => money * factor;
 
         /// <summary>
@@ -56,6 +60,7 @@ namespace NEM.Model.Units
             return EnergyPrice.FromAudPerMwhDelivered(Aud / megawattHours);
         }
 
+        /// <summary>Orders this monetary amount against another by AUD.</summary>
         public int CompareTo(Money other) => Aud.CompareTo(other.Aud);
     }
 }

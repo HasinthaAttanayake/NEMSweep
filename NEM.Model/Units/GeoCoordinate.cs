@@ -6,8 +6,10 @@ public readonly record struct GeoCoordinate
     /// <summary>Mean Earth radius in kilometres, used for great-circle distance.</summary>
     private const double EarthRadiusKilometres = 6371.0088;
 
+    /// <summary>Latitude in decimal degrees, in [-90, +90].</summary>
     public double Latitude { get; }
 
+    /// <summary>Longitude in decimal degrees, in [-180, +180].</summary>
     public double Longitude { get; }
 
     private GeoCoordinate(double latitude, double longitude)
@@ -16,6 +18,9 @@ public readonly record struct GeoCoordinate
         Longitude = longitude;
     }
 
+    /// <summary>Creates a <see cref="GeoCoordinate"/> from a latitude and longitude in decimal degrees.</summary>
+    /// <param name="latitude">Latitude in degrees; must be finite and within [-90, +90].</param>
+    /// <param name="longitude">Longitude in degrees; must be finite and within [-180, +180].</param>
     public static GeoCoordinate FromDegrees(double latitude, double longitude)
     {
         if (!double.IsFinite(latitude) || latitude < -90 || latitude > 90)

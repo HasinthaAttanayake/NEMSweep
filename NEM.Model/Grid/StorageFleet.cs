@@ -2,8 +2,25 @@ using NEM.Model.Units;
 
 namespace NEM.Model.Grid
 {
+    /// <summary>
+    /// One storage archetype's realised capacity, plus the interval state transition that operates
+    /// it. Immutable configuration: state of charge is threaded through
+    /// <see cref="Operate"/> by the caller rather than held here, so the same fleet can be
+    /// dispatched repeatedly without carrying state between runs.
+    /// </summary>
+    /// <remarks>
+    /// Both the power rating and the energy capacity bind every interval, and the fleet is the
+    /// final authority on both: a storage policy may request anything, and this clamps it. The
+    /// same abstraction serves battery and pumped-hydro fleets, which differ only in their
+    /// capacities and technology profile.
+    /// </remarks>
     public sealed class StorageFleet
     {
+        /// <summary>Validates and creates a storage fleet.</summary>
+        /// <param name="storageTechnology">The archetype this fleet realises.</param>
+        /// <param name="storageCapacity">Energy capacity in MWh. Must be positive.</param>
+        /// <param name="powerCapacity">Charge and discharge power rating in MW. Must be positive.</param>
+        /// <param name="technologyProfile">Technical life and round-trip efficiency.</param>
         /// <param name="seedEnergy">
         /// Energy this fleet opens a dispatch run with. Required, not defaulted: a silent
         /// default (even one that looked like a sensible fallback) is exactly the cold-start
@@ -54,9 +71,16 @@ namespace NEM.Model.Grid
         /// <summary>Storage duration determined by this fleet's energy and power capacities.</summary>
         public TimeSpan Duration => StorageCapacity / PowerCapacity;
 
+        /// <summary>The archetype this fleet realises.</summary>
         public StorageTechnology StorageTechnology { get; }
+
+        /// <summary>Energy capacity in MWh. State of charge is always validated within it.</summary>
         public Energy StorageCapacity { get; }
+
+        /// <summary>Charge and discharge power rating in MW. Binds every interval.</summary>
         public Power PowerCapacity { get; }
+
+        /// <summary>Technical life and round-trip efficiency for this fleet.</summary>
         public StorageTechnologyProfile TechnologyProfile { get; }
         /// <summary>
         /// Assumed energy level this fleet opens a dispatch run with. Zero unless set from

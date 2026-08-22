@@ -57,6 +57,33 @@ public sealed record DispatchOutcome
     public RenewableShareMetrics RenewableShare { get; }
     private DemandProfile? DemandProfile { get; }
 
+    /// <summary>Validates and creates immutable dispatch evidence for one region.</summary>
+    /// <param name="regionId">Identifies the region that was dispatched.</param>
+    /// <param name="perFleetGeneration">Available generation by technology before curtailment.</param>
+    /// <param name="perFleetCurtailment">Available generation constrained off by technology; must share the same technology keys as <paramref name="perFleetGeneration"/>.</param>
+    /// <param name="perFleetDelivered">Generator output delivered to the grid by technology, as a bookkeeping allocation rather than a physical attribution.</param>
+    /// <param name="perFleetCharge">Storage charging booked to the technology it was allocated against.</param>
+    /// <param name="demand">Total regional demand at hourly resolution.</param>
+    /// <param name="unserved">Demand that remains unserved after generation, storage, and imports.</param>
+    /// <param name="charge">Total storage charging.</param>
+    /// <param name="discharge">Energy discharged from storage to serve demand.</param>
+    /// <param name="imports">Energy imported into the region.</param>
+    /// <param name="exports">Energy exported from the region.</param>
+    /// <param name="stateOfChargeByTechnology">Storage energy level by technology at the start of each interval, or null for a region without storage.</param>
+    /// <param name="demandProfile">
+    /// The originating demand profile, used to cross-check composed demand against
+    /// <paramref name="demand"/>. Optional for backward-compatible construction paths.
+    /// </param>
+    /// <exception cref="ArgumentException">
+    /// A per-fleet dictionary's technology keys are inconsistent with the others, or the dispatch
+    /// identity (generation, storage, imports, unserved balanced against demand, charge, exports,
+    /// curtailment) fails to close at some interval.
+    /// </exception>
+    /// <exception cref="InvalidOperationException">
+    /// The resolution is not hourly, demand does not match the demand profile's composed total,
+    /// curtailment and unserved demand coexist at the same interval, or any series contains a
+    /// negative value where the invariant forbids it.
+    /// </exception>
     public DispatchOutcome(
         string regionId,
         IReadOnlyDictionary<GenerationTechnology, FlowSeries> perFleetGeneration,

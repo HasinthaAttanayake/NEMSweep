@@ -6,6 +6,7 @@ namespace NEM.Model.Units
     /// </summary>
     public static class QuantityExtensions
     {
+        /// <summary>Sums a collection of powers (MW), seeding from <see cref="Power.Zero"/>.</summary>
         public static Power Sum(this IEnumerable<Power> source)
         {
             ArgumentNullException.ThrowIfNull(source);
@@ -19,6 +20,7 @@ namespace NEM.Model.Units
             return total;
         }
 
+        /// <summary>Sums a collection of energies (MWh), seeding from <see cref="Energy.Zero"/>.</summary>
         public static Energy Sum(this IEnumerable<Energy> source)
         {
             ArgumentNullException.ThrowIfNull(source);

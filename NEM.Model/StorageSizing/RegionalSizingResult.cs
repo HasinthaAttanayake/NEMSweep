@@ -6,6 +6,15 @@ namespace NEM.Model.StorageSizing;
 /// <summary>Final Battery sizing and dispatch evidence for one region.</summary>
 public sealed record RegionalSizingResult
 {
+    /// <summary>Validates and creates a regional sizing result.</summary>
+    /// <param name="dispatchOutcome">Final dispatch outcome for the sized regional system.</param>
+    /// <param name="batterySizing">Total Battery capacity selected for the region.</param>
+    /// <param name="meetsTarget">Whether the final dispatch meets the configured reliability target.</param>
+    /// <param name="status">Terminal status as it applies to this region.</param>
+    /// <param name="terminationEvidence">Human-readable evidence explaining the regional status.</param>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="dispatchOutcome"/> and <paramref name="batterySizing"/> describe different regions.
+    /// </exception>
     public RegionalSizingResult(
         DispatchOutcome dispatchOutcome,
         RegionalBatterySizing batterySizing,

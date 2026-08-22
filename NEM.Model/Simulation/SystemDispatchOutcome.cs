@@ -199,20 +199,67 @@ public sealed class SystemDispatchOutcome
             interconnectorFlows);
     }
 
+    /// <summary>Identity of the power system this evidence describes.</summary>
     public PowerSystemId PowerSystemId { get; }
+
+    /// <summary>First interval instant, in NEM market time (UTC+10).</summary>
     public DateTimeOffset Start { get; }
+
+    /// <summary>Interval length. System outcomes are hourly.</summary>
     public TimeSpan Resolution { get; }
+
+    /// <summary>Number of intervals in every series on this outcome.</summary>
     public int Length { get; }
+
+    /// <summary>
+    /// The validated regional outcomes this aggregate was built from, in system region order.
+    /// Retained so a published system artifact can also disclose its regional evidence.
+    /// </summary>
     public IReadOnlyList<DispatchOutcome> RegionalOutcomes { get; }
+
+    /// <summary>Total system demand in MW, the element-wise sum of every region's total demand.</summary>
     public FlowSeries Demand { get; }
+
+    /// <summary>
+    /// Gross generation in MW by technology, summed across regions. Technologies absent from a
+    /// region are zero-filled so every series covers the whole system.
+    /// </summary>
     public IReadOnlyDictionary<GenerationTechnology, FlowSeries> PerFleetGeneration { get; }
+
+    /// <summary>Curtailed generation in MW by technology, summed across regions.</summary>
     public IReadOnlyDictionary<GenerationTechnology, FlowSeries> PerFleetCurtailment { get; }
+
+    /// <summary>
+    /// Generation delivered to load in MW by technology. This, not generation minus curtailment,
+    /// is what published delivered-generation figures use, because generation can also be diverted
+    /// to charging storage.
+    /// </summary>
     public IReadOnlyDictionary<GenerationTechnology, FlowSeries> PerFleetDelivered { get; }
+
+    /// <summary>
+    /// Storage charging in MW allocated to the generation technology that supplied it. A consistent
+    /// bookkeeping allocation, not a physical attribution.
+    /// </summary>
     public IReadOnlyDictionary<GenerationTechnology, FlowSeries> PerFleetCharge { get; }
+
+    /// <summary>Total energy taken from the grid to charge storage, in MW.</summary>
     public FlowSeries Charge { get; }
+
+    /// <summary>Total energy returned to the grid by storage, in MW.</summary>
     public FlowSeries Discharge { get; }
+
+    /// <summary>
+    /// Interval-beginning stored energy in MWh by storage technology, summed across regions.
+    /// </summary>
     public IReadOnlyDictionary<StorageTechnology, StockSeries> StateOfChargeByTechnology { get; }
+
+    /// <summary>Demand that could not be met, in MW. The basis of the reliability measure.</summary>
     public FlowSeries Unserved { get; }
+
+    /// <summary>
+    /// Demand less unserved energy, in MW: the load actually served. This is the denominator of
+    /// every levelised cost the model publishes.
+    /// </summary>
     public FlowSeries DeliveredToLoad { get; }
 
     /// <summary>Total energy received by regions from other regions, net of losses.</summary>
@@ -230,6 +277,11 @@ public sealed class SystemDispatchOutcome
     /// <summary>Directional solver evidence for every link in the final power system.</summary>
     public IReadOnlyList<InterconnectorFlow> InterconnectorFlows { get; }
 
+    /// <summary>
+    /// Whole-system reliability, recalculated from aggregate demand and aggregate unserved energy.
+    /// It is never an average of the regional percentages, which would weight a small region the
+    /// same as a large one.
+    /// </summary>
     public ReliabilityMetrics Reliability { get; }
 
     private static IReadOnlyDictionary<GenerationTechnology, FlowSeries> ReadOnly(

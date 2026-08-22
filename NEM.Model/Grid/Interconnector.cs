@@ -19,6 +19,16 @@ namespace NEM.Model.Grid;
 /// </remarks>
 public sealed record Interconnector
 {
+    /// <summary>Validates and creates one directed transfer path.</summary>
+    /// <param name="fromRegionId">Sending region. Transfer capacity is metered at this end.</param>
+    /// <param name="toRegionId">
+    /// Receiving region. Must differ from <paramref name="fromRegionId"/> case-insensitively.
+    /// </param>
+    /// <param name="capacity">Directed transfer capacity in MW. Must be finite and non-negative.</param>
+    /// <exception cref="ArgumentException">
+    /// An endpoint is blank, or the two endpoints are the same region.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">Capacity is negative or not finite.</exception>
     public Interconnector(
         string fromRegionId,
         string toRegionId,

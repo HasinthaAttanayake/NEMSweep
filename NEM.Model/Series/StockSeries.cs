@@ -19,6 +19,14 @@ namespace NEM.Model.Series
     /// </summary>
     public sealed class StockSeries : TimeSeries
     {
+        /// <summary>
+        /// Creates a <see cref="StockSeries"/> from a state-of-charge trace in MWh. Every
+        /// value must be non-negative — stocks are unsigned; the upper bound (capacity) is
+        /// enforced where the storage fleet is known, not here.
+        /// </summary>
+        /// <param name="start">Start of the first interval.</param>
+        /// <param name="resolution">Interval duration; must be positive.</param>
+        /// <param name="megawattHours">State of charge at each interval, in MWh; must be non-negative.</param>
         public StockSeries(DateTimeOffset start, TimeSpan resolution, double[] megawattHours)
             : base(start, resolution, megawattHours)
         {

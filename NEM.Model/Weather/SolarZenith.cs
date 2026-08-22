@@ -6,6 +6,7 @@ namespace NEM.Model.Weather
     /// </summary>
     public readonly record struct SolarZenith : IComparable<SolarZenith>
     {
+        /// <summary>The angle in degrees, in [0, 180].</summary>
         public double Degrees { get; }
 
         private SolarZenith(double degrees)
@@ -13,6 +14,7 @@ namespace NEM.Model.Weather
             Degrees = degrees;
         }
 
+        /// <summary>Creates a <see cref="SolarZenith"/> from a value in degrees, in [0, 180].</summary>
         public static SolarZenith FromDegrees(double degrees)
         {
             if (!double.IsFinite(degrees) || degrees is < 0 or > 180)
@@ -81,6 +83,7 @@ namespace NEM.Model.Weather
             return FromDegrees(RadiansToDegrees(Math.Acos(Math.Clamp(cosineZenith, -1, 1))));
         }
 
+        /// <summary>Orders this angle against another by degrees.</summary>
         public int CompareTo(SolarZenith other) => Degrees.CompareTo(other.Degrees);
 
         private static double DegreesToRadians(double degrees) => degrees * Math.PI / 180;

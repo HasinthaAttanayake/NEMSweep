@@ -6,10 +6,12 @@ namespace NEM.Model.Units;
 /// </summary>
 public readonly record struct AnnualDistancePowerCost
 {
+    /// <summary>The rate in AUD per kilometre per MW of transfer capacity per year.</summary>
     public decimal AudPerKmPerMwYear { get; }
 
     private AnnualDistancePowerCost(decimal audPerKmPerMwYear) => AudPerKmPerMwYear = audPerKmPerMwYear;
 
+    /// <summary>Creates an <see cref="AnnualDistancePowerCost"/> from a rate in AUD/km/MW/year.</summary>
     public static AnnualDistancePowerCost FromAudPerKmPerMwYear(decimal audPerKmPerMwYear) =>
         new(audPerKmPerMwYear);
 

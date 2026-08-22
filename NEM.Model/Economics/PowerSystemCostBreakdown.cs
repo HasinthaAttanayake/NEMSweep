@@ -130,8 +130,20 @@ public sealed record PowerSystemCostBreakdown
         DeliveredEnergy = deliveredEnergy;
     }
 
+    /// <summary>
+    /// Total annualised system cost per MWh served to load, in AUD/MWh. The cost of building and
+    /// running the system, not a retail price.
+    /// </summary>
     public EnergyPrice SystemLevelisedCostOfElectricity { get; }
+
+    /// <summary>Annualised generation cost per MWh served to load, in AUD/MWh.</summary>
     public EnergyPrice SystemLevelisedCostOfGeneration { get; }
+
+    /// <summary>
+    /// Annualised storage asset cost per MWh served to load, in AUD/MWh. Not a standalone levelised
+    /// cost of storage: the denominator is system energy served, and charging energy is already
+    /// priced through gross-generation variable and fuel cost.
+    /// </summary>
     public EnergyPrice SystemLevelisedCostOfStorage { get; }
 
     /// <summary>
@@ -147,7 +159,16 @@ public sealed record PowerSystemCostBreakdown
     public IReadOnlyList<RegionCostBreakdown> Regions { get; }
     /// <summary>System annualised generation cost aggregated by technology, in AUD.</summary>
     public IReadOnlyList<GenerationCostContribution> GenerationCostContributions { get; }
+    /// <summary>
+    /// Annualised generation capital, fixed operating, variable operating and fuel cost, in AUD.
+    /// Exactly the sum of <see cref="GenerationCostContributions"/>.
+    /// </summary>
     public Money TotalAnnualisedGenerationCost { get; }
+
+    /// <summary>
+    /// Annualised storage power and energy capital plus fixed operating cost, in AUD. Covers total
+    /// final capacity, including capacity storage sizing introduced.
+    /// </summary>
     public Money TotalAnnualisedStorageCost { get; }
 
     /// <summary>Annualised interconnector capital and fixed operating cost, in AUD.</summary>
