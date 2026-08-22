@@ -5,7 +5,7 @@ to storage requirements, reliability and system cost. That is a narrow use of a 
 
 The model is deterministic, every assumption is either a documented constant or a scenario input,
 and a run takes minutes rather than hours. Those three properties together mean the natural unit of
-work is not a run — it is a **study**: a set of runs that differ in one controlled way, published
+work is not a run but a **study**: a set of runs that differ in one controlled way, published
 together with their provenance.
 
 This section is about designing those.
@@ -14,12 +14,14 @@ This section is about designing those.
 
 Everything here rests on one guarantee: **the same inputs at the same commit produce identical
 results.** There is no random number generator in the model. Rerunning a scenario reproduces every
-modelled value exactly; the only field that moves is the `runId` stamped on the artifact, which
-identifies the run rather than describing it.
+modelled value exactly; in the dispatch artifacts, the only field that moves is the `runId` stamped
+on each one, which identifies the run rather than describing it. Imported input artifacts and the
+sweep index also carry timestamps and durations, which
+[Outputs and provenance](../guide/outputs.md) sets out.
 
 That is why a sweep is meaningful. When you vary one input across twenty points and the storage
-requirement moves, the input moved it — there is no run-to-run noise for the effect to hide in and
-no need to average anything.
+requirement moves, the input moved it. There is no run-to-run noise for the effect to hide in, and
+nothing to average.
 
 It also means a result is checkable. A sweep records the git commit SHA, whether the working tree
 was dirty when it ran, and the SHA-256 of every input file it consumed. Anyone with the repository
@@ -49,29 +51,29 @@ Anything in a scenario config can be swept. These are the axes that repay the ef
 The published study. Add load and watch where the system stops absorbing it.
 
 Vary `dataCentreNameplateMw` per region. Despite its name it is just a flat, always-on load
-increase — use it for electrification, industrial load, anything without a distinct shape. Watch for
-the point at which sizing switches from `NotRequired` to `Resized`, and later to
-`BatteryCapacityLimitReached` or `EnergyLimited`. Those transitions are the interesting part; the
+increase, so use it for electrification, industrial load, or anything without a distinct shape.
+Watch for the point at which the sizing outcome switches from `notRequired` to `resized`, and later
+to `batteryCapacityLimitReached` or `energyLimited`. Those transitions are the interesting part; the
 smooth stretches between them are not.
 
 ### Generation mix
 
-Vary `nameplateCapacityMw` across fleets — more wind against less solar, retiring coal, adding gas.
+Vary `nameplateCapacityMw` across fleets: more wind against less solar, retiring coal, adding gas.
 
 The revealing outputs are curtailment and storage, not cost. A mix that looks cheap on capacity
 alone often turns out to need storage that the capacity comparison never showed, because solar and
 wind fail at different times of day and year.
 
 Note that removing a fleet entirely and setting its capacity to zero are not the same thing: a
-zero-capacity *storage* plan is how you tell the sizing loop "build whatever this needs, at these
-economics".
+zero-capacity *storage* plan is how you tell the sizing loop "build whatever this needs, and price
+it at these economics".
 
 ### Economics
 
 Vary `costBasis.realDiscountRate`, capital costs, fuel prices, or technical lives.
 
-Discount rate first, always. It applies to every capital cost in the system and its effect is
-asymmetric — raising it favours low-capital, high-fuel plant; lowering it favours renewables and
+Discount rate first, always. It applies to every capital cost in the system, and its effect is
+asymmetric: raising it favours low-capital, high-fuel plant, and lowering it favours renewables and
 storage. A conclusion that flips between 5% and 9% was never a conclusion about technology.
 
 Fuel price and heat rate are different in kind from capital cost: together they set short-run
@@ -107,8 +109,8 @@ Run a coarse sweep first, find the region where behaviour changes, then sweep fi
 the case where your overrides did nothing at all.
 
 **Push until it breaks.** Extend the axis past the point where sizing stops succeeding. The outcome
-codes — `EnergyLimited`, `StorageNoLongerImprovesReliability`, `BatteryCapacityLimitReached` — are
-findings, not failures, and the value at which one first appears is often the headline.
+codes `energyLimited`, `storageNoLongerImprovesReliability` and `batteryCapacityLimitReached` are
+findings rather than failures, and the value at which one first appears is often the headline.
 
 **Make `axisValue` honest.** It is a display value only; nothing in the model reads it. A sweep
 whose `axisValue` disagrees with its `overrides` runs happily and produces a chart that lies. See
@@ -116,8 +118,8 @@ whose `axisValue` disagrees with its `overrides` runs happily and produces a cha
 
 ## Reading the result
 
-A sweep publishes 19 scalars per point per region — levelised costs, energy served, renewable
-shares, storage capacity, unserved energy, curtailment, net imports. They are listed in
+A sweep publishes 19 scalars per point per region: levelised costs, energy served, renewable
+shares, storage capacity, unserved energy, curtailment and net imports. They are listed in
 [Outputs and provenance](../guide/outputs.md).
 
 Look for three things:
@@ -134,7 +136,7 @@ Look for three things:
 
 ## Next
 
-- [Driving NemSim with an LLM](llm-workflow.md) — hand the machine-readable schemas to a model and
+- [Driving NemSim with an LLM](llm-workflow.md): hand the machine-readable schemas to a model and
   have it generate sweeps for you.
-- [Sensitivity analysis](sensitivity-analysis.md) — a worked example on the committed sweep.
-- [Sweeps](../guide/sweeps.md) — the mechanics of defining and running one.
+- [Sensitivity analysis](sensitivity-analysis.md): a worked example on the committed sweep.
+- [Sweeps](../guide/sweeps.md): the mechanics of defining and running one.

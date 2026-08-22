@@ -3,13 +3,17 @@
 NemSim is an hourly grid dispatch model for Australia's National Electricity Market, being built
 in public one validated layer at a time.
 
-You describe a set of regions — each with its demand, generation assets and storage — and NemSim
+You describe a set of regions, each with its demand, generation assets and storage, and NemSim
 dispatches them hour by hour across a modelled year. Where the reliability standard you declared is
-not met, it grows storage until either the standard is met or it reports that no battery of any
-size can meet it. The result is a set of technical and economic figures for that system.
+not met, it grows storage until either the standard is met or the search reports what stopped it: a
+capacity ceiling, a pass budget, probes that stopped helping, or a system whose total generation
+energy is below its demand energy. The result is a set of technical and economic figures for that
+system.
 
-The model is deterministic: the same inputs at the same commit produce byte-identical artifacts, and
-every result records the SHA-256 of the exact input bytes it was built from.
+The model is deterministic: the same inputs at the same commit reproduce every modelled value
+exactly, and every result records the SHA-256 of the exact input bytes it was built from. Dispatch
+artifacts are not byte-identical across reruns, because each run stamps a fresh `runId`. See
+[Outputs and provenance](docs/guide/outputs.md) for exactly what differs.
 
 **Documentation:** [how to run it, what it assumes, and how to explore the scenario
 space](docs/index.md)
@@ -30,7 +34,7 @@ The published work so far explores:
    [expectations for data-centre and AI infrastructure developers](https://www.industry.gov.au/publications/expectations-data-centres-and-ai-infrastructure-developers)?
 
 That is one slice of the space the framework supports. Generation mix, economics, reliability
-standards and transmission capacity can all be swept the same way — see
+standards and transmission capacity can all be swept the same way; see
 [Designing a study](docs/exploring/index.md).
 
 ## Available now
@@ -101,7 +105,7 @@ dotnet run --project .\NEM.Web\NEM.Web.csproj
 Copy `NEM.CLI/appsettings.example.json` to `NEM.CLI/appsettings.local.json` for machine-local input
 and output paths. The local file is ignored by Git; the example is the fallback when it is absent.
 
-The full walkthrough — configuration, the first scenario run, and every command — is in
+The full walkthrough covering configuration, the first scenario run and every command is in
 [Getting started](docs/guide/index.md) and the [CLI reference](docs/guide/cli.md).
 
 ### Validation runs

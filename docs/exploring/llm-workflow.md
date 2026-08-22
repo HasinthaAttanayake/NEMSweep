@@ -2,7 +2,7 @@
 
 Designing a sweep is mechanical work with a fiddly file format: read the baseline scenario, decide
 what to vary, write twenty-five JSON merge patches without typos, run them, read the scalars back.
-An LLM is good at exactly that shape of task — provided you give it the contract rather than
+An LLM is good at exactly that shape of task, provided you give it the contract rather than
 expecting it to infer one.
 
 NemSim publishes that contract deliberately. This page is how to hand it over.
@@ -20,8 +20,8 @@ Three properties make NemSim unusually safe to point a language model at:
 - **The model is deterministic.** There is no run-to-run noise for a bad generation to hide in. If
   a point's numbers look wrong, they are wrong for a reason you can find.
 
-What the model cannot do is decide what is worth asking. That is your job — see
-[Designing a study](index.md).
+What the model cannot do is decide what is worth asking. That is your job, and
+[Designing a study](index.md) covers it.
 
 ## What to give it
 
@@ -38,7 +38,7 @@ dotnet run --project NEM.CLI -- --describe-schema scenario
 dotnet run --project NEM.CLI -- --describe-schema sweep
 ```
 
-These are the authoritative field contracts. Paste both into context. Do not paraphrase them —
+These are the authoritative field contracts. Paste both into context. Do not paraphrase them:
 paraphrase is where field names get invented.
 
 ### 2. The baseline scenario
@@ -52,21 +52,24 @@ rest.
 
 ### 3. The merge-patch rules
 
-This is the part a model will get wrong if you do not state it, because it is not standard RFC 7386.
+This is the part a model will get wrong if you do not state it, because it is not plain RFC 7386.
 Give it verbatim:
 
-> Point `overrides` are applied to the baseline scenario as a JSON merge patch, with two extensions:
+> Point `overrides` are applied to the baseline scenario as a JSON merge patch. Four rules govern
+> it, and the last two are extensions to RFC 7386:
 >
-> - `null` as a value deletes that property.
-> - Four arrays are merged **by key** rather than replaced wholesale: `regions` keyed by
->   `regionId`; `regions[].generatingFleets` and `regions[].storageFleets` keyed by `technology`;
->   `monthlyCapacityFactors` keyed by `month`. So a point can change one fleet in one region without
->   restating the whole scenario.
-> - `{"<key>": "...", "$remove": true}` deletes a keyed array element. The object must contain
->   exactly those two properties.
-> - `axisValue` is a display value for the x-axis only. Nothing in the model reads it. The actual
->   parameter change lives entirely in `overrides`, and the two must agree or the resulting chart
->   will be wrong.
+> 1. `null` as a value deletes that property, as RFC 7386 specifies.
+> 2. Any array not named below is replaced wholesale, as RFC 7386 specifies.
+> 3. Four arrays are merged **by key** rather than replaced wholesale: `regions` keyed by
+>    `regionId`; `regions[].generatingFleets` and `regions[].storageFleets` keyed by `technology`;
+>    `monthlyCapacityFactors` keyed by `month`. So a point can change one fleet in one region
+>    without restating the whole scenario.
+> 4. `{"<key>": "...", "$remove": true}` deletes a keyed array element. The object must contain
+>    exactly those two properties.
+
+One thing that is not a merge-patch rule but that a model needs told anyway: `axisValue` is a
+display value for the x-axis only. Nothing in the model reads it. The actual parameter change lives
+entirely in `overrides`, and the two must agree or the resulting chart will be wrong.
 
 ### 4. The output vocabulary
 
@@ -76,8 +79,8 @@ names they are actually emitted under.
 
 ## A prompt scaffold
 
-Adapt this. The structure — role, contract, task, constraints, output format — matters more than the
-wording.
+Adapt this. The structure matters more than the wording: role, contract, task, constraints, output
+format.
 
 ```text
 You are helping design a sweep for NemSim, a deterministic hourly grid dispatch model
@@ -94,7 +97,7 @@ Baseline scenario I am patching:
 <paste scenarios/nem-fy2026-all-regions.json>
 
 MERGE-PATCH RULES
-<paste the four rules above, verbatim>
+<paste the four numbered rules above, verbatim, plus the axisValue note>
 
 TASK
 Produce a sweep definition that varies <ONE THING> from <LOW> to <HIGH> across
@@ -139,7 +142,7 @@ dotnet run --project NEM.CLI -- --fan-out-sweep sweeps/my-sweep.json
 ```
 
 Fan-out writes every point's materialised config **and validates each one**. A hallucinated field,
-a bad region ID, a wrong schema version — all fail here, in seconds, before any dispatch happens.
+a bad region ID or a wrong schema version all fail here, in seconds, before any dispatch happens.
 Feed the error back to the model and regenerate.
 
 Only when fan-out is clean:
@@ -161,7 +164,7 @@ label says +3,000 MW and the overrides add 2,900. Nothing in NemSim catches it, 
 NemSim reads `axisValue`. Every chart downstream will be wrong. This is the single highest-value
 manual check.
 
-**Do not let it interpret levels.** NemSim's biases are systematic and known — see
+**Do not let it interpret levels.** NemSim's biases are systematic and known; see
 [Limitations](../assumptions/limitations.md). A comparison between two points is well supported; an
 absolute figure is not. Ask for differences and shapes, not for headline numbers.
 
@@ -169,9 +172,9 @@ absolute figure is not. Ask for differences and shapes, not for headline numbers
 exactly where a fitted trend fails. If you want to know what happens at twice the axis maximum, run
 that point.
 
-**Watch for the sizing floor.** A point reporting 30 MW / 120 MWh of storage may need almost none —
-that is the floor every sized candidate is raised to, not a fitted result. A model reading the
-scalars alone will not know that.
+**Watch for the sizing floor.** A point reporting 30 MW / 120 MWh of storage may need almost none.
+That is the floor every sized candidate is raised to, not a fitted result, and a model reading the
+scalars alone will not know it.
 
 **Distinguish "not modelled" from zero.** Transmission cost is zero for an unlinked system because
 there are no links; it is *absent* from a regional result because transmission is not in regional
@@ -195,6 +198,6 @@ confident summary goes wrong.
 
 ## Next
 
-- [Sensitivity analysis](sensitivity-analysis.md) — a worked example.
-- [Sweeps](../guide/sweeps.md) — the definition format in full.
-- [Outputs and provenance](../guide/outputs.md) — what a run publishes and how to read it.
+- [Sensitivity analysis](sensitivity-analysis.md): a worked example.
+- [Sweeps](../guide/sweeps.md): the definition format in full.
+- [Outputs and provenance](../guide/outputs.md): what a run publishes and how to read it.

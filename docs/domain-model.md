@@ -328,8 +328,8 @@ classDiagram
   deliberately rather than fixed, because the alternative (a real per-route
   distance table) is more precision than the rest of the cost model supports.
   **Route length is a proxy, and it runs long.** The distance is measured
-  between each region's *solar* weather site — chosen for renewable resource
-  quality, not for where a transmission line terminates — so corridors whose
+  between each region's *solar* weather site, chosen for renewable resource
+  quality rather than for where a transmission line terminates, so corridors whose
   resource sites sit far from the interconnector's real endpoints are
   overstated against the actual NEM route:
 
@@ -344,7 +344,7 @@ classDiagram
   **Reciprocal links each carry the full route length** (see the
   `TransmissionCostParameters` remarks): every corridor is declared as two
   directed interconnectors, each costed independently at the corridor's full
-  distance, so the same kilometre of conductor is paid for twice — once per
+  distance, so the same kilometre of conductor is paid for twice, once per
   direction. Charging each of the 5 physical corridors once at its larger
   directed rating gives 3,954,000 km·MW against the 7,035,547 km·MW actually
   charged across all 10 directed links, so this convention alone accounts for

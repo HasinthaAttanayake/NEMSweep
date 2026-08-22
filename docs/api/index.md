@@ -17,7 +17,7 @@ Namespaces worth starting from:
 | `NEM.Model.Simulation` | `Dispatcher`, dispatch evidence, reliability, and the `IStoragePolicy` extension point |
 | `NEM.Model.StorageSizing` | The sizing search, its options, and its results |
 | `NEM.Model.Economics` | Annuitisation and system costing |
-| `NEM.Model.Units` | Typed quantities. No bare `double` crosses a domain boundary |
+| `NEM.Model.Units` | Typed quantities: power, energy, distance, money and the cost rates. Dimensioned physical and monetary values cross domain boundaries as these types rather than as bare `double`s. Dimensionless ratios, such as round-trip efficiency and the reliability target percentage, stay plain numbers |
 | `NEM.Model.Series`, `NEM.Model.Weather`, `NEM.Model.Generation` | Time series, weather resources, and the solar and wind power curves |
 
 Internal types are not published. The dispatch run, the merit-order sort, the hydro pacer and the
@@ -26,7 +26,7 @@ max-flow algorithms are implementation detail behind `Dispatcher`; they are desc
 
 ## NEM.Contracts
 
-The published artifact schema — the shapes of the JSON that a run writes and that any consumer
+The published artifact schema: the shapes of the JSON that a run writes and that any consumer
 reads. If you are working with NemSim's output rather than calling its model, this is the reference
 you want.
 

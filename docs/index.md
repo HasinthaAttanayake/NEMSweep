@@ -2,17 +2,18 @@
 
 NemSim is an hourly grid dispatch model for Australia's National Electricity Market.
 
-You describe a set of regions — each with its demand, its generation assets and its storage — and
+You describe a set of regions, each with its demand, its generation assets and its storage, and
 NemSim dispatches them hour by hour across a modelled year. Where the reliability standard you
-declared is not met, it grows storage until either the standard is met or it reports that no
-battery of any size can meet it. The result is a set of technical and economic figures: what was
-generated, what was curtailed, what was left unserved, how much storage the system needed, and what
-the whole thing costs per MWh served.
+declared is not met, it grows storage until either the standard is met or the search reports what
+stopped it. The result is a set of technical and economic figures: what was generated, what was
+curtailed, what was left unserved, how much storage the system needed, and what the whole thing
+costs per MWh served.
 
-The model is **deterministic**. The same inputs at the same commit produce identical results —
-every modelled value, to the last decimal place — and every published result carries the SHA-256 of
-the exact input bytes it was built from. (An artifact is not quite byte-identical across reruns:
-each run stamps a fresh `runId`, which identifies the run rather than describing its contents.)
+The model is **deterministic**. The same inputs at the same commit produce identical results, every
+modelled value to the last decimal place, and every published result carries the SHA-256 of the
+exact input bytes it was built from. Dispatch artifacts are not quite byte-identical across reruns,
+because each run stamps a fresh `runId`, which identifies the run rather than describing its
+contents.
 
 That is the property the rest of this site is built around: if a number moves, something you
 changed moved it.
@@ -30,9 +31,9 @@ changed moved it.
 ## What it is for
 
 The published work so far uses NemSim for one question: what happens to system cost and reliability
-as large new loads — data centres, conceptually, though any load increase behaves the same — are
-added to the grid, and at what point does new storage become necessary. You can see that on the
-[results site](https://nemsim.pages.dev/).
+as large new loads are added to the grid, and at what point does new storage become necessary. The
+published study frames those loads as data centres, but any load increase behaves the same way. You
+can see the results on the [results site](https://nemsim.pages.dev/).
 
 That is one slice of a much larger space. Because the model is deterministic and every assumption
 is either a scenario input or a documented constant, the same framework answers questions it was

@@ -1,7 +1,7 @@
 # Sensitivity analysis
 
 A worked reading of the sweep committed to this repository, `datacentre-nameplate-fy2026`. The
-point is not the result — it is the method: what to look at, in what order, and where the traps are.
+point is not the result but the method: what to look at, in what order, and where the traps are.
 
 Figures below come from `NEM.Web/wwwroot/data/sweeps/datacentre-nameplate-fy2026/index.json` as
 published. Rerunning the sweep at a different commit will move them.
@@ -9,8 +9,9 @@ published. Rerunning the sweep at a different commit will move them.
 ## The sweep
 
 One axis: additional always-on load, distributed across the five NEM regions, from 0 MW to
-12,000 MW over 25 points. Everything else held constant — same generation fleets, same
-interconnectors, same economics, same weather year (FY2026, typical meteorological year).
+12,000 MW over 25 points. Everything else is held constant: the same generation fleets, the same
+interconnectors, the same economics, and the same weather year (FY2026, typical meteorological
+year).
 
 Storage sizing runs at every point. That is what makes this a study rather than 25 unrelated runs:
 each point answers "what would this system need to hold the reliability standard at this load?"
@@ -30,9 +31,9 @@ Two boundaries, and the second is the headline. Somewhere between +4,500 MW and 
 system stops being a storage problem.
 
 `storageNoLongerImprovesReliability` means every feasible larger power, energy and combined probe
-failed to materially reduce unserved energy. It identifies solver stagnation — it does **not**
-diagnose the cause. It could be generation timing, or storage policy, or the search itself. Worth
-knowing: it is not `EnergyLimited`, so total available generation energy still exceeded total demand
+failed to materially reduce unserved energy. It identifies solver stagnation and does **not**
+diagnose the cause: it could be generation timing, or storage policy, or the search itself. Worth
+knowing: it is not `energyLimited`, so total available generation energy still exceeded total demand
 energy. The energy exists; the system cannot get it to the right hours.
 
 ## Step 2: read reliability, and stop reading anything else once it fails
@@ -47,7 +48,7 @@ energy. The energy exists; the system cannot get it to the right hours.
 | p24 | 12,000 MW | 5.93% | no |
 
 The reliability target is 0.002% of demand energy. Through p9 the system holds it with margin. At
-p10 unserved energy jumps by two orders of magnitude — from 0.0014% to 0.1506% — and then climbs
+p10 unserved energy jumps by two orders of magnitude, from 0.0014% to 0.1506%, and then climbs
 steadily to 5.93%.
 
 That is a cliff, not a slope. It is the single most important feature of this sweep, and it is
@@ -71,7 +72,7 @@ compare them with the compliant points.
 Two things to notice.
 
 **The response is strongly non-linear.** The first 1,500 MW of load adds about 6 GWh of storage.
-The step from p7 to p8 — 500 MW of load — adds 39 GWh, nearly doubling the fleet. Storage
+The step from p7 to p8, which is 500 MW of load, adds 39 GWh and nearly doubles the fleet. Storage
 requirement is not proportional to load; it is driven by how the new load interacts with the
 existing generation shape, and there is a point where the existing shape stops covering it.
 
@@ -91,13 +92,13 @@ Total levelised cost is the scalar everyone reaches for first, and on its own it
 
 All AUD/MWh served.
 
-System levelised cost **falls** as load is added — from 154.49 to 146.40 by p7. That is real, and
+System levelised cost **falls** as load is added, from 154.49 to 146.40 by p7. That is real, and
 it is not a modelling artefact: a flat always-on load raises the system load factor, and the fixed
 costs of generation and transmission are then spread over more energy served. Generation levelised
 cost falls monotonically from 137.33 to 125.65; transmission from 12.00 to 9.91.
 
 But the storage component moves the other way, from 5.16 to 13.92, and by p8 it is rising faster
-than generation cost is falling. The system total turns around between p7 and p8 — the same place
+than generation cost is falling. The system total turns around between p7 and p8, the same place
 storage capacity nearly doubled.
 
 **That turning point is the finding.** "Adding load reduces levelised cost" is true up to about
@@ -109,9 +110,15 @@ Two more scalars carry information the headline figures do not.
 
 **Curtailment falls monotonically**, from 8.89 TWh at p0 to 0.94 TWh at p24. The added load is
 partly absorbing renewable generation that was previously spilled. That is most of the mechanism
-behind the falling generation cost, and it is also why the early points look so favourable: the
-first few gigawatts of new load are nearly free in system terms because the energy was being thrown
-away.
+behind the falling generation cost, and it is why the early points look favourable: part of the
+added load is served from energy that was already being generated and then spilled, so total annual
+cost rises proportionally less than served energy does.
+
+Be careful what that supports. Falling AUD/MWh is an **average**, and an average falls whenever
+fixed costs are spread over more energy, whether or not the added load is cheap to serve. Nothing
+in this section computes a marginal cost, which would be the change in total annual cost divided by
+the change in energy served between two adjacent points. Read these scalars as "average cost falls
+through p7", not as "the added load is nearly free".
 
 **The two renewable shares move in opposite directions**, which is worth dwelling on:
 
@@ -145,9 +152,12 @@ is exactly the error described in
 
 - Any absolute AUD/MWh figure as a cost of electricity. See
   [Limitations §3](../assumptions/limitations.md#3-this-is-the-cost-of-building-the-system-not-a-power-bill).
-- The storage capacities as requirements. A single weather year understates them —
-  [Limitations §1](../assumptions/limitations.md#1-a-deterministic-run-cannot-honour-an-expected-unserved-energy-standard)
-  — and greedy dispatch biases them in a second, separate direction —
+- The marginal cost of the added load. That would need the change in total annual cost divided by
+  the change in energy served, which this sweep publishes the ingredients for but does not
+  calculate.
+- The storage capacities as requirements. A single weather year understates them, per
+  [Limitations §1](../assumptions/limitations.md#1-a-deterministic-run-cannot-honour-an-expected-unserved-energy-standard),
+  and greedy dispatch biases them in a second, separate direction, per
   [Limitations §4](../assumptions/limitations.md#4-greedy-storage-dispatch-is-wrong-in-both-directions).
 - The exact breakpoint. It sits between two sample points 500 MW apart, and it will move with
   weather year, generation mix and storage economics.
@@ -169,6 +179,6 @@ is exactly the error described in
 
 ## Next
 
-- [Designing a study](index.md) — what else is worth varying.
-- [Driving NemSim with an LLM](llm-workflow.md) — generating sweeps and reading them back.
-- [Limitations](../assumptions/limitations.md) — required before quoting any of this.
+- [Designing a study](index.md): what else is worth varying.
+- [Driving NemSim with an LLM](llm-workflow.md): generating sweeps and reading them back.
+- [Limitations](../assumptions/limitations.md): required before quoting any of this.

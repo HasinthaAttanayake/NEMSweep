@@ -20,8 +20,8 @@ fixed for the rest of the run:
   sizing can introduce a fleet later without becoming scenario-aware itself.
 
 After derivation, dispatch is **scenario-blind**. `Dispatcher` and everything it calls only ever see
-the realised `PowerSystem` — regions, fleets, demand, interconnectors — never the scenario that
-produced it.
+the realised `PowerSystem`, meaning regions, fleets, demand and interconnectors, never the scenario
+that produced it.
 
 ## Interval outer, region inner
 
@@ -38,8 +38,8 @@ for each interval:
 The reason for the inversion is that every region needs to sit at the same hour at the same time for
 transfer to mean anything. A surplus in one region can only serve a deficit in another *within that
 hour* if both regions have already reached that hour before either one moves on. Running each region
-to completion before starting the next — the more obvious loop order — would never put two regions
-at the same interval simultaneously, and transfer would have nothing to connect.
+to completion before starting the next, which is the more obvious loop order, would never put two
+regions at the same interval simultaneously, and transfer would have nothing to connect.
 
 A direct consequence: a system with **no interconnectors** produces results identical to dispatching
 each region independently. Nothing about the loop structure itself favours a linked system; every
@@ -48,13 +48,13 @@ difference a link makes flows entirely through the transfer step.
 ## Order within an interval
 
 For each interval, the sequence is fixed: **generation, then inter-regional transfer, then storage,
-then — strictly local, never exportable — the Hydro reserve fallback.**
+then the Hydro reserve fallback**, which is strictly local and never exportable.
 
 Generation runs first because transfer needs to know each region's post-generation deficit or
 surplus before it can move anything. Storage runs after transfer, not before, so that a region's
 surplus can beat its own battery to a neighbour's unserved load: exporting first means a region never
 locks energy into local storage that another region needed for that hour. The Hydro reserve fallback
-runs last of all, after that region's own storage, and it is invisible to transfer entirely — it is
+runs last of all, after that region's own storage, and it is invisible to transfer entirely. It is
 reachable only from inside the region's own completion step, never from generation, exports, or
 storage charging.
 
@@ -68,22 +68,22 @@ determinism:
 SRMC = variable operating cost + fuel price × heat rate
 ```
 
-Zero-fuel-cost technologies — Solar, Wind, and, in cost terms, Hydro — tie at zero SRMC extremely
-often, so the technology tie-break decides which of them gets dispatched first, and therefore which
-one's surplus gets curtailed first when there is more available than demand needs. Conventional
-Hydro is sorted into this order like any other technology; nothing about `GenerationMeritOrder` singles
-it out.
+Solar, Wind and, in cost terms, Hydro all carry zero fuel cost, so they tie at zero SRMC extremely
+often. The technology tie-break then decides which of them gets dispatched first, and therefore
+which one's surplus gets curtailed first when there is more available than demand needs.
+Conventional Hydro is sorted into this order like any other technology; nothing about
+`GenerationMeritOrder` singles it out.
 
 ## Hydro pacing
 
 Hydro is unlike every other technology in one respect: it carries a monthly *energy* budget instead
 of a fuel cost. Sorted purely by cost, that budget would be spent on whichever hours happen to come
 first each month, which is not how a reservoir with a season to last is actually operated. An earlier
-version tried the intuitive fix — sort Hydro last in merit order, so it only ran once other cheaper
-technologies had already served demand — and it stranded roughly 93% of the budget: relocating Hydro
-in the sort order didn't ration it, because being sorted last just meant the demand that reached it
-was small in most hours, and the reservoir sat mostly unused all month, then had nothing meaningful
-left to contribute at genuine peaks.
+version tried the intuitive fix of sorting Hydro last in merit order, so that it only ran once
+cheaper technologies had already served demand, and that stranded roughly 93% of the budget.
+Relocating Hydro in the sort order did not ration it: being sorted last just meant the demand
+reaching it was small in most hours, so the reservoir sat mostly unused all month and then had
+nothing meaningful left to contribute at genuine peaks.
 
 The fix that shipped is a **causal threshold controller**, `HydroReservationState`, layered
 independently of sort position. Each interval, Hydro's dispatch is capped at:
@@ -104,18 +104,18 @@ there is no usable history, so the fleet instead runs flat at the affordable ave
 The monthly budget is split 90/10: 90% is the pool this controller paces (the "paced" pool); the
 remaining 10% is held out of merit order entirely (the "reserve" pool) and spent only as a
 last-resort local backstop, after that region's own storage has already run, against whatever
-deficit remains. Neither pool carries into the next month — with fewer than three days left, the
+deficit remains. Neither pool carries into the next month, so with fewer than three days left the
 unspent reserve is released into the paced pool rather than being wasted at the month boundary.
 
-Stress the point that runs through the whole mechanism: **there is no foresight anywhere in this.**
-Every input to the threshold and the cap is either the scenario-declared budget (known up front, not
-forecast), calendar arithmetic, the current interval's own residual demand, or a window of strictly
-*past* observations. Nothing reads ahead of the interval it is pricing.
+One point runs through the whole mechanism: **there is no foresight anywhere in it.** Every input
+to the threshold and the cap is either the scenario-declared budget (known up front, not forecast),
+calendar arithmetic, the current interval's own residual demand, or a window of strictly *past*
+observations. Nothing reads ahead of the interval it is pricing.
 
 ## Storage
 
 Storage dispatch is deliberately narrow in what it is trusted with. `RegionalDispatchRun` builds a
-`DispatchContext` — an immutable snapshot of the *current interval only*: signed residual power
+`DispatchContext`, an immutable snapshot of the *current interval only*: signed residual power
 (positive is unmet demand, negative is would-be-curtailed surplus), and one scalar snapshot per
 storage and generation fleet describing its headroom and cost. An `IStoragePolicy` implementation
 receives that context and returns a `StorageDecision`: zero or more `StorageIntent` values, each
@@ -124,9 +124,10 @@ naming a fleet and a requested MW flow.
 The policy owns intent and fleet ordering only. It does not own state of charge, execute storage
 physics, or book unserved demand and curtailment. The dispatch run clamps every intent against real
 headroom, and each `StorageFleet` remains the final authority on power limits, energy limits and
-round-trip loss. A policy can therefore ask for something physically impossible — more discharge than
-the fleet has energy for, more charge than its power rating allows — but it cannot cause it: the
-fleet's `Operate` transition silently reconciles the request down to what is actually deliverable.
+round-trip loss. A policy can therefore ask for something physically impossible, such as more
+discharge than the fleet has energy for or more charge than its power rating allows, but it cannot
+cause it: the fleet's `Operate` transition reconciles the request down to what is actually
+deliverable.
 That boundary is what makes `IStoragePolicy` a safe extension point: swapping in a different policy,
 including one with foresight, requires no change to dispatch itself, because dispatch was never
 trusting the policy with anything it could get wrong.
@@ -143,9 +144,10 @@ Every region's flows close exactly, each interval, against one identity:
 generation + discharge + imports + unserved = demand + charge + exports + curtailment
 ```
 
-Summed across the whole system, imports and exports do not cancel exactly — every export arrives at
-its destination minus whatever transmission losses consumed along the way. So the system-level form
-of the identity replaces the import/export terms with a single losses term instead:
+Summed across the whole system, imports and exports do not cancel exactly, because every export
+arrives at its destination minus whatever transmission losses consumed along the way. The
+system-level form of the identity therefore replaces the import and export terms with a single
+losses term:
 
 ```text
 generation + discharge + unserved = demand + charge + curtailment + transmission losses
@@ -158,9 +160,9 @@ exports cancel and the loss they generated is accounted separately.
 ## Unserved energy and curtailment
 
 Generation and demand rarely balance exactly in any given interval, and the model resolves the gap
-into exactly two residuals. **Unserved energy** is demand that nothing — local generation, storage,
-or import — could reach in that interval. **Curtailment** is generation, almost always intermittent
-renewable output, that nothing needed and nothing could absorb.
+into exactly two residuals. **Unserved energy** is demand that nothing could reach in that interval,
+whether local generation, storage or import. **Curtailment** is generation, almost always
+intermittent renewable output, that nothing needed and nothing could absorb.
 
 Reliability is measured on unserved **energy** as a percentage of demand energy, not on hours served
 or peak unserved power. Those two are useful diagnostics, but they are not the binding measure: a
@@ -170,9 +172,9 @@ compliant Battery capacity.
 
 ## Next
 
-- [Storage sizing](storage-sizing.md) — how Battery capacity is grown until dispatch meets its
+- [Storage sizing](storage-sizing.md): how Battery capacity is grown until dispatch meets its
   reliability target.
-- [Transmission](transmission.md) — how inter-regional transfer decides what moves between regions
+- [Transmission](transmission.md): how inter-regional transfer decides what moves between regions
   before storage runs.
-- [Limitations §4](../assumptions/limitations.md#4-greedy-storage-dispatch-is-wrong-in-both-directions) —
+- [Limitations §4](../assumptions/limitations.md#4-greedy-storage-dispatch-is-wrong-in-both-directions):
   what the absence of foresight in storage dispatch does to a result.

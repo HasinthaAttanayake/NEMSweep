@@ -27,8 +27,8 @@ you need the exact shape beyond what this page covers.
 ## Schema versions
 
 Every artifact carries a `schemaVersion` field, and the current value for each artifact type is
-defined in one place: `NEM.Contracts/ArtifactSchemaVersions.cs`. Rather than repeating those
-numbers here — where they would go stale the moment a schema changes — consult the
+defined in one place: `NEM.Contracts/ArtifactSchemaVersions.cs`. This page does not repeat those
+numbers, because they would go stale the moment a schema changes. Consult the
 [API reference](../api/index.md) for the current values.
 
 ## Sweep scalar vocabulary
@@ -60,13 +60,13 @@ under, its label, and its unit.
 | `transmissionCostStatus` | Transmission cost status | status |
 | `netImportedEnergyMwh` | Net imported energy | MWh |
 
-`transmissionCostStatus` is the one entry the catalogue marks as not chartable — it is a status
+`transmissionCostStatus` is the one entry the catalogue marks as not chartable. It is a status
 label (`calculated` or `notModelled`), not a numeric series.
 
 ## Base-demand externalisation
 
-Sweep points frequently share an identical base-demand series — varying a cost parameter or a
-storage limit does not change demand at all. Rather than repeating that series inside every
+Sweep points frequently share an identical base-demand series, because varying a cost parameter or
+a storage limit does not change demand at all. Rather than repeating that series inside every
 point's result, a sweep run externalises it: the first point to produce a given series writes it
 once to `series/base-demand-{sha256}.json`, where the hash is computed from the serialised series
 itself, and every point whose demand series is byte-identical simply references that file's path.
@@ -75,39 +75,64 @@ series directory does not accumulate stale content-addressed files across regene
 
 ## Provenance and reproducibility
 
-Every dispatch result — a scenario run, a region within one, or a sweep point — records the exact
-input artifacts it consumed: for each of the demand and weather inputs, the filename, the schema
-version, and the SHA-256 digest of the exact bytes that were parsed (`DispatchInputArtifactDTO` in
-`NEM.Contracts/DispatchResultsDTO.cs`). The digest, not the configured file path, is the
-reproducibility boundary: a path can be overwritten with different content later, but the digest
-identifies the bytes that actually produced this result.
+Every dispatch result records the exact input artifacts it consumed, whether that result is a
+scenario run, a region within one, or a sweep point. For each of the demand and weather inputs it
+records the filename, the schema version, and the SHA-256 digest of the exact bytes that were
+parsed (`DispatchInputArtifactDTO` in `NEM.Contracts/DispatchResultsDTO.cs`). The digest, not the
+configured file path, is the reproducibility boundary: a path can be overwritten with different
+content later, but the digest identifies the bytes that actually produced this result.
 
 A sweep's `index.json` additionally records the git commit SHA the model was built from when the
-sweep ran, and a flag for whether the working tree had uncommitted changes at that time — so a
-sweep result states not just which input bytes it read but which version of the model produced it.
+sweep ran, and a flag for whether the working tree had uncommitted changes at that time. A sweep
+result therefore states not just which input bytes it read but which version of the model produced
+it.
 
 ## Writing conventions
 
 Published artifacts follow the conventions in `NEM.CLI/Infrastructure/JsonFile.cs`:
 
 - Property names are camelCase.
-- Object keys are sorted ordinally, so a rerun that changes nothing produces a file identical
-  except for its `runId`, and a rerun that changes one value produces a small, reviewable diff.
-- Numeric values are rounded according to their unit — for example, `*Mw` and `*Mwh` fields to one
-  decimal place, AUD fields to two, and fractional shares to four — rather than carrying full
-  floating-point precision that no one reads.
+- Object keys are sorted ordinally, so a rerun that changes one value produces a small, reviewable
+  diff rather than a reordered file.
+- Numeric values are rounded according to their unit, so `*Mw` and `*Mwh` fields carry one decimal
+  place, AUD fields two, and fractional shares four, rather than full floating-point precision that
+  no one reads.
 - Published artifacts are written unindented. Indentation was roughly seventy percent of the bytes
-  in these files and nothing — not the CLI, not the site, not a person — ever read the whitespace.
+  in these files, and nothing ever read the whitespace: not the CLI, not the site, not a person.
 
-Publishing a scenario or sweep result is atomic: the new files are staged in a temporary directory,
-the previous versions of the target files are moved aside, and only then are the staged files moved
+### What changes between two identical reruns
+
+Rerun a scenario against unchanged inputs at the same commit and every modelled value is
+reproduced exactly. The artifacts are not byte-identical, though, and what differs depends on the
+artifact:
+
+| Artifact | Differs between identical reruns |
+|---|---|
+| `results*.json` | `runId` only, a fresh GUID per run |
+| `demand-{region}.json`, `weather-{region}.json`, `generation-information.json` | `generatedAt`, a UTC timestamp stamped at import |
+| `sweeps/{sweepId}/index.json` | Each point's measured `durationMs`, and the sweep's `totalDurationMs` when recorded |
+
+The `runId`-only guarantee was verified by regenerating all twelve committed dispatch artifacts and
+diffing them leaf by leaf. It applies to the dispatch artifacts; it does not extend to the imported
+inputs or to the sweep index, which record when and how long a run took.
+
+### Atomic publication
+
+Publishing a **scenario** result is atomic: the new files are staged in a temporary directory, the
+previous versions of the target files are moved aside, and only then are the staged files moved
 into place. If anything fails partway through, the move is rolled back and the previous artifacts
 are restored, so a failed run never leaves a half-written result where a complete one used to be
-(`DispatchResultsExport`).
+(`DispatchResultsExport.WritePublication`).
+
+A **sweep** has no equivalent guarantee at the sweep level. Each point's dispatch result lands
+through that same staged path, but it is then rewritten in place to externalise its base-demand
+series, and the generated configs, per-point status files, the sweep index and the manifest are
+written incrementally as the run proceeds. An interrupted sweep can therefore leave a partially
+updated `sweeps/{sweepId}/` directory. Rerunning the sweep restores it.
 
 ## These files are generated
 
-Everything under `NEM.Web/wwwroot/data` is a committed, generated artifact. Do not hand-edit it —
-regenerate it by rerunning the command that produced it (`--ingest` for the input artifacts,
+Everything under `NEM.Web/wwwroot/data` is a committed, generated artifact. Do not hand-edit it.
+Regenerate it by rerunning the command that produced it (`--ingest` for the input artifacts,
 `--run-scenario` or `--run-sweep` for results), so the file on disk stays traceable to the inputs
 and commit that produced it.

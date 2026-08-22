@@ -8,7 +8,7 @@ starts from the same baseline scenario config and applies a small patch on top o
 The full published JSON Schema for the sweep definition format is available from the CLI:
 
 ```bash
-dotnet run --project .\NEM.CLI\NEM.CLI.csproj -- --describe-schema sweep
+dotnet run --project NEM.CLI -- --describe-schema sweep
 ```
 
 ## The definition format
@@ -20,7 +20,7 @@ A sweep is one JSON file.
 | `schemaVersion` | integer | yes | Must equal the version the CLI accepts (see `--describe-schema sweep`). |
 | `sweepId` | string | yes | Must match `^[a-z0-9][a-z0-9-]*$`. Becomes the name of the `sweeps/<sweepId>/` output directory, hence the restricted character set. |
 | `name` | string | yes | Human-readable name. |
-| `axis` | object | yes | `label` and `unit`, both non-blank strings — how the swept quantity is captioned on a chart. |
+| `axis` | object | yes | `label` and `unit`, both non-blank strings, giving how the swept quantity is captioned on a chart. |
 | `baselineConfigPath` | string | yes | Path to the scenario config every point patches. |
 | `points` | array of [point](#points) | yes, at least one | The runs that make up the sweep. |
 
@@ -29,32 +29,33 @@ A sweep is one JSON file.
 | Field | Type | Required | Meaning |
 |---|---|---|---|
 | `pointId` | string | yes | Must match `^[a-z0-9][a-z0-9-]*$` and be unique within the sweep. Becomes part of output filenames. |
-| `axisValue` | number | yes | Where this point sits on the chart's x-axis. Display only — see below. |
+| `axisValue` | number | yes | Where this point sits on the chart's x-axis. Display only; see below. |
 | `label` | string | yes | Human-readable label for this point. |
 | `overrides` | object | yes | A JSON merge patch applied to the baseline config. May be empty (`{}`) for a true baseline point. |
 
 ## `axisValue` does not drive anything
 
 This is the single most important thing to understand about the format. `axisValue` is a plotting
-coordinate — it places the point on the x-axis of a chart — and nothing else. It has no effect on
+coordinate and nothing else: it places the point on the x-axis of a chart, and has no effect on
 what the point actually runs. The only thing that changes what a point runs is `overrides`.
 
 A sweep is free to declare `axisValue: 500` on a point whose `overrides` changes nothing, or changes
 something entirely unrelated to "500" in any unit. Nothing in `--fan-out-sweep` or `--run-sweep`
 cross-checks the two. Such a sweep will fan out, run, and publish a perfectly normal-looking chart
 whose x-axis has no relationship to what was actually varied. When you write a sweep, treat keeping
-`axisValue` and `overrides` in agreement as entirely your responsibility — there is no validation
-that will catch a mismatch for you.
+`axisValue` and `overrides` in agreement as entirely your responsibility. No validation will catch
+a mismatch for you.
 
 ## JSON merge-patch semantics
 
-Each point's `overrides` is applied to the baseline scenario config as an RFC 7386-style JSON merge
-patch, with one deliberate extension for arrays. This is currently documented nowhere else, so it is
-worth being precise about.
+Each point's `overrides` is applied to the baseline scenario config as an RFC 7386 JSON merge patch,
+with two deliberate extensions, both about arrays: four named arrays merge by key rather than being
+replaced, and a reserved `$remove` shape deletes a keyed element. This is currently documented
+nowhere else, so it is worth being precise about.
 
 **Scalars and objects.** A property present in the patch replaces the corresponding property in the
 target. A property whose value is `null` in the patch deletes that property from the target
-entirely — not "sets it to null", removes it. Objects are merged key by key, recursively.
+entirely, rather than setting it to null. Objects are merged key by key, recursively.
 
 ```json
 // baseline
@@ -119,13 +120,13 @@ and `"$remove": true`.
 }
 ```
 
-An object with `$remove: true` plus any other property (other than the key field) is rejected — the
+An object with `$remove: true` plus any other property, other than the key field, is rejected. The
 merge cannot tell whether you meant to remove the item or edit it.
 
 ## Workflow: fan out, then run
 
 ```bash
-dotnet run --project .\NEM.CLI\NEM.CLI.csproj -- --fan-out-sweep .\sweeps\my-sweep.json
+dotnet run --project NEM.CLI -- --fan-out-sweep sweeps/my-sweep.json
 ```
 
 `--fan-out-sweep` applies every point's patch to the baseline, writes each resulting scenario config
@@ -135,12 +136,14 @@ feedback loop: while you are developing or debugging a sweep, run fan-out repeat
 generated configs to confirm each point patches what you intended.
 
 ```bash
-dotnet run --project .\NEM.CLI\NEM.CLI.csproj -- --run-sweep .\sweeps\my-sweep.json
+dotnet run --project NEM.CLI -- --run-sweep sweeps/my-sweep.json
 ```
 
-`--run-sweep` fans out again internally — writing the same `sweeps/<sweepId>/configs/*.json` files —
-but **does not validate** the generated configs before running them, since fan-out's own validation
-step already exercises that path. It then dispatches every point in turn.
+`--run-sweep` fans out again internally, writing the same `sweeps/<sweepId>/configs/*.json` files,
+but **does not validate** the generated configs before running them: a bad point is recorded as a
+per-point failure so that one mistake cannot abandon a long unattended run. It then dispatches
+every point in turn. That difference between the two commands is tracked in
+[issue #116](https://github.com/HasinthaAttanayake/NemSim/issues/116).
 
 Because `--run-sweep` skips the validation fan-out performs on its own, run `--fan-out-sweep` first
 while you are still developing a sweep, so a malformed override surfaces as a fast validation error
@@ -156,6 +159,10 @@ fails, whatever partial dispatch artifacts it produced are deleted so a failed p
 misleading output behind, and the run continues on to the remaining points. Only once every point
 has been attempted does `--run-sweep` exit; if any point failed, the process exit code is `1` and
 the failed point IDs are reported.
+
+The sweep as a whole is not published atomically. Point results, status files, the sweep index and
+the manifest are written as the run proceeds, so an interrupted sweep can leave a partially updated
+`sweeps/<sweepId>/` directory. Rerun the sweep to bring it back into a consistent state.
 
 ## A complete minimal worked example
 
@@ -204,11 +211,11 @@ A two-point sweep varying storage capital cost, run against the committed FY2026
 
 The first point's `overrides` is empty, so it reproduces the baseline exactly; its `axisValue`
 records what the baseline's actual Battery capital cost is, for the chart's sake. The second point
-changes only `powerCapitalCostAudPerMw` on NSW1's `Battery` fleet — the keyed-array merge means the
+changes only `powerCapitalCostAudPerMw` on NSW1's `Battery` fleet. The keyed-array merge means the
 rest of that fleet's cost parameters, its technology profile, and every other region's fleets are
 carried over from the baseline untouched.
 
 ## See also
 
-- [Scenario configuration](scenarios.md) — the format every point's `overrides` patches.
-- [Outputs and provenance](outputs.md) — the full artifact layout a sweep run produces.
+- [Scenario configuration](scenarios.md): the format every point's `overrides` patches.
+- [Outputs and provenance](outputs.md): the full artifact layout a sweep run produces.

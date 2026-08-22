@@ -2,9 +2,9 @@
 
 NemSim answers one question, repeatedly and cheaply:
 
-> Given this set of regions — with this demand, these generation assets, these interconnectors and
-> these economics — what happens when you dispatch it hour by hour for a year, how much storage
-> does it take to hold the reliability standard, and what does the whole thing cost per MWh served?
+> Given this set of regions, with this demand, these generation assets, these interconnectors and
+> these economics, what happens when you dispatch it hour by hour for a year, how much storage does
+> it take to hold the reliability standard, and what does the whole thing cost per MWh served?
 
 Everything else on this site is either how to ask that question, or how to read the answer.
 
@@ -35,7 +35,7 @@ Four stages, each with a clean boundary:
 cost basis and any interconnectors. It knows nothing about files or data.
 
 **Realisation.** `ScenarioDerivation` combines that intent with parsed demand and weather to
-produce a `PowerSystem` — the actual grid to be dispatched. This is a pure transformation; after it,
+produce a `PowerSystem`, the actual grid to be dispatched. This is a pure transformation; after it,
 nothing downstream is scenario-aware.
 
 **Dispatch.** The `Dispatcher` walks the year an hour at a time. Within each hour it dispatches
@@ -45,8 +45,9 @@ curtailment. See [Dispatch](dispatch.md).
 
 **Assessment.** Reliability is measured as unserved energy against demand energy. If a region misses
 its target, `StorageSizingService` grows Battery capacity and re-dispatches the entire system, until
-either every region complies or the search reports why it cannot. See
-[Storage sizing](storage-sizing.md). The final system is then priced — see [Economics](economics.md).
+either every region complies or the search reports what stopped it. See
+[Storage sizing](storage-sizing.md). The final system is then priced, which
+[Economics](economics.md) covers.
 
 ## The two properties that matter
 
@@ -55,8 +56,8 @@ identical results, value for value. There are no confidence intervals because th
 distribution, only the single realisation you asked for.
 
 That sounds like a weakness and is mostly a strength. It means a difference between two runs is
-attributable: if you changed one input and a number moved, that input moved it. It is what makes
-sweeps — dozens of runs varying one axis — a sensible unit of work rather than a statistical
+attributable: if you changed one input and a number moved, that input moved it. It is what makes a
+sweep of dozens of runs varying one axis a sensible unit of work rather than a statistical
 exercise.
 
 **It is inspectable.** Every assumption is either a value you supplied in the scenario or a constant
@@ -73,7 +74,7 @@ A small set of terms carries most of the meaning. They are used precisely throug
 | **Region** | One NEM region, modelled as a single node. NSW1, QLD1, SA1, TAS1, VIC1. |
 | **Fleet** | All capacity of one technology in one region, treated as a single unit. |
 | **Merit order** | Dispatch order: ascending short-run marginal cost, tie-broken by technology. |
-| **Residual** | Demand less generation, within an interval. Positive is a deficit; negative is surplus. |
+| **Residual** | Demand less generation, within an interval. Positive is a deficit; negative is a surplus. |
 | **Unserved energy (USE)** | Demand that could not be met. The binding reliability measure, as a percentage of demand energy. |
 | **Curtailment** | Available generation that could not be used and was not stored. |
 | **Delivered to load** | Demand minus unserved. The denominator of every levelised cost. |
@@ -85,9 +86,9 @@ A small set of terms carries most of the meaning. They are used precisely throug
 NemSim is a system-planning model. It is not a market simulator, not a power-flow model, and not a
 forecast.
 
-No bidding, no prices, no settlement. No unit commitment — no minimum stable generation, no
-start-up costs, no ramp rates. No forced outages. No intra-regional network. No frequency control
-or system strength. No demand response.
+No bidding, no prices, no settlement. No unit commitment, so no minimum stable generation, no
+start-up costs and no ramp rates. No forced outages. No intra-regional network. No frequency
+control or system strength. No demand response.
 
 Those absences are what make it small enough to run a 25-point sweep over five regions and 8,760
 hours in a reasonable time, which is the trade it exists to make. They are also why
@@ -95,7 +96,7 @@ hours in a reasonable time, which is the trade it exists to make. They are also 
 
 ## Where to go next
 
-| | |
+| Page | Covers |
 |---|---|
 | [Dispatch](dispatch.md) | The hourly loop, merit order, hydro pacing, storage policy |
 | [Storage sizing](storage-sizing.md) | The sizing search and what each outcome means |
