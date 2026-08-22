@@ -29,7 +29,7 @@ public static class DataCentreDemand
     /// <param name="intervalCount">Number of intervals to generate. Must be positive.</param>
     /// <returns>
     /// A flat series at <paramref name="nameplate"/> multiplied by <see cref="LoadFactor"/> for
-    /// every interval — not a duty-cycle shape.
+    /// every interval, rather than a duty-cycle shape.
     /// </returns>
     /// <exception cref="ArgumentOutOfRangeException">
     /// Nameplate is negative, or <paramref name="intervalCount"/> is not positive.

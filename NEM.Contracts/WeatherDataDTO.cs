@@ -41,13 +41,16 @@ public readonly record struct WeatherLocation(
 /// <param name="SourceFile">Name of the EPW file the solar series was read from.</param>
 /// <param name="Location">Site the EPW file describes.</param>
 /// <param name="GlobalHorizontalRadiationWhPerSquareMetre">
-/// Global horizontal irradiance for the interval, in Wh/m².
+/// Global horizontal irradiation, integrated over the interval, in Wh/m². This is energy per unit
+/// area, not an irradiance in W/m².
 /// </param>
 /// <param name="DirectNormalRadiationWhPerSquareMetre">
-/// Direct normal irradiance for the interval, in Wh/m².
+/// Direct normal irradiation, integrated over the interval, in Wh/m². This is energy per unit
+/// area, not an irradiance in W/m².
 /// </param>
 /// <param name="DiffuseHorizontalRadiationWhPerSquareMetre">
-/// Diffuse horizontal irradiance for the interval, in Wh/m².
+/// Diffuse horizontal irradiation, integrated over the interval, in Wh/m². This is energy per unit
+/// area, not an irradiance in W/m².
 /// </param>
 /// <param name="SolarZenithDegrees">Solar zenith angle at the interval, in degrees.</param>
 /// <param name="DryBulbTemperatureDegreesCelsius">Ambient dry-bulb air temperature for the interval, in degrees Celsius.</param>

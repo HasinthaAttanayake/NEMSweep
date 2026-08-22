@@ -5,6 +5,10 @@ namespace NEM.Contracts;
 /// Information" worksheet of the published workbook. One row per generating unit; the model reads
 /// this to place existing and committed plant, not to describe anything it dispatched itself.
 /// </summary>
+/// <param name="SchemaVersion">Schema version of this artifact; see <see cref="ArtifactSchemaVersions.GenerationInformation"/>.</param>
+/// <param name="SourceFile">Name of the workbook file the rows were read from.</param>
+/// <param name="GeneratedAt">When this artifact was generated, in UTC. It is stamped fresh on every import, so it differs between two imports of identical source data.</param>
+/// <param name="Rows">One entry per generating unit in the workbook, in the order the worksheet lists them.</param>
 public sealed record GenerationInformationDTO(
     int SchemaVersion,
     string SourceFile,

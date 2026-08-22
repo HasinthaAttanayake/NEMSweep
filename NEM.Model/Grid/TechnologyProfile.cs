@@ -60,7 +60,10 @@ namespace NEM.Model.Grid
     public sealed record GenerationTechnologyProfile
     {
         /// <summary>Validates and creates a generation technology profile.</summary>
-        /// <param name="heatRate">Thermal energy required per MWh of electricity delivered.</param>
+        /// <param name="heatRate">
+        /// Thermal energy consumed per MWh of electricity generated. Fuel cost is charged on gross
+        /// generation, not on the energy that reaches load.
+        /// </param>
         /// <param name="technicalLifeYears">
         /// Operating life used to annuitise capital cost. Must be positive.
         /// </param>
@@ -75,7 +78,7 @@ namespace NEM.Model.Grid
             TechnicalLifeYears = technicalLifeYears;
         }
 
-        /// <summary>Thermal energy required to deliver one MWh of electricity.</summary>
+        /// <summary>Thermal energy consumed per MWh of electricity generated.</summary>
         public HeatRate HeatRate { get; }
 
         /// <summary>Expected operating life of the generating asset in years.</summary>

@@ -1,7 +1,7 @@
 namespace NEM.Model.Units;
 
 /// <summary>
-/// Generation operating cost in AUD per MWh generated — a rate, not a cost total.
+/// Generation operating cost in AUD per MWh generated: a rate, not a cost total.
 /// Multiply by generated energy (see <see cref="For"/>) to get an actual spend.
 /// </summary>
 public readonly record struct GenerationEnergyCost : IComparable<GenerationEnergyCost>

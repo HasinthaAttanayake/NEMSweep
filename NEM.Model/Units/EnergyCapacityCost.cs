@@ -2,7 +2,7 @@ namespace NEM.Model.Units;
 
 /// <summary>
 /// One-time capital cost per unit of storage energy capacity, in AUD/MWh of storage
-/// capacity — not AUD/MWh generated or delivered.
+/// capacity. It is not AUD/MWh generated or delivered.
 /// </summary>
 public readonly record struct EnergyCapacityCost
 {

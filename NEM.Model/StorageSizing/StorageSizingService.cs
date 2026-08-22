@@ -3,8 +3,8 @@ using NEM.Model.Grid;
 namespace NEM.Model.StorageSizing;
 
 /// <summary>
-/// Finds Battery capacity that brings a system within its reliability target, or reports why no
-/// capacity can.
+/// Finds Battery capacity that brings a system within its reliability target, or reports why the
+/// bounded search did not get there.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -26,7 +26,9 @@ public static class StorageSizingService
     /// <param name="options">The reliability target and the capacity and pass bounds.</param>
     /// <returns>
     /// The final system, its dispatch evidence, the per-region capacity settled on, and a status
-    /// saying whether the target was met and, if not, what stopped the search.
+    /// saying whether the target was met and, if not, what stopped the search. Only
+    /// <see cref="StorageSizingStatus.EnergyLimited"/> establishes that no Battery capacity could
+    /// have met the target; the other terminal statuses report a bound the search reached.
     /// </returns>
     public static StorageSizingRunResult Size(
         PowerSystem powerSystem,

@@ -1,7 +1,7 @@
 namespace NEM.Model.Units
 {
     /// <summary>
-    /// Power in megawatts (MW) — a rate, not a quantity of energy.
+    /// Power in megawatts (MW): a rate, not a quantity of energy.
     /// <para>
     /// A power figure is either an average over an interval (e.g. metered demand
     /// over a block) or a capacity (e.g. a generator's nameplate rating). To get
@@ -16,7 +16,7 @@ namespace NEM.Model.Units
     /// <para>
     /// Adding two powers is meaningful across space (summing a fleet at the same
     /// instant), but not across time: two consecutive interval averages do not add
-    /// to the average over the combined interval — for that you sum energy, not
+    /// to the average over the combined interval. For that you sum energy, not
     /// power. The operator here does not distinguish the two; combining across time
     /// is guarded where a series and its resolution are known, not on the scalar.
     /// </para>

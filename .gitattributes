@@ -1,6 +1,6 @@
 # Published artifacts. NEM.CLI writes these; nobody edits them by hand, and a rerun rewrites
 # millions of lines across a few hundred files. Left to itself GitHub tries to diff all of it,
-# gives up ("this diff is taking too long to generate"), and then renders nothing at all — the
+# gives up ("this diff is taking too long to generate"), and then renders nothing at all, the
 # handful of source files in the same pull request included.
 #
 # -diff compares them by hash instead of by content, so the source diff survives a data refresh.

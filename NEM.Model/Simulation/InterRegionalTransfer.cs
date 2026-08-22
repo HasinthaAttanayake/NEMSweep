@@ -18,8 +18,8 @@ public sealed record InterconnectorFlow
     /// region, metered at the sending end.
     /// </param>
     /// <param name="losses">
-    /// Energy consumed by losses on this link, in MW. Must be aligned with
-    /// <paramref name="flow"/> and never greater than it.
+    /// Power lost on this link, in MW: the part of <paramref name="flow"/> that does not arrive.
+    /// Must be aligned with <paramref name="flow"/> and never greater than it.
     /// </param>
     public InterconnectorFlow(
         Interconnector interconnector,
@@ -42,7 +42,7 @@ public sealed record InterconnectorFlow
     /// <summary>Non-negative scheduled flow from the interconnector's sending region.</summary>
     public FlowSeries Flow { get; }
 
-    /// <summary>Non-negative loss attributed to this interconnector.</summary>
+    /// <summary>Non-negative power lost on this interconnector, in MW.</summary>
     public FlowSeries Losses { get; }
 }
 

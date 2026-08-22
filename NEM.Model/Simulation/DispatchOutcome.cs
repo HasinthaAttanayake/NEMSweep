@@ -37,13 +37,13 @@ public sealed record DispatchOutcome
     public FlowSeries NativeDemand { get; }
     /// <summary>Demand served by generation, storage discharge, and imports.</summary>
     public FlowSeries DeliveredToLoad { get; }
-    /// <summary>Total storage charging.</summary>
+    /// <summary>Total power drawn from the grid to charge storage, in MW.</summary>
     public FlowSeries Charge { get; }
-    /// <summary>Energy discharged from storage to serve demand.</summary>
+    /// <summary>Power discharged from storage to serve demand, in MW.</summary>
     public FlowSeries Discharge { get; }
-    /// <summary>Energy imported into the region.</summary>
+    /// <summary>Power imported into the region, in MW, net of transmission losses.</summary>
     public FlowSeries Imports { get; }
-    /// <summary>Energy exported from the region.</summary>
+    /// <summary>Power exported from the region, in MW, metered at the sending end.</summary>
     public FlowSeries Exports { get; }
     /// <summary>Total non-negative magnitude of available generation constrained off.</summary>
     public FlowSeries Curtailment { get; }
@@ -61,14 +61,14 @@ public sealed record DispatchOutcome
     /// <param name="regionId">Identifies the region that was dispatched.</param>
     /// <param name="perFleetGeneration">Available generation by technology before curtailment.</param>
     /// <param name="perFleetCurtailment">Available generation constrained off by technology; must share the same technology keys as <paramref name="perFleetGeneration"/>.</param>
-    /// <param name="perFleetDelivered">Generator output delivered to the grid by technology, as a bookkeeping allocation rather than a physical attribution.</param>
+    /// <param name="perFleetDelivered">Generator output delivered to the grid by technology, covering both local load and exports, as a bookkeeping allocation rather than a physical attribution.</param>
     /// <param name="perFleetCharge">Storage charging booked to the technology it was allocated against.</param>
     /// <param name="demand">Total regional demand at hourly resolution.</param>
     /// <param name="unserved">Demand that remains unserved after generation, storage, and imports.</param>
-    /// <param name="charge">Total storage charging.</param>
-    /// <param name="discharge">Energy discharged from storage to serve demand.</param>
-    /// <param name="imports">Energy imported into the region.</param>
-    /// <param name="exports">Energy exported from the region.</param>
+    /// <param name="charge">Total power drawn from the grid to charge storage, in MW.</param>
+    /// <param name="discharge">Power discharged from storage to serve demand, in MW.</param>
+    /// <param name="imports">Power imported into the region, in MW, net of transmission losses.</param>
+    /// <param name="exports">Power exported from the region, in MW, metered at the sending end.</param>
     /// <param name="stateOfChargeByTechnology">Storage energy level by technology at the start of each interval, or null for a region without storage.</param>
     /// <param name="demandProfile">
     /// The originating demand profile, used to cross-check composed demand against

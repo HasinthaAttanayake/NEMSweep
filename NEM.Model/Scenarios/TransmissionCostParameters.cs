@@ -8,7 +8,7 @@ namespace NEM.Model.Scenarios;
 /// line's capex and fixed opex scale with the route's length and the megawatts it is rated to
 /// carry, since a higher-capacity corridor over the same distance costs more to build and
 /// maintain. Each physical corridor is declared as two directed interconnectors, and each is
-/// costed independently — so a corridor's route length is charged once per direction rather than
+/// costed independently, so a corridor's route length is charged once per direction rather than
 /// once per physical asset built, which is a known overstatement against a build-once model (see
 /// <c>docs/domain-model.md</c> for the size of it). There is no variable or fuel term: transmission
 /// has no marginal fuel cost in this model. Losses already impose a marginal cost implicitly, by

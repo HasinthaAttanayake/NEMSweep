@@ -40,7 +40,7 @@ namespace NEM.Model.Units
         /// <summary>
         /// Energy from average <paramref name="power"/> sustained over
         /// <paramref name="interval"/>: MWh = MW × hours. The interval is required
-        /// and must be positive — a duration cannot be zero or run backwards.
+        /// and must be positive, because a duration cannot be zero or run backwards.
         /// </summary>
         /// <param name="power">Average power over the interval (MW).</param>
         /// <param name="interval">Duration the average applies to; must be positive.</param>

@@ -3,7 +3,7 @@ namespace NEM.Model.Units;
 /// <summary>A physical length in kilometres, such as a transmission line route length.</summary>
 public readonly record struct Distance : IComparable<Distance>
 {
-    /// <summary>The value in kilometres. Unsigned — a route length cannot be negative.</summary>
+    /// <summary>The value in kilometres. Unsigned, because a route length cannot be negative.</summary>
     public double Kilometres { get; }
 
     private Distance(double kilometres) => Kilometres = kilometres;

@@ -5,10 +5,10 @@ namespace NEM.Model.Weather
 {
     /// <summary>
     /// A resource trace: wind speed (m/s) or EPW radiation (Wh/m²). Traces are inputs
-    /// to conversion, not participants in arithmetic — read at index <c>t</c>, feed to a
+    /// to conversion, not participants in arithmetic: read at index <c>t</c>, feed to a
     /// conversion, get a <see cref="Power"/>. They carry no flow/stock category because
     /// the split does not apply: integrating wind speed yields metres of air, and the
-    /// EPW radiation field is already integrated over the hour.
+    /// EPW radiation field is already integrated over each interval.
     /// <para>
     /// Two guarantees are encoded in the unit tag and carried height:
     /// the Wh/m² tag prevents multiplying an already-integrated field by Δt "to get
@@ -34,8 +34,8 @@ namespace NEM.Model.Weather
         public TraceUnit Unit { get; }
 
         /// <summary>
-        /// Measurement height in metres — present for wind speed (the hub-height
-        /// correction depends on it), absent otherwise.
+        /// Measurement height in metres. Present for wind speed, whose hub-height
+        /// correction depends on it, and absent otherwise.
         /// </summary>
         public double? MeasurementHeightMetres { get; }
 
@@ -44,7 +44,7 @@ namespace NEM.Model.Weather
 
         /// <summary>
         /// A wind-speed trace (m/s) at a stated measurement height. The height is
-        /// required and must be positive — it is needed for the hub-height correction.
+        /// required and must be positive, because the hub-height correction needs it.
         /// </summary>
         public static TraceSeries WindSpeed(
             DateTimeOffset start,
@@ -80,8 +80,8 @@ namespace NEM.Model.Weather
         }
 
         /// <summary>
-        /// A Direct Normal Radiation trace (Wh/m²), already integrated
-        /// over the hour. No measurement height applies. Named for the component, not the
+        /// A Direct Normal Radiation trace (Wh/m²), already integrated over each
+        /// interval of <paramref name="resolution"/>. No measurement height applies. Named for the component, not the
         /// bare unit, so a Global Horizontal or Diffuse Horizontal field cannot be passed
         /// where Direct Normal is required.
         /// </summary>
@@ -95,8 +95,8 @@ namespace NEM.Model.Weather
         }
 
         /// <summary>
-        /// A Global Horizontal Radiation trace (Wh/m²), already integrated
-        /// over the hour. No measurement height applies. Named for the component, not the
+        /// A Global Horizontal Radiation trace (Wh/m²), already integrated over each
+        /// interval of <paramref name="resolution"/>. No measurement height applies. Named for the component, not the
         /// bare unit, so a Direct Normal or Diffuse Horizontal field cannot be passed
         /// where Global Horizontal is required.
         /// </summary>
@@ -110,8 +110,8 @@ namespace NEM.Model.Weather
         }
 
         /// <summary>
-        /// A Diffuse Horizontal Radiation trace (Wh/m²), already integrated
-        /// over the hour. No measurement height applies. Named for the component, not the
+        /// A Diffuse Horizontal Radiation trace (Wh/m²), already integrated over each
+        /// interval of <paramref name="resolution"/>. No measurement height applies. Named for the component, not the
         /// bare unit, so a Global Horizontal or Direct Normal field cannot be passed
         /// where Diffuse Horizontal is required.
         /// </summary>

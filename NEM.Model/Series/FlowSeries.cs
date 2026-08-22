@@ -4,12 +4,12 @@ namespace NEM.Model.Series
 {
     /// <summary>
     /// A flow series in megawatts (MW): demand, per-fleet generation, charge/discharge
-    /// rate, interconnector flow, residual. The workhorse of dispatch — everything in
+    /// rate, interconnector flow, residual. It is the workhorse of dispatch: everything in
     /// the energy balance is a flow.
     /// <para>
     /// A flow is meaningful to integrate over time (see <see cref="Integrate"/>) and to
     /// resample by mean (see <see cref="ResampleToHourly"/>). Values are stored so an
-    /// indexed read returns a <see cref="Power"/> without allocating — the dispatch
+    /// indexed read returns a <see cref="Power"/> without allocating, because the dispatch
     /// hour loop indexes into the series with scalars.
     /// </para>
     /// </summary>

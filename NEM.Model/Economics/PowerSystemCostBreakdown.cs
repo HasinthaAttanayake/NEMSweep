@@ -89,8 +89,8 @@ public sealed record RegionCostBreakdown
 /// </summary>
 /// <remarks>
 /// Transmission is held at system level and is not attributed to any region. An
-/// interconnector spans two regions, and every way of splitting it between them — evenly,
-/// by rating, or by realised flow — is arbitrary. The consequence is that the regional
+/// interconnector spans two regions, and every way of splitting it between them is
+/// arbitrary, whether evenly, by rating, or by realised flow. The consequence is that the regional
 /// levelised costs do not sum to the system figure, because the system figure carries
 /// transmission and the regional ones do not.
 /// </remarks>

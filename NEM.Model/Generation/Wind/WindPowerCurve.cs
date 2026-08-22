@@ -38,7 +38,10 @@ namespace NEM.Model.Generation.Wind
         /// <summary>Speed below which the turbine produces nothing.</summary>
         public const double CutInWindSpeedMetresPerSecond = 2.5;
 
-        /// <summary>Speed at and above which the turbine produces its full rating.</summary>
+        /// <summary>
+        /// Speed from which the turbine produces its full rating, holding that rating up to the
+        /// cut-out speed. Above cut-out the turbine shuts down and output falls to zero.
+        /// </summary>
         public const double RatedWindSpeedMetresPerSecond = 11.0;
 
         /// <summary>Lowest cut-out speed the brochure permits; a lower setting is rejected.</summary>

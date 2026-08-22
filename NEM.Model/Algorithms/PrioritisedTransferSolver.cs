@@ -54,8 +54,8 @@ internal sealed record TransferResult(
 /// <remarks>
 /// Each sink is served in turn by a full max-flow solve from a virtual super-source over
 /// the sources' remaining capacity. Committed flow is then subtracted from edge capacity
-/// and the next sink starts from a fresh network of what is left — no residual reverse
-/// edges cross a stage boundary, so a lower-priority sink can never claw back flow
+/// and the next sink starts from a fresh network of what is left. No residual reverse
+/// edge crosses a stage boundary, so a lower-priority sink can never claw back flow
 /// already committed to a higher-priority one. That is the priority guarantee, and it is
 /// also why the outcome is deliberately not a global optimum.
 /// <para>
