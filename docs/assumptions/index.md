@@ -6,9 +6,9 @@ misread one.
 **Model assumptions** are baked into the code. You cannot change them by editing a scenario, and
 every run carries them. They are the subject of this page.
 
-**Scenario parameters** — discount rate, capital costs, round-trip efficiencies, technical lives,
-fuel prices, installed capacities — are values *you* supply. NemSim makes no claim about them; it
-takes what you give it. They are covered in [Scenario parameters](scenario-parameters.md).
+**Scenario parameters** are values *you* supply: discount rate, capital costs, round-trip
+efficiencies, technical lives, fuel prices, installed capacities. NemSim makes no claim about them;
+it takes what you give it. They are covered in [Scenario parameters](scenario-parameters.md).
 
 Read [Limitations](limitations.md) first if you have not. This page says what the model assumes;
 that page says where those assumptions will mislead you.
@@ -34,20 +34,34 @@ an assumptions page that can silently go stale is worse than none.
 | `storage.pumpedHydroSeedFraction` | 0.8 |
 | `storage.defaultSeedFraction` | 0.5 |
 | `hydro.reserveFraction` | 0.1 |
+| `solar.groundAlbedo` | 0.2 |
+| `solar.systemFactor` | 0.95 |
+| `solar.standardTestIrradianceWattsPerSquareMetre` | 1000 |
+| `solar.cellTemperatureRiseAboveDryBulbCelsius` | 25 |
+| `solar.referenceCellTemperatureCelsius` | 25 |
+| `solar.temperatureCoefficientPerCelsius` | -0.0027 |
+| `wind.referenceTurbineCapacityMw` | 3.4 |
+| `wind.referenceAirDensityKilogramsPerCubicMetre` | 1.225 |
+| `wind.hubHeightMetres` | 120 |
+| `wind.shearExponent` | 0.2 |
+| `wind.cutInSpeedMetresPerSecond` | 2.5 |
+| `wind.ratedSpeedMetresPerSecond` | 11 |
+| `wind.cutOutSpeedMetresPerSecond` | 20 |
 
 <!-- assumption-values:end -->
 
 ## Reliability
 
-### Default reliability target — 0.002% of demand energy unserved
+### Default reliability target: 0.002% of demand energy unserved
 
 **Where:** `StorageSizingOptions.DefaultTargetUsePercentage`
 **Source:** the National Electricity Rules reliability standard.
 **Impact:** this is what storage is sized against. A stricter target grows storage; a looser one
 shrinks it, superlinearly in both directions, because the last increment of reliability is bought
 against the rarest events.
-**Revisit when:** the NER standard changes, or you are deliberately pricing a different standard —
-in which case set `storageSizing.targetUsePercentage` on the scenario rather than changing the code.
+**Revisit when:** the NER standard changes, or you are deliberately pricing a different standard.
+In that second case, set `storageSizing.targetUsePercentage` on the scenario rather than changing
+the code.
 
 Note the mismatch described in [Limitations §1](limitations.md#1-a-deterministic-run-cannot-honour-an-expected-unserved-energy-standard): the standard is
 an expectation, and a single-weather-year run produces a realisation.
@@ -65,7 +79,7 @@ big ones. Never compare an hours-based figure against an energy-based target.
 
 **Where:** `SystemReliabilityAssessment.Create`
 **Why:** a system-average that hides one failing region is not a reliable system.
-**Impact:** system USE is calculated from aggregate demand and aggregate unserved energy — never by
+**Impact:** system USE is calculated from aggregate demand and aggregate unserved energy, never by
 averaging regional percentages, which would weight a small region equally with a large one.
 
 ## Dispatch
@@ -133,7 +147,7 @@ do better.
 may start incremental Coal or Gas to fill remaining storage headroom, in ascending short-run
 marginal cost order. Battery is served before PumpedHydro.
 **Impact:** storage never pre-charges against a forecast shortfall, and never arbitrages.
-**Revisit when:** you implement a policy with foresight — `IStoragePolicy` is the extension point,
+**Revisit when:** you implement a policy with foresight. `IStoragePolicy` is the extension point,
 and swapping it requires no change to dispatch.
 
 ### Round-trip efficiency is applied once, on charging
@@ -145,7 +159,7 @@ priced through gross-generation variable and fuel cost, not as a separate storag
 
 ## Storage
 
-### Opening state of charge — 80% for pumped hydro, 50% for everything else
+### Opening state of charge: 80% for pumped hydro, 50% for everything else
 
 **Where:** `StorageSeedPolicy`
 **Why:** dispatch used to open every fleet at zero MWh, which is not how real plant starts a year.
@@ -169,7 +183,7 @@ be scaled freely. Batteries are, to a first approximation, purchasable in arbitr
 **Impact:** a scenario that would be better served by more pumped hydro will instead be given
 batteries, at battery economics.
 
-### Sizing floor — 30 MW and 120 MWh, with a four-hour minimum duration
+### Sizing floor: 30 MW and 120 MWh, with a four-hour minimum duration
 
 **Where:** `StorageSizingOptions.MinimumPowerMw`, `MinimumEnergyMwh`; enforced in
 `StorageSizingSearch`
@@ -183,8 +197,8 @@ Reported capacity is a floor, not a fitted minimum, at the small end.
 
 **Where:** `StorageSizingOptions`
 **Impact:** `maximumPowerMw` and `maximumEnergyMwh` bound each region independently. A
-whole-system artifact sums the regional figures — including the limits — so a system total is
-compared against the summed ceiling, not the per-region one.
+whole-system artifact sums the regional figures, limits included, so a system total is compared
+against the summed ceiling rather than the per-region one.
 
 ### Sizing returns a near-frontier point
 
@@ -252,13 +266,13 @@ excludes the tail events that drive storage and reliability. See
 **Where:** the input bundle's `weather/{REGION}/solar` and `weather/{REGION}/wind`
 **Why:** the best solar resource and the best wind resource in a region are rarely co-located.
 **Impact:** the solar site doubles as the region's location for transmission costing, which is the
-approximation described above. There is no single weather basis for a whole-system result — each
+approximation described above. There is no single weather basis for a whole-system result: each
 region is simulated against its own typical year.
 
 ### Demand is operational demand, exogenous and inelastic
 
 **Where:** AEMO actual operational demand archives; `DemandProfile`
-**Impact:** rooftop PV is already netted out — see
+**Impact:** rooftop PV is already netted out. See
 [Limitations §2](limitations.md#2-the-82-renewable-target-is-not-the-same-target-on-a-grid-scale-basis).
 Demand does not respond to price or to scarcity. Additive components, such as a data-centre load,
 are added on top as flat full-load-factor flows unless a shape is supplied.
@@ -267,9 +281,102 @@ are added on top as flat full-load-factor flows unless a shape is supplied.
 
 **Where:** everywhere. There is no random number generator in the model.
 **Impact:** same inputs at the same commit reproduce every modelled value exactly. There are no
-confidence intervals, because there is no distribution — only the single realisation you asked for.
-The one field that changes between otherwise identical reruns is the artifact's `runId`.
-This is what makes sweeps and sensitivity analysis the right way to use the tool.
+confidence intervals, because there is no distribution, only the single realisation you asked for.
+In a dispatch artifact, the one field that changes between otherwise identical reruns is `runId`.
+Imported input artifacts also carry a `generatedAt` timestamp, and a sweep index records measured
+run durations, so those files differ in more than `runId`; see
+[Outputs and provenance](../guide/outputs.md). This is what makes sweeps and sensitivity analysis
+the right way to use the tool.
+
+## Solar and wind resource conversion
+
+Every constant in this section is fixed in the model. A scenario config cannot change any of them;
+it can only scale the resulting trace by a fleet's `nameplateCapacityMw`. The wind values are
+`WindPowerCurveSettings` defaults, which a library caller could override, but the CLI never does,
+so every published artifact was produced with the values below.
+
+### Solar array is dual-axis tracking
+
+**Where:** `GlobalTiltedIrradiationSeries`, `DualAxisSolarPowerCurve`
+**Why:** the modelled asset is a utility-scale N-type HJT plant on dual-axis trackers, which keeps
+the array normal to the sun and removes tilt and azimuth from the input surface entirely.
+**Impact:** it is the most favourable orientation there is. A fixed-tilt or single-axis plant on the
+same site would produce less, and with a different daily shape, so a NemSim solar trace is not a
+generic "solar" trace.
+**Revisit when:** you need to model an existing fixed-tilt fleet rather than new build.
+
+### Ground albedo: 0.2
+
+**Where:** `GlobalTiltedIrradiationSeries.GroundAlbedo`
+**Source:** the conventional generic-ground value used in solar resource assessment. Not a
+site-specific measurement.
+**Impact:** it sets how much ground-reflected irradiation reaches the tilted array. It is a small
+term in the total, and it is not measured, so a site over sand or snow is modelled low and a site
+over dark soil high.
+**Revisit when:** modelling a site with a measured albedo, or one where ground reflectance is
+plainly not generic.
+
+### System factor: 0.95, before temperature derating
+
+**Where:** `DualAxisSolarPowerCurve.SystemFactor`
+**Source:** a single lumped figure standing in for inverter, wiring and soiling losses. Not sourced
+from a specific plant's performance data.
+**Impact:** it scales every solar interval by 5%, so it moves the level of solar output without
+changing its shape. Any conclusion about solar's *share* is far less sensitive to it than any
+conclusion about absolute solar energy.
+**Revisit when:** plant-specific performance-ratio data is available.
+
+### Cell temperature: 25 °C above ambient, derated at −0.27% per °C
+
+**Where:** `DualAxisSolarPowerCurve.CellTemperatureRiseAboveDryBulbCelsius`,
+`ReferenceCellTemperatureDegreesCelsius`, `TemperatureCoefficientPerDegreeCelsius`
+**Source:** the temperature coefficient is a typical N-type HJT figure; the 25 °C rise is a flat
+assumption rather than a thermal model. Neither is measured for a specific site.
+**Impact:** cell temperature is modelled as dry-bulb plus a constant, so it does not respond to
+irradiance, wind speed or mounting. Hot, still, high-irradiance hours are the ones this understates
+most, and those are summer afternoons.
+**Revisit when:** you need summer peak solar output to be right in level rather than in shape.
+
+### Standard test irradiance: 1000 W/m²
+
+**Where:** `DualAxisSolarPowerCurve.StandardTestIrradiance`
+**Source:** the IEC standard test condition every panel's nameplate rating is quoted against.
+**Impact:** none that is discretionary. It is the definition of the rating the model scales from.
+
+### Wind turbine: a 3.4 MW reference curve at 1.225 kg/m³
+
+**Where:** `WindPowerCurve.ReferenceTurbineCapacity`,
+`ReferenceAirDensityKilogramsPerCubicMetre`
+**Source:** a digitised Goldwind GW 140/3MW(S) power curve, published at 1.225 kg/m³.
+**Impact:** one machine stands in for every wind fleet in the model, and **no air-density
+correction is applied**, so a site materially denser or thinner than sea-level standard is modelled
+slightly wrong. Applying a non-linear curve to an interval-mean wind speed also approximates rather
+than equals mean power over the interval.
+**Revisit when:** modelling a fleet whose turbines differ materially from this class, or a site at
+altitude.
+
+### Hub height 120 m, shear exponent 0.2
+
+**Where:** `WindPowerCurve.DefaultHubHeightMetres`, `DefaultShearExponent`, applied through
+`WindPowerCurveSettings`
+**Source:** 120 m is a representative modern onshore hub height; 0.2 is the conventional open-land
+power-law shear exponent. Neither is site-measured.
+**Impact:** EPW wind speed is measured at 10 m and extrapolated to hub height by the power law, so
+the shear exponent is applied to every interval and moves modelled wind energy directly. Over
+forest or complex terrain the true exponent is higher, and over water lower.
+**Revisit when:** site-measured shear or a mast at hub height is available.
+
+### Cut-in 2.5 m/s, rated 11 m/s, cut-out 20 m/s
+
+**Where:** `WindPowerCurve.CutInWindSpeedMetresPerSecond`, `RatedWindSpeedMetresPerSecond`,
+`DefaultCutOutWindSpeedMetresPerSecond`
+**Source:** the reference turbine's own curve. `MinimumCutOutWindSpeedMetresPerSecond` (20 m/s) is
+the floor a caller-supplied cut-out may not go below.
+**Impact:** below cut-in the turbine produces nothing; from rated speed up to cut-out it produces
+its full rating; above cut-out it shuts down and output falls to zero. Storm shutdowns are
+therefore modelled as instantaneous and fleet-wide across a region, with no hysteresis and no
+spatial diversity between turbines.
+**Revisit when:** modelling a region where high-wind shutdown events are material to reliability.
 
 ## Economics
 
@@ -277,7 +384,7 @@ This is what makes sweeps and sensitivity analysis the right way to use the tool
 
 **Where:** `LevelisedCostCalculator`
 **Why:** so a single modelled year can carry its share of assets that last decades.
-**Impact:** the discount rate is real, not nominal — costs are stated in the scenario's real-dollar
+**Impact:** the discount rate is real, not nominal. Costs are stated in the scenario's real-dollar
 year, so inflation must not be applied twice. At a zero rate the annuity formula is undefined and
 recovery degenerates to straight-line, `1/n`.
 
@@ -299,11 +406,12 @@ loss allocation.
 ### Every levelised figure is divided by energy served
 
 **Where:** `PowerSystemCostBreakdown`, `RegionCostBreakdown`
-**Impact:** the denominator is `DispatchOutcome.DeliveredToLoad` — demand minus unserved — not
-generation. A regional levelised cost uses only that region's served energy, never the system total.
+**Impact:** the denominator is `DispatchOutcome.DeliveredToLoad`, meaning demand minus unserved,
+never generation. A regional levelised cost uses only that region's served energy, never the system
+total.
 
 ## Next
 
-- [Limitations](limitations.md) — where these assumptions will mislead you.
-- [Scenario parameters](scenario-parameters.md) — the values you choose.
-- [Domain model reference](../domain-model.md) — the full ownership and invariant detail.
+- [Limitations](limitations.md): where these assumptions will mislead you.
+- [Scenario parameters](scenario-parameters.md): the values you choose.
+- [Domain model reference](../domain-model.md): the full ownership and invariant detail.

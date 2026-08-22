@@ -1,6 +1,8 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using AwesomeAssertions;
+using NEM.Model.Generation.Solar;
+using NEM.Model.Generation.Wind;
 using NEM.Model.Grid;
 using NEM.Model.Simulation;
 using NEM.Model.StorageSizing;
@@ -32,6 +34,25 @@ public sealed class ModelAssumptionsTests
             ["storage.pumpedHydroSeedFraction"] = StorageSeedPolicy.PumpedHydroSeedFraction,
             ["storage.defaultSeedFraction"] = StorageSeedPolicy.DefaultSeedFraction,
             ["hydro.reserveFraction"] = HydroReservationState.ReserveFraction,
+            ["solar.groundAlbedo"] = GlobalTiltedIrradiationSeries.GroundAlbedo,
+            ["solar.systemFactor"] = DualAxisSolarPowerCurve.SystemFactor,
+            ["solar.standardTestIrradianceWattsPerSquareMetre"] =
+                DualAxisSolarPowerCurve.StandardTestIrradiance.WattsPerSquareMetre,
+            ["solar.cellTemperatureRiseAboveDryBulbCelsius"] =
+                DualAxisSolarPowerCurve.CellTemperatureRiseAboveDryBulbDegreesCelsius,
+            ["solar.referenceCellTemperatureCelsius"] =
+                DualAxisSolarPowerCurve.ReferenceCellTemperatureDegreesCelsius,
+            ["solar.temperatureCoefficientPerCelsius"] =
+                DualAxisSolarPowerCurve.TemperatureCoefficientPerDegreeCelsius,
+            ["wind.referenceTurbineCapacityMw"] = WindPowerCurve.ReferenceTurbineCapacity.Megawatts,
+            ["wind.referenceAirDensityKilogramsPerCubicMetre"] =
+                WindPowerCurve.ReferenceAirDensityKilogramsPerCubicMetre,
+            ["wind.hubHeightMetres"] = WindPowerCurveSettings.Default.HubHeightMetres,
+            ["wind.shearExponent"] = WindPowerCurveSettings.Default.ShearExponent,
+            ["wind.cutInSpeedMetresPerSecond"] = WindPowerCurve.CutInWindSpeedMetresPerSecond,
+            ["wind.ratedSpeedMetresPerSecond"] = WindPowerCurve.RatedWindSpeedMetresPerSecond,
+            ["wind.cutOutSpeedMetresPerSecond"] =
+                WindPowerCurveSettings.Default.CutOutWindSpeedMetresPerSecond,
         };
 
     [Fact]

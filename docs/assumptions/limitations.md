@@ -6,9 +6,24 @@ These are not disclaimers. Each one changes how a result should be read, and in 
 say which direction the error runs. They are stated first, ahead of the assumptions register,
 because a reader who takes only one page from this site should take this one.
 
+## The four that matter most
+
+If you read nothing else on this page, read these four. Each links to the section that works it
+through.
+
+| Limitation | What it does to a result |
+|---|---|
+| [1. A deterministic run cannot honour an expectation-based standard](#1-a-deterministic-run-cannot-honour-an-expected-unserved-energy-standard) | **Storage is understated.** The standard is an expectation across many weather outcomes; one typical year is a realisation, and it excludes the tail events that drive reliability. Treat a sizing result as a lower bound. |
+| [2. The 82% renewable target is measured on a different basis](#2-the-82-renewable-target-is-not-the-same-target-on-a-grid-scale-basis) | **Not directly comparable.** Operational demand nets out rooftop PV before the model sees it, and no rooftop fleet is dispatched. Two shares are published, on grid-scale and native bases; neither is "the" number. |
+| [3. This is the cost of building the system, not a power bill](#3-this-is-the-cost-of-building-the-system-not-a-power-bill) | **Not a price.** The figures are annuitised build-and-run cost per MWh served. No distribution, retail, market, environmental scheme or tax costs are modelled. |
+| [4. Greedy storage dispatch is wrong in both directions](#4-greedy-storage-dispatch-is-wrong-in-both-directions) | **Biased both ways.** With no foresight, storage undersizes against a multi-day wind drought and oversizes against a system able to arbitrage. Which dominates depends on the scenario. |
+
+Four more follow, on sizing, transmission distance, interconnector losses, and what is not modelled
+at all.
+
 ## 1. A deterministic run cannot honour an expected-unserved-energy standard
 
-The reliability standard NemSim sizes against — 0.002% of demand energy unserved — is an
+The reliability standard NemSim sizes against, 0.002% of demand energy unserved, is an
 **expectation across a distribution** of weather and demand outcomes. NemSim runs a single weather
 year and produces a **realised** figure from it.
 
@@ -20,8 +35,8 @@ representative months and, by construction, contains few of them.
 typical year will need more storage than that to meet 0.002% USE *in expectation*. Treat a sizing
 result as a lower bound on required capacity, not an estimate of it.
 
-Doing this properly means running many weather years — or synthetic years drawn from a fitted
-distribution — and taking the expectation across them. NemSim does not do that today.
+Doing this properly means running many weather years, or synthetic years drawn from a fitted
+distribution, and taking the expectation across them. NemSim does not do that today.
 
 ## 2. The 82% renewable target is not the same target on a grid-scale basis
 
@@ -82,10 +97,16 @@ The storage sizing search grows Battery capacity until every region is inside th
 target, then refines each changed region's power and energy coordinate by coordinate. The result is
 a **deterministic coordinate-wise near-frontier point**.
 
-It is not a global minimum, and it is emphatically not cost-optimal — nothing in the search prices
-the capacity it adds. A different search order could land on a different, equally compliant point.
-Two sizing results are comparable to each other because the procedure is deterministic; neither is
-"the answer".
+It is not a global minimum, and it is emphatically not cost-optimal: nothing in the search prices
+the capacity it adds. A different search order could land on a different but equally compliant
+point. Two sizing results are comparable to each other because the procedure is deterministic;
+neither is "the answer".
+
+A sizing run that does not meet the target reports which bound stopped it. Only the
+`energyLimited` outcome, where total available generation energy across the system is below total
+demand energy, proves that no Battery could have met the target. A capacity ceiling, a pass budget,
+or probes that stopped helping each report a limit of the search rather than a limit of the
+system.
 
 The same applies to inter-regional transfer, which serves regions in priority order by successive
 max-flow solves. That guarantees a higher-priority region is never starved by a lower-priority one,
@@ -93,12 +114,12 @@ and for the same reason is deliberately not a global optimum.
 
 ## 6. Transmission route length is a proxy, and it runs long
 
-Two approximations compound here. Both are kept deliberately, because the alternative — a real
-per-route distance table — is more precision than the rest of the cost model supports. Both inflate
+Two approximations compound here. Both are kept deliberately, because the alternative, a real
+per-route distance table, is more precision than the rest of the cost model supports. Both inflate
 reported transmission cost.
 
 **Route length is measured between weather sites.** A region's location, in NemSim, is the location
-of its *solar* weather station — a site chosen for solar resource quality, not for where a
+of its *solar* weather station, a site chosen for solar resource quality rather than for where a
 transmission line terminates. Interconnector length is the great-circle distance between two such
 sites:
 
@@ -114,7 +135,7 @@ A consequence worth stating plainly: **swapping a region's solar weather file si
 system transmission cost**, because the resource site is the only source of regional location.
 
 **Reciprocal links each carry the full route length.** Every corridor is declared as two directed
-interconnectors, and each is costed independently over the corridor's full distance — so the same
+interconnectors, and each is costed independently over the corridor's full distance, so the same
 kilometre of conductor is paid for twice. Charging each of the five physical corridors once at its
 larger directed rating gives 3,954,000 km·MW against the 7,035,547 km·MW actually charged across
 all ten directed links. This convention alone accounts for roughly **1.8×** of reported
@@ -152,11 +173,11 @@ assumption is either a documented constant or a scenario input, the *difference*
 is trustworthy even where the absolute level is not: the same biases sit on both sides and largely
 cancel.
 
-That is what makes sweeps the natural unit of work here — see
-[Sensitivity analysis](../exploring/sensitivity-analysis.md).
+That is what makes sweeps the natural unit of work here, as
+[Sensitivity analysis](../exploring/sensitivity-analysis.md) works through.
 
 ## Next
 
-- [Model assumptions](index.md) — the constants baked into the model, with values and sources.
-- [Scenario parameters](scenario-parameters.md) — the values you supply, which NemSim makes no
+- [Model assumptions](index.md): the constants baked into the model, with values and sources.
+- [Scenario parameters](scenario-parameters.md): the values you supply, which NemSim makes no
   claim about.
