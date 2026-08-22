@@ -1,0 +1,12 @@
+# API surface published to the documentation site.
+#
+# docfx already excludes non-public members. These rules drop the remaining noise that a reader
+# of a domain model does not benefit from: compiler-generated record plumbing and the object
+# members every type inherits.
+apiRules:
+  - exclude:
+      uidRegex: '^NEM\..*\.<Clone>\$$'
+  - exclude:
+      uidRegex: '^NEM\..*\.PrintMembers'
+  - exclude:
+      uidRegex: '^NEM\..*\.EqualityContract'
