@@ -9,38 +9,52 @@
     inferred from whichever links happened to carry something: a link that never ran is still a
     link, and it is drawn idle rather than left out. What the artifact still does not record is a
     path, so nothing here traces an import across more than one hop.
+
+    Regions sit on real state outlines rather than on a geometric layout. The outlines are a fixed
+    backdrop that says where a region is; nothing about them is a model output, and no figure the
+    run publishes is encoded in a shape's size. A link is drawn between the two region nodes it
+    joins, over the states rather than clipped to the border between them, because two states that
+    touch leave only a hairline of canvas and an arrow drawn into it says nothing a reader can see.
 *@
 <figure class="network-map @Class">
     <div class="plot-scroll">
         <svg viewBox="@($"0 0 1000 {Height}")" role="group" aria-label="@AriaLabel"
              style="@($"aspect-ratio: 1000 / {Height};")">
+            @* Shapes first, then links over them, then every label over both, so a link never
+               hides behind a state and a region's name is never crossed by a line. *@
+            @foreach (NodeGeometry node in _nodes)
+            {
+                <g class="network-node @NodeClass(node)">
+                    <title>@node.Readout</title>
+                    <path d="@node.PathData" />
+                </g>
+            }
+
             @foreach (EdgeGeometry edge in _edges)
             {
                 <g class="network-edge @(edge.Source.EnergyMwh is > 0 ? "is-flowing" : "is-idle")">
                     <title>@edge.Readout</title>
-                    <line x1="@Fmt(edge.FromX)" y1="@Fmt(edge.FromY)"
-                          x2="@Fmt(edge.ToX)" y2="@Fmt(edge.ToY)"
-                          stroke-width="@Fmt(edge.Width)" />
+                    <path class="network-link" d="@edge.PathData" stroke-width="@Fmt(edge.Width)" />
                     @if (edge.Source.EnergyMwh is > 0)
                     {
                         <polygon class="network-arrow" points="@edge.Arrow" />
-                        <SvgText Class="network-edge-label" X="edge.LabelX" Y="edge.LabelY"
-                                 Anchor="middle" Value="@edge.Label" />
                     }
                 </g>
             }
 
             @foreach (NodeGeometry node in _nodes)
             {
-                <g class="network-node @NodeClass(node)">
-                    <title>@node.Readout</title>
-                    <circle cx="@Fmt(node.X)" cy="@Fmt(node.Y)" r="@Fmt(node.Radius)" />
+                <g class="network-node-text">
+                    @if (node.LeaderPath is { } leader)
+                    {
+                        <path class="network-leader" d="@leader" />
+                    }
                     <SvgText Class="network-node-id" X="node.X" Y="node.Y + 5" Anchor="middle"
                              Value="@node.Source.RegionId" />
-                    <SvgText Class="network-node-label" X="node.X" Y="node.Y + node.Radius + 20"
-                             Anchor="middle" Value="@node.Source.Name" />
-                    <SvgText Class="network-node-detail" X="node.X" Y="node.Y + node.Radius + 36"
-                             Anchor="middle" Value="@node.Detail" />
+                    <SvgText Class="network-node-label" X="node.LabelX" Y="node.LabelY - 3"
+                             Anchor="@node.LabelAnchor" Value="@node.Source.Name" />
+                    <SvgText Class="network-node-detail" X="node.LabelX" Y="node.LabelY + 13"
+                             Anchor="@node.LabelAnchor" Value="@node.Detail" />
                 </g>
             }
         </svg>
@@ -50,16 +64,18 @@
         <span><i class="network-key-exporter"></i>net exporter</span>
         <span><i class="network-key-balanced"></i>balanced</span>
         <span class="network-note">
-            Node size follows demand; line thickness follows how much of the link's capacity was
-            used. Every link the run declares is drawn, so a line without an arrow is a link that
-            carried nothing. The model records which regions each link joins and not the path an
-            import travelled, so nothing here traces energy across more than one hop.
+            The figure beside a region is its demand; nothing here sizes a state by what it used.
+            Line thickness follows the energy a link carried against the busiest link in the run,
+            and every link the run declares is drawn, so a dashed line without an arrow is a link
+            that carried nothing. Hover a line, or read the table below, for what it carried. A line
+            joins the two regions its link connects and is not the route the energy took, so nothing
+            here traces energy across more than one hop.
         </span>
     </figcaption>
 </figure>
 
 @code {
-    /// <summary>One region as a node: its size, its trade balance and what to say about it.</summary>
+    /// <summary>One region as a node: its demand, its trade balance and what to say about it.</summary>
     public sealed record NetworkNode(
         string RegionId,
         string Name,
@@ -83,8 +99,101 @@
     [Parameter, EditorRequired] public IReadOnlyList<NetworkNode> Nodes { get; set; } = [];
     [Parameter, EditorRequired] public IReadOnlyList<NetworkEdge> Edges { get; set; } = [];
     [Parameter, EditorRequired] public string AriaLabel { get; set; } = string.Empty;
-    [Parameter] public double Height { get; set; } = 380;
+    [Parameter] public double Height { get; set; } = 560;
     [Parameter] public string? Class { get; set; }
+
+    private const double TopMargin = 24;
+    private const double BottomMargin = 24;
+
+    // The frame is wider than the eastern seaboard is tall, so the map is fitted to the height and
+    // centred, and the width left over becomes a label column on each side. Reserving the columns
+    // before fitting rather than after is what stops a label running off the edge of the viewBox
+    // on any future shape data that happens to be wider than this one.
+    private const double LabelColumn = 150;
+    private const double LabelGap = 26;
+    private const double MinLabelGap = 44;
+
+    // How far a shape retreats from a border it shares with a neighbour, in viewBox units, and the
+    // distance in shape-space over which that retreat fades away to nothing. See InsetOutline.
+    private const double BorderInset = 4;
+    private const double BorderTaper = 45;
+    private const double MiterLimit = 2.2;
+
+    // A link stops clear of the region id sitting on the node it arrives at. The clearance is the
+    // half-size of a box around that text rather than one radius, because the ids are four or five
+    // characters wide and one character tall: a radius large enough to clear "NSW1" sideways would
+    // hold a link arriving from the north twice as far off the node as it needs to be.
+    private const double NodeClearanceX = 26;
+    private const double NodeClearanceY = 13;
+    private const double NodeClearancePad = 4;
+
+    // How far a link bows off the straight line between its two nodes, which is what makes the two
+    // directions of a pair read as two links rather than as one line drawn twice.
+    private const double BowFraction = 0.11;
+    private const double MinimumBow = 10;
+
+    private const double MinLinkWidth = 2;
+    private const double LinkWidthRange = 8;
+    private const double ArrowHead = 10;
+    private const double FallbackRadius = 18;
+
+    /// <summary>
+    /// One NEM region's real coastline, in a shared local coordinate space where x is
+    /// 22 units per degree of longitude east of 129E and y is 22 units per degree of latitude
+    /// south. <see cref="LabelSide"/> is 1 to hang the region's name off the right of the map and
+    /// -1 to hang it off the left.
+    /// </summary>
+    private sealed record StateShape(IReadOnlyList<(double X, double Y)> Points, int LabelSide);
+
+    // Coastlines traced from Natural Earth's 1:50m admin-1 states/provinces boundaries
+    // (naturalearthdata.com), which the project places in the public domain for any use. Only the
+    // mainland ring of each state is kept, so offshore islands (Kangaroo Island, King Island, the
+    // Whitsundays and the like) are dropped, and each ring is cut down to a few dozen points so the
+    // shape stays a clean line rather than a dense coastal survey. It is enough to read as the real
+    // state and is not a claim about the exact border. Borders that are shared in reality are
+    // shared coordinates here too, which is what InsetOutline needs to find them.
+    private static readonly IReadOnlyDictionary<string, StateShape> StateShapes =
+        new Dictionary<string, StateShape>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["QLD1"] = new StateShape(
+                [(198.0, 803.0), (198.0, 595.2), (242.8, 620.5), (260.3, 614.1), (277.8, 562.2), (279.1, 502.7),
+                    (296.0, 466.6), (324.6, 546.7), (340.4, 544.1), (358.3, 559.8), (380.5, 645.5), (434.7, 677.4),
+                    (455.5, 724.7), (476.8, 724.2), (480.5, 747.1), (526.1, 790.5), (539.3, 850.2), (516.8, 852.8),
+                    (492.6, 872.1), (465.3, 859.3), (439.4, 869.0), (264.0, 869.0), (264.0, 803.0)],
+                LabelSide: 1),
+            ["NSW1"] = new StateShape(
+                [(264.6, 980.0), (264.0, 869.0), (439.4, 869.0), (465.3, 859.3), (492.6, 872.1), (516.8, 852.8),
+                    (539.3, 850.2), (526.8, 922.6), (490.4, 969.8), (466.3, 1019.3), (460.7, 1056.0), (420.9, 1040.1),
+                    (416.5, 1023.4), (347.6, 1025.8), (315.2, 996.3), (266.1, 980.4)],
+                LabelSide: 1),
+            ["VIC1"] = new StateShape(
+                [(263.3, 1068.6), (263.3, 979.1), (284.4, 981.6), (344.7, 1024.9), (412.8, 1022.0), (420.9, 1040.1),
+                    (460.7, 1056.0), (417.6, 1064.4), (390.0, 1077.0), (382.8, 1092.2), (371.0, 1078.5),
+                    (358.0, 1077.0), (348.0, 1070.0), (343.0, 1074.0), (319.9, 1085.1), (297.0, 1076.0),
+                    (272.0, 1076.5)],
+                LabelSide: 1),
+            ["SA1"] = new StateShape(
+                [(0.0, 928.2), (0.0, 803.0), (264.0, 803.0), (263.3, 1068.6), (238.0, 1041.0), (222.0, 1015.5),
+                    (214.0, 1013.5), (200.2, 1014.2), (208.5, 999.0), (201.3, 983.4), (195.8, 988.0), (173.8, 1007.6),
+                    (189.2, 977.0), (197.8, 961.0), (193.6, 946.0), (188.1, 957.0), (173.8, 972.0), (153.8, 1001.0),
+                    (140.8, 992.0), (129.8, 971.0), (114.4, 953.0), (103.4, 937.2), (47.2, 923.9), (4.1, 927.5)],
+                LabelSide: -1),
+            ["TAS1"] = new StateShape(
+                [(425.5, 1157.4), (416.8, 1181.0), (402.6, 1172.4), (393.2, 1190.5), (375.0, 1189.0),
+                    (345.4, 1137.2), (345.8, 1125.8), (381.0, 1136.6), (418.7, 1128.2), (425.2, 1156.6)],
+                LabelSide: 1),
+        };
+
+    /// <summary>
+    /// How much of the border inset each point of each shape takes, from 1 for a point sitting on a
+    /// border it shares with another state down to 0 for open coastline. It depends only on the
+    /// static outlines above, so it is worked out once rather than on every render.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, IReadOnlyList<double>> InsetWeights =
+        StateShapes.ToDictionary(
+            entry => entry.Key,
+            entry => (IReadOnlyList<double>)[.. entry.Value.Points.Select(point => BorderWeight(point, entry.Key))],
+            StringComparer.OrdinalIgnoreCase);
 
     private List<NodeGeometry> _nodes = [];
     private List<EdgeGeometry> _edges = [];
@@ -92,13 +201,44 @@
     protected override void OnParametersSet()
     {
         _nodes = LayOutNodes();
-        _edges = [.. Edges.Select(BuildEdge).Where(edge => edge is not null).Select(edge => edge!.Value)];
+        double busiest = Edges.Count == 0 ? 0 : Edges.Max(edge => Math.Abs(edge.EnergyMwh ?? 0));
+        _edges = [.. Edges
+            .Select(edge => BuildEdge(edge, busiest))
+            .Where(edge => edge is not null)
+            .Select(edge => edge!.Value)
+            // Thickest first so the busiest link is painted underneath and a hairline link crossing
+            // it stays visible instead of disappearing into it.
+            .OrderByDescending(edge => edge.Width)];
     }
 
     /// <summary>
-    /// Places the regions evenly around a circle in the order the artifact lists them. A geographic
-    /// layout would be a better map, but the model publishes no coordinates and inventing them
-    /// would put a claim about where things are into a picture of what flowed.
+    /// One node's geometry while it is still open to the label de-collision pass. Split from
+    /// <see cref="NodeGeometry"/> only so <see cref="LabelY"/> can move after every node's initial
+    /// position is known, rather than needing the whole list built in one shot.
+    /// </summary>
+    private sealed class PendingNode
+    {
+        public required NetworkNode Node { get; init; }
+        public required double CentreX { get; init; }
+        public required double CentreY { get; init; }
+        public required IReadOnlyList<(double X, double Y)> Outline { get; init; }
+        public required string PathData { get; init; }
+        public required double LabelX { get; init; }
+        public required string LabelAnchor { get; init; }
+        public required double LabelY { get; set; }
+        public required string Detail { get; init; }
+        public required string Readout { get; init; }
+    }
+
+    /// <summary>
+    /// Places each region on its real state outline, fitted once to the frame. The frame is wider
+    /// than the map is, so the map is fitted to the height, centred, and the width left either side
+    /// becomes a label column: every name on a side of the map starts at the same x, close enough
+    /// to the coastline to belong to it. A second pass pushes apart any two labels on the same side
+    /// that would otherwise sit on top of each other, and each label keeps a leader back to its own
+    /// state so the pushing cannot break which name goes with which shape. A region the shared map
+    /// does not know about (none exist today, but nothing stops a future artifact declaring one)
+    /// gets a place in the corner rather than being dropped from the picture.
     /// </summary>
     private List<NodeGeometry> LayOutNodes()
     {
@@ -108,39 +248,313 @@
             return placed;
         }
 
-        double centreX = 500;
-        double centreY = (Height / 2) - 12;
-        double orbit = Math.Min(centreY - 70, 300);
-        double largestDemand = Nodes.Max(node => Math.Abs(node.DemandMwh));
-        for (int index = 0; index < Nodes.Count; index++)
+        var allPoints = StateShapes.Values.SelectMany(shape => shape.Points).ToList();
+        double minX = allPoints.Min(point => point.X);
+        double minY = allPoints.Min(point => point.Y);
+        double boundingWidth = allPoints.Max(point => point.X) - minX;
+        double boundingHeight = allPoints.Max(point => point.Y) - minY;
+        double widthBudget = 1000 - (2 * (LabelColumn + LabelGap));
+        double heightBudget = Height - TopMargin - BottomMargin;
+        double scale = Math.Min(heightBudget / boundingHeight, widthBudget / boundingWidth);
+        double mapLeft = (1000 - (boundingWidth * scale)) / 2;
+        double mapRight = mapLeft + (boundingWidth * scale);
+        double offsetX = mapLeft - (minX * scale);
+        double offsetY = TopMargin - (minY * scale);
+
+        var pending = new List<PendingNode>();
+        int fallbackIndex = 0;
+        foreach (NetworkNode node in Nodes)
         {
-            NetworkNode node = Nodes[index];
-            // Two regions read better facing each other than stacked on a vertical axis.
-            double angle = Nodes.Count == 1
-                ? 0
-                : (2 * Math.PI * index / Nodes.Count) - (Math.PI / 2)
-                    + (Nodes.Count == 2 ? Math.PI / 2 : 0);
-            double x = Nodes.Count == 1 ? centreX : centreX + (orbit * Math.Cos(angle));
-            double y = Nodes.Count == 1 ? centreY : centreY + (orbit * Math.Sin(angle) * 0.55);
-            double share = largestDemand <= 0 ? 1 : Math.Abs(node.DemandMwh) / largestDemand;
-            placed.Add(new NodeGeometry(
-                node,
-                x,
-                y,
-                26 + (22 * Math.Sqrt(share)),
-                $"{PlotFormat.Compact(node.DemandMwh)} MWh",
-                $"{node.Name}\nDemand {PlotFormat.Compact(node.DemandMwh)} MWh\n"
-                    + (node.NetImportedMwh > 0
-                        ? $"Net importer of {PlotFormat.Compact(node.NetImportedMwh)} MWh"
-                        : node.NetImportedMwh < 0
-                            ? $"Net exporter of {PlotFormat.Compact(-node.NetImportedMwh)} MWh"
-                            : "No net trade")));
+            string detail = $"{PlotFormat.Compact(node.DemandMwh)} MWh";
+            string readout = $"{node.Name}\nDemand {PlotFormat.Compact(node.DemandMwh)} MWh\n"
+                + (node.NetImportedMwh > 0
+                    ? $"Net importer of {PlotFormat.Compact(node.NetImportedMwh)} MWh"
+                    : node.NetImportedMwh < 0
+                        ? $"Net exporter of {PlotFormat.Compact(-node.NetImportedMwh)} MWh"
+                        : "No net trade");
+
+            if (StateShapes.TryGetValue(node.RegionId, out StateShape? shape))
+            {
+                List<(double X, double Y)> outline = InsetOutline(
+                    shape, InsetWeights[node.RegionId], scale, offsetX, offsetY);
+                (double X, double Y) centre = Centroid(outline);
+                pending.Add(new PendingNode
+                {
+                    Node = node, CentreX = centre.X, CentreY = centre.Y, Outline = outline,
+                    PathData = BuildPolygonPath(outline),
+                    LabelX = shape.LabelSide > 0 ? mapRight + LabelGap : mapLeft - LabelGap,
+                    LabelAnchor = shape.LabelSide > 0 ? "start" : "end", LabelY = centre.Y,
+                    Detail = detail, Readout = readout,
+                });
+            }
+            else
+            {
+                // No outline for this region id: park it in the corner rather than skip it, on a
+                // circle approximated as a polygon so it behaves like any other shape downstream.
+                double centreX = LabelColumn / 2;
+                double centreY = TopMargin + (fallbackIndex * 3 * FallbackRadius) + FallbackRadius;
+                List<(double X, double Y)> outline = BuildCircleOutline(centreX, centreY, FallbackRadius);
+                fallbackIndex++;
+                pending.Add(new PendingNode
+                {
+                    Node = node, CentreX = centreX, CentreY = centreY, Outline = outline,
+                    PathData = BuildPolygonPath(outline), LabelX = centreX, LabelAnchor = "middle",
+                    LabelY = centreY + FallbackRadius + 16, Detail = detail, Readout = readout,
+                });
+            }
         }
 
+        // Two labels on the same side of the map can be close enough in y to collide even when the
+        // states they name do not touch; push the lower one down until every label on that side
+        // clears the one above it. The leader drawn below is what keeps a pushed label attached to
+        // its own state.
+        foreach (IGrouping<string, PendingNode> group in pending.GroupBy(item => item.LabelAnchor))
+        {
+            PendingNode? previous = null;
+            foreach (PendingNode item in group.OrderBy(entry => entry.LabelY))
+            {
+                if (previous is not null && item.LabelY - previous.LabelY < MinLabelGap)
+                {
+                    item.LabelY = previous.LabelY + MinLabelGap;
+                }
+
+                previous = item;
+            }
+        }
+
+        placed.AddRange(pending.Select(item => new NodeGeometry(
+            item.Node, item.CentreX, item.CentreY, item.Outline, item.PathData,
+            item.LabelX, item.LabelAnchor, item.LabelY, LeaderPath(item), item.Detail, item.Readout)));
         return placed;
     }
 
-    private EdgeGeometry? BuildEdge(NetworkEdge edge)
+    /// <summary>
+    /// A hairline from where the label's sight line leaves the state to just short of the text, or
+    /// null when the two are close enough that a line between them would be a smudge rather than a
+    /// pointer.
+    /// </summary>
+    private static string? LeaderPath(PendingNode node)
+    {
+        if (node.LabelAnchor is "middle")
+        {
+            return null;
+        }
+
+        double textEdge = node.LabelAnchor is "start" ? node.LabelX - 8 : node.LabelX + 8;
+        (double X, double Y) anchor = ExitOutline(
+            (node.CentreX, node.CentreY), (node.LabelX, node.LabelY), node.Outline);
+        return Math.Abs(textEdge - anchor.X) < 12
+            ? null
+            : $"M{PlotFormat.Coordinate(anchor.X, anchor.Y)} L{PlotFormat.Coordinate(textEdge, node.LabelY)}";
+    }
+
+    /// <summary>
+    /// The share of the border inset a point takes: 1 where it sits on a border shared with another
+    /// state, fading to 0 over <see cref="BorderTaper"/> of shape space. Two states that meet do so
+    /// on the same coordinates, so drawn as they are traced they would share an edge with no canvas
+    /// between them for the interconnector to be seen in. Insetting only near a shared border, and
+    /// by a fixed distance rather than by a fraction of the shape, opens the same sliver of gap at
+    /// every junction whatever the size of the states meeting there, and leaves real coastline
+    /// exactly where it was traced.
+    /// </summary>
+    private static double BorderWeight((double X, double Y) point, string ownRegionId)
+    {
+        double nearest = double.PositiveInfinity;
+        foreach ((string regionId, StateShape shape) in StateShapes)
+        {
+            if (string.Equals(regionId, ownRegionId, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            IReadOnlyList<(double X, double Y)> points = shape.Points;
+            for (int i = 0; i < points.Count; i++)
+            {
+                nearest = Math.Min(nearest, DistanceToSegment(point, points[i], points[(i + 1) % points.Count]));
+            }
+        }
+
+        return Math.Max(0, 1 - (nearest / BorderTaper));
+    }
+
+    /// <summary>
+    /// The traced outline mapped into the frame and pulled inward along each corner's bisector by
+    /// its share of <see cref="BorderInset"/>. The miter is capped so a sharp headland is blunted
+    /// rather than shot off into a spike.
+    /// </summary>
+    private static List<(double X, double Y)> InsetOutline(
+        StateShape shape, IReadOnlyList<double> weights, double scale, double offsetX, double offsetY)
+    {
+        List<(double X, double Y)> mapped =
+            [.. shape.Points.Select(point => ((point.X * scale) + offsetX, (point.Y * scale) + offsetY))];
+        // Which side of an edge is the inside depends on which way the ring was traced.
+        double facing = SignedArea(mapped) > 0 ? 1 : -1;
+        var inset = new List<(double X, double Y)>(mapped.Count);
+        for (int i = 0; i < mapped.Count; i++)
+        {
+            (double X, double Y) current = mapped[i];
+            if (weights[i] <= 0)
+            {
+                inset.Add(current);
+                continue;
+            }
+
+            (double X, double Y)? before = InwardNormal(mapped[(i - 1 + mapped.Count) % mapped.Count], current, facing);
+            (double X, double Y)? after = InwardNormal(current, mapped[(i + 1) % mapped.Count], facing);
+            (double X, double Y) first = before ?? after ?? default;
+            if (before is null && after is null)
+            {
+                inset.Add(current);
+                continue;
+            }
+
+            double sumX = (before?.X ?? 0) + (after?.X ?? 0);
+            double sumY = (before?.Y ?? 0) + (after?.Y ?? 0);
+            double length = Math.Sqrt((sumX * sumX) + (sumY * sumY));
+            if (length < 1e-6)
+            {
+                inset.Add(current);
+                continue;
+            }
+
+            double bisectorX = sumX / length;
+            double bisectorY = sumY / length;
+            // The bisector is shorter than the edge normals it averages, so a corner has to travel
+            // further than a straight edge does to open the same gap. Capped, or a near-reversal
+            // would send the corner most of the way across the shape.
+            double cosine = Math.Max(0.2, (bisectorX * first.X) + (bisectorY * first.Y));
+            double travel = Math.Min(BorderInset / cosine, BorderInset * MiterLimit) * weights[i];
+            inset.Add((current.X + (bisectorX * travel), current.Y + (bisectorY * travel)));
+        }
+
+        return inset;
+    }
+
+    private static (double X, double Y)? InwardNormal((double X, double Y) from, (double X, double Y) to, double facing)
+    {
+        double dx = to.X - from.X;
+        double dy = to.Y - from.Y;
+        double length = Math.Sqrt((dx * dx) + (dy * dy));
+        return length < 1e-9 ? null : (-dy / length * facing, dx / length * facing);
+    }
+
+    private static double SignedArea(IReadOnlyList<(double X, double Y)> points)
+    {
+        double total = 0;
+        for (int i = 0; i < points.Count; i++)
+        {
+            (double X, double Y) a = points[i];
+            (double X, double Y) b = points[(i + 1) % points.Count];
+            total += (a.X * b.Y) - (b.X * a.Y);
+        }
+
+        return total / 2;
+    }
+
+    /// <summary>
+    /// The outline's centre of area, which is where a reader reads the shape as being. The average
+    /// of the vertices is not: it drifts toward whichever coast the tracing spent the most points
+    /// on, which on South Australia is far enough to put the label in the wrong half of the state.
+    /// </summary>
+    private static (double X, double Y) Centroid(IReadOnlyList<(double X, double Y)> points)
+    {
+        double area = SignedArea(points);
+        if (Math.Abs(area) < 1e-9)
+        {
+            return (points.Average(point => point.X), points.Average(point => point.Y));
+        }
+
+        double x = 0;
+        double y = 0;
+        for (int i = 0; i < points.Count; i++)
+        {
+            (double X, double Y) a = points[i];
+            (double X, double Y) b = points[(i + 1) % points.Count];
+            double cross = (a.X * b.Y) - (b.X * a.Y);
+            x += (a.X + b.X) * cross;
+            y += (a.Y + b.Y) * cross;
+        }
+
+        return (x / (6 * area), y / (6 * area));
+    }
+
+    private static double DistanceToSegment((double X, double Y) point, (double X, double Y) a, (double X, double Y) b)
+    {
+        double dx = b.X - a.X;
+        double dy = b.Y - a.Y;
+        double lengthSquared = (dx * dx) + (dy * dy);
+        double t = lengthSquared < 1e-12
+            ? 0
+            : Math.Clamp((((point.X - a.X) * dx) + ((point.Y - a.Y) * dy)) / lengthSquared, 0, 1);
+        double offsetX = point.X - (a.X + (t * dx));
+        double offsetY = point.Y - (a.Y + (t * dy));
+        return Math.Sqrt((offsetX * offsetX) + (offsetY * offsetY));
+    }
+
+    private static string BuildPolygonPath(IReadOnlyList<(double X, double Y)> mappedPoints) =>
+        $"M{string.Join(" L", mappedPoints.Select(point => PlotFormat.Coordinate(point.X, point.Y)))} Z";
+
+    private static List<(double X, double Y)> BuildCircleOutline(double centreX, double centreY, double radius)
+    {
+        const int Sides = 28;
+        var points = new List<(double X, double Y)>(Sides);
+        for (int i = 0; i < Sides; i++)
+        {
+            double angle = 2 * Math.PI * i / Sides;
+            points.Add((centreX + (radius * Math.Cos(angle)), centreY + (radius * Math.Sin(angle))));
+        }
+
+        return points;
+    }
+
+    /// <summary>
+    /// Where a ray from <paramref name="rayStart"/> toward <paramref name="rayTowards"/> first
+    /// crosses <paramref name="outline"/>. <paramref name="rayStart"/> is a centroid and is assumed
+    /// to be inside the outline, so this is the point where the line leaves that state's coastline,
+    /// which is where a leader out to a label has to start to not be drawn over the state.
+    /// </summary>
+    private static (double X, double Y) ExitOutline(
+        (double X, double Y) rayStart, (double X, double Y) rayTowards, IReadOnlyList<(double X, double Y)> outline)
+    {
+        double dx = rayTowards.X - rayStart.X;
+        double dy = rayTowards.Y - rayStart.Y;
+        double bestT = double.PositiveInfinity;
+        (double X, double Y) best = rayStart;
+        for (int i = 0; i < outline.Count; i++)
+        {
+            (double X, double Y) a = outline[i];
+            (double X, double Y) b = outline[(i + 1) % outline.Count];
+            double ex = b.X - a.X;
+            double ey = b.Y - a.Y;
+            double denominator = (dx * ey) - (dy * ex);
+            if (Math.Abs(denominator) < 1e-9)
+            {
+                continue;
+            }
+
+            double relX = a.X - rayStart.X;
+            double relY = a.Y - rayStart.Y;
+            double t = ((relX * ey) - (relY * ex)) / denominator;
+            double u = ((relX * dy) - (relY * dx)) / denominator;
+            if (t > 1e-6 && t <= 1 && u >= 0 && u <= 1 && t < bestT)
+            {
+                bestT = t;
+                best = (rayStart.X + (t * dx), rayStart.Y + (t * dy));
+            }
+        }
+
+        return double.IsPositiveInfinity(bestT) ? rayStart : best;
+    }
+
+    /// <summary>
+    /// One link as a curve between the two region nodes it joins. It is drawn over the states
+    /// rather than clipped to the gap between them: neighbouring states leave a few units of canvas
+    /// between their coastlines, and an arrow drawn only in that gap is shorter than its own head.
+    /// The bow is what separates the two directions of a pair, and it takes its sign from the
+    /// direction of travel, so the outbound link of a pair sits on one side of the straight line
+    /// and the return sits on the other.
+    /// </summary>
+    private EdgeGeometry? BuildEdge(NetworkEdge edge, double busiestEnergyMwh)
     {
         NodeGeometry? from = _nodes.FirstOrDefault(node =>
             string.Equals(node.Source.RegionId, edge.FromRegionId, StringComparison.OrdinalIgnoreCase));
@@ -154,43 +568,57 @@
         double dx = to.X - from.X;
         double dy = to.Y - from.Y;
         double length = Math.Sqrt((dx * dx) + (dy * dy));
-        if (length <= 0)
+        if (length <= 1e-6)
         {
             return null;
         }
 
-        // Both directions of a pair exist as separate links, so each is offset to its own side
-        // rather than drawn on top of its opposite.
         double unitX = dx / length;
         double unitY = dy / length;
-        double offset = 9;
-        double shiftX = -unitY * offset;
-        double shiftY = unitX * offset;
+        // Two nodes closer together than the clearance they each want would leave nothing to draw,
+        // so the clearance gives way rather than the link inverting.
+        double clearance = Math.Min(NodeClearance(unitX, unitY), length * 0.4);
+        double startX = from.X + (unitX * clearance);
+        double startY = from.Y + (unitY * clearance);
+        double endX = to.X - (unitX * clearance);
+        double endY = to.Y - (unitY * clearance);
 
-        double startX = from.X + (unitX * from.Radius) + shiftX;
-        double startY = from.Y + (unitY * from.Radius) + shiftY;
-        double endX = to.X - (unitX * to.Radius) + shiftX;
-        double endY = to.Y - (unitY * to.Radius) + shiftY;
+        double bow = Math.Max(MinimumBow, BowFraction * (length - (2 * clearance)));
+        double controlX = ((startX + endX) / 2) - (unitY * bow);
+        double controlY = ((startY + endY) / 2) + (unitX * bow);
 
-        double midX = (startX + endX) / 2;
-        double midY = (startY + endY) / 2;
-        double head = 11;
+        // The head points along the curve where it arrives, not along the straight line between the
+        // nodes, or a bowed link would arrive with its head turned off the line it was drawn on.
+        double tangentX = endX - controlX;
+        double tangentY = endY - controlY;
+        double tangentLength = Math.Sqrt((tangentX * tangentX) + (tangentY * tangentY));
+        if (tangentLength > 1e-6)
+        {
+            tangentX /= tangentLength;
+            tangentY /= tangentLength;
+        }
+
+        // Energy carried against the busiest link, rather than the link's own capacity factor: the
+        // figures in these runs sit between a thousandth and a tenth of capacity, so a width read
+        // off the factor puts every line in the picture within a hair of the minimum.
+        double share = busiestEnergyMwh <= 0 ? 0 : Math.Abs(edge.EnergyMwh ?? 0) / busiestEnergyMwh;
+        double width = MinLinkWidth + (LinkWidthRange * Math.Sqrt(Math.Clamp(share, 0, 1)));
+        double head = Math.Max(ArrowHead, width * 1.8);
         string arrow = string.Join(" ",
             PlotFormat.Coordinate(endX, endY),
-            PlotFormat.Coordinate(endX - (unitX * head) - (unitY * head * 0.5), endY - (unitY * head) + (unitX * head * 0.5)),
-            PlotFormat.Coordinate(endX - (unitX * head) + (unitY * head * 0.5), endY - (unitY * head) - (unitX * head * 0.5)));
+            PlotFormat.Coordinate(
+                endX - (tangentX * head) - (tangentY * head * 0.55),
+                endY - (tangentY * head) + (tangentX * head * 0.55)),
+            PlotFormat.Coordinate(
+                endX - (tangentX * head) + (tangentY * head * 0.55),
+                endY - (tangentY * head) - (tangentX * head * 0.55)));
 
         return new EdgeGeometry(
             edge,
-            startX,
-            startY,
-            endX,
-            endY,
-            2 + (10 * Math.Clamp(edge.CapacityFactor ?? 0, 0, 1)),
+            $"M{PlotFormat.Coordinate(startX, startY)} Q{PlotFormat.Coordinate(controlX, controlY)} "
+                + PlotFormat.Coordinate(endX, endY),
+            width,
             arrow,
-            midX + (shiftX * 1.6),
-            midY + (shiftY * 1.6) - 6,
-            edge.EnergyMwh is { } energy ? $"{PlotFormat.Compact(energy)} MWh" : string.Empty,
             $"{edge.Id} · {edge.FromRegionId} to {edge.ToRegionId}\n"
                 + $"Link capacity {PlotFormat.Compact(edge.CapacityMw)} MW\n"
                 + (edge.EnergyMwh is { } carried
@@ -198,6 +626,17 @@
                         + $"Peak {PlotFormat.Compact(edge.PeakMw ?? 0)} MW\n"
                         + $"{PlotFormat.Share(edge.CapacityFactor ?? 0, 1)} of capacity used"
                     : "No flow evidence read yet"));
+    }
+
+    /// <summary>
+    /// How far along a unit direction the region id's text box reaches, which is where a link
+    /// arriving from that direction has to stop.
+    /// </summary>
+    private static double NodeClearance(double unitX, double unitY)
+    {
+        double toSide = Math.Abs(unitX) < 1e-6 ? double.PositiveInfinity : NodeClearanceX / Math.Abs(unitX);
+        double toCap = Math.Abs(unitY) < 1e-6 ? double.PositiveInfinity : NodeClearanceY / Math.Abs(unitY);
+        return Math.Min(toSide, toCap) + NodeClearancePad;
     }
 
     private static string NodeClass(NodeGeometry node) => node.Source.NetImportedMwh switch
@@ -213,20 +652,19 @@
         NetworkNode Source,
         double X,
         double Y,
-        double Radius,
+        IReadOnlyList<(double X, double Y)> Outline,
+        string PathData,
+        double LabelX,
+        string LabelAnchor,
+        double LabelY,
+        string? LeaderPath,
         string Detail,
         string Readout);
 
     private readonly record struct EdgeGeometry(
         NetworkEdge Source,
-        double FromX,
-        double FromY,
-        double ToX,
-        double ToY,
+        string PathData,
         double Width,
         string Arrow,
-        double LabelX,
-        double LabelY,
-        string Label,
         string Readout);
 }

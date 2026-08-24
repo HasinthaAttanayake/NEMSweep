@@ -462,12 +462,13 @@ code {
     margin: 0;
 }
 
-.network-edge line {
+.network-link {
+    fill: none;
     stroke: var(--color-accent-cool);
     stroke-linecap: round;
 }
 
-.network-edge.is-idle line {
+.network-edge.is-idle .network-link {
     stroke: var(--color-border-control);
     stroke-dasharray: 5 5;
 }
@@ -476,26 +477,28 @@ code {
     fill: var(--color-accent-cool);
 }
 
-.network-edge-label {
-    fill: var(--color-accent-cool);
-    font-family: var(--font-body);
-    font-size: 13px;
-    font-variant-numeric: tabular-nums;
-    font-weight: 700;
+/* A label sits in the margin beside the map rather than on the state it names, so it needs a
+   hairline back to its own coastline. It is a pointer and not part of the drawing, so it is light
+   enough that a reader follows it without reading it as a link. */
+.network-leader {
+    fill: none;
+    stroke: var(--color-border);
+    stroke-width: 1.2;
 }
 
-.network-node circle {
+.network-node path {
     fill: var(--color-surface);
     stroke: var(--color-track-fill);
     stroke-width: 2.5;
+    stroke-linejoin: round;
 }
 
-.network-node.is-importer circle {
+.network-node.is-importer path {
     fill: var(--color-negative-soft);
     stroke: var(--color-negative);
 }
 
-.network-node.is-exporter circle {
+.network-node.is-exporter path {
     fill: var(--color-positive-soft);
     stroke: var(--color-positive);
 }
@@ -540,7 +543,7 @@ code {
     display: inline-block;
     width: 12px;
     height: 12px;
-    border-radius: 50%;
+    border-radius: 3px;
     border: 2px solid var(--color-track-fill);
     background: var(--color-surface);
 }
