@@ -436,11 +436,33 @@
             new("Levelised cost", PlotFormat.Money(_analysis.Result.Cost.SlcoeAudPerMwh), "AUD/MWh served"),
             new("Annual system cost", PlotFormat.MoneyTotal(_analysis.Result.Cost.TotalAnnualisedCostAud), "generation, storage and transmission"),
             new("Renewable share", RenewableShare, "of delivered energy"),
-            new(
-                "Reliability",
-                _analysis.Result.Reliability.WithinTarget ? "Within target" : "Outside target",
-                $"{PlotFormat.Share(AllowanceUsed, 0)} of the unserved-energy allowance used"),
+            new("Reliability", ReliabilityHeadline, ReliabilityDetail),
         ];
+
+    /// <summary>
+    /// Read from the sizing outcome rather than <c>Reliability.WithinTarget</c>: the target is
+    /// satisfiable by having built the storage that satisfies it, so the raw verdict cannot
+    /// distinguish an existing fleet that already held from one that had to be rebuilt first. Under
+    /// a "what happens when the data centres arrive?" headline, "within target" alone reads as
+    /// reassurance the run does not support.
+    /// </summary>
+    private string ReliabilityHeadline => _analysis!.Result.StorageSizing.Outcome switch
+    {
+        StorageSizingOutcome.NotRequired => "Existing fleet holds",
+        StorageSizingOutcome.Resized => "Storage grown to comply",
+        _ => "Cannot meet target",
+    };
+
+    private string ReliabilityDetail => _analysis!.Result.StorageSizing.Outcome switch
+    {
+        StorageSizingOutcome.Resized =>
+            $"grown by {PlotFormat.Compact(_analysis.Result.StorageSizing.FinalEnergyMwh - _analysis.Result.StorageSizing.InitialEnergyMwh)} MWh to reach "
+                + $"{PlotFormat.Share(AllowanceUsed, 0)} of the unserved-energy allowance used",
+        StorageSizingOutcome.NotRequired =>
+            $"{PlotFormat.Share(AllowanceUsed, 0)} of the unserved-energy allowance used",
+        _ =>
+            $"even after resizing, {PlotFormat.Share(AllowanceUsed, 0)} of the unserved-energy allowance used",
+    };
 
     private string RenewableShare => _analysis!.SystemMix.TotalMwh > 0
         ? PlotFormat.Share(_analysis.SystemMix.RenewableShare)
