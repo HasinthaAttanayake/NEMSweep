@@ -221,16 +221,10 @@ uncertainty.
 **Revisit when:** sourcing a cited per-link value. This is the highest-priority open assumption in
 the model.
 
-### Route length is the great-circle distance between solar weather sites
-
-**Where:** `PowerSystemCostCalculator`, via `RegionalResourceProfile.Location`
-See [Limitations §6](limitations.md#6-transmission-route-length-is-a-proxy-and-it-runs-long) for
-the model-versus-actual table and what it does to reported cost.
-
 ### Reciprocal links are costed twice
 
 **Where:** the scenario convention of declaring each corridor as two directed interconnectors.
-See [Limitations §6](limitations.md#6-transmission-route-length-is-a-proxy-and-it-runs-long).
+See [Limitations §6](limitations.md#6-reciprocal-interconnectors-are-each-costed-at-the-corridors-full-length).
 Roughly 1.8× of reported transmission cost is this convention.
 
 ### Transfer serves regions in priority order

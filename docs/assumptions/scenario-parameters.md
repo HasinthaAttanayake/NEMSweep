@@ -97,14 +97,16 @@ a proof that no battery could, which only the `energyLimited` outcome gives.
 |---|---|---|
 | `fromRegionId`, `toRegionId` | region | A **directed** path. A reciprocal corridor is two entries. |
 | `capacityMw` | MW | Directed transfer capacity, metered at the sending end. |
+| `routeLengthKm` | km | The line's route length, declared directly rather than derived from anything else. A reciprocal corridor declares the same value on both of its entries. |
 | `capitalCostAudPerKmPerMw` | AUD/km/MW | Build cost, scaling with both route length and capacity. |
 | `fixedOperatingCostAudPerKmPerMwYear` | AUD/km/MW/year | Fixed operating cost on the same basis. There is no variable term. |
 | `technicalLifeYears` | years | Annuitisation period. |
 
-**Route length is not a parameter.** It is derived from the endpoint regions' weather-site
-coordinates. Two consequences are worth knowing before you quote a transmission cost, both covered
-in [Limitations §6](limitations.md#6-transmission-route-length-is-a-proxy-and-it-runs-long): route
-length runs long, and declaring a corridor in both directions charges its full length twice.
+**Declaring a corridor in both directions charges its full route length twice**, covered in
+[Limitations §6](limitations.md#6-reciprocal-interconnectors-are-each-costed-at-the-corridors-full-length).
+Route length used to be derived from the endpoint regions' weather-site coordinates and ran long
+against the real NEM corridors; it is now a value you supply, so a more accurate figure is a data
+change, not a code change.
 
 ## Demand
 

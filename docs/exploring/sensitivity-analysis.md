@@ -85,17 +85,17 @@ Total levelised cost is the scalar everyone reaches for first, and on its own it
 
 | Point | Added load | System | Generation | Storage | Transmission |
 |---|---|---|---|---|---|
-| p0 | 0 MW | 154.49 | 137.33 | 5.16 | 12.00 |
-| p3 | 1,500 MW | 149.26 | 132.53 | 5.52 | 11.21 |
-| p7 | 3,500 MW | 146.40 | 127.64 | 8.46 | 10.31 |
-| p9 | 4,500 MW | 149.48 | 125.65 | 13.92 | 9.91 |
+| p0 | 0 MW | 148.40 | 137.33 | 5.16 | 5.90 |
+| p3 | 1,500 MW | 143.56 | 132.53 | 5.52 | 5.52 |
+| p7 | 3,500 MW | 141.17 | 127.64 | 8.46 | 5.07 |
+| p9 | 4,500 MW | 144.45 | 125.65 | 13.92 | 4.87 |
 
 All AUD/MWh served.
 
-System levelised cost **falls** as load is added, from 154.49 to 146.40 by p7. That is real, and
+System levelised cost **falls** as load is added, from 148.40 to 141.17 by p7. That is real, and
 it is not a modelling artefact: a flat always-on load raises the system load factor, and the fixed
 costs of generation and transmission are then spread over more energy served. Generation levelised
-cost falls monotonically from 137.33 to 125.65; transmission from 12.00 to 9.91.
+cost falls monotonically from 137.33 to 125.65; transmission from 5.90 to 4.87.
 
 But the storage component moves the other way, from 5.16 to 13.92, and by p8 it is rising faster
 than generation cost is falling. The system total turns around between p7 and p8, the same place

@@ -60,8 +60,8 @@ habit from carrying over into a multi-region config.
 | `storageFleets` | array of [storage fleet](#regionsstoragefleets) | yes, at least one | n/a | This region's storage. Technologies must be distinct within the region. |
 | `dataCentreNameplateMw` | number | no, default 0 | MW | A flat, full-load-factor additive demand component, representing new load such as a data centre. |
 
-An interconnector endpoint must name a region that appears in `regions`, because route length is
-derived from that region's weather site (see [below](#interconnectors)).
+An interconnector endpoint must name a region that appears in `regions` (see
+[below](#interconnectors)).
 
 ## `regions[].generatingFleets[]`
 
@@ -158,6 +158,7 @@ published result, not a failure of the tool.
 | `fromRegionId` | string | yes | n/a | Sending-end region. Must be one of `regions`. |
 | `toRegionId` | string | yes | n/a | Receiving-end region. Must be one of `regions` and different from `fromRegionId`. |
 | `capacityMw` | number | yes | MW | Directed transfer capacity, metered at the sending end. |
+| `routeLengthKm` | number | yes, positive | km | The line's route length. Declared directly; not derived from anything else. |
 | `capitalCostAudPerKmPerMw` | decimal | yes | AUD per km per MW | Capital cost rate, multiplied by route length and capacity. |
 | `fixedOperatingCostAudPerKmPerMwYear` | decimal | yes | AUD per km per MW per year | Fixed O&M cost rate, multiplied by route length and capacity. |
 | `technicalLifeYears` | integer | yes, nonzero | years | Technical life used to annuitise capital cost. |
@@ -169,11 +170,8 @@ capital and fixed cost for that corridor rather than splitting it between the tw
 [Limitations](../assumptions/limitations.md) for what that does to reported system cost. At most one
 interconnector is permitted per exact direction, and `fromRegionId`/`toRegionId` must not be equal.
 
-Route length is **not** a field in this schema. It is derived at run time as the great-circle
-distance between the two endpoint regions' weather-site coordinates, specifically each region's
-solar site (see [Input bundles](input-bundles.md)). This means an interconnector endpoint requires
-its region to have weather data loaded, and it means changing a region's solar weather file changes
-every interconnector's reported cost for that region, not just its generation.
+Costing an interconnector does not require its endpoint regions to carry weather data: route length
+is `routeLengthKm`, not anything derived from a region's weather file.
 
 ## Time
 

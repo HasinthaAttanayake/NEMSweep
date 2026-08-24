@@ -35,9 +35,10 @@ distribution to sample and gives no confidence intervals. See
 
 The single most useful habit when working with NemSim: **read differences, not levels**.
 
-The model's biases are systematic. Transmission route length runs long. Greedy storage dispatch is
-wrong in a known direction. A typical meteorological year understates tail events. Every one of
-those sits on *both* runs when you compare two, and largely cancels.
+The model's biases are systematic. Reciprocal interconnectors are each costed at the corridor's
+full length, roughly doubling reported transmission cost. Greedy storage dispatch is wrong in a
+known direction. A typical meteorological year understates tail events. Every one of those sits on
+*both* runs when you compare two, and largely cancels.
 
 So a claim of the form "storage requirement roughly triples between +2 GW and +6 GW of new load" is
 far better supported than "the system needs 14 GWh of storage". Frame findings the first way.
@@ -94,7 +95,7 @@ Vary interconnector `capacityMw`, or add and remove links entirely.
 
 Interconnection and storage are substitutes: both move energy from where and when it is abundant to
 where and when it is not. Sweeping one while the sizing loop solves for the other shows the
-trade-off directly. Read [Limitations §6](../assumptions/limitations.md#6-transmission-route-length-is-a-proxy-and-it-runs-long)
+trade-off directly. Read [Limitations §6](../assumptions/limitations.md#6-reciprocal-interconnectors-are-each-costed-at-the-corridors-full-length)
 before drawing a cost conclusion from it.
 
 ## Designing a good sweep
