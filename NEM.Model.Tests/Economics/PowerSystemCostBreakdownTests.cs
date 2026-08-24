@@ -276,8 +276,11 @@ public sealed class PowerSystemCostBreakdownTests
     }
 
     [Fact]
-    public void Calculate_RequiresBothInterconnectorEndpointsToCarryAResourceProfile()
+    public void Calculate_DoesNotRequireResourceProfilesForInterconnectorEndpoints()
     {
+        // Transmission cost is charged against the interconnector's declared route length, not a
+        // distance derived from the endpoints' weather sites, so a region missing a resource
+        // profile entirely (NSW1, below) must not stop the system from being costed.
         Scenario scenario = TwoRegionScenario(Interconnectors());
         DispatchOutcome nswOutcome = DispatchOutcomeFor("NSW1", deliveredMegawattHours: 1);
         DispatchOutcome vicOutcome = DispatchOutcomeFor("VIC1", deliveredMegawattHours: 2);
@@ -293,12 +296,12 @@ public sealed class PowerSystemCostBreakdownTests
             ],
             [Link()]);
 
-        var act = () => PowerSystemCostCalculator.Calculate(
+        PowerSystemCostBreakdown breakdown = PowerSystemCostCalculator.Calculate(
             scenario,
             powerSystem,
             [nswOutcome, vicOutcome]);
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("*NSW1*resource profile*");
+        breakdown.TotalAnnualisedTransmissionCost.Should().Be(OneLinkCost(capacityMw: 700));
     }
 
     [Fact]
@@ -436,6 +439,7 @@ public sealed class PowerSystemCostBreakdownTests
             fromRegionId,
             toRegionId,
             Power.FromMegawatts(capacityMw),
+            NswLocation.DistanceTo(VicLocation),
             new TransmissionCostParameters(
                 DistancePowerCost.FromAudPerKmPerMw(CapitalCostAudPerKmPerMw),
                 AnnualDistancePowerCost.FromAudPerKmPerMwYear(FixedOperatingCostAudPerKmPerMwYear)),
