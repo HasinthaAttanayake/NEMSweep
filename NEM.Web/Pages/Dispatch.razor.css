@@ -73,12 +73,23 @@
 .weather-bases-note { max-width: 640px; margin: .35rem 0 0; color: var(--color-muted); font-size: .85rem; line-height: 1.55; }
 .weather-region { margin-top: 1.15rem; }
 .weather-region h3 { margin: 0 0 .4rem; font-family: var(--font-display); font-size: 1.02rem; font-weight: 600; }
-.assumption-band { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem 2rem; margin-top: 1rem; padding: 1.25rem 0; border-top: 1px solid var(--color-border); }
+.assumption-band { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem 2rem; margin-top: 1rem; padding: 1.25rem 0; border-top: 1px solid var(--color-border); }
 .assumption-band div { min-width: 0; }
 .assumption-band span, .assumption-band strong, .assumption-band small { display: block; }
 .assumption-band span { margin-bottom: .25rem; color: var(--color-muted); font-size: .78rem; text-transform: uppercase; }
 .assumption-band strong { font-size: .9rem; font-weight: 600; }
 .assumption-band small { margin-top: .2rem; color: var(--color-muted); font-size: .78rem; }
+.assumption-detail { display: flex; flex-direction: column; gap: 1.25rem; margin-top: 1rem; padding: 1.25rem 0; border-top: 1px solid var(--color-border); }
+.assumption-table-wrap { min-width: 0; }
+.assumption-table-label { display: block; margin-bottom: .5rem; color: var(--color-muted); font-size: .78rem; text-transform: uppercase; }
+.assumption-detail .table-scroll { overflow-x: auto; border-block: 1px solid var(--color-border); }
+.assumption-table { width: 100%; min-width: 640px; border-collapse: collapse; font-size: .82rem; }
+.assumption-table th, .assumption-table td { padding: .5rem .75rem; border-bottom: 1px solid var(--color-border); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.assumption-table th:first-child, .assumption-table td:first-child { text-align: left; }
+.assumption-table thead th { color: var(--color-muted); font-size: .7rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.assumption-table tbody tr:last-child th, .assumption-table tbody tr:last-child td { border-bottom: 0; }
+.assumption-docs-link { max-width: 720px; margin: 1rem 0 0; color: var(--color-muted); font-size: .85rem; line-height: 1.55; }
+.assumption-docs-link a { color: var(--accent); font-weight: 600; }
 @media (max-width: 900px) { .cost-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); } .cost-ledger { grid-column: 1 / -1; } }
 @media (max-width: 760px) { .dispatch-controls { align-items: stretch; flex-direction: column; } .view-select, .date-field input { width: 100%; } .run-navigation { order: 1; } .cost-heading { align-items: flex-start; flex-direction: column; gap: .75rem; } .cost-layout { grid-template-columns: 1fr; gap: 1.25rem; } .cost-primary { padding: 0 0 1.25rem; border-right: 0; border-bottom: 1px solid var(--color-border); } .cost-ledger { grid-column: auto; } .assumption-band { grid-template-columns: 1fr; } }.reliability-band { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem 2rem; margin-top: 1rem; padding: 1.25rem 0; border-top: 1px solid var(--color-border); }
 .reliability-band div { min-width: 0; }

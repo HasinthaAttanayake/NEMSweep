@@ -294,10 +294,10 @@ public sealed class SystemAnalysisTests
         double solar,
         double wind,
         double hydro) => new()
-    {
-        ["Coal"] = coal,
-        ["Solar"] = solar,
-        ["Wind"] = wind,
-        ["Hydro"] = hydro,
-    };
+        {
+            ["Coal"] = coal,
+            ["Solar"] = solar,
+            ["Wind"] = wind,
+            ["Hydro"] = hydro,
+        };
 }

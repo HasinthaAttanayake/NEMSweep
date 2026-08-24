@@ -233,14 +233,14 @@ public sealed class DispatchArtifactValidatorTests
         return baseResult with
         {
             RegionIds = ["NSW1", "VIC1"],
-                Topology = new DispatchTopologyDTO(
+            Topology = new DispatchTopologyDTO(
                 ["NSW1", "VIC1"],
                 [new DispatchTopologyLinkDTO("NSW1->VIC1", "NSW1", "VIC1", 100)]),
-                RegionSummariesById = new Dictionary<string, RegionDispatchSummaryDTO>
-                {
-                    ["NSW1"] = baseResult.RegionSummariesById["NSW1"],
-                    ["VIC1"] = baseResult.RegionSummariesById["NSW1"],
-                },
+            RegionSummariesById = new Dictionary<string, RegionDispatchSummaryDTO>
+            {
+                ["NSW1"] = baseResult.RegionSummariesById["NSW1"],
+                ["VIC1"] = baseResult.RegionSummariesById["NSW1"],
+            },
             DataSeries = baseResult.DataSeries with { TransmissionLossesMw = [0.5, 0.25, 0] },
         };
     }
