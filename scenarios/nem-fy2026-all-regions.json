@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "id": "nem-fy2026-all-regions",
   "name": "NEM FY2026 all regions",
   "costBasis": {
@@ -18,6 +18,7 @@
       "fromRegionId": "NSW1",
       "toRegionId": "QLD1",
       "capacityMw": 957,
+      "routeLengthKm": 500,
       "capitalCostAudPerKmPerMw": 3860,
       "fixedOperatingCostAudPerKmPerMwYear": 38.6,
       "technicalLifeYears": 50
@@ -26,6 +27,7 @@
       "fromRegionId": "QLD1",
       "toRegionId": "NSW1",
       "capacityMw": 1610,
+      "routeLengthKm": 500,
       "capitalCostAudPerKmPerMw": 3860,
       "fixedOperatingCostAudPerKmPerMwYear": 38.6,
       "technicalLifeYears": 50
@@ -34,6 +36,7 @@
       "fromRegionId": "VIC1",
       "toRegionId": "NSW1",
       "capacityMw": 1700,
+      "routeLengthKm": 300,
       "capitalCostAudPerKmPerMw": 3860,
       "fixedOperatingCostAudPerKmPerMwYear": 38.6,
       "technicalLifeYears": 50
@@ -42,6 +45,7 @@
       "fromRegionId": "NSW1",
       "toRegionId": "VIC1",
       "capacityMw": 1900,
+      "routeLengthKm": 300,
       "capitalCostAudPerKmPerMw": 3860,
       "fixedOperatingCostAudPerKmPerMwYear": 38.6,
       "technicalLifeYears": 50
@@ -50,6 +54,7 @@
       "fromRegionId": "TAS1",
       "toRegionId": "VIC1",
       "capacityMw": 594,
+      "routeLengthKm": 370,
       "capitalCostAudPerKmPerMw": 3860,
       "fixedOperatingCostAudPerKmPerMwYear": 38.6,
       "technicalLifeYears": 50
@@ -58,6 +63,7 @@
       "fromRegionId": "VIC1",
       "toRegionId": "TAS1",
       "capacityMw": 478,
+      "routeLengthKm": 370,
       "capitalCostAudPerKmPerMw": 3860,
       "fixedOperatingCostAudPerKmPerMwYear": 38.6,
       "technicalLifeYears": 50
@@ -66,6 +72,7 @@
       "fromRegionId": "VIC1",
       "toRegionId": "SA1",
       "capacityMw": 820,
+      "routeLengthKm": 275,
       "capitalCostAudPerKmPerMw": 3860,
       "fixedOperatingCostAudPerKmPerMwYear": 38.6,
       "technicalLifeYears": 50
@@ -74,6 +81,7 @@
       "fromRegionId": "SA1",
       "toRegionId": "VIC1",
       "capacityMw": 750,
+      "routeLengthKm": 275,
       "capitalCostAudPerKmPerMw": 3860,
       "fixedOperatingCostAudPerKmPerMwYear": 38.6,
       "technicalLifeYears": 50
@@ -82,6 +90,7 @@
       "fromRegionId": "NSW1",
       "toRegionId": "SA1",
       "capacityMw": 150,
+      "routeLengthKm": 900,
       "capitalCostAudPerKmPerMw": 3860,
       "fixedOperatingCostAudPerKmPerMwYear": 38.6,
       "technicalLifeYears": 50
@@ -90,6 +99,7 @@
       "fromRegionId": "SA1",
       "toRegionId": "NSW1",
       "capacityMw": 150,
+      "routeLengthKm": 900,
       "capitalCostAudPerKmPerMw": 3860,
       "fixedOperatingCostAudPerKmPerMwYear": 38.6,
       "technicalLifeYears": 50
