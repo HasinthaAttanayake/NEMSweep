@@ -519,9 +519,10 @@
     }
 
     /// <summary>
-    /// The system as nodes and edges. Everything here is a figure the run already publishes; the
-    /// layout is a circle because the model records no coordinates, and placing regions
-    /// geographically would put a claim about where they are into a picture of what flowed.
+    /// The system as nodes and edges. Every figure here is one the run already publishes. Where the
+    /// map puts a region is not one of them: the component supplies a fixed backdrop of state
+    /// outlines for the five NEM regions. The run does publish a terminal coordinate for each end of
+    /// each interconnector, and nothing here reads it.
     /// </summary>
     private void BuildNetwork()
     {
