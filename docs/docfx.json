@@ -6,8 +6,8 @@
         {
           "src": "..",
           "files": [
-            "NEM.Model/NEM.Model.csproj",
-            "NEM.Contracts/NEM.Contracts.csproj"
+            "NEMSweep.Model/NEMSweep.Model.csproj",
+            "NEMSweep.Contracts/NEMSweep.Contracts.csproj"
           ]
         }
       ],
@@ -46,12 +46,12 @@
       "modern"
     ],
     "globalMetadata": {
-      "_appName": "NemSim",
-      "_appTitle": "NemSim",
+      "_appName": "NEMSweep",
+      "_appTitle": "NEMSweep",
       "_enableSearch": true,
       "_disableContribution": false,
       "_gitContribute": {
-        "repo": "https://github.com/HasinthaAttanayake/NemSim",
+        "repo": "https://github.com/HasinthaAttanayake/NEMSweep",
         "branch": "main"
       }
     },

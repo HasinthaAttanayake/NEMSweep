@@ -1,6 +1,6 @@
 # What the model does
 
-NemSim answers one question, repeatedly and cheaply:
+NEMSweep answers one question, repeatedly and cheaply:
 
 > Given this set of regions, with this demand, these generation assets, these interconnectors and
 > these economics, what happens when you dispatch it hour by hour for a year, how much storage does
@@ -83,7 +83,7 @@ A small set of terms carries most of the meaning. They are used precisely throug
 
 ## What it deliberately does not do
 
-NemSim is a system-planning model. It is not a market simulator, not a power-flow model, and not a
+NEMSweep is a system-planning model. It is not a market simulator, not a power-flow model, and not a
 forecast.
 
 No bidding, no prices, no settlement. No unit commitment, so no minimum stable generation, no

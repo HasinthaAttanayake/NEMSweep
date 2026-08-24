@@ -1,9 +1,9 @@
-# NemSim
+# NEMSweep
 
-NemSim is an hourly grid dispatch model for Australia's National Electricity Market, being built
+NEMSweep is an hourly grid dispatch model for Australia's National Electricity Market, being built
 in public one validated layer at a time.
 
-You describe a set of regions, each with its demand, generation assets and storage, and NemSim
+You describe a set of regions, each with its demand, generation assets and storage, and NEMSweep
 dispatches them hour by hour across a modelled year. Where the reliability standard you declared is
 not met, it grows storage until either the standard is met or the search reports what stopped it: a
 capacity ceiling, a pass budget, probes that stopped helping, or a system whose total generation
@@ -17,7 +17,7 @@ artifacts are not byte-identical across reruns, because each run stamps a fresh 
 
 **Documentation:** [how to run it, what it assumes, and how to explore the scenario
 space](docs/index.md)
-**Live results site:** [https://nemsim.pages.dev/](https://nemsim.pages.dev/)
+**Live results site:** [https://nemsweep.pages.dev/](https://nemsweep.pages.dev/)
 
 > **Under active construction**
 >
@@ -59,14 +59,14 @@ Follow progress on the
 
 ## Repository
 
-- `NEM.Model` contains domain models, units, time series, and generation models.
-- `NEM.Contracts` defines the exported data contracts.
-- `NEM.CLI` validates source data and generates the datasets consumed by the site.
-- `NEM.Web` is the Blazor WebAssembly results site.
-- `NEM.Model.Tests`, `NEM.CLI.Tests`, and `NEM.Web.Tests` cover model, ingestion, and web behaviour.
+- `NEMSweep.Model` contains domain models, units, time series, and generation models.
+- `NEMSweep.Contracts` defines the exported data contracts.
+- `NEMSweep.CLI` validates source data and generates the datasets consumed by the site.
+- `NEMSweep.Web` is the Blazor WebAssembly results site.
+- `NEMSweep.Model.Tests`, `NEMSweep.CLI.Tests`, and `NEMSweep.Web.Tests` cover model, ingestion, and web behaviour.
 - `docs` is the docfx documentation site.
 
-`NEM.CLI` is organised by workflow, with application mechanics kept separate:
+`NEMSweep.CLI` is organised by workflow, with application mechanics kept separate:
 
 | Folder | Responsibility |
 | --- | --- |
@@ -79,30 +79,30 @@ Follow progress on the
 | `Ingest` | Input-bundle validation and coordinated artifact ingestion |
 | `Scenarios` | Scenario input adaptation, dispatch orchestration, and result export |
 
-`NEM.CLI.Tests` mirrors the same feature folders. The implemented aggregate roots and
+`NEMSweep.CLI.Tests` mirrors the same feature folders. The implemented aggregate roots and
 domain-service boundaries are tracked in the [domain model](docs/domain-model.md).
 
 ## Local development
 
-NemSim targets .NET 10.
+NEMSweep targets .NET 10.
 
 ```powershell
-dotnet build .\NemSim.slnx
+dotnet build .\NEMSweep.slnx
 ```
 
 ```powershell
-dotnet test .\NemSim.slnx
+dotnet test .\NEMSweep.slnx
 ```
 
 ```powershell
-dotnet run --project .\NEM.CLI\NEM.CLI.csproj -- --help
+dotnet run --project .\NEMSweep.CLI\NEMSweep.CLI.csproj -- --help
 ```
 
 ```powershell
-dotnet run --project .\NEM.Web\NEM.Web.csproj
+dotnet run --project .\NEMSweep.Web\NEMSweep.Web.csproj
 ```
 
-Copy `NEM.CLI/appsettings.example.json` to `NEM.CLI/appsettings.local.json` for machine-local input
+Copy `NEMSweep.CLI/appsettings.example.json` to `NEMSweep.CLI/appsettings.local.json` for machine-local input
 and output paths. The local file is ignored by Git; the example is the fallback when it is absent.
 
 The full walkthrough covering configuration, the first scenario run and every command is in
@@ -113,13 +113,13 @@ The full walkthrough covering configuration, the first scenario run and every co
 Run the committed hand-calculated dispatch fixtures with:
 
 ```powershell
-dotnet test .\NEM.Model.Tests\NEM.Model.Tests.csproj --filter FullyQualifiedName~ManualScenarioFixtureTests
+dotnet test .\NEMSweep.Model.Tests\NEMSweep.Model.Tests.csproj --filter FullyQualifiedName~ManualScenarioFixtureTests
 ```
 
 Run the synthetic 8,760-hour storage-sizing acceptance in Release mode with:
 
 ```powershell
-dotnet test .\NEM.Model.Tests\NEM.Model.Tests.csproj -c Release --filter FullyQualifiedName~FullYearSizingAcceptanceTests --logger "console;verbosity=detailed"
+dotnet test .\NEMSweep.Model.Tests\NEMSweep.Model.Tests.csproj -c Release --filter FullyQualifiedName~FullYearSizingAcceptanceTests --logger "console;verbosity=detailed"
 ```
 
 The full-year test prints solver wall-clock time, dispatch-pass count, and the selected Battery

@@ -1,13 +1,13 @@
 # Model assumptions
 
-There are two kinds of assumption in a NemSim result, and confusing them is the most common way to
+There are two kinds of assumption in a NEMSweep result, and confusing them is the most common way to
 misread one.
 
 **Model assumptions** are baked into the code. You cannot change them by editing a scenario, and
 every run carries them. They are the subject of this page.
 
 **Scenario parameters** are values *you* supply: discount rate, capital costs, round-trip
-efficiencies, technical lives, fuel prices, installed capacities. NemSim makes no claim about them;
+efficiencies, technical lives, fuel prices, installed capacities. NEMSweep makes no claim about them;
 it takes what you give it. They are covered in [Scenario parameters](scenario-parameters.md).
 
 Read [Limitations](limitations.md) first if you have not. This page says what the model assumes;
@@ -295,7 +295,7 @@ so every published artifact was produced with the values below.
 **Why:** the modelled asset is a utility-scale N-type HJT plant on dual-axis trackers, which keeps
 the array normal to the sun and removes tilt and azimuth from the input surface entirely.
 **Impact:** it is the most favourable orientation there is. A fixed-tilt or single-axis plant on the
-same site would produce less, and with a different daily shape, so a NemSim solar trace is not a
+same site would produce less, and with a different daily shape, so a NEMSweep solar trace is not a
 generic "solar" trace.
 **Revisit when:** you need to model an existing fixed-tilt fleet rather than new build.
 

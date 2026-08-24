@@ -1,6 +1,6 @@
 # Scenario parameters
 
-Everything on this page is a value **you** supply in a scenario configuration. NemSim does not
+Everything on this page is a value **you** supply in a scenario configuration. NEMSweep does not
 assert any of it. It takes what you give it, dispatches accordingly, and reports the consequence.
 
 That distinction matters. The constants in [Model assumptions](index.md) are the model's claims and
@@ -15,7 +15,7 @@ sensitive results are to each.
 ## Why we are not publishing a sourced cost deck
 
 A costing deck that claims authority invites a reader to accept the output without examining the
-input. NemSim's whole proposition is the opposite: change a number, rerun, and see what moves.
+input. NEMSweep's whole proposition is the opposite: change a number, rerun, and see what moves.
 
 So the committed scenario carries no citations, and none of its economic values should be treated
 as ours. If you need defensible numbers, bring your own. CSIRO's GenCost and AEMO's Integrated
@@ -74,7 +74,7 @@ costs are; what changes is the bill attached to them. That is the same point
 result is a near-frontier point, not a cost-optimal one, so the power and energy costs are worth
 sweeping to price the shape the search chose, not to steer it.
 
-A scenario with a zero-capacity Battery plan is how you tell NemSim "build whatever storage this
+A scenario with a zero-capacity Battery plan is how you tell NEMSweep "build whatever storage this
 needs, and price it at these economics". That is the normal way to use the sizing loop.
 
 ## Storage sizing block

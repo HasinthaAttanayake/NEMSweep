@@ -1,6 +1,6 @@
 # Scenario configuration
 
-A scenario config is a single JSON file describing every region NemSim will dispatch: its demand
+A scenario config is a single JSON file describing every region NEMSweep will dispatch: its demand
 and weather inputs, its generating and storage fleets, the interconnectors linking it to other
 regions, the cost basis the run is priced against, and the bounds the storage-sizing search may use
 to grow a region's Battery capacity. `--run-scenario` reads one of these, dispatches it hour by
@@ -9,7 +9,7 @@ hour across the modelled year, and writes the results.
 The authoritative machine-readable form of everything on this page is the published JSON Schema:
 
 ```bash
-dotnet run --project NEM.CLI -- --describe-schema scenario
+dotnet run --project NEMSweep.CLI -- --describe-schema scenario
 ```
 
 Run that to see the exact `schemaVersion` the installed CLI accepts, and to validate a config

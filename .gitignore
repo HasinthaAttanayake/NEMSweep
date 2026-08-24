@@ -291,11 +291,11 @@ healthchecksdb
 .env.*.local
 
 # Machine-local scenario configuration
-NEM.CLI/appsettings.local.json
+NEMSweep.CLI/appsettings.local.json
 
 # data
 data/
-!NEM.Web/wwwroot/data/
+!NEMSweep.Web/wwwroot/data/
 
 # Generated files
 dist/

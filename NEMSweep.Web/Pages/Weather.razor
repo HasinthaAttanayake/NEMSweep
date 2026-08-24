@@ -1,0 +1,666 @@
+@page "/inputs/weather"
+@using NEMSweep.Contracts
+@inject ArtifactLoader ArtifactLoader
+
+<PageTitle>Weather traces</PageTitle>
+
+<div class="weather-page">
+    <PageHeader Eyebrow="EPW resource traces" Title="Weather data">
+        <ScopeContent>
+            @if (_weather is not null)
+            {
+                <ScopeLine Region="@($"{RegionLabel} · Solar: {SolarLocationLabel} · Wind: {WindLocationLabel}")"
+                           Period="@WeatherPeriod"
+                           Resolution="@WeatherResolution"
+                           BaselineGlobal="true" />
+            }
+        </ScopeContent>
+        <TrailingContent>
+        @if (_weather is not null)
+        {
+            <div class="weather-controls">
+                @if (_regionOptions.Count > 1)
+                {
+                    <MudSelect T="string"
+                               Label="Region"
+                               Value="_selectedRegion"
+                               ValueChanged="OnRegionChanged"
+                               Variant="Variant.Outlined"
+                               Class="region-select">
+                        @foreach (string region in _regionOptions)
+                        {
+                            <MudSelectItem T="string" Value="region">@RegionNames.Full(region)</MudSelectItem>
+                        }
+                    </MudSelect>
+                }
+
+                <MudSelect T="int"
+                           Label="Period"
+                           Value="_selectedMonth"
+                           ValueChanged="OnMonthChanged"
+                           Variant="Variant.Outlined"
+                           Class="period-select">
+                    <MudSelectItem T="int" Value="0">Full year</MudSelectItem>
+                    @foreach (MonthOption month in Months)
+                    {
+                        <MudSelectItem T="int" Value="month.Number">@month.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </div>
+        }
+        </TrailingContent>
+    </PageHeader>
+
+    <ArtifactLoadStateView State="_loadState">
+        @if (_weather is not null)
+        {
+        <MetricStrip Items="@WeatherMetrics" Columns="3" AriaLabel="Selected period summary" />
+
+        <div class="trace-context">
+            <span>@_periodLabel</span>
+            <span>@_rawPointCount hourly observations</span>
+            <span>@_displayPointCount displayed</span>
+        </div>
+
+        <section class="weather-provenance" aria-label="Weather source provenance">
+            <div>
+                <h2>Solar resource</h2>
+                <p>@SolarLocationLabel</p>
+                <small>@_weather.Solar.SourceFile</small>
+            </div>
+            <div>
+                <h2>Wind resource</h2>
+                <p>@WindLocationLabel</p>
+                <small>@_weather.Wind.SourceFile</small>
+            </div>
+            @* Two sites for one region is easy to miss when the difference is two strings a
+               reader has to compare, and a resource read hundreds of kilometres from where it is
+               used is worth stating rather than leaving to be noticed. *@
+            @if (SitesDiffer)
+            {
+                <p class="weather-sites-note">
+                    This region's solar and wind traces come from different weather files:
+                    @_weather.Solar.Location.City for solar and @_weather.Wind.Location.City for
+                    wind. Every dispatch result for @RegionLabel names both.
+                </p>
+            }
+        </section>
+
+        <MudTabs Elevation="0" Class="weather-tabs" Style="max-width: 100%; overflow: hidden">
+            <MudTabPanel Text="Solar production">
+                <ChartFrame Heading="Dual-axis solar production"
+                            Description="@($"Modelled AC output for {_solarCapacityMegawatts:N1} MW at {_weather.Solar.Location.City}")"
+                            Class="production-chart" HeadingClass="production-heading stack-on-mobile">
+                    <TrailingContent>
+                        <div class="capacity-control" aria-label="Solar AC capacity">
+                            <MudTooltip Text="Decrease capacity">
+                                <MudIconButton Icon="@Icons.Material.Filled.Remove"
+                                               Size="Size.Small"
+                                               OnClick="@(() => AdjustSolarCapacity(-1))"
+                                               Disabled="@(_solarCapacityMegawatts <= MinimumSolarCapacityMegawatts)"
+                                               aria-label="Decrease solar capacity" />
+                            </MudTooltip>
+                            <MudNumericField T="double"
+                                             Label="AC capacity"
+                                             Value="_solarCapacityMegawatts"
+                                             ValueChanged="OnSolarCapacityChanged"
+                                             Min="MinimumSolarCapacityMegawatts"
+                                             Max="MaximumSolarCapacityMegawatts"
+                                             Step="1"
+                                             Immediate="true"
+                                             HideSpinButtons="true"
+                                             Variant="Variant.Outlined"
+                                             Adornment="Adornment.End"
+                                             AdornmentText="MW"
+                                             Class="capacity-input" />
+                            <MudTooltip Text="Increase capacity">
+                                <MudIconButton Icon="@Icons.Material.Filled.Add"
+                                               Size="Size.Small"
+                                               OnClick="@(() => AdjustSolarCapacity(1))"
+                                               Disabled="@(_solarCapacityMegawatts >= MaximumSolarCapacityMegawatts)"
+                                               aria-label="Increase solar capacity" />
+                            </MudTooltip>
+                        </div>
+                    </TrailingContent>
+                    <ChildContent>
+                    <div class="production-summary" aria-label="Solar production summary">
+                        <div>
+                            <span>Peak output</span>
+                            <strong>@_peakSolarProductionMegawatts.ToString("N2") MW</strong>
+                        </div>
+                        <div>
+                            <span>Energy produced</span>
+                            <strong>@_solarEnergyMegawattHours.ToString("N0") MWh</strong>
+                        </div>
+                        <div>
+                            <span>Capacity factor</span>
+                            <strong>@_solarCapacityFactor.ToString("P1")</strong>
+                        </div>
+                    </div>
+                    <MudChart ChartType="ChartType.Line"
+                              ChartSeries="_solarProductionSeries"
+                              ChartLabels="_xAxisLabels"
+                              ChartOptions="_solarProductionChartOptions"
+                              Width="100%"
+                              Height="420px" />
+                    </ChildContent>
+                </ChartFrame>
+            </MudTabPanel>
+            <MudTabPanel Text="Wind production">
+                <ChartFrame Heading="Wind production"
+                            Description="@($"Modelled output for {_windCapacityMegawatts:N1} MW at {_weather.Wind.Location.City} using the Goldwind GW 140/3MW(S) 3.4 MW variant at {_weather.Wind.MeasurementHeightMetres:N0} m hub height")"
+                            Class="production-chart wind-production-chart" HeadingClass="production-heading stack-on-mobile">
+                    <TrailingContent>
+                        <div class="capacity-control" aria-label="Installed wind capacity">
+                            <MudTooltip Text="Decrease capacity">
+                                <MudIconButton Icon="@Icons.Material.Filled.Remove"
+                                               Size="Size.Small"
+                                               OnClick="@(() => AdjustWindCapacity(-1))"
+                                               Disabled="@(_windCapacityMegawatts <= MinimumWindCapacityMegawatts)"
+                                               aria-label="Decrease wind capacity" />
+                            </MudTooltip>
+                            <MudNumericField T="double"
+                                             Label="Installed capacity"
+                                             Value="_windCapacityMegawatts"
+                                             ValueChanged="OnWindCapacityChanged"
+                                             Min="MinimumWindCapacityMegawatts"
+                                             Max="MaximumWindCapacityMegawatts"
+                                             Step="1"
+                                             Immediate="true"
+                                             HideSpinButtons="true"
+                                             Variant="Variant.Outlined"
+                                             Adornment="Adornment.End"
+                                             AdornmentText="MW"
+                                             Class="capacity-input" />
+                            <MudTooltip Text="Increase capacity">
+                                <MudIconButton Icon="@Icons.Material.Filled.Add"
+                                               Size="Size.Small"
+                                               OnClick="@(() => AdjustWindCapacity(1))"
+                                               Disabled="@(_windCapacityMegawatts >= MaximumWindCapacityMegawatts)"
+                                               aria-label="Increase wind capacity" />
+                            </MudTooltip>
+                        </div>
+                    </TrailingContent>
+                    <ChildContent>
+                    <div class="production-summary wind-production-summary" aria-label="Wind production summary">
+                        <div>
+                            <span>Peak output</span>
+                            <strong>@_peakWindProductionMegawatts.ToString("N2") MW</strong>
+                        </div>
+                        <div>
+                            <span>Energy produced</span>
+                            <strong>@_windEnergyMegawattHours.ToString("N0") MWh</strong>
+                        </div>
+                        <div>
+                            <span>Capacity factor</span>
+                            <strong>@_windCapacityFactor.ToString("P1")</strong>
+                        </div>
+                    </div>
+                    <MudChart ChartType="ChartType.Line"
+                              ChartSeries="_windProductionSeries"
+                              ChartLabels="_xAxisLabels"
+                              ChartOptions="_windProductionChartOptions"
+                              Width="100%"
+                              Height="420px" />
+                    </ChildContent>
+                </ChartFrame>
+            </MudTabPanel>
+            <MudTabPanel Text="Global horizontal radiation">
+                <ChartFrame Heading="Global horizontal radiation" Description="Total hourly solar energy received by a horizontal surface"
+                            Unit="Wh/m²" Style="--accent: var(--solar); --accent-soft: var(--solar-soft)">
+                    <MudChart ChartType="ChartType.Line"
+                              ChartSeries="_ghiSeries"
+                              ChartLabels="_xAxisLabels"
+                              Width="100%"
+                              Height="420px" />
+                </ChartFrame>
+            </MudTabPanel>
+            <MudTabPanel Text="Direct normal radiation">
+                <ChartFrame Heading="Direct normal radiation" Description="Hourly energy received normal to the sun's rays"
+                            Unit="Wh/m²" Style="--accent: var(--solar); --accent-soft: var(--solar-soft)">
+                    <MudChart ChartType="ChartType.Line"
+                              ChartSeries="_dniSeries"
+                              ChartLabels="_xAxisLabels"
+                              Width="100%"
+                              Height="420px" />
+                </ChartFrame>
+            </MudTabPanel>
+            <MudTabPanel Text="Diffuse horizontal radiation">
+                <ChartFrame Heading="Diffuse horizontal radiation" Description="Hourly sky radiation received by a horizontal surface"
+                            Unit="Wh/m²" Style="--accent: var(--solar); --accent-soft: var(--solar-soft)">
+                    <MudChart ChartType="ChartType.Line"
+                              ChartSeries="_dhiSeries"
+                              ChartLabels="_xAxisLabels"
+                              Width="100%"
+                              Height="420px" />
+                </ChartFrame>
+            </MudTabPanel>
+            <MudTabPanel Text="Wind speed">
+                <ChartFrame Heading="Wind speed" Description="@($"Hourly speed at {_weather.Wind.MeasurementHeightMetres:N0} metres")"
+                            Unit="m/s" Style="--accent: var(--wind); --accent-soft: var(--wind-soft)">
+                    <MudChart ChartType="ChartType.Line"
+                              ChartSeries="_windSeries"
+                              ChartLabels="_xAxisLabels"
+                              Width="100%"
+                              Height="420px" />
+                </ChartFrame>
+            </MudTabPanel>
+            <MudTabPanel Text="Dry-bulb temperature">
+                <ChartFrame Heading="Dry-bulb temperature" Description="Hourly ambient air temperature"
+                            Unit="°C" Style="--accent: var(--temperature); --accent-soft: var(--temperature-soft)">
+                    <MudChart ChartType="ChartType.Line"
+                              ChartSeries="_temperatureSeries"
+                              ChartLabels="_xAxisLabels"
+                              Width="100%"
+                              Height="420px" />
+                </ChartFrame>
+            </MudTabPanel>
+        </MudTabs>
+        }
+    </ArtifactLoadStateView>
+</div>
+
+@code {
+    private const double MinimumSolarCapacityMegawatts = 0.1;
+    private const double MaximumSolarCapacityMegawatts = 10000;
+    private const double MinimumWindCapacityMegawatts = 0.1;
+    private const double MaximumWindCapacityMegawatts = 10000;
+
+    private static readonly MonthOption[] Months =
+    [
+        new(1, "January"),
+        new(2, "February"),
+        new(3, "March"),
+        new(4, "April"),
+        new(5, "May"),
+        new(6, "June"),
+        new(7, "July"),
+        new(8, "August"),
+        new(9, "September"),
+        new(10, "October"),
+        new(11, "November"),
+        new(12, "December"),
+    ];
+
+    private ArtifactLoadState _loadState = ArtifactLoadState.Loading();
+    private WeatherDataDTO? _weather;
+    private int _selectedMonth;
+    private List<ChartSeries<double>> _ghiSeries = [];
+    private List<ChartSeries<double>> _dniSeries = [];
+    private List<ChartSeries<double>> _dhiSeries = [];
+    private List<ChartSeries<double>> _windSeries = [];
+    private List<ChartSeries<double>> _temperatureSeries = [];
+    private List<ChartSeries<double>> _solarProductionSeries = [];
+    private List<ChartSeries<double>> _windProductionSeries = [];
+    private LineChartOptions _solarProductionChartOptions = BuildProductionChartOptions(1);
+    private LineChartOptions _windProductionChartOptions = BuildProductionChartOptions(1);
+    private string[] _xAxisLabels = [];
+    private int _rawPointCount;
+    private int _displayPointCount;
+    private double _peakDni;
+    private double _meanDaylightDni;
+    private double _meanWind;
+    private double _peakWind;
+    private double _meanTemperature;
+    private double _minimumTemperature;
+    private double _maximumTemperature;
+    private double _solarCapacityMegawatts = 1;
+    private double _peakSolarProductionMegawatts;
+    private double _solarEnergyMegawattHours;
+    private double _solarCapacityFactor;
+    private double _windCapacityMegawatts = 1;
+    private double _peakWindProductionMegawatts;
+    private double _windEnergyMegawattHours;
+    private double _windCapacityFactor;
+    private string _periodLabel = string.Empty;
+    private List<string> _regionOptions = [];
+    private Dictionary<string, string> _weatherPathsByRegion = new(StringComparer.OrdinalIgnoreCase);
+    private string _selectedRegion = string.Empty;
+
+    private IReadOnlyList<MetricStripItem> WeatherMetrics =>
+    [
+        new("Peak DNI", _peakDni.ToString("N0"), "Wh/m²", "--metric-accent: var(--solar)"),
+        new("Mean daylight DNI", _meanDaylightDni.ToString("N0"), "Wh/m²", "--metric-accent: var(--solar)"),
+        new("Mean wind", _meanWind.ToString("N1"), $"m/s at {_weather!.Wind.MeasurementHeightMetres:N0} m", "--metric-accent: var(--wind)"),
+        new("Peak wind", _peakWind.ToString("N1"), "m/s", "--metric-accent: var(--wind)"),
+        new("Mean dry bulb", _meanTemperature.ToString("N1"), "°C", "--metric-accent: var(--temperature)"),
+        new("Dry-bulb range", $"{_minimumTemperature:N1} to {_maximumTemperature:N1}", "°C", "--metric-accent: var(--temperature)"),
+    ];
+
+    /// <summary>
+    /// The artifact carries a start and a resolution, not an end, so the inclusive end comes from
+    /// the trace length. Stating only the start read as a single-day period.
+    /// </summary>
+    private string WeatherPeriod
+    {
+        get
+        {
+            int intervals = _weather!.Solar.DryBulbTemperatureDegreesCelsius.Length;
+            if (intervals <= 1 || _weather.Resolution <= TimeSpan.Zero)
+            {
+                return _weather.Start.ToString("dd MMM yyyy");
+            }
+
+            DateTimeOffset end = _weather.Start.AddTicks(_weather.Resolution.Ticks * intervals).AddTicks(-1);
+            return $"{_weather.Start:dd MMM yyyy} to {end:dd MMM yyyy}";
+        }
+    }
+    private string WeatherResolution => $"{_weather!.Resolution.TotalHours:N0}-hour intervals";
+    private string SolarLocationLabel => FormatLocation(_weather!.Solar.Location);
+    private string WindLocationLabel => FormatLocation(_weather!.Wind.Location);
+
+    private string RegionLabel => RegionNames.Full(_weather!.RegionId);
+
+    /// <summary>
+    /// Whether the two roles were assembled from different weather files. The WMO identifier is the
+    /// comparison rather than the file name, because one site can be published under more than one
+    /// file while remaining the same location.
+    /// </summary>
+    private bool SitesDiffer => _weather is not null
+        && !string.Equals(
+            _weather.Solar.Location.Wmo,
+            _weather.Wind.Location.Wmo,
+            StringComparison.OrdinalIgnoreCase);
+
+    private static string FormatLocation(WeatherLocation location) =>
+        $"{location.City} · WMO {location.Wmo} · {location.Latitude:0.0000}, {location.Longitude:0.0000}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            ArtifactLoadResult<SystemDispatchOverviewDTO> overviewResult =
+                await ArtifactLoader.LoadAsync<SystemDispatchOverviewDTO>("data/results-overview.json");
+            if (!overviewResult.IsSuccess)
+            {
+                _loadState = overviewResult.State;
+                return;
+            }
+
+            if (!RegionArtifactResolver.TryResolveWeatherPaths(
+                    overviewResult.Value!.RegionIds,
+                    overviewResult.Value.DataSourcesByRegion,
+                    out IReadOnlyList<string> regionOptions,
+                    out IReadOnlyDictionary<string, string> weatherPathsByRegion,
+                    out string? validationMessage))
+            {
+                _loadState = ArtifactLoadState.InvalidData(validationMessage!);
+                return;
+            }
+
+            _regionOptions = regionOptions.ToList();
+            _weatherPathsByRegion = new Dictionary<string, string>(
+                weatherPathsByRegion, StringComparer.OrdinalIgnoreCase);
+            _selectedRegion = _regionOptions[0];
+            await LoadWeatherAsync(_weatherPathsByRegion[_selectedRegion], _selectedRegion);
+        }
+        catch (Exception exception)
+        {
+            _loadState = ArtifactLoadState.Failed($"Error loading weather data: {exception.Message}");
+        }
+    }
+
+    private async Task OnRegionChanged(string region)
+    {
+        if (!_weatherPathsByRegion.TryGetValue(region, out string? weatherPath)
+            || string.Equals(region, _selectedRegion, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _selectedRegion = region;
+        _loadState = ArtifactLoadState.Loading();
+        await LoadWeatherAsync(weatherPath, region);
+    }
+
+    private async Task LoadWeatherAsync(string path, string expectedRegion)
+    {
+        ArtifactLoadResult<WeatherDataDTO> loadResult =
+            await ArtifactLoader.LoadAsync<WeatherDataDTO>(path);
+        if (!loadResult.IsSuccess)
+        {
+            _loadState = loadResult.State;
+            return;
+        }
+
+        WeatherDataDTO weather = loadResult.Value!;
+        if (!string.Equals(weather.RegionId, expectedRegion, StringComparison.OrdinalIgnoreCase))
+        {
+            _loadState = ArtifactLoadState.InvalidData(
+                $"Weather artifact region {weather.RegionId} does not match selected region {expectedRegion}.");
+            return;
+        }
+
+        int dniLength = weather.Solar.DirectNormalRadiationWhPerSquareMetre.Length;
+        int ghiLength = weather.Solar.GlobalHorizontalRadiationWhPerSquareMetre.Length;
+        int dhiLength = weather.Solar.DiffuseHorizontalRadiationWhPerSquareMetre.Length;
+        int zenithLength = weather.Solar.SolarZenithDegrees.Length;
+        int temperatureLength = weather.Solar.DryBulbTemperatureDegreesCelsius.Length;
+        int windLength = weather.Wind.WindSpeedMetresPerSecond.Length;
+        int solarProductionLength = weather.Solar.ProductionMegawattsAtOneMegawattAc.Length;
+        int windProductionLength = weather.Wind.ProductionMegawattsAtOneMegawattInstalled.Length;
+        if (dniLength == 0
+            || ghiLength != dniLength
+            || dhiLength != dniLength
+            || zenithLength != dniLength
+            || temperatureLength != dniLength
+            || windLength != dniLength
+            || solarProductionLength != dniLength
+            || windProductionLength != dniLength)
+        {
+            _loadState = ArtifactLoadState.InvalidData("Weather traces are empty or misaligned.");
+            return;
+        }
+
+        _weather = weather;
+        BuildCharts();
+        _loadState = loadResult.State;
+    }
+
+    private void OnMonthChanged(int month)
+    {
+        _selectedMonth = month;
+        BuildCharts();
+    }
+
+    private void OnSolarCapacityChanged(double capacityMegawatts)
+    {
+        _solarCapacityMegawatts = Math.Clamp(
+            capacityMegawatts,
+            MinimumSolarCapacityMegawatts,
+            MaximumSolarCapacityMegawatts);
+        BuildCharts();
+    }
+
+    private void AdjustSolarCapacity(double deltaMegawatts)
+    {
+        OnSolarCapacityChanged(_solarCapacityMegawatts + deltaMegawatts);
+    }
+
+    private void OnWindCapacityChanged(double capacityMegawatts)
+    {
+        _windCapacityMegawatts = Math.Clamp(
+            capacityMegawatts,
+            MinimumWindCapacityMegawatts,
+            MaximumWindCapacityMegawatts);
+        BuildCharts();
+    }
+
+    private void AdjustWindCapacity(double deltaMegawatts)
+    {
+        OnWindCapacityChanged(_windCapacityMegawatts + deltaMegawatts);
+    }
+
+    private void BuildCharts()
+    {
+        if (_weather is null)
+        {
+            return;
+        }
+
+        double[] ghi = _weather.Solar.GlobalHorizontalRadiationWhPerSquareMetre;
+        double[] dni = _weather.Solar.DirectNormalRadiationWhPerSquareMetre;
+        double[] dhi = _weather.Solar.DiffuseHorizontalRadiationWhPerSquareMetre;
+        double[] temperature = _weather.Solar.DryBulbTemperatureDegreesCelsius;
+        double[] wind = _weather.Wind.WindSpeedMetresPerSecond;
+        double[] solarProductionAtOneMegawattAc =
+            _weather.Solar.ProductionMegawattsAtOneMegawattAc;
+        double[] windProductionAtOneMegawattInstalled =
+            _weather.Wind.ProductionMegawattsAtOneMegawattInstalled;
+        var selectedIndexes = new List<int>();
+
+        for (int index = 0; index < dni.Length; index++)
+        {
+            DateTimeOffset timestamp = InstantAt(index);
+            if (_selectedMonth == 0 || timestamp.Month == _selectedMonth)
+            {
+                selectedIndexes.Add(index);
+            }
+        }
+
+        _rawPointCount = selectedIndexes.Count;
+        int stride = Math.Max(1, _rawPointCount / 500);
+        var displayedIndexes = selectedIndexes.Where((_, position) => position % stride == 0).ToArray();
+        _displayPointCount = displayedIndexes.Length;
+
+        _ghiSeries =
+        [
+            new ChartSeries<double>
+            {
+                Name = "GHI (Wh/m²)",
+                Data = displayedIndexes.Select(index => ghi[index]).ToArray(),
+            },
+        ];
+        _dniSeries =
+        [
+            new ChartSeries<double>
+            {
+                Name = "DNI (Wh/m²)",
+                Data = displayedIndexes.Select(index => dni[index]).ToArray(),
+            },
+        ];
+        _dhiSeries =
+        [
+            new ChartSeries<double>
+            {
+                Name = "DHI (Wh/m²)",
+                Data = displayedIndexes.Select(index => dhi[index]).ToArray(),
+            },
+        ];
+        _windSeries =
+        [
+            new ChartSeries<double>
+            {
+                Name = "Wind speed (m/s)",
+                Data = displayedIndexes.Select(index => wind[index]).ToArray(),
+            },
+        ];
+        _temperatureSeries =
+        [
+            new ChartSeries<double>
+            {
+                Name = "Dry bulb (°C)",
+                Data = displayedIndexes.Select(index => temperature[index]).ToArray(),
+            },
+        ];
+        _solarProductionSeries =
+        [
+            new ChartSeries<double>
+            {
+                Name = $"Solar production ({_solarCapacityMegawatts:N1} MW AC)",
+                Data = displayedIndexes
+                    .Select(index => solarProductionAtOneMegawattAc[index] * _solarCapacityMegawatts)
+                    .ToArray(),
+            },
+        ];
+        _solarProductionChartOptions = BuildProductionChartOptions(_solarCapacityMegawatts);
+        _windProductionSeries =
+        [
+            new ChartSeries<double>
+            {
+                Name = $"Wind production ({_windCapacityMegawatts:N1} MW installed)",
+                Data = displayedIndexes
+                    .Select(index => windProductionAtOneMegawattInstalled[index] * _windCapacityMegawatts)
+                    .ToArray(),
+            },
+        ];
+        _windProductionChartOptions = BuildProductionChartOptions(_windCapacityMegawatts);
+
+        _xAxisLabels = BuildLabels(displayedIndexes);
+        double[] selectedDni = selectedIndexes.Select(index => dni[index]).ToArray();
+        double[] daylightDni = selectedDni.Where(value => value > 0).ToArray();
+        double[] selectedWind = selectedIndexes.Select(index => wind[index]).ToArray();
+        double[] selectedTemperature = selectedIndexes.Select(index => temperature[index]).ToArray();
+        double[] selectedSolarProduction = selectedIndexes
+            .Select(index => solarProductionAtOneMegawattAc[index] * _solarCapacityMegawatts)
+            .ToArray();
+        double[] selectedWindProduction = selectedIndexes
+            .Select(index => windProductionAtOneMegawattInstalled[index] * _windCapacityMegawatts)
+            .ToArray();
+        _peakDni = selectedDni.Max();
+        _meanDaylightDni = daylightDni.Length == 0 ? 0 : daylightDni.Average();
+        _meanWind = selectedWind.Average();
+        _peakWind = selectedWind.Max();
+        _meanTemperature = selectedTemperature.Average();
+        _minimumTemperature = selectedTemperature.Min();
+        _maximumTemperature = selectedTemperature.Max();
+        _peakSolarProductionMegawatts = selectedSolarProduction.Max();
+        _solarEnergyMegawattHours =
+            selectedSolarProduction.Sum() * _weather.Resolution.TotalHours;
+        double maximumEnergyMegawattHours =
+            _solarCapacityMegawatts * selectedSolarProduction.Length * _weather.Resolution.TotalHours;
+        _solarCapacityFactor = maximumEnergyMegawattHours == 0
+            ? 0
+            : _solarEnergyMegawattHours / maximumEnergyMegawattHours;
+        _peakWindProductionMegawatts = selectedWindProduction.Max();
+        _windEnergyMegawattHours =
+            selectedWindProduction.Sum() * _weather.Resolution.TotalHours;
+        double maximumWindEnergyMegawattHours =
+            _windCapacityMegawatts * selectedWindProduction.Length * _weather.Resolution.TotalHours;
+        _windCapacityFactor = maximumWindEnergyMegawattHours == 0
+            ? 0
+            : _windEnergyMegawattHours / maximumWindEnergyMegawattHours;
+        _periodLabel = _selectedMonth == 0
+            ? "Representative full year"
+            : Months.Single(month => month.Number == _selectedMonth).Name;
+    }
+
+    private string[] BuildLabels(IReadOnlyList<int> indexes)
+    {
+        var labels = new string[indexes.Count];
+        int labelStride = Math.Max(1, indexes.Count / 12);
+
+        for (int position = 0; position < indexes.Count; position++)
+        {
+            if (position % labelStride == 0 || position == indexes.Count - 1)
+            {
+                DateTimeOffset timestamp = InstantAt(indexes[position]);
+                labels[position] = _selectedMonth == 0
+                    ? timestamp.ToString("MMM")
+                    : timestamp.ToString("dd MMM");
+            }
+            else
+            {
+                labels[position] = string.Empty;
+            }
+        }
+
+        return labels;
+    }
+
+    private DateTimeOffset InstantAt(int index)
+    {
+        return _weather!.Start + TimeSpan.FromTicks(_weather.Resolution.Ticks * index);
+    }
+
+    private static LineChartOptions BuildProductionChartOptions(double capacityMegawatts)
+    {
+        return new LineChartOptions
+        {
+            YAxisTicks = Math.Clamp((int)Math.Ceiling(capacityMegawatts / 5.0), 2, 25),
+            YAxisSuggestedMax = capacityMegawatts,
+        };
+    }
+
+    private sealed record MonthOption(int Number, string Name);
+}

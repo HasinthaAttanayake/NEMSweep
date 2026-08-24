@@ -2,9 +2,9 @@
 
 The figures on this page are the cost of **building and running** the modelled system for one year,
 not a retail electricity bill. There is no bidding, no settlement, no market price anywhere in
-NemSim, and nothing here should be read as what anyone would pay. See
+NEMSweep, and nothing here should be read as what anyone would pay. See
 [Limitations §3](../assumptions/limitations.md#3-this-is-the-cost-of-building-the-system-not-a-power-bill)
-before quoting a dollar figure from a NemSim result.
+before quoting a dollar figure from a NEMSweep result.
 
 ## Annuitisation
 
@@ -110,4 +110,4 @@ assumptions any more accurate.
 - [Storage sizing](storage-sizing.md): how the Battery capacity priced here is arrived at.
 - [Transmission](transmission.md): the layering that produces the route length `DistancePowerCost`
   and `AnnualDistancePowerCost` are charged against.
-- [Limitations](../assumptions/limitations.md): what a NemSim AUD/MWh figure is not.
+- [Limitations](../assumptions/limitations.md): what a NEMSweep AUD/MWh figure is not.

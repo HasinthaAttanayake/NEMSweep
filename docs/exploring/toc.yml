@@ -1,6 +1,6 @@
 - name: Designing a study
   href: index.md
-- name: Driving NemSim with an LLM
+- name: Driving NEMSweep with an LLM
   href: llm-workflow.md
 - name: Sensitivity analysis
   href: sensitivity-analysis.md

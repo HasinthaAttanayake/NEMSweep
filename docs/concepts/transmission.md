@@ -25,7 +25,7 @@ responsibility is the interesting part:
   each region's post-generation surplus or deficit onto a node in a capacity graph, delegates to the
   pure algorithms below to find out what can move, and books the outcome back onto the regions as
   imports and exports.
-- **The algorithm layer** (`NEM.Model/Algorithms`) knows none of that. `EdmondsKarp` finds maximum
+- **The algorithm layer** (`NEMSweep.Model/Algorithms`) knows none of that. `EdmondsKarp` finds maximum
   flow on an abstract capacity graph; `FlowPathDecomposition` turns an edge-flow solution into
   discrete source-to-sink routes; `PrioritisedTransferSolver` sequences sinks and calls both. None of
   it has ever heard of a region, a megawatt, or a transmission loss. Those are the transfer layer's

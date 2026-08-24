@@ -1,0 +1,78 @@
+@namespace NEMSweep.Web.Components.Viz
+
+@*
+    A composition as a single proportional bar. Generation mix is a share question — "how much of
+    this region's energy came from wind" — and a share reads faster off one bar than off five
+    numbers a reader has to total themselves.
+*@
+<div class="mix-bar @Class">
+    @* Either part of the heading stands on its own: a bar in a card already sits under a title and
+       needs only its detail, while a bar on its own needs the label. *@
+    @if (!string.IsNullOrWhiteSpace(Label) || !string.IsNullOrWhiteSpace(Detail))
+    {
+        <div class="mix-bar-heading">
+            @if (!string.IsNullOrWhiteSpace(Label))
+            {
+                <span>@Label</span>
+            }
+            @if (!string.IsNullOrWhiteSpace(Detail))
+            {
+                <small>@Detail</small>
+            }
+        </div>
+    }
+    <div class="mix-bar-track" role="img" aria-label="@AriaLabel">
+        @foreach (MixSegmentGeometry segment in _segments)
+        {
+            <i style="@($"width: {PlotFormat.Length(segment.Percentage)}%; background-color: {segment.Source.Color};")"
+               title="@($"{segment.Source.Name}: {FormatValue(segment.Source.Value)} ({segment.Percentage:N1}%)")"></i>
+        }
+    </div>
+    @if (ShowLegend)
+    {
+        <ul class="mix-bar-legend">
+            @foreach (MixSegmentGeometry segment in _segments.Where(segment => segment.Percentage > 0))
+            {
+                <li>
+                    <i style="@($"background-color: {segment.Source.Color}")"></i>
+                    <span>@segment.Source.Name</span>
+                    <strong>@segment.Percentage.ToString("N1")%</strong>
+                </li>
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<MixSegment> Segments { get; set; } = [];
+    [Parameter, EditorRequired] public string AriaLabel { get; set; } = string.Empty;
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public string? Detail { get; set; }
+    [Parameter] public string Unit { get; set; } = "MWh";
+
+    /// <summary>
+    /// Whether segment values are AUD rather than a physical quantity in <see cref="Unit"/>. A cost
+    /// mix and an energy mix share this component, and a dollar figure printed with "MWh" after it
+    /// reads as a unit error rather than as money.
+    /// </summary>
+    [Parameter] public bool Money { get; set; }
+
+    [Parameter] public bool ShowLegend { get; set; } = true;
+    [Parameter] public string? Class { get; set; }
+
+    private List<MixSegmentGeometry> _segments = [];
+
+    protected override void OnParametersSet()
+    {
+        double total = Segments.Sum(segment => Math.Max(0, segment.Value));
+        _segments = [.. Segments.Select(segment => new MixSegmentGeometry(
+            segment,
+            total <= 0 ? 0 : 100 * Math.Max(0, segment.Value) / total))];
+    }
+
+    private string FormatValue(double value) => Money
+        ? PlotFormat.MoneyTotal((decimal)value)
+        : $"{PlotFormat.Compact(value)} {Unit}";
+
+    private readonly record struct MixSegmentGeometry(MixSegment Source, double Percentage);
+}

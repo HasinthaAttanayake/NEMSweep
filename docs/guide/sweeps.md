@@ -8,7 +8,7 @@ starts from the same baseline scenario config and applies a small patch on top o
 The full published JSON Schema for the sweep definition format is available from the CLI:
 
 ```bash
-dotnet run --project NEM.CLI -- --describe-schema sweep
+dotnet run --project NEMSweep.CLI -- --describe-schema sweep
 ```
 
 ## The definition format
@@ -126,7 +126,7 @@ merge cannot tell whether you meant to remove the item or edit it.
 ## Workflow: fan out, then run
 
 ```bash
-dotnet run --project NEM.CLI -- --fan-out-sweep sweeps/my-sweep.json
+dotnet run --project NEMSweep.CLI -- --fan-out-sweep sweeps/my-sweep.json
 ```
 
 `--fan-out-sweep` applies every point's patch to the baseline, writes each resulting scenario config
@@ -136,7 +136,7 @@ any dispatch. This is the fast feedback loop: while you are developing or debugg
 fan-out repeatedly and read the generated configs to confirm each point patches what you intended.
 
 ```bash
-dotnet run --project NEM.CLI -- --run-sweep sweeps/my-sweep.json
+dotnet run --project NEMSweep.CLI -- --run-sweep sweeps/my-sweep.json
 ```
 
 `--run-sweep` fans out again internally, writing the same `sweeps/<sweepId>/configs/*.json` files,

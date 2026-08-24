@@ -1,7 +1,7 @@
 # Outputs and provenance
 
-This page is for reading the JSON NemSim produces, or consuming it programmatically. Every
-artifact described here lives under `NEM.Web/wwwroot/data` and is written by `NEM.CLI`.
+This page is for reading the JSON NEMSweep produces, or consuming it programmatically. Every
+artifact described here lives under `NEMSweep.Web/wwwroot/data` and is written by `NEMSweep.CLI`.
 
 ## Artifact map
 
@@ -21,13 +21,13 @@ artifact described here lives under `NEM.Web/wwwroot/data` and is written by `NE
 | `sweeps/{sweepId}/configs/{pointId}.json` | The fully-resolved scenario config that point ran, produced by merging the point's overrides onto the sweep's baseline config. |
 | `sweeps/{sweepId}/series/base-demand-{sha256}.json` | A base-demand series externalised from one or more points that share it byte-for-byte. See below. |
 
-Read `NEM.CLI/Scenarios/DispatchResultsExport.cs` and `NEM.CLI/Scenarios/SweepArtifactExport.cs` if
+Read `NEMSweep.CLI/Scenarios/DispatchResultsExport.cs` and `NEMSweep.CLI/Scenarios/SweepArtifactExport.cs` if
 you need the exact shape beyond what this page covers.
 
 ## Schema versions
 
 Every artifact carries a `schemaVersion` field, and the current value for each artifact type is
-defined in one place: `NEM.Contracts/ArtifactSchemaVersions.cs`. This page does not repeat those
+defined in one place: `NEMSweep.Contracts/ArtifactSchemaVersions.cs`. This page does not repeat those
 numbers, because they would go stale the moment a schema changes. Consult the
 [API reference](../api/index.md) for the current values.
 
@@ -35,7 +35,7 @@ numbers, because they would go stale the moment a schema changes. Consult the
 
 A sweep publishes one set of scalars per point per region (and one for the system as a whole), in
 `sweeps/{sweepId}/index.json` and alongside each point's full result. The catalogue in
-`NEM.Contracts/SweepScalarCatalog.cs` is the full vocabulary: the JSON name each scalar is emitted
+`NEMSweep.Contracts/SweepScalarCatalog.cs` is the full vocabulary: the JSON name each scalar is emitted
 under, its label, and its unit.
 
 | JSON name | Label | Unit |
@@ -78,7 +78,7 @@ series directory does not accumulate stale content-addressed files across regene
 Every dispatch result records the exact input artifacts it consumed, whether that result is a
 scenario run, a region within one, or a sweep point. For each of the demand and weather inputs it
 records the filename, the schema version, and the SHA-256 digest of the exact bytes that were
-parsed (`DispatchInputArtifactDTO` in `NEM.Contracts/DispatchResultsDTO.cs`). The digest, not the
+parsed (`DispatchInputArtifactDTO` in `NEMSweep.Contracts/DispatchResultsDTO.cs`). The digest, not the
 configured file path, is the reproducibility boundary: a path can be overwritten with different
 content later, but the digest identifies the bytes that actually produced this result.
 
@@ -89,7 +89,7 @@ it.
 
 ## Writing conventions
 
-Published artifacts follow the conventions in `NEM.CLI/Infrastructure/JsonFile.cs`:
+Published artifacts follow the conventions in `NEMSweep.CLI/Infrastructure/JsonFile.cs`:
 
 - Property names are camelCase.
 - Object keys are sorted ordinally, so a rerun that changes one value produces a small, reviewable
@@ -132,7 +132,7 @@ updated `sweeps/{sweepId}/` directory. Rerunning the sweep restores it.
 
 ## These files are generated
 
-Everything under `NEM.Web/wwwroot/data` is a committed, generated artifact. Do not hand-edit it.
+Everything under `NEMSweep.Web/wwwroot/data` is a committed, generated artifact. Do not hand-edit it.
 Regenerate it by rerunning the command that produced it (`--ingest` for the input artifacts,
 `--run-scenario` or `--run-sweep` for results), so the file on disk stays traceable to the inputs
 and commit that produced it.

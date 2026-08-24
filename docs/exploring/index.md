@@ -1,6 +1,6 @@
 # Designing a study
 
-NemSim's published work so far asks one question: what does adding a large new load to the grid do
+NEMSweep's published work so far asks one question: what does adding a large new load to the grid do
 to storage requirements, reliability and system cost. That is a narrow use of a general instrument.
 
 The model is deterministic, every assumption is either a documented constant or a scenario input,
@@ -33,7 +33,7 @@ distribution to sample and gives no confidence intervals. See
 
 ## Comparative, not absolute
 
-The single most useful habit when working with NemSim: **read differences, not levels**.
+The single most useful habit when working with NEMSweep: **read differences, not levels**.
 
 The model's biases are systematic. Reciprocal interconnectors are each costed at the corridor's
 full length, roughly doubling reported transmission cost. Greedy storage dispatch is wrong in a
@@ -137,7 +137,7 @@ Look for three things:
 
 ## Next
 
-- [Driving NemSim with an LLM](llm-workflow.md): hand the machine-readable schemas to a model and
+- [Driving NEMSweep with an LLM](llm-workflow.md): hand the machine-readable schemas to a model and
   have it generate sweeps for you.
 - [Sensitivity analysis](sensitivity-analysis.md): a worked example on the committed sweep.
 - [Sweeps](../guide/sweeps.md): the mechanics of defining and running one.
