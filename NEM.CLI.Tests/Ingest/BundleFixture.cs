@@ -50,7 +50,9 @@ internal sealed class BundleFixture : IDisposable
         }
         File.WriteAllText(Path.Combine(RootPath, "appsettings.local.json"), JsonSerializer.Serialize(new
         {
-            inputBundleRoot = "bundle", outputRoot = "output", defaultScenarioPath = "unused.json",
+            inputBundleRoot = "bundle",
+            outputRoot = "output",
+            defaultScenarioPath = "unused.json",
         }));
         File.WriteAllText(Path.Combine(RootPath, "NemSim.slnx"), string.Empty);
         Paths = RepositoryPaths.Discover(RootPath);
@@ -90,8 +92,11 @@ internal sealed class BundleFixture : IDisposable
 
     private void WriteManifest() => File.WriteAllText(Path.Combine(BundlePath, "manifest.json"), JsonSerializer.Serialize(new
     {
-        schemaVersion = 1, bundleId = "bundle", name = "Test bundle",
-        period = new { start = periodStart, end = periodStart.AddDays(days) }, regions,
+        schemaVersion = 1,
+        bundleId = "bundle",
+        name = "Test bundle",
+        period = new { start = periodStart, end = periodStart.AddDays(days) },
+        regions,
     }));
 
     private void WriteGenerationWorkbook()

@@ -8,12 +8,12 @@ namespace NEM.CLI.Tests.Configuration;
 public sealed class ScenarioConfigTests
 {
     [Fact]
-    public void Load_RequiresSchemaVersionFour()
+    public void Load_RequiresCurrentSchemaVersion()
     {
         var act = () => Load(config => config["schemaVersion"] = 1);
 
         act.Should().Throw<FormatException>()
-            .WithMessage("*found 1*expected 4*");
+            .WithMessage("*found 1*expected 5*");
     }
 
     [Fact]
@@ -88,7 +88,25 @@ public sealed class ScenarioConfigTests
         interconnector.FromRegionId.Should().Be("NSW1");
         interconnector.ToRegionId.Should().Be("VIC1");
         interconnector.CapacityMw.Should().Be(1_000);
+        interconnector.RouteLengthKm.Should().Be(500);
         interconnector.TechnicalLifeYears.Should().Be(50);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Load_RejectsInterconnectorWithNonPositiveRouteLength(double routeLengthKm)
+    {
+        var act = () => Load(config =>
+        {
+            AddVicRegion(config);
+            JsonObject interconnector = Interconnector("NSW1", "VIC1");
+            interconnector["routeLengthKm"] = routeLengthKm;
+            config["interconnectors"] = new JsonArray(interconnector);
+        });
+
+        act.Should().Throw<FormatException>()
+            .WithMessage("*interconnectors*routeLengthKm*positive*");
     }
 
     [Fact]
@@ -245,7 +263,7 @@ public sealed class ScenarioConfigTests
     {
         JsonObject config = JsonNode.Parse("""
         {
-                    "schemaVersion": 4,
+                    "schemaVersion": 5,
           "id": "test",
           "name": "Test",
           "costBasis": { "year": 2026, "realDiscountRate": 0.07 },
@@ -294,6 +312,7 @@ public sealed class ScenarioConfigTests
         ["fromRegionId"] = fromRegionId,
         ["toRegionId"] = toRegionId,
         ["capacityMw"] = 1_000,
+        ["routeLengthKm"] = 500,
         ["capitalCostAudPerKmPerMw"] = 1_000,
         ["fixedOperatingCostAudPerKmPerMwYear"] = 10,
         ["technicalLifeYears"] = 50,

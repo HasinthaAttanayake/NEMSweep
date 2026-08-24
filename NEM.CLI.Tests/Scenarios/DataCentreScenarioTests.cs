@@ -12,8 +12,8 @@ public sealed class DataCentreScenarioTests
     public void Run_ExpandsPositiveNameplateAsNamedFlatDemandComponent()
     {
         using var fixture = new ScenarioFixture();
-        DispatchResultsDTO baseline = fixture.Run("baseline.json");
-        DispatchResultsDTO withDataCentre = fixture.Run("data-centre.json");
+        SystemDispatchResultsDTO baseline = fixture.Run("baseline.json");
+        SystemDispatchResultsDTO withDataCentre = fixture.Run("data-centre.json");
 
         withDataCentre.DataSeries.Demand.AdditiveComponentsByNameMw.Should()
             .ContainKey("Data centre");
@@ -31,7 +31,7 @@ public sealed class DataCentreScenarioTests
     {
         using var fixture = new ScenarioFixture();
 
-        DispatchResultsDTO result = fixture.Run("baseline.json");
+        SystemDispatchResultsDTO result = fixture.Run("baseline.json");
 
         result.DataSeries.Demand.AdditiveComponentsByNameMw.Should().BeEmpty();
         result.DataSeries.Demand.TotalDemandMw.Should().OnlyContain(value => value == 10);
@@ -82,17 +82,15 @@ public sealed class DataCentreScenarioTests
 
         public string RootPath { get; }
 
-        public DispatchResultsDTO Run(string scenarioFile)
+        public SystemDispatchResultsDTO Run(string scenarioFile)
         {
-            string outputPath = Path.Combine(RootPath, $"{Path.GetFileNameWithoutExtension(scenarioFile)}-results.json");
-            var context = new CliContext(
-                NEM.CLI.Infrastructure.RepositoryPaths.Discover(RootPath),
-                RootPath,
-                TextWriter.Null);
+            NEM.CLI.Infrastructure.RepositoryPaths paths =
+                NEM.CLI.Infrastructure.RepositoryPaths.Discover(RootPath);
+            var context = new CliContext(paths, RootPath, TextWriter.Null);
 
-            ScenarioCommand.Run(context, $"scenarios/{scenarioFile}", outputPath).Should().Be(0);
-            return JsonSerializer.Deserialize<DispatchResultsDTO>(
-                File.ReadAllBytes(outputPath),
+            ScenarioCommand.Run(context, $"scenarios/{scenarioFile}").Should().Be(0);
+            return JsonSerializer.Deserialize<SystemDispatchResultsDTO>(
+                File.ReadAllBytes(paths.DispatchResultsPath),
                 NEM.CLI.Infrastructure.JsonFile.ReadOptions)
                 ?? throw new InvalidOperationException("Scenario command produced an empty result.");
         }
@@ -101,7 +99,7 @@ public sealed class DataCentreScenarioTests
 
         private void WriteScenario(string fileName, string dataCentreProperty) => File.WriteAllText(
             Path.Combine(RootPath, "scenarios", fileName), $$"""
-            { "schemaVersion": 4, "id": "{{Path.GetFileNameWithoutExtension(fileName)}}", "name": "Test", "costBasis": { "year": 2026, "realDiscountRate": 0.07 }, "storageSizing": { "maximumPowerMw": 100, "maximumEnergyMwh": 400 }, "regions": [{ "regionId": "NSW1", "demandFile": "demand.json", "weatherFile": "weather.json"{{dataCentreProperty}}, "generatingFleets": [{ "technology": "Gas", "nameplateCapacityMw": 2000, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 } }], "storageFleets": [{ "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0, "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 }, "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 } }] }] }
+            { "schemaVersion": 5, "id": "{{Path.GetFileNameWithoutExtension(fileName)}}", "name": "Test", "costBasis": { "year": 2026, "realDiscountRate": 0.07 }, "storageSizing": { "maximumPowerMw": 100, "maximumEnergyMwh": 400 }, "regions": [{ "regionId": "NSW1", "demandFile": "demand.json", "weatherFile": "weather.json"{{dataCentreProperty}}, "generatingFleets": [{ "technology": "Gas", "nameplateCapacityMw": 2000, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 } }], "storageFleets": [{ "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0, "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 }, "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 } }] }] }
             """);
     }
 }

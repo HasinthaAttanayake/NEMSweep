@@ -9,11 +9,9 @@ internal sealed class RepositoryPaths
 
     public string SolutionRoot { get; }
     public string WebDataDirectory => Path.Combine(SolutionRoot, "NEM.Web", "wwwroot", "data");
-    public string DemandDataPath => WebDataPath("demand-data.json");
     public string DispatchResultsPath => WebDataPath("results.json");
     public string WeatherDataPath(string regionId) =>
         WebDataPath($"weather-{regionId.ToLowerInvariant()}.json");
-    public string WeatherProvenancePath => WebDataPath("weather-provenance.json");
 
     public static RepositoryPaths Discover(string startPath)
     {

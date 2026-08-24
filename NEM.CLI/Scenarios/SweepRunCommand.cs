@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using NEM.CLI.Application;
 using NEM.CLI.Configuration;
 using NEM.CLI.Infrastructure;
@@ -14,12 +15,19 @@ internal static class SweepRunCommand
     {
         var runStopwatch = Stopwatch.StartNew();
         SweepRunMetadata runMetadata = SweepArtifactExport.CaptureRunMetadata(context.Paths.SolutionRoot);
-        SweepDefinition definition = SweepFanOutCommand.WriteConfigs(
-            context,
-            definitionPath,
-            validateGeneratedConfigs: false);
+        (SweepDefinition definition, JsonNode baseline) =
+            SweepFanOutCommand.LoadDefinitionAndBaseline(context, definitionPath);
+        string configOutputDirectory = SweepFanOutCommand.ConfigOutputDirectory(context, definition);
         string sweepDirectory = context.Paths.WebDataPath(Path.Combine("sweeps", definition.SweepId));
         string pointsDirectory = Path.Combine(sweepDirectory, "points");
+        // Both created before the first point runs: the per-point failure handler cleans up inside
+        // them, so a point that fails before anything has written to either would otherwise take
+        // the whole run down from inside the handler meant to contain it, which is the abort that
+        // recording per-point failures exists to prevent. Nothing else creates them until a point gets far
+        // enough to dispatch, so the first point failing on a sweep id that has never been
+        // published is enough to hit this.
+        Directory.CreateDirectory(pointsDirectory);
+        Directory.CreateDirectory(Path.Combine(sweepDirectory, "configs"));
         var failedPointIds = new List<string>();
         var indexPoints = new List<SweepIndexPointDTO>();
         var configPaths = new List<string>();
@@ -29,19 +37,11 @@ internal static class SweepRunCommand
         foreach (SweepPoint point in definition.Points)
         {
             string axisValue = point.AxisValue.ToString("G17", CultureInfo.InvariantCulture);
-            string configPath = Path.Combine(
-                context.Paths.SolutionRoot,
-                "sweeps",
-                definition.SweepId,
-                "configs",
-                $"{point.PointId}.json");
-            configPaths.Add(configPath);
             string publishedConfigPath = Path.Combine(
                 sweepDirectory,
                 "configs",
                 $"{point.PointId}.json");
-            Directory.CreateDirectory(Path.GetDirectoryName(publishedConfigPath)!);
-            File.Copy(configPath, publishedConfigPath, overwrite: true);
+            string configPath = Path.Combine(configOutputDirectory, $"{point.PointId}.json");
             string resultPath = Path.Combine(pointsDirectory, $"{point.PointId}.json");
             string statusPath = Path.Combine(pointsDirectory, $"{point.PointId}.status.json");
 
@@ -51,6 +51,19 @@ internal static class SweepRunCommand
             var pointStopwatch = Stopwatch.StartNew();
             try
             {
+                // Generated here, inside the per-point try, so a malformed override for one point
+                // is recorded as that point's failure rather than aborting every other point in an
+                // unattended run. The generated config is not validated here: ScenarioCommand.Run
+                // loads it through the same validation below and already attributes a schema failure
+                // to the input stage, so validating twice would only cost a second parse, and would
+                // reject the config before it is published, leaving the index citing a file that was
+                // never written.
+                WritePointConfig(definition, baseline, configOutputDirectory, point);
+                configPaths.Add(configPath);
+                // Published before dispatch, so a point that fails while running is still published
+                // beside the exact config it failed on.
+                File.Copy(configPath, publishedConfigPath, overwrite: true);
+
                 ScenarioCommand.Run(context, configPath, resultPath, $"{point.PointId}-");
                 pointStopwatch.Stop();
                 SystemDispatchResultsDTO systemResult = JsonSerializer.Deserialize<SystemDispatchResultsDTO>(
@@ -137,6 +150,14 @@ internal static class SweepRunCommand
                 {
                     File.Delete(regionalPath);
                 }
+
+                // A point whose overrides could not be merged never generated a config, so anything
+                // still sitting at the published path belongs to an earlier run. Leaving it there
+                // would have the index cite a config this point never ran against.
+                if (!File.Exists(configPath))
+                {
+                    File.Delete(publishedConfigPath);
+                }
                 SweepPointFailureDTO failure = SweepArtifactExport.CreateFailure(exception);
                 JsonFile.Write(
                     new SweepPointStatusFile(
@@ -199,6 +220,33 @@ internal static class SweepRunCommand
         (context.Error ?? TextWriter.Null).WriteLine(
             $"Sweep {definition.SweepId} completed with failed points: {string.Join(", ", failedPointIds)}.");
         return 1;
+    }
+
+    /// <summary>Generates one point's scenario config, attributing a merge-patch failure to the
+    /// input stage so it surfaces as that point's failure rather than an unhandled crash.</summary>
+    private static void WritePointConfig(
+        SweepDefinition definition,
+        JsonNode baseline,
+        string outputDirectory,
+        SweepPoint point)
+    {
+        try
+        {
+            _ = SweepFanOutCommand.WritePointConfig(
+                definition,
+                baseline,
+                outputDirectory,
+                point,
+                validate: false);
+        }
+        catch (Exception exception) when (exception is FormatException or JsonException or ArgumentException)
+        {
+            throw new ScenarioRunException(
+                SweepFailureStage.Input,
+                "invalidConfig",
+                exception.Message,
+                exception);
+        }
     }
 
     /// <summary>

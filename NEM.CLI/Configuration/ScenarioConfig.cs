@@ -200,6 +200,15 @@ internal static class ScenarioConfig
             }
 
             ValidateNonNegative(interconnector.CapacityMw, "interconnectors", "capacityMw");
+            if (double.IsNaN(interconnector.RouteLengthKm)
+                || double.IsInfinity(interconnector.RouteLengthKm)
+                || interconnector.RouteLengthKm <= 0)
+            {
+                throw new FormatException(
+                    $"scenario.interconnectors field 'routeLengthKm' value {interconnector.RouteLengthKm} "
+                    + "must be finite and positive.");
+            }
+
             ValidateNonNegative(interconnector.CapitalCostAudPerKmPerMw, "interconnectors", "capitalCostAudPerKmPerMw");
             ValidateNonNegative(interconnector.FixedOperatingCostAudPerKmPerMwYear, "interconnectors", "fixedOperatingCostAudPerKmPerMwYear");
             if (interconnector.TechnicalLifeYears == 0)
@@ -335,6 +344,7 @@ internal sealed record ScenarioInterconnectorSettings(
     [property: JsonRequired] string FromRegionId,
     [property: JsonRequired] string ToRegionId,
     [property: JsonRequired] double CapacityMw,
+    [property: JsonRequired] double RouteLengthKm,
     [property: JsonRequired] decimal CapitalCostAudPerKmPerMw,
     [property: JsonRequired] decimal FixedOperatingCostAudPerKmPerMwYear,
     [property: JsonRequired] uint TechnicalLifeYears);
