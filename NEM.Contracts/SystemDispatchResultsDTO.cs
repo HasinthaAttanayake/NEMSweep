@@ -23,7 +23,8 @@ public sealed record SystemDispatchResultsDTO(
     StorageSizingOutcomeDTO StorageSizing,
     DispatchCostDTO Cost,
     [property: JsonRequired] DispatchTopologyDTO Topology,
-    [property: JsonRequired] DispatchInterconnectorDTO[] Interconnectors);
+    [property: JsonRequired] DispatchInterconnectorDTO[] Interconnectors,
+    DispatchCostBasisDTO? CostBasis = null);
 
 /// <summary>Declared directed network topology for a whole-system dispatch result.</summary>
 public sealed record DispatchTopologyDTO(

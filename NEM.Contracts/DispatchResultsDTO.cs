@@ -48,6 +48,15 @@ public sealed record DispatchScenarioDTO(
     DateTimeOffset PeriodEnd,
     TimeSpan Resolution);
 
+/// <summary>
+/// The real-dollar valuation basis every cost figure in a dispatch artifact is expressed against.
+/// </summary>
+/// <param name="Year">The calendar year whose real Australian dollars every cost figure represents.</param>
+/// <param name="RealDiscountRate">The dimensionless real discount rate, as a fraction: 0.07 means 7%.</param>
+public sealed record DispatchCostBasisDTO(
+    int Year,
+    decimal RealDiscountRate);
+
 /// <summary>Input provenance for a single-scenario dispatch result.</summary>
 /// <param name="DemandInput">Filename, schema version, and digest of the demand artifact consumed.</param>
 /// <param name="WeatherInput">Filename, schema version, and digest of the weather artifact consumed.</param>
@@ -80,21 +89,51 @@ public sealed record DispatchPowerSystemDTO(
     DispatchFleetDTO[] Fleets,
     DispatchStorageFleetDTO[] StorageFleets);
 
-/// <summary>One generating fleet's identity and installed capacity.</summary>
+/// <summary>
+/// One generating fleet's identity, installed capacity, and the scenario cost assumptions it was
+/// costed against. The cost fields are the scenario author's own values, not model constants; see
+/// <c>docs/assumptions/scenario-parameters.md</c>.
+/// </summary>
 /// <param name="Technology">The generation technology, e.g. <c>Coal</c>, <c>Solar</c>, <c>Hydro</c>.</param>
 /// <param name="NameplateCapacityMw">Installed nameplate capacity in MW; not a dispatch series.</param>
+/// <param name="CapitalCostAudPerMw">Overnight capital cost per MW of nameplate capacity.</param>
+/// <param name="FixedOperatingCostAudPerMwYear">Annual fixed operating cost per MW of nameplate capacity.</param>
+/// <param name="VariableOperatingCostAudPerMwh">Variable operating cost per MWh generated.</param>
+/// <param name="FuelPriceAudPerGj">Fuel price per GJ thermal, multiplied by heat rate to cost fuel.</param>
+/// <param name="HeatRateGjPerMwh">Thermal energy consumed per MWh of electricity generated.</param>
+/// <param name="TechnicalLifeYears">Operating life used to annuitise capital cost.</param>
 public sealed record DispatchFleetDTO(
     string Technology,
-    double NameplateCapacityMw);
+    double NameplateCapacityMw,
+    decimal CapitalCostAudPerMw = 0,
+    decimal FixedOperatingCostAudPerMwYear = 0,
+    decimal VariableOperatingCostAudPerMwh = 0,
+    decimal FuelPriceAudPerGj = 0,
+    double HeatRateGjPerMwh = 0,
+    uint TechnicalLifeYears = 0);
 
-/// <summary>One storage fleet's identity and installed capacity.</summary>
+/// <summary>
+/// One storage fleet's identity, installed capacity, and the scenario cost assumptions it was
+/// costed against. The cost fields are the scenario author's own values, not model constants; see
+/// <c>docs/assumptions/scenario-parameters.md</c>.
+/// </summary>
 /// <param name="Technology">The storage technology, e.g. <c>Battery</c>, <c>PumpedHydro</c>.</param>
 /// <param name="EnergyCapacityMwh">Installed energy capacity in MWh.</param>
 /// <param name="PowerCapacityMw">Installed power capacity in MW.</param>
+/// <param name="PowerCapitalCostAudPerMw">Overnight capital cost per MW of power capacity.</param>
+/// <param name="EnergyCapitalCostAudPerMwh">Overnight capital cost per MWh of storage capacity.</param>
+/// <param name="FixedOperatingCostAudPerMwYear">Annual fixed operating cost per MW of power capacity.</param>
+/// <param name="RoundTripEfficiency">Fraction of charging energy that survives a full charge-discharge cycle.</param>
+/// <param name="TechnicalLifeYears">Operating life used to annuitise capital cost.</param>
 public sealed record DispatchStorageFleetDTO(
     string Technology,
     double EnergyCapacityMwh,
-    double PowerCapacityMw);
+    double PowerCapacityMw,
+    decimal PowerCapitalCostAudPerMw = 0,
+    decimal EnergyCapitalCostAudPerMwh = 0,
+    decimal FixedOperatingCostAudPerMwYear = 0,
+    double RoundTripEfficiency = 0,
+    uint TechnicalLifeYears = 0);
 
 /// <summary>
 /// The region's demand series. Total demand, not base demand alone, is what dispatch serves.
@@ -159,9 +198,9 @@ public sealed record DispatchSeriesDTO(
 
 /// <summary>Directed interconnector evidence retained in a system artifact.</summary>
 /// <remarks>
-/// <see cref="DistanceKm"/> is the great-circle distance between the endpoint regions' weather
-/// sites, used to cost the line by route length. The From/To latitude and longitude are each
-/// region's solar weather site, the location already carried by its resource profile.
+/// <see cref="DistanceKm"/> is the line's declared route length, the same value used to cost it.
+/// The From/To latitude and longitude are each region's solar weather site, the location already
+/// carried by its resource profile, and are for map placement only, not costing.
 /// </remarks>
 public sealed record DispatchInterconnectorDTO(
     [property: JsonRequired] string Id,
@@ -174,7 +213,10 @@ public sealed record DispatchInterconnectorDTO(
     [property: JsonRequired] double FromLatitude = 0,
     [property: JsonRequired] double FromLongitude = 0,
     [property: JsonRequired] double ToLatitude = 0,
-    [property: JsonRequired] double ToLongitude = 0);
+    [property: JsonRequired] double ToLongitude = 0,
+    decimal CapitalCostAudPerKmPerMw = 0,
+    decimal FixedOperatingCostAudPerKmPerMwYear = 0,
+    uint TechnicalLifeYears = 0);
 
 /// <summary>
 /// Integrated energy totals and reliability diagnostics for a single-scenario dispatch run.
