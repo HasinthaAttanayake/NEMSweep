@@ -183,17 +183,28 @@ public sealed class ScenarioInterconnector
     /// <param name="fromRegionId">Sending region. Transfer capacity is metered at this end.</param>
     /// <param name="toRegionId">Receiving region. Must differ from <paramref name="fromRegionId"/>.</param>
     /// <param name="capacity">Directed transfer capacity in MW. A reciprocal path is a separate plan.</param>
+    /// <param name="routeLength">
+    /// The line's route length, declared here rather than derived from anything else. A physical
+    /// corridor realised as two directed interconnectors declares the same route length on each.
+    /// </param>
     /// <param name="costParameters">Capital and fixed operating cost per km per MW of capacity.</param>
     /// <param name="technicalLifeYears">Asset life used to annuitise capital cost. Must be positive.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="routeLength"/> is zero.</exception>
     public ScenarioInterconnector(
         string fromRegionId,
         string toRegionId,
         Power capacity,
+        Distance routeLength,
         TransmissionCostParameters costParameters,
         uint technicalLifeYears)
     {
         ArgumentNullException.ThrowIfNull(costParameters);
         ArgumentOutOfRangeException.ThrowIfZero(technicalLifeYears);
+        if (routeLength.Kilometres <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(routeLength), routeLength, "Interconnector route length must be positive.");
+        }
 
         // Validated here so endpoint and capacity rules live in exactly one place.
         Interconnector realised = new(fromRegionId, toRegionId, capacity);
@@ -201,6 +212,7 @@ public sealed class ScenarioInterconnector
         FromRegionId = realised.FromRegionId;
         ToRegionId = realised.ToRegionId;
         Capacity = realised.Capacity;
+        RouteLength = routeLength;
         CostParameters = costParameters;
         TechnicalLifeYears = technicalLifeYears;
     }
@@ -215,9 +227,13 @@ public sealed class ScenarioInterconnector
     public Power Capacity { get; }
 
     /// <summary>
-    /// Capital and fixed operating cost per km per MW. Route length is derived from the endpoint
-    /// regions' weather-site coordinates rather than declared here.
+    /// The line's route length, the basis for its transmission cost. Declared directly on the
+    /// interconnector rather than derived from the endpoint regions' weather-site coordinates, so
+    /// transmission cost does not depend on which weather file a region happens to be assigned.
     /// </summary>
+    public Distance RouteLength { get; }
+
+    /// <summary>Capital and fixed operating cost per km per MW.</summary>
     public TransmissionCostParameters CostParameters { get; }
 
     /// <summary>

@@ -4,7 +4,7 @@ namespace NEM.Model.Scenarios;
 
 /// <summary>Economic assumptions attached to one scenario interconnector.</summary>
 /// <remarks>
-/// Costed per directed transfer capacity, scaled by the great-circle distance between endpoints: a
+/// Costed per directed transfer capacity, scaled by the interconnector's declared route length: a
 /// line's capex and fixed opex scale with the route's length and the megawatts it is rated to
 /// carry, since a higher-capacity corridor over the same distance costs more to build and
 /// maintain. Each physical corridor is declared as two directed interconnectors, and each is

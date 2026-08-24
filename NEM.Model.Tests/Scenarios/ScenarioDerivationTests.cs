@@ -204,6 +204,7 @@ public sealed class ScenarioDerivationTests
                 "NSW1",
                 "VIC1",
                 Power.FromMegawatts(700),
+                Distance.FromKilometres(100),
                 ZeroTransmissionCosts(),
                 technicalLifeYears: 50u)]);
 
@@ -231,6 +232,7 @@ public sealed class ScenarioDerivationTests
                 "NSW1",
                 "QLD1",
                 Power.FromMegawatts(700),
+                Distance.FromKilometres(100),
                 ZeroTransmissionCosts(),
                 technicalLifeYears: 50u)]);
 
@@ -270,11 +272,27 @@ public sealed class ScenarioDerivationTests
             "NSW1",
             "VIC1",
             Power.FromMegawatts(700),
+            Distance.FromKilometres(100),
             ZeroTransmissionCosts(),
             technicalLifeYears: 0u);
 
         act.Should().Throw<ArgumentOutOfRangeException>()
             .WithParameterName("technicalLifeYears");
+    }
+
+    [Fact]
+    public void Construction_InterconnectorWithZeroRouteLength_Throws()
+    {
+        var act = () => new ScenarioInterconnector(
+            "NSW1",
+            "VIC1",
+            Power.FromMegawatts(700),
+            Distance.Zero,
+            ZeroTransmissionCosts(),
+            technicalLifeYears: 50u);
+
+        act.Should().Throw<ArgumentOutOfRangeException>()
+            .WithParameterName("routeLength");
     }
 
     private static Scenario TwoRegionScenario(
@@ -302,6 +320,7 @@ public sealed class ScenarioDerivationTests
             fromRegionId,
             toRegionId,
             Power.FromMegawatts(700),
+            Distance.FromKilometres(100),
             ZeroTransmissionCosts(),
             technicalLifeYears: 50u);
 

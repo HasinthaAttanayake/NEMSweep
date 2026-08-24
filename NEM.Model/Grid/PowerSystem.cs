@@ -113,8 +113,9 @@ public sealed class PowerSystem
 
     /// <summary>
     /// A region's weather resource profile, the only source of regional location in the model.
-    /// Shared by every reader that derives an interconnector's line distance or endpoint
-    /// coordinates from it, so a region missing weather data reports the same failure everywhere.
+    /// Shared by every reader that derives an interconnector endpoint's map coordinates from it, so
+    /// a region missing weather data reports the same failure everywhere. Transmission cost does
+    /// not depend on this: an interconnector's route length is declared on the scenario directly.
     /// </summary>
     public RegionalResourceProfile RequireResourceProfile(string regionId)
     {
@@ -129,7 +130,7 @@ public sealed class PowerSystem
         return region.ResourceProfile
             ?? throw new InvalidOperationException(
                 $"Region '{regionId}' requires a weather resource profile to derive its "
-                + "interconnectors' line distance and endpoint location.");
+                + "interconnectors' endpoint location.");
     }
 
     private static void ValidateInterconnectors(

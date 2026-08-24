@@ -3,7 +3,6 @@ using NEM.Model.Scenarios;
 using NEM.Model.Simulation;
 using NEM.Model.StorageSizing;
 using NEM.Model.Units;
-using NEM.Model.Weather;
 
 namespace NEM.Model.Economics;
 
@@ -26,8 +25,8 @@ namespace NEM.Model.Economics;
 /// <para>
 /// Transmission is annuitised from each directed interconnector's cost assumptions and charged once
 /// at system level, so regional costs deliberately do not sum to the system total. Route length is
-/// the great-circle distance between the endpoint regions' weather sites, which is why costing a
-/// linked system requires every interconnector endpoint to carry a resource profile.
+/// declared directly on the scenario interconnector rather than derived from anything else, so
+/// transmission cost does not depend on regional weather data at all.
 /// </para>
 /// </remarks>
 public static class PowerSystemCostCalculator
@@ -172,7 +171,7 @@ public static class PowerSystemCostCalculator
         return new PowerSystemCostBreakdown(
             totalAnnualisedGenerationCost,
             totalAnnualisedStorageCost,
-            AnnualisedTransmissionCost(scenario, powerSystem),
+            AnnualisedTransmissionCost(scenario),
             totalDeliveredEnergy,
             regionBreakdowns,
             systemGenerationCosts
@@ -183,18 +182,17 @@ public static class PowerSystemCostCalculator
     }
 
     /// <summary>
-    /// Interconnector capital and fixed operating cost, charged against the great-circle
-    /// distance between its endpoint regions' weather sites and its directed capacity. There is
-    /// no variable term: transmission has no marginal fuel cost here, and losses already raise
-    /// cost implicitly by requiring more generation per MWh delivered.
+    /// Interconnector capital and fixed operating cost, charged against its declared route length
+    /// and its directed capacity. There is no variable term: transmission has no marginal fuel cost
+    /// here, and losses already raise cost implicitly by requiring more generation per MWh delivered.
     /// </summary>
-    private static Money AnnualisedTransmissionCost(Scenario scenario, PowerSystem powerSystem)
+    private static Money AnnualisedTransmissionCost(Scenario scenario)
     {
         Money total = Money.Zero;
         foreach (ScenarioInterconnector interconnector in scenario.Interconnectors)
         {
             TransmissionCostParameters costs = interconnector.CostParameters;
-            Distance distance = InterconnectorDistance(powerSystem, interconnector);
+            Distance distance = interconnector.RouteLength;
             total += LevelisedCostCalculator.Annuitise(
                     costs.CapitalCost.For(distance, interconnector.Capacity),
                     scenario.CostBasis.RealDiscountRate,
@@ -203,20 +201,6 @@ public static class PowerSystemCostCalculator
         }
 
         return total;
-    }
-
-    /// <summary>
-    /// Great-circle distance between an interconnector's endpoint regions, derived from each
-    /// region's weather site. Both endpoints must carry a resource profile, since that is the
-    /// only source of regional location in the model.
-    /// </summary>
-    private static Distance InterconnectorDistance(
-        PowerSystem powerSystem,
-        ScenarioInterconnector interconnector)
-    {
-        RegionalResourceProfile from = powerSystem.RequireResourceProfile(interconnector.FromRegionId);
-        RegionalResourceProfile to = powerSystem.RequireResourceProfile(interconnector.ToRegionId);
-        return from.Location.DistanceTo(to.Location);
     }
 
     /// <summary>Directed endpoint identity normalised only for case-insensitive region matching.</summary>
