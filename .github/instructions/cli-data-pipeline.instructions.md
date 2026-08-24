@@ -1,6 +1,6 @@
 ---
-description: "Use when changing NEM.CLI commands, source-data parsing, configuration, exports, scenario runs, provenance, or generated web data artifacts."
-applyTo: ["NEM.CLI/**", "NEM.CLI.Tests/**"]
+description: "Use when changing NEMSweep.CLI commands, source-data parsing, configuration, exports, scenario runs, provenance, or generated web data artifacts."
+applyTo: ["NEMSweep.CLI/**", "NEMSweep.CLI.Tests/**"]
 ---
 # CLI and Data Pipeline
 
@@ -19,5 +19,5 @@ applyTo: ["NEM.CLI/**", "NEM.CLI.Tests/**"]
 - Test parsers with small synthetic fixtures and temporary files. Add contract
   tests when an exporter or generated JSON shape changes.
 - Regenerate dispatch data with
-  `dotnet run --project .\NEM.CLI\NEM.CLI.csproj -- --run-scenario` after changing
+  `dotnet run --project .\NEMSweep.CLI\NEMSweep.CLI.csproj -- --run-scenario` after changing
   its producer or committed inputs.

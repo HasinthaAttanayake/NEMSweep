@@ -1,7 +1,7 @@
 #!/bin/sh
 # Cloudflare Pages build for the documentation site.
 #
-# Mirrors NEM.Web/build.sh: Pages images do not ship .NET 10, so install it locally, then restore
+# Mirrors NEMSweep.Web/build.sh: Pages images do not ship .NET 10, so install it locally, then restore
 # the pinned docfx from .config/dotnet-tools.json and build the docset. Output directory is
 # docs/_site.
 set -e

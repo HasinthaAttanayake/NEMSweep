@@ -12,7 +12,7 @@ one kind of source at a time and are there for iterating on a single input. They
 whole-bundle check, so a bundle you intend to publish from should still go through
 `--validate-inputs` and `--ingest`.
 
-The live bundle lives at `NEM.CLI/data/nemsim-inputs/` and is gitignored, because it is large and
+The live bundle lives at `NEMSweep.CLI/data/nemsweep-inputs/` and is gitignored, because it is large and
 is derived from third-party sources you fetch yourself rather than something the repository
 carries. What follows describes its required shape rather than assuming you have a copy of it
 open.
@@ -48,7 +48,7 @@ two files loose in the region folder, an extra subdirectory, or zero files in a 
 
 Demand archives are discovered recursively under `demand/operational-demand-hh/`, but any path
 containing a `reference` segment is skipped, so you can keep original downloads alongside the
-archives NemSim actually reads without them being picked up twice.
+archives NEMSweep actually reads without them being picked up twice.
 
 ## The manifest
 
@@ -65,7 +65,7 @@ archives NemSim actually reads without them being picked up twice.
 ## Where the source data comes from
 
 - **Demand.** AEMO's actual operational demand half-hourly archives (`PUBLIC_ACTUAL_OPERATIONAL
-  _DEMAND_HH_*` and similar AEMO nemweb archive naming). NemSim reads the `.zip` archives in place
+  _DEMAND_HH_*` and similar AEMO nemweb archive naming). NEMSweep reads the `.zip` archives in place
   rather than requiring you to extract them first.
 - **Generation.** AEMO's Generation Information workbook, a single `.xlsx` file listing existing
   and committed generating unit capacity, technology, and status.
@@ -92,7 +92,7 @@ durable if you change an assignment.
 
 ### The FY2026 bundle's current assignment
 
-Checked directly against `NEM.CLI/data/nemsim-inputs/manifest.json` and the `weather/` subdirectory
+Checked directly against `NEMSweep.CLI/data/nemsweep-inputs/manifest.json` and the `weather/` subdirectory
 contents. The bundle currently covers all five NEM regions:
 
 | Region | Solar site | Wind site |
@@ -115,7 +115,7 @@ an NSW1/VIC1-only bundle, so it is stale against the current manifest and folder
 Validation and ingestion are two separate steps, and only one of them writes anything.
 
 ```bash
-dotnet run --project NEM.CLI -- --validate-inputs
+dotnet run --project NEMSweep.CLI -- --validate-inputs
 ```
 
 `--validate-inputs` loads the manifest, discovers every file the bundle shape requires, parses the
@@ -124,7 +124,7 @@ including any negative demand intervals it had to clamp to zero. It writes nothi
 first, especially after replacing any source file.
 
 ```bash
-dotnet run --project NEM.CLI -- --ingest
+dotnet run --project NEMSweep.CLI -- --ingest
 ```
 
 `--ingest` runs the same validation and then writes the per-region `demand-<region>.json` and
@@ -136,7 +136,7 @@ list.
 ## What validation rejects
 
 Malformed, incomplete, duplicated, or misaligned source data is an explicit failure, not something
-NemSim tries to repair on your behalf. This includes: a demand archive missing an expected column,
+NEMSweep tries to repair on your behalf. This includes: a demand archive missing an expected column,
 two demand readings that conflict for the same interval, weather series that don't line up on the
 calendar-hour grid the scenario period expects (including a weather source with no entry for 29
 February), and a generation workbook missing a required column. The one narrow exception is

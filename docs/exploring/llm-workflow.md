@@ -1,15 +1,15 @@
-# Driving NemSim with an LLM
+# Driving NEMSweep with an LLM
 
 Designing a sweep is mechanical work with a fiddly file format: read the baseline scenario, decide
 what to vary, write twenty-five JSON merge patches without typos, run them, read the scalars back.
 An LLM is good at exactly that shape of task, provided you give it the contract rather than
 expecting it to infer one.
 
-NemSim publishes that contract deliberately. This page is how to hand it over.
+NEMSweep publishes that contract deliberately. This page is how to hand it over.
 
 ## Why this works
 
-Three properties make NemSim unusually safe to point a language model at:
+Three properties make NEMSweep unusually safe to point a language model at:
 
 - **The schemas are machine-readable and self-describing.** `--describe-schema` emits JSON Schema
   (draft 2020-12) for both input formats, generated from the same constants the validator enforces,
@@ -27,16 +27,16 @@ What the model cannot do is decide what is worth asking. That is your job, and
 ## What to give it
 
 Four things, in this order. Everything here is a file or a command output; none of it requires
-explaining NemSim in prose.
+explaining NEMSweep in prose.
 
 ### 1. The schemas
 
 ```bash
-dotnet run --project NEM.CLI -- --describe-schema scenario
+dotnet run --project NEMSweep.CLI -- --describe-schema scenario
 ```
 
 ```bash
-dotnet run --project NEM.CLI -- --describe-schema sweep
+dotnet run --project NEMSweep.CLI -- --describe-schema sweep
 ```
 
 These are the authoritative field contracts. Paste both into context. Do not paraphrase them:
@@ -84,7 +84,7 @@ Adapt this. The structure matters more than the wording: role, contract, task, c
 format.
 
 ```text
-You are helping design a sweep for NemSim, a deterministic hourly grid dispatch model
+You are helping design a sweep for NEMSweep, a deterministic hourly grid dispatch model
 for Australia's National Electricity Market.
 
 CONTRACT
@@ -139,7 +139,7 @@ the last point. If a change could be an artefact of the sizing floor
 While you are iterating on a sweep definition, fan out on its own first:
 
 ```bash
-dotnet run --project NEM.CLI -- --fan-out-sweep sweeps/my-sweep.json
+dotnet run --project NEMSweep.CLI -- --fan-out-sweep sweeps/my-sweep.json
 ```
 
 Fan-out writes every point's materialised config **and validates each one, stopping at the first
@@ -149,7 +149,7 @@ seconds, before any dispatch happens. Feed the error back to the model and regen
 Once fan-out is clean, or once you are past the iterate-and-regenerate stage entirely:
 
 ```bash
-dotnet run --project NEM.CLI -- --run-sweep sweeps/my-sweep.json
+dotnet run --project NEMSweep.CLI -- --run-sweep sweeps/my-sweep.json
 ```
 
 `--run-sweep` fans out again and validates each point the same way, but records an invalid point as
@@ -162,11 +162,11 @@ An LLM will produce a fluent, confident reading of a sweep whether or not the sw
 These are the failure modes worth watching for.
 
 **Check `axisValue` against `overrides` yourself.** The model will produce a definition where the
-label says +3,000 MW and the overrides add 2,900. Nothing in NemSim catches it, because nothing in
-NemSim reads `axisValue`. Every chart downstream will be wrong. This is the single highest-value
+label says +3,000 MW and the overrides add 2,900. Nothing in NEMSweep catches it, because nothing in
+NEMSweep reads `axisValue`. Every chart downstream will be wrong. This is the single highest-value
 manual check.
 
-**Do not let it interpret levels.** NemSim's biases are systematic and known; see
+**Do not let it interpret levels.** NEMSweep's biases are systematic and known; see
 [Limitations](../assumptions/limitations.md). A comparison between two points is well supported; an
 absolute figure is not. Ask for differences and shapes, not for headline numbers.
 

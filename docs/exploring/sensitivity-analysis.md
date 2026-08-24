@@ -3,7 +3,7 @@
 A worked reading of the sweep committed to this repository, `datacentre-nameplate-fy2026`. The
 point is not the result but the method: what to look at, in what order, and where the traps are.
 
-Figures below come from `NEM.Web/wwwroot/data/sweeps/datacentre-nameplate-fy2026/index.json` as
+Figures below come from `NEMSweep.Web/wwwroot/data/sweeps/datacentre-nameplate-fy2026/index.json` as
 published. Rerunning the sweep at a different commit will move them.
 
 ## The sweep
@@ -180,5 +180,5 @@ is exactly the error described in
 ## Next
 
 - [Designing a study](index.md): what else is worth varying.
-- [Driving NemSim with an LLM](llm-workflow.md): generating sweeps and reading them back.
+- [Driving NEMSweep with an LLM](llm-workflow.md): generating sweeps and reading them back.
 - [Limitations](../assumptions/limitations.md): required before quoting any of this.

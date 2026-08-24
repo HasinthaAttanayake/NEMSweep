@@ -4,29 +4,29 @@ This page takes you from a fresh clone to a dispatch result on screen.
 
 ## Prerequisites
 
-NemSim targets `net10.0` (see `NEM.Model/NEM.Model.csproj`), so you need the .NET 10 SDK installed.
+NEMSweep targets `net10.0` (see `NEMSweep.Model/NEMSweep.Model.csproj`), so you need the .NET 10 SDK installed.
 Nothing else is required to build, test or run the CLI.
 
 ## Clone, build, test
 
 ```bash
-git clone https://github.com/HasinthaAttanayake/NemSim.git
+git clone https://github.com/HasinthaAttanayake/NEMSweep.git
 ```
 
 ```bash
-dotnet build NemSim.slnx
+dotnet build NEMSweep.slnx
 ```
 
 ```bash
-dotnet test NemSim.slnx
+dotnet test NEMSweep.slnx
 ```
 
-The solution file is `NemSim.slnx` at the repository root. `dotnet test` runs `NEM.Model.Tests`,
-`NEM.CLI.Tests` and `NEM.Web.Tests`.
+The solution file is `NEMSweep.slnx` at the repository root. `dotnet test` runs `NEMSweep.Model.Tests`,
+`NEMSweep.CLI.Tests` and `NEMSweep.Web.Tests`.
 
 ## Configuration
 
-`NEM.CLI` reads its settings from a JSON file next to the built executable. There are two
+`NEMSweep.CLI` reads its settings from a JSON file next to the built executable. There are two
 candidates, checked in this order:
 
 1. `appsettings.local.json`, which is machine-local, gitignored, and absent by default.
@@ -36,29 +36,29 @@ candidates, checked in this order:
 Copy the example to create your own local file:
 
 ```bash
-cp NEM.CLI/appsettings.example.json NEM.CLI/appsettings.local.json
+cp NEMSweep.CLI/appsettings.example.json NEMSweep.CLI/appsettings.local.json
 ```
 
 Because the local file is gitignored, editing it never produces a diff for anyone else, and
 because the example is the fallback, the CLI works out of the box even if you skip this step.
 
-The three settings, from `NEM.CLI/Configuration/CliSettings.cs`:
+The three settings, from `NEMSweep.CLI/Configuration/CliSettings.cs`:
 
 | Setting | Meaning |
 |---|---|
 | `inputBundleRoot` | Where `--validate-inputs` and `--ingest` look for an input bundle by default. |
-| `outputRoot` | Where `--ingest` writes its artifacts, and the first place a scenario run looks for the demand and weather files a scenario references. Normally `NEM.Web/wwwroot/data`, the directory the web site reads from. It does **not** control where scenario results are published. |
+| `outputRoot` | Where `--ingest` writes its artifacts, and the first place a scenario run looks for the demand and weather files a scenario references. Normally `NEMSweep.Web/wwwroot/data`, the directory the web site reads from. It does **not** control where scenario results are published. |
 | `defaultScenarioPath` | The scenario configuration `--run-scenario` uses when you do not pass one explicitly. |
 
 All three are plain strings resolved relative to the solution root at run time, so you can point
-`inputBundleRoot` or `outputRoot` at a directory outside the repository without NemSim caring where
+`inputBundleRoot` or `outputRoot` at a directory outside the repository without NEMSweep caring where
 your shell happens to be. The [CLI reference](cli.md) covers how command-line paths are resolved
 the same way.
 
 ## First run
 
 ```bash
-dotnet run --project NEM.CLI -- --run-scenario
+dotnet run --project NEMSweep.CLI -- --run-scenario
 ```
 
 With no argument, this loads the scenario at `defaultScenarioPath`. That is the committed
@@ -70,7 +70,7 @@ scenario's reliability standard as it goes.
 
 It writes `results.json`, `results-overview.json`, and a `results-{region}.json` and
 `results-{region}-overview.json` pair for each region. Results always go to
-`NEM.Web/wwwroot/data`, which is a fixed path rather than the configured `outputRoot`; changing
+`NEMSweep.Web/wwwroot/data`, which is a fixed path rather than the configured `outputRoot`; changing
 `outputRoot` moves where inputs are read from, not where results land. Publication is atomic, so a
 failed run never leaves a half-written artifact in place.
 
@@ -85,17 +85,17 @@ reading closely.
 ## Viewing results
 
 ```bash
-dotnet run --project NEM.Web
+dotnet run --project NEMSweep.Web
 ```
 
-`NEM.Web` is a Blazor WebAssembly site that reads the JSON artifacts under
-`NEM.Web/wwwroot/data`, the same files `--run-scenario` writes and `--ingest` writes to by default.
+`NEMSweep.Web` is a Blazor WebAssembly site that reads the JSON artifacts under
+`NEMSweep.Web/wwwroot/data`, the same files `--run-scenario` writes and `--ingest` writes to by default.
 Open the URL it prints to browse the results you just generated.
 
 ## Validation runs worth knowing about
 
 Two test runs act as acceptance checks on the model rather than ordinary unit tests. See the
-"Validation runs" section of the repository [README](https://github.com/HasinthaAttanayake/NemSim#readme)
+"Validation runs" section of the repository [README](https://github.com/HasinthaAttanayake/NEMSweep#readme)
 for the exact commands:
 
 - A suite of hand-calculated dispatch fixtures, checked against manually worked figures.

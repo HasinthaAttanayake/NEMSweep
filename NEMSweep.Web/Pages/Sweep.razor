@@ -1,0 +1,327 @@
+@page "/sweeps/{SweepId}"
+@using NEMSweep.Contracts
+@using NEMSweep.Web.Components.Viz
+@using NEMSweep.Web.Services
+@using NEMSweep.Web.Services.Insights
+@inject SweepManifestLoader SweepManifestLoader
+@inject SweepIndexLoader SweepIndexLoader
+@inject NavigationManager Navigation
+@inject ViewportScroller Scroller
+
+<PageTitle>@(_index?.Name ?? "Sweep")</PageTitle>
+
+<main class="sweep-page">
+    <PageHeader Eyebrow="Scenario sweep" Title="@(_index?.Name ?? "Sweep")">
+        <ScopeContent>
+            @if (_index is not null)
+            {
+                @* The scope block is optional: a sweep whose points span different periods has
+                   none, and the page says nothing rather than inventing one. *@
+                @if (_index.Scope is not null)
+                {
+                    <ScopeLine Region="@RegionNames.FullList(_index.Scope.RegionIds)"
+                               Period="@Period(_index.Scope)"
+                               Resolution="@Resolution(_index.Scope)" />
+                }
+                <p class="sweep-axis">
+                    @_index.Points.Length runs, one per value of @_index.Axis.Label
+                    (@_index.Axis.Unit). Everything else in the scenario is held constant.
+                </p>
+            }
+        </ScopeContent>
+        <TrailingContent>
+            @if (_index is not null && RegionOptions.Count > 1)
+            {
+                <MudSelect T="string"
+                           Label="Results"
+                           Value="_selectedRegion"
+                           ValueChanged="OnRegionChanged"
+                           Variant="Variant.Outlined"
+                           Class="region-select">
+                    @foreach (string region in RegionOptions)
+                    {
+                        <MudSelectItem T="string" Value="region">@RegionLabel(region)</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+        </TrailingContent>
+    </PageHeader>
+
+    <ArtifactLoadStateView State="_loadState">
+        @if (_index is not null && _axis is not null && _analysis is not null)
+        {
+            @* These values are ranges rather than single figures, so they are set smaller than the
+               strip's default to keep each one on one line. *@
+            <MetricStrip Items="@Metrics" AriaLabel="Sweep result summary" Columns="4"
+                         Style="--metric-value-size: 1.3rem;" />
+
+            @* A sweep page is long and gets longer with every measure the contract adds and every
+               region a run covers. The sections are listed once at the top so the page stays
+               traversable rather than relying on the reader scrolling to discover it. *@
+            <nav class="sweep-sections" aria-label="Sections on this page">
+                <a href="@SectionHref("findings")">Findings</a>
+                <a href="@SectionHref("runs")">All runs</a>
+                @if (_analysis.Runs.Count > 1)
+                {
+                    <a href="@SectionHref("headline")">Cost headline</a>
+                    <a href="@SectionHref("tradeoff-heading")">Trade-offs</a>
+                }
+                <a href="@SectionHref("series-heading")">Every measure</a>
+            </nav>
+
+            <div id="findings"></div>
+            <FindingCards Findings="@_analysis.Findings"
+                          Heading="What this sweep shows"
+                          Description="Derived from the sweep index alone. Each finding names the runs it is drawn from, so it can be checked against the table below." />
+
+            <SweepOutcomeSummary Index="_index" RegionId="@SelectedRegionId" />
+
+            <div id="runs"></div>
+            <SweepRunTable Index="@_index"
+                           RegionId="@SelectedRegionId"
+                           AnnualCostLabel="@_analysis.AnnualCostLabel"
+                           HighlightPointId="@_analysis.CheapestUnitCost?.Point.PointId" />
+
+            @if (_analysis.Runs.Count > 1)
+            {
+                <div id="headline"></div>
+                <SweepCostDivergence Analysis="@_analysis" RegionId="@SelectedRegionId" />
+                <SweepTradeoffExplorer Analysis="@_analysis" RegionId="@SelectedRegionId" />
+            }
+
+            <section class="series-section" aria-labelledby="series-heading">
+                <div class="section-heading">
+                    <p class="section-index">Every result</p>
+                    <h2 id="series-heading">Which measures actually moved</h2>
+                    <p>
+                        One tile per figure the sweep index carries. Select a tile to draw it full
+                        size; a tile marked as unchanged is a result too — it says the input the
+                        sweep varied did not touch that measure.
+                    </p>
+                </div>
+
+                <SweepScalarGrid Index="@_index"
+                                 RegionId="@SelectedRegionId"
+                                 SelectedKey="@_axis.Key"
+                                 OnSelect="SelectSeriesAsync" />
+
+                @* The picker is a grid of eighteen tiles, so the chart it drives can sit a
+                   screen below the tile that was clicked. The chart is brought into view when the
+                   selection lands off screen. *@
+                <div @ref="_seriesChart" class="scroll-reveal-target">
+                    <SweepChart Index="@_index"
+                                YAxis="@_axis"
+                                RegionId="@SelectedRegionId"
+                                Heading="@_axis.Label"
+                                Description="@($"Achieved {_axis.Label.ToLowerInvariant()} at each run of the sweep. Select a point to open that run.")"
+                                DrillDownTarget="ResolveDrillDownTarget" />
+                </div>
+            </section>
+
+            @if (_index.Scope is not null)
+            {
+                @* The scope carries one weather basis. A sweep covering several regions is
+                   simulated against a weather file per region, so the single basis is named as the
+                   sweep's rather than presented as the only one in play. *@
+                @if (_index.Scope.RegionIds.Length > 1)
+                {
+                    <p class="weather-scope-note">
+                        This sweep covers @RegionNames.FullList(_index.Scope.RegionIds).
+                        Its index records one weather basis for the sweep; each region's own weather
+                        file is named on that region's dispatch page.
+                    </p>
+                }
+                <WeatherBasisNote Basis="_index.Scope.WeatherBasis" />
+            }
+
+            <ProvenanceFooter CommitSha="@_index.Provenance.GitCommitSha"
+                              CommitUrl="@CommitUrl"
+                              IsDirty="@_index.Provenance.WorkingTreeDirty"
+                              DurationMs="@_index.Provenance.TotalDurationMs"
+                              Inputs="@ProvenanceInputs"
+                              Region="@(_index.Scope is null ? null : RegionNames.FullList(_index.Scope.RegionIds))"
+                              Period="@(_index.Scope is null ? null : Period(_index.Scope))"
+                              Resolution="@(_index.Scope is null ? null : Resolution(_index.Scope))" />
+        }
+    </ArtifactLoadStateView>
+</main>
+
+@code {
+    private const string CommitUrlPrefix = "https://github.com/HasinthaAttanayake/NEMSweep/commit/";
+
+    [Parameter] public string SweepId { get; set; } = string.Empty;
+
+    [SupplyParameterFromQuery(Name = "region")]
+    public string? RegionQuery { get; set; }
+
+    private ArtifactLoadState _loadState = ArtifactLoadState.Loading();
+    private SweepIndexDTO? _index;
+    private SweepChartYAxis? _axis;
+    private SweepAnalysis? _analysis;
+    private string _selectedRegion = "System";
+    private ElementReference _seriesChart;
+
+    private IReadOnlyList<string> RegionOptions => _index?.Points
+        .SelectMany(point => point.RegionScalars ?? [])
+        .Select(region => region.RegionId)
+        .Where(region => !string.IsNullOrWhiteSpace(region))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .Order(StringComparer.OrdinalIgnoreCase)
+        .Prepend("System")
+        .ToArray() ?? ["System"];
+
+    private string? SelectedRegionId => _selectedRegion == "System" ? null : _selectedRegion;
+
+    private static string Period(SweepScopeDTO scope) =>
+        $"{scope.PeriodStart:dd MMM yyyy} to {scope.PeriodEnd.AddTicks(-1):dd MMM yyyy}";
+
+    private static string Resolution(SweepScopeDTO scope) =>
+        $"{scope.Resolution.TotalHours:N0}-hour intervals";
+
+    /// <summary>
+    /// The four figures a reader wants before deciding which chart to look at: what a megawatt-hour
+    /// costs at each end of the sweep, what the whole scenario costs at each end, and how many runs
+    /// produced nothing at all.
+    /// </summary>
+    private IReadOnlyList<MetricStripItem> Metrics
+    {
+        get
+        {
+            SweepAnalysis analysis = _analysis!;
+            if (analysis.First is not { } first || analysis.Last is not { } last)
+            {
+                return
+                [
+                    new("Runs", _index!.Points.Length.ToString("N0")),
+                    new("Runs without results", analysis.ConstrainedPoints.Count.ToString("N0")),
+                ];
+            }
+
+            return
+            [
+                new(
+                    "Levelised cost",
+                    $"{PlotFormat.Money(first.Scalars.SlcoeAudPerMwh)} → {PlotFormat.Money(last.Scalars.SlcoeAudPerMwh)}",
+                    $"AUD/MWh, {first.Label} to {last.Label}"),
+                new(
+                    analysis.AnnualCostLabel,
+                    $"{PlotFormat.MoneyTotal((decimal)first.TotalAnnualCostAud)} → {PlotFormat.MoneyTotal((decimal)last.TotalAnnualCostAud)}",
+                    "derived from cost per MWh and energy served"),
+                // The cheapest megawatt-hour can belong to a run that never served its load, and a
+                // strip that names it without saying so reads as the run to pick.
+                new(
+                    "Cheapest per MWh",
+                    analysis.CheapestUnitCost?.Label ?? "—",
+                    analysis.CheapestUnitCost is { } cheapest
+                        ? $"{PlotFormat.Money(cheapest.Scalars.SlcoeAudPerMwh)}/MWh"
+                            + (cheapest.OutsideReliabilityTarget
+                                ? " · outside the reliability standard"
+                                : string.Empty)
+                        : null),
+                new(
+                    "Runs",
+                    $"{analysis.Runs.Count:N0} of {_index!.Points.Length:N0}",
+                    analysis.ConstrainedPoints.Count == 0
+                        ? "every run produced results"
+                        : $"{analysis.ConstrainedPoints.Count:N0} reached a modelled limit"),
+            ];
+        }
+    }
+
+    private IReadOnlyList<ProvenanceInputFile> ProvenanceInputs => _index!.Provenance.InputFiles
+        .Select(input => new ProvenanceInputFile(input.Path, input.Sha256, input.Purpose))
+        .ToArray();
+
+    private string CommitUrl => $"{CommitUrlPrefix}{_index!.Provenance.GitCommitSha}";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Navigating between sweeps reuses this component, so the previous route's state would
+        // otherwise stay on screen until the new index arrives.
+        _loadState = ArtifactLoadState.Loading();
+        _index = null;
+        _axis = null;
+        _analysis = null;
+        _selectedRegion = "System";
+
+        ArtifactLoadResult<SweepManifestDTO> manifest = await SweepManifestLoader.LoadAsync();
+        if (!manifest.IsSuccess)
+        {
+            _loadState = manifest.State;
+            return;
+        }
+
+        SweepManifestEntryDTO? entry = manifest.Value!.Sweeps
+            .FirstOrDefault(sweep => string.Equals(sweep.SweepId, SweepId, StringComparison.Ordinal));
+        if (entry is null)
+        {
+            _loadState = ArtifactLoadState.NotFound("This sweep does not exist.");
+            return;
+        }
+
+        ArtifactLoadResult<SweepIndexDTO> index = await SweepIndexLoader.LoadAsync(SweepPaths.IndexPath(entry));
+        _loadState = index.State;
+        _index = index.Value;
+        _selectedRegion = RegionOptions.FirstOrDefault(region =>
+            !string.Equals(region, "System", StringComparison.Ordinal)
+            && string.Equals(region, RegionQuery, StringComparison.OrdinalIgnoreCase)) ?? "System";
+        _axis = _index is null ? null : DefaultAxis(_index, SelectedRegionId);
+        _analysis = _index is null ? null : SweepAnalysis.Build(_index, SelectedRegionId);
+    }
+
+    /// <summary>
+    /// Opens on the first series that actually varies across the sweep, falling back to the first
+    /// the artifact carries values for. Nothing here decides what the sweep means; the grid offers
+    /// every other series one click away.
+    /// </summary>
+    private static SweepChartYAxis? DefaultAxis(SweepIndexDTO index, string? regionId)
+    {
+        SweepChartYAxis? withValues = null;
+        foreach (SweepChartYAxis candidate in SweepSeriesCatalogue.All)
+        {
+            double[] values = SweepChartData.Build(index, candidate, regionId).Values;
+            if (values.Length == 0)
+            {
+                continue;
+            }
+
+            withValues ??= candidate;
+            if (values.Distinct().Count() > 1)
+            {
+                return candidate;
+            }
+        }
+
+        return withValues;
+    }
+
+    private async Task SelectSeriesAsync(string key)
+    {
+        _axis = SweepSeriesCatalogue.Resolve(key) ?? _axis;
+        StateHasChanged();
+        await Scroller.RevealAsync(_seriesChart);
+    }
+
+    /// <summary>
+    /// An in-page link that keeps whatever region and axes the address already names, so jumping
+    /// to a section does not quietly reset the view someone was sent.
+    /// </summary>
+    private string SectionHref(string anchor)
+    {
+        string uri = Navigation.Uri;
+        int hash = uri.IndexOf('#', StringComparison.Ordinal);
+        return $"{(hash < 0 ? uri : uri[..hash])}#{anchor}";
+    }
+
+    private string ResolveDrillDownTarget(SweepIndexPointDTO point) =>
+        SweepPaths.RunRoute(SweepId, point.PointId, SelectedRegionId);
+
+    private void OnRegionChanged(string region) => Navigation.NavigateTo(
+        string.Equals(region, "System", StringComparison.Ordinal)
+            ? SweepPaths.PageRoute(SweepId)
+            : $"{SweepPaths.PageRoute(SweepId)}?region={Uri.EscapeDataString(region)}");
+
+    private static string RegionLabel(string region) => region == "System"
+        ? "System"
+        : $"{RegionNames.State(region)} ({region}) detail";
+}

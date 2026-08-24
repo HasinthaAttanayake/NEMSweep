@@ -1,8 +1,8 @@
 # CLI reference
 
-`NEM.CLI` is a single executable with no options parser: each command is a flag literal followed
+`NEMSweep.CLI` is a single executable with no options parser: each command is a flag literal followed
 by zero to three positional arguments, matched by a pattern in
-`NEM.CLI/Application/CommandRouter.cs`. This page documents every command it routes.
+`NEMSweep.CLI/Application/CommandRouter.cs`. This page documents every command it routes.
 
 Paths you pass on the command line for a scenario config, a sweep definition or an input bundle
 are resolved relative to the **solution root**, not to your current working directory
@@ -20,7 +20,7 @@ import commands are the exception, and each section below says so.
 ## Help and version
 
 ```bash
-dotnet run --project NEM.CLI -- --help
+dotnet run --project NEMSweep.CLI -- --help
 ```
 
 `-h` and `--usage` are accepted as synonyms. Usage text is written to standard output and the
@@ -28,7 +28,7 @@ command returns `0`, because asking for help is a success rather than an unrecog
 line.
 
 ```bash
-dotnet run --project NEM.CLI -- --version
+dotnet run --project NEMSweep.CLI -- --version
 ```
 
 Prints the assembly's informational version (falling back to its assembly version, or `unknown`).
@@ -38,11 +38,11 @@ Prints the assembly's informational version (falling back to its assembly versio
 ### `--run-scenario`
 
 ```bash
-dotnet run --project NEM.CLI -- --run-scenario
+dotnet run --project NEMSweep.CLI -- --run-scenario
 ```
 
 ```bash
-dotnet run --project NEM.CLI -- --run-scenario scenarios/my-scenario.json
+dotnet run --project NEMSweep.CLI -- --run-scenario scenarios/my-scenario.json
 ```
 
 | Argument | Optional | Default |
@@ -54,7 +54,7 @@ sizing storage against the scenario's reliability standard. Writes `results.json
 `results-overview.json`, and a `results-{region}.json` and `results-{region}-overview.json` pair per
 region.
 
-Results are published to `NEM.Web/wwwroot/data` (`RepositoryPaths.DispatchResultsPath`), which is
+Results are published to `NEMSweep.Web/wwwroot/data` (`RepositoryPaths.DispatchResultsPath`), which is
 fixed. The configured `outputRoot` governs where a scenario's demand and weather **inputs** are
 looked for, not where its results are written, so pointing `outputRoot` elsewhere does not move
 `results.json`.
@@ -69,7 +69,7 @@ naming the achieved and target unserved-energy percentages.
 ### `--fan-out-sweep`
 
 ```bash
-dotnet run --project NEM.CLI -- --fan-out-sweep sweeps/my-sweep.json
+dotnet run --project NEMSweep.CLI -- --fan-out-sweep sweeps/my-sweep.json
 ```
 
 | Argument | Optional | Default |
@@ -85,7 +85,7 @@ a bad override surfaces immediately, against every point, without running any di
 ### `--run-sweep`
 
 ```bash
-dotnet run --project NEM.CLI -- --run-sweep sweeps/my-sweep.json
+dotnet run --project NEMSweep.CLI -- --run-sweep sweeps/my-sweep.json
 ```
 
 | Argument | Optional | Default |
@@ -105,7 +105,7 @@ status files, the sweep index and the manifest each land as they are produced. A
 can therefore leave a partially updated `sweeps/{sweepId}/` directory. Rerun the sweep to bring it
 back to a consistent state.
 
-Published under `NEM.Web/wwwroot/data/sweeps/{sweepId}/`: `index.json` (the sweep index),
+Published under `NEMSweep.Web/wwwroot/data/sweeps/{sweepId}/`: `index.json` (the sweep index),
 `points/{pointId}.json` and `points/{pointId}.status.json` for each point, a copy of each point's
 `configs/{pointId}.json`, and any base-demand series the points reference under `series/`.
 `sweeps/index.json` (the manifest of all published sweeps) is rewritten from what is on disk after
@@ -114,11 +114,11 @@ every run.
 ### `--describe-schema`
 
 ```bash
-dotnet run --project NEM.CLI -- --describe-schema scenario
+dotnet run --project NEMSweep.CLI -- --describe-schema scenario
 ```
 
 ```bash
-dotnet run --project NEM.CLI -- --describe-schema sweep
+dotnet run --project NEMSweep.CLI -- --describe-schema sweep
 ```
 
 | Argument | Optional | Default |
@@ -137,11 +137,11 @@ workbook) plus a `manifest.json`.
 ### `--validate-inputs`
 
 ```bash
-dotnet run --project NEM.CLI -- --validate-inputs
+dotnet run --project NEMSweep.CLI -- --validate-inputs
 ```
 
 ```bash
-dotnet run --project NEM.CLI -- --validate-inputs path/to/input-bundle
+dotnet run --project NEMSweep.CLI -- --validate-inputs path/to/input-bundle
 ```
 
 | Argument | Optional | Default |
@@ -155,11 +155,11 @@ it is safe to run against a bundle you have not committed to yet.
 ### `--ingest`
 
 ```bash
-dotnet run --project NEM.CLI -- --ingest
+dotnet run --project NEMSweep.CLI -- --ingest
 ```
 
 ```bash
-dotnet run --project NEM.CLI -- --ingest path/to/input-bundle
+dotnet run --project NEMSweep.CLI -- --ingest path/to/input-bundle
 ```
 
 | Argument | Optional | Default |
@@ -185,11 +185,11 @@ They are covered by `--ingest`; use them when iterating on a single input.
 ### `--import-demand`
 
 ```bash
-dotnet run --project NEM.CLI -- --import-demand
+dotnet run --project NEMSweep.CLI -- --import-demand
 ```
 
 ```bash
-dotnet run --project NEM.CLI -- --import-demand path/to/output-directory
+dotnet run --project NEMSweep.CLI -- --import-demand path/to/output-directory
 ```
 
 | Argument | Optional | Default |
@@ -204,7 +204,7 @@ resolved relative to your current working directory, not the solution root.
 ### `--generation-information`
 
 ```bash
-dotnet run --project NEM.CLI -- --generation-information path/to/workbook.xlsx
+dotnet run --project NEMSweep.CLI -- --generation-information path/to/workbook.xlsx
 ```
 
 | Argument | Optional | Default |
@@ -212,17 +212,17 @@ dotnet run --project NEM.CLI -- --generation-information path/to/workbook.xlsx
 | workbook path | no | n/a |
 
 Reads a generation-information workbook and writes `generation-information.json` under
-`NEM.Web/wwwroot/data`. The workbook path is used as given, so it is relative to your current
+`NEMSweep.Web/wwwroot/data`. The workbook path is used as given, so it is relative to your current
 working directory unless it is absolute, rather than resolved against the solution root.
 
 ### `--epw-report`
 
 ```bash
-dotnet run --project NEM.CLI -- --epw-report NSW1 path/to/solar.epw
+dotnet run --project NEMSweep.CLI -- --epw-report NSW1 path/to/solar.epw
 ```
 
 ```bash
-dotnet run --project NEM.CLI -- --epw-report NSW1 path/to/solar.epw path/to/wind.epw
+dotnet run --project NEMSweep.CLI -- --epw-report NSW1 path/to/solar.epw path/to/wind.epw
 ```
 
 | Argument | Optional | Default |
@@ -234,6 +234,6 @@ dotnet run --project NEM.CLI -- --epw-report NSW1 path/to/solar.epw path/to/wind
 The region argument is validated against the five NEM regions (`NSW1`, `QLD1`, `SA1`, `TAS1`,
 `VIC1`); anything else is rejected before any file is read. The EPW paths, like the
 generation-information workbook path, are used as given rather than resolved against the solution
-root. Writes `weather-{region}.json` under `NEM.Web/wwwroot/data`, and prints the provenance
+root. Writes `weather-{region}.json` under `NEMSweep.Web/wwwroot/data`, and prints the provenance
 report, including the daylight DNI source shares, along with a count of each series constructed.
 

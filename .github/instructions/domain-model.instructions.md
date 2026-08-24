@@ -1,8 +1,8 @@
 ---
-description: "Use when adding or changing NEM.Model domain types, aggregate roots, domain services, relationships, invariants, time semantics, or unit semantics. Keeps the tracked domain model accurate."
+description: "Use when adding or changing NEMSweep.Model domain types, aggregate roots, domain services, relationships, invariants, time semantics, or unit semantics. Keeps the tracked domain model accurate."
 applyTo:
-    - "NEM.Model/**"
-    - "NEM.Model.Tests/**"
+    - "NEMSweep.Model/**"
+    - "NEMSweep.Model.Tests/**"
 ---
 # Domain Model Maintenance
 

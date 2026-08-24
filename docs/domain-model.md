@@ -1,6 +1,6 @@
 # Domain model
 
-This document tracks the domain types currently implemented in `NEM.Model`.
+This document tracks the domain types currently implemented in `NEMSweep.Model`.
 It describes code that exists now; future concepts belong here only when their
 domain types and invariants are implemented.
 
@@ -250,7 +250,7 @@ classDiagram
   interconnectors produces results identical to dispatching each region alone.
 - `InterRegionalTransfer` is the only place the domain meets the graph. It maps
   regional surplus and deficit onto nodes, delegates to the pure algorithms in
-  `NEM.Model/Algorithms`, and books deliveries back as imports and exports. The
+  `NEMSweep.Model/Algorithms`, and books deliveries back as imports and exports. The
   algorithm layer knows nothing of regions, power, or losses; the transfer layer
   knows nothing of how maximum flow is found. Losses are applied over the result,
   never inside the search, which is what keeps it a standard max-flow problem.
@@ -314,8 +314,8 @@ classDiagram
   interconnector cost assumptions and charged once at system level, so
   regional costs do not sum to the system total. Route length is a field
   declared directly on `ScenarioInterconnector` (`Distance RouteLength`),
-  not derived from anything else, so `NEM.Model.Economics` has no dependency
-  on `NEM.Model.Weather`: a scenario is fully specified economically without
+  not derived from anything else, so `NEMSweep.Model.Economics` has no dependency
+  on `NEMSweep.Model.Weather`: a scenario is fully specified economically without
   any interconnector endpoint needing weather data. A system result states
   whether transmission economics were calculated;
   regional results state that transmission is not modelled in their cost scope,

@@ -2,7 +2,7 @@
 
 Generated from the XML documentation comments in the source. Two assemblies are published here.
 
-## NEM.Model
+## NEMSweep.Model
 
 The domain model: scenarios, the realised power system, dispatch, storage sizing, economics, and the
 typed quantities everything is expressed in. This is the library you would reference to run the
@@ -12,22 +12,22 @@ Namespaces worth starting from:
 
 | Namespace | What lives there |
 |---|---|
-| `NEM.Model.Scenarios` | Scenario intent, and `ScenarioDerivation` which realises it |
-| `NEM.Model.Grid` | The realised system: regions, fleets, storage, interconnectors, and the technology vocabulary |
-| `NEM.Model.Simulation` | `Dispatcher`, dispatch evidence, reliability, and the `IStoragePolicy` extension point |
-| `NEM.Model.StorageSizing` | The sizing search, its options, and its results |
-| `NEM.Model.Economics` | Annuitisation and system costing |
-| `NEM.Model.Units` | Typed quantities: power, energy, distance, money and the cost rates. Dimensioned physical and monetary values cross domain boundaries as these types rather than as bare `double`s. Dimensionless ratios, such as round-trip efficiency and the reliability target percentage, stay plain numbers |
-| `NEM.Model.Series`, `NEM.Model.Weather`, `NEM.Model.Generation` | Time series, weather resources, and the solar and wind power curves |
+| `NEMSweep.Model.Scenarios` | Scenario intent, and `ScenarioDerivation` which realises it |
+| `NEMSweep.Model.Grid` | The realised system: regions, fleets, storage, interconnectors, and the technology vocabulary |
+| `NEMSweep.Model.Simulation` | `Dispatcher`, dispatch evidence, reliability, and the `IStoragePolicy` extension point |
+| `NEMSweep.Model.StorageSizing` | The sizing search, its options, and its results |
+| `NEMSweep.Model.Economics` | Annuitisation and system costing |
+| `NEMSweep.Model.Units` | Typed quantities: power, energy, distance, money and the cost rates. Dimensioned physical and monetary values cross domain boundaries as these types rather than as bare `double`s. Dimensionless ratios, such as round-trip efficiency and the reliability target percentage, stay plain numbers |
+| `NEMSweep.Model.Series`, `NEMSweep.Model.Weather`, `NEMSweep.Model.Generation` | Time series, weather resources, and the solar and wind power curves |
 
 Internal types are not published. The dispatch run, the merit-order sort, the hydro pacer and the
 max-flow algorithms are implementation detail behind `Dispatcher`; they are described in
 [Dispatch](../concepts/dispatch.md) and the [domain model reference](../domain-model.md).
 
-## NEM.Contracts
+## NEMSweep.Contracts
 
 The published artifact schema: the shapes of the JSON that a run writes and that any consumer
-reads. If you are working with NemSim's output rather than calling its model, this is the reference
+reads. If you are working with NEMSweep's output rather than calling its model, this is the reference
 you want.
 
 `ArtifactSchemaVersions` carries the current version of every artifact. `SweepScalarCatalog` names

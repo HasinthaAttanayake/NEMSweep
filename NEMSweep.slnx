@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="NEMSweep.CLI.Tests/NEMSweep.CLI.Tests.csproj" />
+  <Project Path="NEMSweep.CLI/NEMSweep.CLI.csproj" Id="6038508c-acff-46b7-8578-4b90cb7b132d" />
+  <Project Path="NEMSweep.Contracts/NEMSweep.Contracts.csproj" Id="072a96da-d7d5-43cd-9401-381803305916" />
+  <Project Path="NEMSweep.Model.Tests/NEMSweep.Model.Tests.csproj" Id="d4c06f12-2c71-467b-ba1d-17f825d4cfc7" />
+  <Project Path="NEMSweep.Model/NEMSweep.Model.csproj" Id="0003c1e1-66a2-4216-b184-468f4f7e8733" />
+  <Project Path="NEMSweep.Web/NEMSweep.Web.csproj" />
+  <Project Path="NEMSweep.Web.Tests/NEMSweep.Web.Tests.csproj" />
+</Solution>

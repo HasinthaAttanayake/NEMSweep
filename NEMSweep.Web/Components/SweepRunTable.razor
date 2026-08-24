@@ -1,0 +1,229 @@
+@using NEMSweep.Contracts
+@using System.Globalization
+@using NEMSweep.Web.Components.Viz
+@using NEMSweep.Web.Services
+
+@* Every headline figure for every run. The index now carries the reliability metrics that used to
+   cost one multi-megabyte detail fetch each, so the whole table is free. *@
+<section class="run-table-section" aria-label="Runs in this sweep">
+    <div class="run-table-heading">
+        <div>
+            <h2>All runs</h2>
+            <p>Every figure the sweep index records, per run, with the annual cost each one implies. Each run opens in the same viewer as the baseline dispatch.</p>
+        </div>
+        <CsvDownload Headers="@CsvHeaders"
+                     Rows="@CsvRows"
+                     FileName="@CsvWriter.FileName(Index.SweepId, RegionId ?? "system", "runs")"
+                     Label="Download runs" />
+    </div>
+
+    <div class="run-table-scroll">
+        <table class="run-table">
+            <thead>
+                <tr>
+                    <th scope="col" class="sticky-column">Run</th>
+                    <th scope="col">@Index.Axis.Label<small>@Index.Axis.Unit</small></th>
+                    <th scope="col">Outcome</th>
+                    <th scope="col">Run time</th>
+                    <th scope="col">Reliability<small>vs target</small></th>
+                    <th scope="col">Storage sizing</th>
+                    <th scope="col">@AnnualCostLabel<small>AUD, derived</small></th>
+                    @foreach (SweepChartYAxis column in SweepSeriesCatalogue.All)
+                    {
+                        <th scope="col">@column.Label<small>@column.Unit</small></th>
+                    }
+                    <th scope="col"><span class="visually-hidden">Open</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (SweepIndexPointDTO point in Index.Points)
+                {
+                    <tr class="@(point.PointId == HighlightPointId ? "run-highlighted" : null)">
+                        <th scope="row" class="sticky-column">@point.Label</th>
+                        <td>@point.AxisValue.ToString(_axisFormat)</td>
+                        <td>
+                            @if (point.Status == SweepPointStatus.Succeeded)
+                            {
+                                <span>Completed</span>
+                            }
+                            else
+                            {
+                                <span class="run-constrained" title="@point.Failure?.Message">
+                                    @StageLabel(point.Failure?.Stage) constraint
+                                </span>
+                            }
+                        </td>
+                        <td>@Duration(point)</td>
+                        <td>
+                            @if (WithinTarget(point) is not { } within)
+                            {
+                                <span>—</span>
+                            }
+                            else
+                            {
+                                <span class="@(within ? "within-target" : "outside-target")">
+                                    @(within ? "Within" : "Outside")
+                                </span>
+                            }
+                        </td>
+                        <td>@SizingLabel(point.StorageSizing)</td>
+                        <td class="cell-derived">@AnnualCost(point)</td>
+                        @foreach (SweepChartYAxis column in SweepSeriesCatalogue.All)
+                        {
+                            <td>@Scalar(point, column)</td>
+                        }
+                        <td>
+                            @if (point.Status == SweepPointStatus.Succeeded)
+                            {
+                                <a href="@SweepPaths.RunRoute(Index.SweepId, point.PointId)">Open run</a>
+                            }
+                            else
+                            {
+                                <span class="run-failure" title="@point.Failure?.Message">@point.Failure?.Code</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public SweepIndexDTO Index { get; set; } = default!;
+    [Parameter] public string? RegionId { get; set; }
+
+    /// <summary>
+    /// What the derived cost column is of. Selecting a region makes every scalar that region's, so
+    /// a fixed "Annual system cost" would report one region's bill as the market's.
+    /// </summary>
+    [Parameter] public string AnnualCostLabel { get; set; } = "Annual system cost";
+
+    /// <summary>The run to mark as the reference in the table, usually the cheapest per MWh.</summary>
+    [Parameter] public string? HighlightPointId { get; set; }
+
+    private readonly Dictionary<string, string> _columnFormats = new(StringComparer.Ordinal);
+    private string _axisFormat = "N0";
+
+    protected override void OnParametersSet()
+    {
+        // A column reads as a column only when every cell in it shares a decimal count, so the
+        // precision is chosen per column from the values it actually holds.
+        _axisFormat = SweepValueFormat.ColumnFormat(Index.Points.Select(point => (double?)point.AxisValue));
+        _columnFormats.Clear();
+        foreach (SweepChartYAxis column in SweepSeriesCatalogue.All)
+        {
+            _columnFormats[column.Key] = SweepValueFormat.ColumnFormat(Index.Points.Select(point =>
+            {
+                SweepPointScalarResultsDTO? scalars = SweepChartData.SelectScalars(point, RegionId);
+                return scalars is null ? null : column.SelectValue(scalars);
+            }));
+        }
+    }
+
+    /// <summary>
+    /// Reliability for the selected scope. Every other cell in the row switches with the region
+    /// picker, so a column that kept reporting the system's verdict told a region that served all
+    /// of its load that it had missed the standard.
+    /// </summary>
+    private bool? WithinTarget(SweepIndexPointDTO point) => SweepChartData.WithinReliabilityTarget(
+        point.Reliability,
+        SweepChartData.SelectScalars(point, RegionId));
+
+    private string Scalar(SweepIndexPointDTO point, SweepChartYAxis column)
+    {
+        SweepPointScalarResultsDTO? scalars = SweepChartData.SelectScalars(point, RegionId);
+        double? value = scalars is null ? null : column.SelectValue(scalars);
+        return value is null
+            ? "—"
+            : SweepValueFormat.WithPrefix(column.ValuePrefix, value.Value, value.Value.ToString(_columnFormats[column.Key]));
+    }
+
+    /// <summary>
+    /// Every column the table shows, as machine-readable values. A spreadsheet is where someone
+    /// goes to do arithmetic on these, so the figures are written unformatted and invariant —
+    /// "$11.06b" and "66,275,989" read well on screen and cannot be summed anywhere else.
+    /// </summary>
+    private IReadOnlyList<string> CsvHeaders =>
+    [
+        "Run",
+        $"{Index.Axis.Label} ({Index.Axis.Unit})",
+        "Outcome",
+        "Run time (s)",
+        "Reliability",
+        "Storage sizing",
+        $"{AnnualCostLabel} (AUD, derived)",
+        .. SweepSeriesCatalogue.All.Select(column => $"{column.Label} ({column.Unit})"),
+    ];
+
+    private IReadOnlyList<IReadOnlyList<string>> CsvRows =>
+    [
+        .. Index.Points.Select(point =>
+        {
+            SweepPointScalarResultsDTO? scalars = SweepChartData.SelectScalars(point, RegionId);
+            return (IReadOnlyList<string>)
+            [
+                point.Label,
+                Number(point.AxisValue),
+                point.Status == SweepPointStatus.Succeeded
+                    ? "Completed"
+                    : $"{StageLabel(point.Failure?.Stage)} constraint: {point.Failure?.Message}",
+                point.DurationMs is null ? string.Empty : Number(point.DurationMs.Value / 1000),
+                WithinTarget(point) is not { } within ? string.Empty : within ? "Within" : "Outside",
+                point.StorageSizing is null ? string.Empty : SizingLabel(point.StorageSizing),
+                scalars is null
+                    ? string.Empty
+                    : Number((double)scalars.SlcoeAudPerMwh * scalars.EnergyServedMwh),
+                .. SweepSeriesCatalogue.All.Select(column =>
+                {
+                    double? value = scalars is null ? null : column.SelectValue(scalars);
+                    return value is null ? string.Empty : Number(value.Value);
+                }),
+            ];
+        }),
+    ];
+
+    /// <summary>
+    /// The shortest form that round-trips back to the same double, which is what a bare invariant
+    /// ToString gives. A fixed 17 significant digits is equally exact and prints 166.9 as
+    /// 166.90000000000001, which reads as a defect rather than as precision.
+    /// </summary>
+    private static string Number(double value) => value.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// What the run's whole year costs, from the levelised cost and the energy it served. Marked as
+    /// derived in the header because the artifact publishes the two factors, not the product.
+    /// </summary>
+    private string AnnualCost(SweepIndexPointDTO point)
+    {
+        SweepPointScalarResultsDTO? scalars = SweepChartData.SelectScalars(point, RegionId);
+        return scalars is null
+            ? "—"
+            : PlotFormat.MoneyTotal(scalars.SlcoeAudPerMwh * (decimal)scalars.EnergyServedMwh);
+    }
+
+    /// <summary>Whole seconds under a minute, whole minutes and seconds above it.</summary>
+    private static string Duration(SweepIndexPointDTO point) =>
+        point.DurationMs is null ? "—" : PlotFormat.Duration(point.DurationMs.Value);
+
+    private static string SizingLabel(StorageSizingOutcomeDTO? sizing) => sizing?.Outcome switch
+    {
+        StorageSizingOutcome.NotRequired => "Not required",
+        StorageSizingOutcome.Resized => "Resized",
+        StorageSizingOutcome.EnergyLimited => "Energy-limited",
+        StorageSizingOutcome.StorageNoLongerImprovesReliability => "Storage no longer improves reliability",
+        StorageSizingOutcome.BatteryCapacityLimitReached => "Battery limit reached",
+        StorageSizingOutcome.PassLimitReached => "Pass limit reached",
+        _ => "—",
+    };
+
+    private static string StageLabel(SweepFailureStage? stage) => stage switch
+    {
+        SweepFailureStage.Input => "Input",
+        SweepFailureStage.Dispatch => "Dispatch",
+        SweepFailureStage.Sizing => "Sizing",
+        SweepFailureStage.Costing => "Costing",
+        SweepFailureStage.Export => "Export",
+        _ => "Unattributed",
+    };
+}
