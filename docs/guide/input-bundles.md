@@ -81,18 +81,14 @@ the wind site for the quality of its wind resource, so they are frequently diffe
 locations within the region.
 
 This matters beyond generation shape. The **solar** site's coordinates are the model's *only*
-source of that region's location: interconnector route length, and therefore every interconnector's
-reported capital and fixed transmission cost, is derived as the great-circle distance between the
-solar-site coordinates of the two endpoint regions (see [Scenario configuration](scenarios.md#interconnectors)
-and [Limitations](../assumptions/limitations.md)). The wind site's coordinates are not used for
-this. Practically: swapping a region's solar EPW for a different site silently changes that
-region's effective location and therefore every interconnector cost touching it, even though
-nothing about the change looks transmission-related.
+source of that region's location, published on every dispatch result as that region's endpoint
+coordinates for map display (see [Scenario configuration](scenarios.md#interconnectors)). Transmission
+cost does not depend on it: an interconnector's route length is a scenario value you declare
+directly, not derived from a region's weather file.
 
 No file in the repository records why a given site was chosen for a given role. That context is
 currently held only by the person who built the bundle. Document your own reasoning somewhere
-durable if you change an assignment. Tracking the assignment properly is
-[issue #119](https://github.com/HasinthaAttanayake/NemSim/issues/119).
+durable if you change an assignment.
 
 ### The FY2026 bundle's current assignment
 

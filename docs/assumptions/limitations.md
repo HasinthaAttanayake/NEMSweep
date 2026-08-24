@@ -112,34 +112,24 @@ The same applies to inter-regional transfer, which serves regions in priority or
 max-flow solves. That guarantees a higher-priority region is never starved by a lower-priority one,
 and for the same reason is deliberately not a global optimum.
 
-## 6. Transmission route length is a proxy, and it runs long
+## 6. Reciprocal interconnectors are each costed at the corridor's full length
 
-Two approximations compound here. Both are kept deliberately, because the alternative, a real
-per-route distance table, is more precision than the rest of the cost model supports. Both inflate
-reported transmission cost.
+Every corridor that carries flow both ways is declared as two directed interconnectors (see
+[Scenario configuration](../guide/scenarios.md#interconnectors)), and each is costed independently
+over the corridor's full route length, so the same kilometre of conductor is paid for twice.
+Charging each of the five physical corridors once at its larger directed rating gives
+1,955,280 km·MW against the 3,461,890 km·MW actually charged across all ten directed links. This
+convention alone accounts for roughly **1.8×** of reported transmission cost. It is kept
+deliberately: attributing a shared asset's cost to one direction rather than the other would need a
+convention of its own, and this one is at least uniform.
 
-**Route length is measured between weather sites.** A region's location, in NemSim, is the location
-of its *solar* weather station, a site chosen for solar resource quality rather than for where a
-transmission line terminates. Interconnector length is the great-circle distance between two such
-sites:
-
-| Link | Model | Actual route |
-|---|---|---|
-| VIC1–SA1 | 784 km | Heywood, ~275 km |
-| VIC1–NSW1 | 732 km | VNI, ~300 km |
-| NSW1–QLD1 | 964 km | QNI corridor, ~500 km |
-| TAS1–VIC1 | 360 km | Basslink, ~370 km |
-| NSW1–SA1 | 1,020 km | EnergyConnect, ~900 km |
-
-A consequence worth stating plainly: **swapping a region's solar weather file silently changes
-system transmission cost**, because the resource site is the only source of regional location.
-
-**Reciprocal links each carry the full route length.** Every corridor is declared as two directed
-interconnectors, and each is costed independently over the corridor's full distance, so the same
-kilometre of conductor is paid for twice. Charging each of the five physical corridors once at its
-larger directed rating gives 3,954,000 km·MW against the 7,035,547 km·MW actually charged across
-all ten directed links. This convention alone accounts for roughly **1.8×** of reported
-transmission cost.
+Route length itself is a declared field on each scenario interconnector (`routeLengthKm`), not
+derived from anything else. It used to be the great-circle distance between the endpoint regions'
+solar weather sites, which ran long against the real NEM corridors and meant swapping a region's
+solar weather file silently changed transmission cost. The committed scenario now carries
+approximate real corridor distances instead (Heywood ≈275 km, VNI ≈300 km, the QNI corridor
+≈500 km, Basslink ≈370 km, EnergyConnect ≈900 km); a more precise per-route figure can replace any
+of them without a code change.
 
 ## 7. Interconnector losses are a flat unsourced placeholder
 

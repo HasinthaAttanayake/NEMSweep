@@ -13,7 +13,7 @@ link belongs to neither region alone and attributing it to one side or the other
 arbitrary. A corridor that carries flow both ways is not one bidirectional link; it is **two**
 directed interconnectors, each independently declared and each independently costed. That
 convention matters for economics too: see [Economics](economics.md) and
-[Limitations §6](../assumptions/limitations.md#6-transmission-route-length-is-a-proxy-and-it-runs-long)
+[Limitations §6](../assumptions/limitations.md#6-reciprocal-interconnectors-are-each-costed-at-the-corridors-full-length)
 for what declaring both directions does to reported cost.
 
 ## The layering
@@ -112,23 +112,20 @@ directional forward/reverse link series that attribution is built from.
 
 ## Costing
 
-Interconnector cost is charged against the great-circle distance between its two endpoint regions'
-*solar* weather sites, which are the only source of a region's location in the model, and its
-directed transfer capacity, using the `DistancePowerCost` and `AnnualDistancePowerCost` rates
-described in [Economics](economics.md). Two approximations compound in that route length, and both
-inflate reported transmission cost: the solar site is chosen for resource quality, not for where a
-real transmission line terminates, so modelled distance runs long against the actual NEM corridors;
-and because each corridor is declared as two directed interconnectors, the same kilometre of
-conductor is paid for twice, once per direction.
-[Limitations §6](../assumptions/limitations.md#6-transmission-route-length-is-a-proxy-and-it-runs-long)
-carries the full model-versus-actual distance table and the roughly 1.8× cost consequence of
-double-costing reciprocal links, so this page does not repeat them.
+Interconnector cost is charged against its declared route length (`routeLengthKm`, a required field
+on each scenario interconnector, alongside its directed capacity) using the `DistancePowerCost` and
+`AnnualDistancePowerCost` rates described in [Economics](economics.md). Route length is not derived
+from anything else, so it does not depend on which weather file a region happens to be assigned.
+One approximation remains: because each corridor is declared as two directed interconnectors, the
+same kilometre of conductor is paid for twice, once per direction.
+[Limitations §6](../assumptions/limitations.md#6-reciprocal-interconnectors-are-each-costed-at-the-corridors-full-length)
+carries the roughly 1.8× cost consequence of that, so this page does not repeat it.
 
 ## Next
 
 - [Dispatch](dispatch.md): where transfer sits between generation and storage within an interval.
 - [Economics](economics.md): how the capacity and route length described here become an annual cost.
-- [Limitations §6](../assumptions/limitations.md#6-transmission-route-length-is-a-proxy-and-it-runs-long)
+- [Limitations §6](../assumptions/limitations.md#6-reciprocal-interconnectors-are-each-costed-at-the-corridors-full-length)
   and
   [Limitations §7](../assumptions/limitations.md#7-interconnector-losses-are-a-flat-unsourced-placeholder):
   the two places transmission figures will mislead you.
