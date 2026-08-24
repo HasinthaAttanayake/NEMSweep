@@ -158,6 +158,102 @@ public sealed class SweepRunTests
         error.ToString().Should().Contain("failed points: p1");
     }
 
+    /// <summary>
+    /// A malformed override can fail before a config is even generated, not just after: a keyed
+    /// array override missing its key property fails inside the JSON merge patch itself. That used
+    /// to happen in an unguarded fan-out pass before any point's dispatch even started, aborting the
+    /// whole run with no results published for any point. It must now isolate to the one point.
+    /// Run for the malformed point in either position: the failure handler cleans up inside the
+    /// points directory, which nothing creates until a point dispatches, so a malformed *first*
+    /// point used to take the whole run down inside the handler meant to contain it.
+    /// </summary>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public void Run_ContinuesAfterAnOverrideFailsToMergeIntoTheBaseline(int malformedIndex)
+    {
+        const string Malformed = """{ "regions": [{ "generatingFleets": [] }] }""";
+        using var fixture = new SweepRunFixture();
+        fixture.WriteDefinition($$"""
+            [{ "pointId": "p0", "axisValue": 0, "label": "First", "overrides": {{(malformedIndex == 0 ? Malformed : "{}")}} },
+             { "pointId": "p1", "axisValue": 1, "label": "Second", "overrides": {{(malformedIndex == 1 ? Malformed : "{}")}} }]
+            """);
+        string failedId = $"p{malformedIndex}";
+        string succeededId = $"p{1 - malformedIndex}";
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+
+        int exitCode = SweepRunCommand.Run(fixture.CreateContext(output, error), "sweeps/test-sweep.json");
+
+        exitCode.Should().Be(1);
+        File.Exists(fixture.PointResultPath(succeededId)).Should().BeTrue();
+        File.Exists(fixture.PointResultPath(failedId)).Should().BeFalse();
+        Status(fixture, succeededId)["status"]!.GetValue<string>().Should().Be("succeeded");
+        Status(fixture, failedId)["status"]!.GetValue<string>().Should().Be("failed");
+        JsonObject failedPoint = ReadIndex(fixture)["points"]![malformedIndex]!.AsObject();
+        failedPoint["status"]!.GetValue<string>().Should().Be("failed");
+        failedPoint["failure"]!["stage"]!.GetValue<string>().Should().Be("input");
+        failedPoint["failure"]!["code"]!.GetValue<string>().Should().Be("invalidConfig");
+        error.ToString().Should().Contain($"failed points: {failedId}");
+    }
+
+    /// <summary>
+    /// A point that fails while running still ran against a real config, and the index cites one
+    /// for every point. That config must therefore be published before dispatch, or the index
+    /// points at a file that was never written.
+    /// </summary>
+    [Fact]
+    public void Run_PublishesTheConfigOfAPointThatFailsItsSchemaValidation()
+    {
+        using var fixture = new SweepRunFixture();
+        fixture.WriteDefinition("""
+            [{ "pointId": "p0", "axisValue": 0, "label": "Base", "overrides": {} },
+             { "pointId": "p1", "axisValue": 1, "label": "Invalid", "overrides": { "costBasis": { "year": 1000 } } }]
+            """);
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+
+        int exitCode = SweepRunCommand.Run(fixture.CreateContext(output, error), "sweeps/test-sweep.json");
+
+        exitCode.Should().Be(1);
+        JsonObject failedPoint = ReadIndex(fixture)["points"]![1]!.AsObject();
+        failedPoint["status"]!.GetValue<string>().Should().Be("failed");
+        failedPoint["failure"]!["stage"]!.GetValue<string>().Should().Be("input");
+        failedPoint["failure"]!["code"]!.GetValue<string>().Should().Be("invalidConfig");
+        File.Exists(PublishedConfig(fixture, failedPoint)).Should().BeTrue();
+    }
+
+    /// <summary>
+    /// A point whose overrides never merged has no config of its own, so a config left at that
+    /// path by an earlier run must not survive to be cited as the one this point ran against.
+    /// </summary>
+    [Fact]
+    public void Run_DoesNotPublishAStaleConfigForAPointWhoseOverridesFailedToMerge()
+    {
+        using var fixture = new SweepRunFixture();
+        fixture.WriteDefinition("""
+            [{ "pointId": "p0", "axisValue": 0, "label": "Base", "overrides": {} },
+             { "pointId": "p1", "axisValue": 1, "label": "Changed", "overrides": { "name": "Changed scenario" } }]
+            """);
+        using var output = new StringWriter();
+        SweepRunCommand.Run(fixture.CreateContext(output), "sweeps/test-sweep.json").Should().Be(0);
+        string publishedBefore = PublishedConfig(fixture, ReadIndex(fixture)["points"]![1]!.AsObject());
+        File.Exists(publishedBefore).Should().BeTrue();
+        File.Delete(Path.Combine(fixture.RootPath, "sweeps", "test-sweep", "configs", "p1.json"));
+
+        fixture.WriteDefinition("""
+            [{ "pointId": "p0", "axisValue": 0, "label": "Base", "overrides": {} },
+             { "pointId": "p1", "axisValue": 1, "label": "Changed", "overrides": { "regions": [{ "generatingFleets": [] }] } }]
+            """);
+        using var rerunOutput = new StringWriter();
+        using var rerunError = new StringWriter();
+
+        SweepRunCommand.Run(fixture.CreateContext(rerunOutput, rerunError), "sweeps/test-sweep.json")
+            .Should().Be(1);
+
+        File.Exists(publishedBefore).Should().BeFalse();
+    }
+
     [Fact]
     public void Run_ExternalizesBothSystemAndRegionalDemandToTheSameSharedSeriesFile()
     {
@@ -403,6 +499,13 @@ public sealed class SweepRunTests
     private static JsonObject ReadIndex(SweepRunFixture fixture) =>
         JsonNode.Parse(File.ReadAllText(fixture.IndexPath))!.AsObject();
 
+    /// <summary>Resolves an index point's <c>configPath</c> the way a reader of the published
+    /// sweep would, so a citation that does not resolve to a file fails the test.</summary>
+    private static string PublishedConfig(SweepRunFixture fixture, JsonObject point) =>
+        Path.Combine(
+            fixture.SweepDataPath,
+            point["configPath"]!.GetValue<string>().Replace('/', Path.DirectorySeparatorChar));
+
     private static byte[] NormalizedResultBytes(string path)
     {
         JsonObject result = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
@@ -492,7 +595,7 @@ public sealed class SweepRunTests
                         10,
                         zeroes))));
             File.WriteAllText(Path.Combine(RootPath, "scenarios", "baseline.json"), """
-            { "schemaVersion": 4, "id": "baseline", "name": "Baseline", "costBasis": { "year": 2026, "realDiscountRate": 0.07 }, "storageSizing": { "maximumPowerMw": 100, "maximumEnergyMwh": 400 }, "regions": [{ "regionId": "NSW1", "demandFile": "demand.json", "weatherFile": "weather.json", "generatingFleets": [{ "technology": "Gas", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 } }], "storageFleets": [{ "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0, "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 }, "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 } }] }] }
+            { "schemaVersion": 5, "id": "baseline", "name": "Baseline", "costBasis": { "year": 2026, "realDiscountRate": 0.07 }, "storageSizing": { "maximumPowerMw": 100, "maximumEnergyMwh": 400 }, "regions": [{ "regionId": "NSW1", "demandFile": "demand.json", "weatherFile": "weather.json", "generatingFleets": [{ "technology": "Gas", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 } }], "storageFleets": [{ "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0, "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 }, "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 } }] }] }
             """);
             Paths = RepositoryPaths.Discover(RootPath);
         }
@@ -542,7 +645,7 @@ public sealed class SweepRunTests
                 Path.Combine(RootPath, "weather.json"),
                 Path.Combine(RootPath, "weather-vic1.json"));
             File.WriteAllText(Path.Combine(RootPath, "scenarios", "baseline.json"), """
-            { "schemaVersion": 4, "id": "baseline", "name": "Baseline", "costBasis": { "year": 2026, "realDiscountRate": 0.07 }, "storageSizing": { "maximumPowerMw": 100, "maximumEnergyMwh": 400 }, "regions": [{ "regionId": "NSW1", "demandFile": "demand.json", "weatherFile": "weather.json", "generatingFleets": [{ "technology": "Gas", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 } }], "storageFleets": [{ "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0, "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 }, "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 } }] }, { "regionId": "VIC1", "demandFile": "demand-vic1.json", "weatherFile": "weather-vic1.json", "generatingFleets": [{ "technology": "Gas", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 } }], "storageFleets": [{ "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0, "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 }, "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 } }] }] }
+            { "schemaVersion": 5, "id": "baseline", "name": "Baseline", "costBasis": { "year": 2026, "realDiscountRate": 0.07 }, "storageSizing": { "maximumPowerMw": 100, "maximumEnergyMwh": 400 }, "regions": [{ "regionId": "NSW1", "demandFile": "demand.json", "weatherFile": "weather.json", "generatingFleets": [{ "technology": "Gas", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 } }], "storageFleets": [{ "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0, "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 }, "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 } }] }, { "regionId": "VIC1", "demandFile": "demand-vic1.json", "weatherFile": "weather-vic1.json", "generatingFleets": [{ "technology": "Gas", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 } }], "storageFleets": [{ "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0, "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 }, "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 } }] }] }
             """);
         }
 

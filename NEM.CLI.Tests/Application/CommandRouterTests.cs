@@ -15,11 +15,11 @@ public sealed class CommandRouterTests
         using var fixture = new CliFixture();
         RepositoryPaths paths = fixture.Paths;
 
-        paths.DemandDataPath.Should().EndWith(
-            Path.Combine("NEM.Web", "wwwroot", "data", "demand-data.json"));
+        paths.WeatherDataPath("NSW1").Should().EndWith(
+            Path.Combine("NEM.Web", "wwwroot", "data", "weather-nsw1.json"));
         paths.DispatchResultsPath.Should().EndWith(
             Path.Combine("NEM.Web", "wwwroot", "data", "results.json"));
-        paths.DemandDataPath.Should().NotBe(paths.DispatchResultsPath);
+        paths.WeatherDataPath("NSW1").Should().NotBe(paths.DispatchResultsPath);
         paths.ResolveConfiguredPath(Path.Combine("NEM.CLI", "data", "demand-zips")).Should().Be(
             Path.Combine(fixture.RootPath, "NEM.CLI", "data", "demand-zips"));
     }
@@ -70,8 +70,7 @@ public sealed class CommandRouterTests
         [
             "--version", "--run-scenario", "--fan-out-sweep", "--run-sweep", "--describe-schema",
             "--validate-inputs", "--ingest", "--import-demand", "--generation-information",
-            "--epw-report", "--epw-series", "--epw-validate", "--epw-gaps", "--epw-rows",
-            "--epw-header",
+            "--epw-report",
         ];
         foreach (string command in routed)
         {
@@ -152,10 +151,10 @@ public sealed class CommandRouterTests
         using var error = new StringWriter();
         var application = new CommandRouter(fixture.Paths, fixture.RootPath, output, error);
 
-        int exitCode = application.Run(["--epw-header", "missing.epw"]);
+        int exitCode = application.Run(["--epw-report", "NSW1", "missing.epw"]);
 
         exitCode.Should().Be(1);
-        error.ToString().Should().StartWith("EPW header report failed:");
+        error.ToString().Should().StartWith("EPW report failed:");
     }
 
     [Theory]
@@ -218,12 +217,12 @@ public sealed class CommandRouterTests
     {
         using var fixture = new CliFixture();
         fixture.WriteSettings("appsettings.local.json", "Local scenario");
-                Directory.CreateDirectory(Path.Combine(fixture.RootPath, "scenarios"));
-                File.WriteAllText(
-                        Path.Combine(fixture.RootPath, "scenarios", "Local scenario.json"),
-                        """
+        Directory.CreateDirectory(Path.Combine(fixture.RootPath, "scenarios"));
+        File.WriteAllText(
+                Path.Combine(fixture.RootPath, "scenarios", "Local scenario.json"),
+                """
                         {
-                            "schemaVersion": 4,
+                            "schemaVersion": 5,
                             "id": "test-scenario",
                             "name": "Test scenario",
                             "costBasis": { "year": 2026, "realDiscountRate": 0.07 },

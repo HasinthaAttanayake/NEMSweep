@@ -264,6 +264,11 @@ internal static class DispatchResultsExport
                     link.Capacity.Megawatts)).ToArray()),
             systemOutcome.InterconnectorFlows.Select(flow =>
             {
+                // Route length is the declared scenario value, not a distance derived from the
+                // endpoints; lat/lon are still read off the weather site purely for map placement.
+                ScenarioInterconnector scenarioLink = dispatch.Scenario.Interconnectors.Single(link =>
+                    string.Equals(link.FromRegionId, flow.Interconnector.FromRegionId, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(link.ToRegionId, flow.Interconnector.ToRegionId, StringComparison.OrdinalIgnoreCase));
                 GeoCoordinate from = dispatch.PowerSystem
                     .RequireResourceProfile(flow.Interconnector.FromRegionId).Location;
                 GeoCoordinate to = dispatch.PowerSystem
@@ -275,12 +280,16 @@ internal static class DispatchResultsExport
                     flow.Interconnector.Capacity.Megawatts,
                     ValuesOf(flow.Flow),
                     ValuesOf(flow.Losses),
-                    from.DistanceTo(to).Kilometres,
+                    scenarioLink.RouteLength.Kilometres,
                     from.Latitude,
                     from.Longitude,
                     to.Latitude,
-                    to.Longitude);
-            }).ToArray());
+                    to.Longitude,
+                    scenarioLink.CostParameters.CapitalCost.AudPerKmPerMw,
+                    scenarioLink.CostParameters.FixedOperatingCost.AudPerKmPerMwYear,
+                    scenarioLink.TechnicalLifeYears);
+            }).ToArray(),
+            new DispatchCostBasisDTO(dispatch.Scenario.CostBasis.Year, dispatch.Scenario.CostBasis.RealDiscountRate));
         SystemDispatchOverviewDTO overview = new(
             ArtifactSchemaVersions.SystemDispatchOverview,
             system.RunId,
@@ -534,23 +543,6 @@ internal static class DispatchResultsExport
         return minimumIndex;
     }
 
-    public static DispatchResultsDTO Create(DispatchExportRequest request)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-        DispatchEvidence evidence = CreateEvidence(request);
-        return new DispatchResultsDTO(
-            ArtifactSchemaVersions.DispatchResults,
-            evidence.Scenario,
-            DateTimeOffset.UtcNow,
-            evidence.Sources,
-            evidence.PowerSystem,
-            evidence.DataSeries,
-            evidence.Metrics,
-            evidence.Reliability,
-            evidence.StorageSizing,
-            CreateLegacyCost(request, evidence.Outcome));
-    }
-
     /// <summary>Everything a dispatch-results artifact needs except cost, which depends on the caller's scope.</summary>
     private sealed record DispatchEvidence(
         DispatchScenarioDTO Scenario,
@@ -587,6 +579,12 @@ internal static class DispatchResultsExport
         double deliveredGenerationMwh = deliveredGenerationByTechnology.Values
             .Sum(series => series.Integrate().MegawattHours);
         Region region = powerSystem.Regions.Single(region => region.RegionId == outcome.RegionId);
+        ScenarioRegion scenarioRegion = request.Scenario.Regions.Single(candidate =>
+            string.Equals(candidate.RegionId, outcome.RegionId, StringComparison.OrdinalIgnoreCase));
+        var generatingCostsByTechnology = scenarioRegion.GeneratingFleets.ToDictionary(
+            fleet => fleet.Technology);
+        var storageCostsByTechnology = scenarioRegion.StorageFleets.ToDictionary(
+            fleet => fleet.Technology);
 
         return new DispatchEvidence(
             new DispatchScenarioDTO(
@@ -603,13 +601,32 @@ internal static class DispatchResultsExport
                 request.DemandData.SourceArchives.ToArray()),
             new DispatchPowerSystemDTO(
                 powerSystem.Id.Value,
-                region.GeneratingFleets.Select(fleet => new DispatchFleetDTO(
-                    fleet.GenerationTechnology.ToString(),
-                    fleet.NameplateCapacity.Megawatts)).ToArray(),
-                region.StorageFleets.Select(fleet => new DispatchStorageFleetDTO(
-                    fleet.StorageTechnology.ToString(),
-                    fleet.StorageCapacity.MegawattHours,
-                    fleet.PowerCapacity.Megawatts)).ToArray()),
+                region.GeneratingFleets.Select(fleet =>
+                {
+                    ScenarioGeneratingFleet costed = generatingCostsByTechnology[fleet.GenerationTechnology];
+                    return new DispatchFleetDTO(
+                        fleet.GenerationTechnology.ToString(),
+                        fleet.NameplateCapacity.Megawatts,
+                        costed.CostParameters.CapitalCost.AudPerMwCapacity,
+                        costed.CostParameters.FixedOperatingCost.AudPerMwYear,
+                        costed.CostParameters.VariableOperatingCost.AudPerMwhGenerated,
+                        costed.CostParameters.FuelPrice.AudPerGjThermal,
+                        costed.TechnologyProfile.HeatRate.GigajoulesPerMegawattHour,
+                        costed.TechnologyProfile.TechnicalLifeYears);
+                }).ToArray(),
+                region.StorageFleets.Select(fleet =>
+                {
+                    ScenarioStorageFleet costed = storageCostsByTechnology[fleet.StorageTechnology];
+                    return new DispatchStorageFleetDTO(
+                        fleet.StorageTechnology.ToString(),
+                        fleet.StorageCapacity.MegawattHours,
+                        fleet.PowerCapacity.Megawatts,
+                        costed.CostParameters.PowerCapitalCost.AudPerMwCapacity,
+                        costed.CostParameters.EnergyCapitalCost.AudPerMwhCapacity,
+                        costed.CostParameters.FixedOperatingCost.AudPerMwYear,
+                        costed.TechnologyProfile.RoundTripEfficiency,
+                        costed.TechnologyProfile.TechnicalLifeYears);
+                }).ToArray()),
             new DispatchSeriesDTO(
                 new DispatchDemandDTO(
                     ValuesOf(region.Demand.BaseDemand),
@@ -649,33 +666,6 @@ internal static class DispatchResultsExport
             CreateStorageSizingOutcome(request, regionalSizing),
             outcome);
     }
-
-    /// <summary>Cost for the single-region legacy artifact, where system and region scope coincide.</summary>
-    private static DispatchCostDTO CreateLegacyCost(DispatchExportRequest request, DispatchOutcome outcome)
-    {
-        DispatchGenerationCostContributionDTO[] costContributions = CreateGenerationCostContributions(
-            request.CostBreakdown.GenerationCostContributions,
-            outcome.DeliveredToLoad.Integrate().MegawattHours);
-        return new DispatchCostDTO(
-            "calculated",
-            costContributions.Sum(contribution => contribution.AnnualisedCostAud),
-            request.CostBreakdown.TotalAnnualisedStorageCost.Aud,
-            request.CostBreakdown.TotalAnnualisedCost.Aud,
-            request.CostBreakdown.SystemLevelisedCostOfGeneration.AudPerMwhDelivered,
-            request.CostBreakdown.SystemLevelisedCostOfStorage.AudPerMwhDelivered,
-            request.CostBreakdown.SystemLevelisedCostOfElectricity.AudPerMwhDelivered,
-            0,
-            0,
-            request.Scenario.Interconnectors.Count > 0
-                ? TransmissionCostStatus.Calculated
-                : TransmissionCostStatus.NotModelled,
-            outcome.Imports.Integrate().MegawattHours
-                - outcome.Exports.Integrate().MegawattHours,
-            costContributions);
-    }
-
-    public static void WriteJson(DispatchResultsDTO result, string path)
-        => JsonFile.Write(result, path);
 
     private static StorageSizingOutcomeDTO CreateStorageSizingOutcome(
         DispatchExportRequest request,
