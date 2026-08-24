@@ -1,4 +1,5 @@
 @page "/"
+@using System.Globalization
 @using NEM.Contracts
 @using NEM.Web.Components.Viz
 @using NEM.Web.Services
@@ -11,39 +12,105 @@
 
 <div class="home-page">
     <header class="project-header">
-        <p class="eyebrow">Open National Electricity Market simulation</p>
-        <h1>NemSim</h1>
+        <p class="eyebrow">Open National Electricity Market model</p>
+        <h1>How will Australia's Energy Grid Support Data Centres?</h1>
         <p class="lead">
-            An open model of Australia's National Electricity Market, being built in public one
-            validated layer at a time.
+            Add just 500 MW of data centre capacity across the eastern states, with FY25-26 generation and transmission assets held constant, and the National Energy Market (NEM) needs
+            2,035 MWh of new storage infrastructure to hold its reliability standard.
+        </p>
+        <p class="lead">
+            That's just one scenario. Bring your own demand, generation and storage fleets, economic assumptions and see what moves.
         </p>
         <div class="project-actions">
             <MudButton Variant="Variant.Filled"
                        Color="Color.Primary"
-                       Href="https://github.com/users/HasinthaAttanayake/projects/11"
-                       Target="_blank"
-                       rel="noopener noreferrer"
-                       StartIcon="@Icons.Material.Filled.TrackChanges">
-                Track project
+                       Href="#case-study"
+                       StartIcon="@Icons.Material.Filled.QueryStats">
+                See the current case study
             </MudButton>
             <MudButton Variant="Variant.Outlined"
                        Color="Color.Primary"
-                       Href="https://github.com/HasinthaAttanayake/NemSim"
+                       Href="@DocumentationLinks.Home"
                        Target="_blank"
                        rel="noopener noreferrer"
-                       StartIcon="@Icons.Material.Filled.Code">
-                View source
+                       StartIcon="@Icons.Material.Filled.MenuBook">
+                Read the documentation
             </MudButton>
         </div>
+        <p class="project-links">
+            <a href="https://github.com/users/HasinthaAttanayake/projects/11" target="_blank" rel="noopener noreferrer">Track the project</a>
+            <span aria-hidden="true">·</span>
+            <a href="https://github.com/HasinthaAttanayake/NemSim" target="_blank" rel="noopener noreferrer">View source</a>
+        </p>
     </header>
+
+    <section class="claims-band" aria-label="How to read these figures">
+        <p class="claim">
+            <strong>Use it to compare, not to quote.</strong>
+            The gap between two scenarios is the trustworthy output. Any single figure carries the
+            model's assumptions with it, so treat the comparison as the finding and the level as an
+            estimate.
+        </p>
+        <p class="claim">
+            <strong>These are build-and-run costs, not bills.</strong>
+            What the system costs to construct and operate per unit of energy delivered. Retail,
+            network and scheme costs are not in here, so nothing on this page is a price anyone
+            pays.
+        </p>
+        <p class="claim">
+            <strong>You can show your working.</strong>
+            Every figure traces to a published run and to the exact data behind it, and every
+            assumption sits in an
+            <a href="@DocumentationLinks.Assumptions" target="_blank" rel="noopener noreferrer">assumptions register</a>
+            that a test suite checks against the code on every change.
+        </p>
+    </section>
+
+    <section class="problem-section" aria-labelledby="problem-heading">
+        <div class="section-heading">
+            <div>
+                <p class="section-label">Why this exists</p>
+                <h2 id="problem-heading">Most modelling of the transition asks you to trust it</h2>
+            </div>
+        </div>
+        <div class="problem-cards">
+            <article class="problem-card">
+                <h3>A headline number that improves as the system fails</h3>
+                <p>
+                    Cost per megawatt-hour is measured against the energy actually served, so
+                    demand the grid never met simply leaves the denominator. Quote that figure
+                    alone and a system in shortfall reads as one getting cheaper.
+                </p>
+            </article>
+            <article class="problem-card">
+                <h3>One national average, five different grids</h3>
+                <p>
+                    NSW, QLD, VIC, SA and TAS carry different resource mixes, demand shapes and
+                    transmission constraints. A blended national figure hides all of it.
+                </p>
+            </article>
+            <article class="problem-card">
+                <h3>Assumptions that drift without anyone noticing</h3>
+                <p>
+                    A model's constants get tweaked for one run and the documentation never catches
+                    up, so a report can go stale silently and nobody downstream can tell.
+                </p>
+            </article>
+        </div>
+        <p class="problem-resolution">
+            NemSim answers each of these directly: cost is always reported beside the unserved
+            energy behind it, and dispatch is simulated per region and reported per region rather
+            than blended into a national figure.
+        </p>
+    </section>
 
     @if (_system is not null && _analysis is not null)
     {
-        <section class="headline-section" aria-labelledby="headline-heading">
+        <section id="case-study" class="headline-section" aria-labelledby="headline-heading">
             <div class="section-heading">
                 <div>
-                    <p class="section-label">Latest run</p>
-                    <h2 id="headline-heading">What the current simulation costs</h2>
+                    <p class="section-label">Case study &middot; latest run</p>
+                    <h2 id="headline-heading">What the current run costs</h2>
                 </div>
                 <p>@ScopeSentence</p>
             </div>
@@ -80,11 +147,11 @@
     {
         @* Loading has a spinner and every other non-success state says why. Dropping the section
            silently would leave the page looking as though the run simply has no headline. *@
-        <section class="headline-section" aria-labelledby="headline-heading">
+        <section id="case-study" class="headline-section" aria-labelledby="headline-heading">
             <div class="section-heading">
                 <div>
-                    <p class="section-label">Latest run</p>
-                    <h2 id="headline-heading">What the current simulation costs</h2>
+                    <p class="section-label">Case study &middot; latest run</p>
+                    <h2 id="headline-heading">What the current run costs</h2>
                 </div>
             </div>
             <ArtifactLoadStateView State="_systemState"><span /></ArtifactLoadStateView>
@@ -98,12 +165,12 @@
         <section class="state-section" aria-labelledby="state-heading">
             <div class="section-heading">
                 <div>
-                    <p class="section-label">Where the build is</p>
-                    <h2 id="state-heading">What the model does today</h2>
+                    <p class="section-label">How it works</p>
+                    <h2 id="state-heading">What NemSim actually simulates</h2>
                 </div>
                 <p>
-                    NemSim is built one validated layer at a time. Every line below is read from the
-                    artifacts the latest run produced, so this list is current by construction.
+                    Every line below is read from the artifacts the latest run produced, not
+                    written by hand, so it describes what ran rather than what might.
                 </p>
             </div>
 
@@ -135,14 +202,46 @@
         </div>
 
         <ol>
-            <li>What could electricity cost in 2030 if Australia achieves its 82% renewable generation target?</li>
             <li>
-                How could data-centre growth affect that outcome under the Australian Government's
+                How much storage does the NEM have to build to keep meeting its reliability
+                standard as data centres arrive, under the Australian Government's
                 <a href="https://www.industry.gov.au/publications/expectations-data-centres-and-ai-infrastructure-developers"
                    target="_blank"
-                   rel="noopener noreferrer">expectations for developers</a>?
+                   rel="noopener noreferrer">expectations for developers</a>, and where does
+                storage stop being the answer at all?
             </li>
+            <li>What could electricity cost in 2030 if Australia achieves its 82% renewable generation target?</li>
         </ol>
+    </section>
+
+    <section class="docs-cta" aria-labelledby="docs-cta-heading">
+        <div class="docs-cta-copy">
+            <p class="section-label">Documentation</p>
+            <h2 id="docs-cta-heading">Every figure here traces back to a documented assumption</h2>
+            <p>
+                The guide, the concept pages behind dispatch and storage sizing, the full
+                assumptions and limitations register, and how to run your own sweeps with an LLM
+                all live on their own site &mdash; read it before you quote a number from this one.
+            </p>
+        </div>
+        <div class="docs-cta-actions">
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Href="@DocumentationLinks.Home"
+                       Target="_blank"
+                       rel="noopener noreferrer"
+                       StartIcon="@Icons.Material.Filled.MenuBook">
+                Open the documentation
+            </MudButton>
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Primary"
+                       Href="@DocumentationLinks.Limitations"
+                       Target="_blank"
+                       rel="noopener noreferrer"
+                       StartIcon="@Icons.Material.Filled.Rule">
+                Assumptions and limitations
+            </MudButton>
+        </div>
     </section>
 
     @* An empty manifest legitimately means "no sweeps yet" and the section is omitted. A manifest
@@ -198,6 +297,28 @@
                                 <div>
                                     <dt>Annual cost</dt>
                                     <dd>@PlotFormat.MoneyTotal((decimal)first.TotalAnnualCostAud) → @PlotFormat.MoneyTotal((decimal)last.TotalAnnualCostAud)</dd>
+                                </div>
+                                @* Both shown beside the cost figures deliberately. Storage is
+                                   rebuilt until the run holds the reliability standard, so a run
+                                   can report as within target only because it built its way there.
+                                   Unserved demand also leaves the levelised-cost denominator, so
+                                   a sweep can read as getting cheaper while the grid fails.
+                                   The sizing outcome carries the rest: notRequired means the fleet
+                                   held, resized means storage was built to hold it, and anything
+                                   else means storage stopped closing the gap, so what is left is
+                                   generation or transmission investment. Which of the two is not
+                                   something sizing decides: only energyLimited proves a system-wide
+                                   energy shortfall, and the others report a bound the search hit. *@
+                                @if (StorageBuild(first, last) is { } storageBuild)
+                                {
+                                    <div>
+                                        <dt>Storage energy built</dt>
+                                        <dd>@storageBuild</dd>
+                                    </div>
+                                }
+                                <div>
+                                    <dt>Unserved energy</dt>
+                                    <dd>@UnservedShare(first) → @UnservedShare(last)</dd>
                                 </div>
                             }
                             @if (summary.Analysis.ConstrainedPoints.Count > 0)
@@ -279,6 +400,14 @@
                 </span>
                 <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
             </a>
+            <a href="@DocumentationLinks.LlmWorkflow" target="_blank" rel="noopener noreferrer">
+                <MudIcon Icon="@Icons.Material.Filled.SmartToy" />
+                <span>
+                    <strong>Design a sweep with an LLM</strong>
+                    <small>The published contract a model can run against, and the guardrails</small>
+                </span>
+                <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
+            </a>
         </div>
     </section>
 </div>
@@ -316,6 +445,31 @@
     private string RenewableShare => _analysis!.SystemMix.TotalMwh > 0
         ? PlotFormat.Share(_analysis.SystemMix.RenewableShare)
         : "—";
+
+    /// <summary>
+    /// A sweep run's unserved energy as a share of demand. Held to three decimals because the
+    /// reliability standard itself is 0.002%, so rounding to the usual one decimal would show every
+    /// run in a sweep as 0.0% right up to the point the grid is failing outright.
+    /// </summary>
+    private static string UnservedShare(SweepRun run) =>
+        run.Scalars.UnservedEnergyPercentageOfDemand.ToString("N3", CultureInfo.InvariantCulture) + "%";
+
+    /// <summary>
+    /// How far the sweep drove the storage fleet, read from the sizing outcome rather than from
+    /// the reliability verdict. A run counts as within target once sizing has grown storage enough
+    /// to get it there, so the verdict alone cannot distinguish a fleet that held from one that
+    /// had to be rebuilt first. Omitted when the sweep's runs carry no sizing outcome.
+    /// </summary>
+    /// <remarks>
+    /// Formatted plainly rather than through <see cref="PlotFormat.Compact"/>: these two figures
+    /// straddle its hundred-thousand threshold, so compacting would print one as 14,387 and the
+    /// other as 109k in the same row.
+    /// </remarks>
+    private static string? StorageBuild(SweepRun first, SweepRun last) =>
+        first.Point.StorageSizing is { } start && last.Point.StorageSizing is { } end
+            ? $"{start.FinalEnergyMwh.ToString("N0", CultureInfo.CurrentCulture)} → "
+                + $"{end.FinalEnergyMwh.ToString("N0", CultureInfo.CurrentCulture)} MWh"
+            : null;
 
     private double AllowanceUsed => _analysis!.Result.Reliability.TargetUsePercentageOfDemand <= 0
         ? 0

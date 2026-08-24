@@ -572,11 +572,150 @@
             }
             <div><span>Storage fleet</span><strong>@StorageFleetSummary()</strong></div>
             <div>
+                <span>Cost basis</span>
+                @if (_systemResult?.CostBasis is { } costBasis)
+                {
+                    <strong>@costBasis.Year.ToString(CultureInfo.InvariantCulture) real AUD</strong>
+                    <small>@costBasis.RealDiscountRate.ToString("P1", CultureInfo.InvariantCulture) real discount rate</small>
+                }
+                else
+                {
+                    <strong>Not published on this artifact</strong>
+                }
+            </div>
+            <div>
                 <span>Reliability outcome</span>
                 <strong>@_result.Metrics.HoursServedFraction.ToString("P3") hours served</strong>
                 <small>@_result.Metrics.UnservedHours unserved hours · @_result.Metrics.UnservedEnergyMwh.ToString("N0") MWh USE</small>
             </div>
         </section>
+
+        @* The values below are the scenario author's own assumptions, not model constants: they
+           come straight off the artifact so this list cannot drift from what was actually run. *@
+        @if (_result.PowerSystem.Fleets.Length > 0 || _result.PowerSystem.StorageFleets.Length > 0)
+        {
+            <section class="assumption-detail" aria-label="Scenario parameter values">
+                @if (_result.PowerSystem.Fleets.Length > 0)
+                {
+                    <div class="assumption-table-wrap">
+                        <span class="assumption-table-label">Generating fleet parameters</span>
+                        <div class="table-scroll">
+                            <table class="assumption-table">
+                                <thead>
+                                    <tr>
+                                        <th>Technology</th>
+                                        <th>Capacity</th>
+                                        <th>Capital</th>
+                                        <th>Fixed O&amp;M</th>
+                                        <th>Variable O&amp;M</th>
+                                        <th>Fuel</th>
+                                        <th>Heat rate</th>
+                                        <th>Life</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (DispatchFleetDTO fleet in _result.PowerSystem.Fleets)
+                                    {
+                                        <tr>
+                                            <td>@fleet.Technology</td>
+                                            <td>@fleet.NameplateCapacityMw.ToString("N0") MW</td>
+                                            <td>@PlotFormat.Money(fleet.CapitalCostAudPerMw, 0)/MW</td>
+                                            <td>@PlotFormat.Money(fleet.FixedOperatingCostAudPerMwYear, 0)/MW/yr</td>
+                                            <td>@PlotFormat.Money(fleet.VariableOperatingCostAudPerMwh, 2)/MWh</td>
+                                            <td>@PlotFormat.Money(fleet.FuelPriceAudPerGj, 2)/GJ</td>
+                                            <td>@fleet.HeatRateGjPerMwh.ToString("N2") GJ/MWh</td>
+                                            <td>@fleet.TechnicalLifeYears yr</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+                @if (_result.PowerSystem.StorageFleets.Length > 0)
+                {
+                    <div class="assumption-table-wrap">
+                        <span class="assumption-table-label">Storage fleet parameters</span>
+                        <div class="table-scroll">
+                            <table class="assumption-table">
+                                <thead>
+                                    <tr>
+                                        <th>Technology</th>
+                                        <th>Power</th>
+                                        <th>Energy</th>
+                                        <th>Power capital</th>
+                                        <th>Energy capital</th>
+                                        <th>Fixed O&amp;M</th>
+                                        <th>Round-trip</th>
+                                        <th>Life</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (DispatchStorageFleetDTO fleet in _result.PowerSystem.StorageFleets)
+                                    {
+                                        <tr>
+                                            <td>@fleet.Technology</td>
+                                            <td>@fleet.PowerCapacityMw.ToString("N0") MW</td>
+                                            <td>@fleet.EnergyCapacityMwh.ToString("N0") MWh</td>
+                                            <td>@PlotFormat.Money(fleet.PowerCapitalCostAudPerMw, 0)/MW</td>
+                                            <td>@PlotFormat.Money(fleet.EnergyCapitalCostAudPerMwh, 0)/MWh</td>
+                                            <td>@PlotFormat.Money(fleet.FixedOperatingCostAudPerMwYear, 0)/MW/yr</td>
+                                            <td>@fleet.RoundTripEfficiency.ToString("P0", CultureInfo.InvariantCulture)</td>
+                                            <td>@fleet.TechnicalLifeYears yr</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+            </section>
+        }
+
+        @if (_systemResult?.Interconnectors is { Length: > 0 } interconnectors)
+        {
+            <section class="assumption-detail" aria-label="Interconnector parameter values">
+                <div class="assumption-table-wrap">
+                    <span class="assumption-table-label">Interconnector parameters</span>
+                    <div class="table-scroll">
+                        <table class="assumption-table">
+                            <thead>
+                                <tr>
+                                    <th>Link</th>
+                                    <th>Capacity</th>
+                                    <th>Route length</th>
+                                    <th>Capital</th>
+                                    <th>Fixed O&amp;M</th>
+                                    <th>Life</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (DispatchInterconnectorDTO link in interconnectors)
+                                {
+                                    <tr>
+                                        <td>@link.FromRegionId → @link.ToRegionId</td>
+                                        <td>@link.CapacityMw.ToString("N0") MW</td>
+                                        <td>@link.DistanceKm.ToString("N0") km</td>
+                                        <td>@PlotFormat.Money(link.CapitalCostAudPerKmPerMw, 0)/km/MW</td>
+                                        <td>@PlotFormat.Money(link.FixedOperatingCostAudPerKmPerMwYear, 1)/km/MW/yr</td>
+                                        <td>@link.TechnicalLifeYears yr</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        }
+
+        <p class="assumption-docs-link">
+            These are the scenario author's own values, not model constants. The model constants
+            behind this run &mdash; storage dispatch policy, transmission losses, resource
+            derating and the rest &mdash; are documented in the
+            <a href="@DocumentationLinks.Home" target="_blank" rel="noopener noreferrer">assumptions register</a>,
+            and what both kinds of assumption mean for a result you're about to quote is in
+            <a href="@DocumentationLinks.Limitations" target="_blank" rel="noopener noreferrer">limitations</a>.
+        </p>
         <ProvenanceFooter
                           CommitSha="@SweepCommitSha"
                           CommitUrl="@SweepCommitUrl"

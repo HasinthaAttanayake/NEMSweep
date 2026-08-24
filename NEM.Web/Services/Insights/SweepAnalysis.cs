@@ -432,7 +432,7 @@ public sealed record SweepAnalysis(
             + $"{PlotFormat.Compact(addedMwh)} MWh{power}, and "
             + (resizedRuns == analysis.Runs.Count - onset
                 ? "every run beyond it needs more again."
-                : $"{resizedRuns} runs in the sweep need building."),
+                : $"{resizedRuns} runs in the sweep hold the standard only by building storage."),
             FindingTone.Constraint,
             $"{needsBuild.AxisValue:N0}",
             $"{analysis.AxisUnit} before new build",
@@ -492,15 +492,36 @@ public sealed record SweepAnalysis(
 
         SweepRun worst = missed.MaxBy(run => run.Scalars.UnservedEnergyPercentageOfDemand)!;
         double target = worst.Point.Reliability!.TargetUsePercentageOfDemand;
+        // A missed run whose sizing outcome is past Resized had storage grown for it and still fell
+        // short, so more storage is not what closes that gap. A run that was never resized says
+        // nothing about storage's ceiling, so the qualifier is only earned when every missed run
+        // carries one of the exhausted outcomes.
+        bool storageExhausted = missed.All(run =>
+            run.Point.StorageSizing?.Outcome is { } outcome
+            && outcome is not (StorageSizingOutcome.NotRequired or StorageSizingOutcome.Resized));
+        // Counted so the headline finding can say what the runs it does not cover needed. Without
+        // it a reader sees "15 of 25 cannot meet the standard" and takes the other 10 to be fine,
+        // when 9 of them hold it only because the sizing loop built their way there.
+        int builtToHold = analysis.Runs.Count(run =>
+            run.Point.StorageSizing?.Outcome == StorageSizingOutcome.Resized);
+        string storageSentence = storageExhausted
+            ? " The sizing loop grew storage for every one of them and still fell short, so what "
+                + "closes that gap is generation or transmission rather than more storage."
+                + (builtToHold > 0
+                    ? $" A further {builtToHold} {(builtToHold == 1 ? "run holds" : "runs hold")} "
+                        + "the standard only by building storage."
+                    : string.Empty)
+            : string.Empty;
         // "From here onwards" is only true when the misses reach the end of the sweep. A sweep that
         // recovers past one bad run gets a count instead of a boundary it does not have.
         bool toTheEnd = analysis.Runs
             .SkipWhile(run => run != missed[0])
             .All(run => run.OutsideReliabilityTarget);
         findings.Add(new Finding(
-            missed.Length == analysis.Runs.Count
+            (missed.Length == analysis.Runs.Count
                 ? $"No run in this sweep meets the reliability standard for {analysis.ScopeName}"
-                : $"{missed.Length} of {analysis.Runs.Count} runs cannot meet the reliability standard",
+                : $"{missed.Length} of {analysis.Runs.Count} runs cannot meet the reliability standard")
+                + (storageExhausted ? " even with more storage" : string.Empty),
             (toTheEnd && missed.Length < analysis.Runs.Count
                 ? $"From {missed[0].Label} onwards, every run ends outside the standard. "
                 : $"{missed.Length} {(missed.Length == 1 ? "run ends" : "runs end")} outside the "
@@ -509,7 +530,8 @@ public sealed record SweepAnalysis(
             + $"{Percentage(worst.Scalars.UnservedEnergyPercentageOfDemand)} of demand unserved "
             + $"against a {Percentage(target)} target — "
             + $"{PlotFormat.Compact(worst.Scalars.UnservedEnergyMwh)} MWh. The cost figures for those "
-            + $"runs are the cost of {analysis.ScopeName} not serving its load.",
+            + $"runs are the cost of {analysis.ScopeName} not serving its load."
+            + storageSentence,
             FindingTone.Constraint,
             missed.Length.ToString("N0"),
             $"of {analysis.Runs.Count:N0} runs outside the standard",

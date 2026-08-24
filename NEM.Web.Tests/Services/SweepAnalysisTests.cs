@@ -1,4 +1,4 @@
-using AwesomeAssertions;
+﻿using AwesomeAssertions;
 using NEM.Contracts;
 using NEM.Web.Services.Insights;
 
@@ -237,6 +237,60 @@ public sealed class SweepAnalysisTests
         analysis.Findings[0].Should().Be(finding);
     }
 
+    /// <summary>
+    /// A run counts as within target once the sizing loop has built its way there, so a bare count
+    /// of misses reads as though every other run were fine. The headline has to separate the runs
+    /// storage could not save from the runs it did.
+    /// </summary>
+    [Fact]
+    public void Build_SaysMissedRunsWereAlreadyGivenStorageAndCountsTheRunsThatBuiltTheirWayBack()
+    {
+        SweepAnalysis analysis = Analyse(
+            Sized("p0", "Baseline", 0, StorageSizingOutcome.NotRequired),
+            Sized("p1", "+500 MW", 500, StorageSizingOutcome.Resized),
+            Sized("p2", "+4,500 MW", 4500, StorageSizingOutcome.Resized),
+            Sized(
+                "p3",
+                "+5,000 MW",
+                5000,
+                StorageSizingOutcome.StorageNoLongerImprovesReliability,
+                achievedUse: 0.1506,
+                unserved: 346_919.4));
+
+        Finding finding = analysis.Findings.Should().ContainSingle(finding =>
+            finding.Headline.Contains("cannot meet the reliability standard")).Subject;
+
+        finding.Headline.Should().Be(
+            "1 of 4 runs cannot meet the reliability standard even with more storage");
+        finding.Detail.Should().Contain("grew storage for every one of them and still fell short");
+        finding.Detail.Should().Contain("generation or transmission rather than more storage");
+        finding.Detail.Should().Contain("A further 2 runs hold the standard only by building storage.");
+    }
+
+    /// <summary>
+    /// The qualifier is a claim about storage's ceiling, so it is only earned when every missed run
+    /// actually had storage grown for it and still fell short.
+    /// </summary>
+    [Fact]
+    public void Build_OmitsTheStorageQualifierWhenAMissedRunWasNeverResized()
+    {
+        SweepAnalysis analysis = Analyse(
+            Sized("p0", "Baseline", 0, StorageSizingOutcome.NotRequired),
+            Sized(
+                "p1",
+                "+5,000 MW",
+                5000,
+                StorageSizingOutcome.Resized,
+                achievedUse: 0.1506,
+                unserved: 346_919.4));
+
+        Finding finding = analysis.Findings.Should().ContainSingle(finding =>
+            finding.Headline.Contains("cannot meet the reliability standard")).Subject;
+
+        finding.Headline.Should().Be("1 of 2 runs cannot meet the reliability standard");
+        finding.Detail.Should().NotContain("more storage");
+    }
+
     [Fact]
     public void Build_CountsMissedRunsWithoutClaimingABoundaryWhenTheSweepRecovers()
     {
@@ -316,9 +370,9 @@ public sealed class SweepAnalysisTests
     {
         SweepIndexPointDTO point = Run("p0", "Baseline", 0, achievedUse: 5.9253, unserved: 17_287_805.1)
             with
-            {
-                RegionScalars = [new SweepPointRegionScalarsDTO("QLD1", Scalars())],
-            };
+        {
+            RegionScalars = [new SweepPointRegionScalarsDTO("QLD1", Scalars())],
+        };
 
         SweepAnalysis system = SweepAnalysis.Build(Index(point));
         SweepAnalysis region = SweepAnalysis.Build(Index(point), "QLD1");
@@ -384,9 +438,11 @@ public sealed class SweepAnalysisTests
         string pointId,
         string label,
         double axisValue,
-        StorageSizingOutcome outcome) => Run(pointId, label, axisValue) with
-    {
-        StorageSizing = new StorageSizingOutcomeDTO(
+        StorageSizingOutcome outcome,
+        double achievedUse = 0,
+        double unserved = 0) => Run(pointId, label, axisValue, achievedUse: achievedUse, unserved: unserved) with
+        {
+            StorageSizing = new StorageSizingOutcomeDTO(
             outcome,
             5515,
             940,
@@ -395,7 +451,7 @@ public sealed class SweepAnalysisTests
             100_000,
             10_000,
             3),
-    };
+        };
 
     private static SweepIndexPointDTO Failed(string pointId, string label, double axisValue) =>
         ArtifactFixtures.FailedPoint(pointId, label, axisValue, "The Battery capacity bounds are insufficient.");
