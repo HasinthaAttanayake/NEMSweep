@@ -67,6 +67,21 @@ public sealed class StarSchemaExportTests
     }
 
     [Fact]
+    public void Write_LocatesARegionEvenWhenTheRunHasNoInterconnectors()
+    {
+        Dictionary<string, string> tables = WriteTables();
+
+        // The published artifact only exposes coordinates on interconnector endpoints, so reading
+        // them from there leaves a single-region run blank, and that is the first run anyone makes.
+        string[] region = Rows(tables["dim_region.csv"])[1];
+        region[0].Should().Be("NSW1");
+        region[1].Should().NotBeEmpty();
+        region[2].Should().NotBeEmpty();
+        double.Parse(region[1], System.Globalization.CultureInfo.InvariantCulture)
+            .Should().BeApproximately(-33.9, 0.01);
+    }
+
+    [Fact]
     public void Write_KeepsEveryTableInsideTheSpreadsheetRowCeiling()
     {
         Dictionary<string, string> tables = WriteTables();
@@ -100,6 +115,7 @@ public sealed class StarSchemaExportTests
         var written = new Dictionary<string, string>(StringComparer.Ordinal);
         StarSchemaExport.Write(
             fixture.Publication,
+            fixture.PowerSystem,
             fixture.Directory,
             pointId,
             (path, contents) => written[Path.GetFileName(path)] = contents);

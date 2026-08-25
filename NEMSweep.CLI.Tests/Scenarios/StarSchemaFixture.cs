@@ -3,6 +3,7 @@ using NEMSweep.CLI.Configuration;
 using NEMSweep.CLI.Infrastructure;
 using NEMSweep.CLI.Scenarios;
 using NEMSweep.Contracts;
+using NEMSweep.Model.Grid;
 using NEMSweep.Model.StorageSizing;
 using NEMSweep.Model.Units;
 using ContractsScenario = NEMSweep.Contracts.Scenario;
@@ -27,6 +28,7 @@ internal sealed class StarSchemaFixture : IDisposable
 
         WorkspacePaths paths = WorkspacePaths.FromRoots(Directory, Directory, Directory);
         ScenarioDispatchResult dispatch = ScenarioRunner.RunDispatch(WriteAndLoadScenario(), paths);
+        PowerSystem = dispatch.PowerSystem;
         Publication = DispatchResultsExport.WritePublication(
             new DispatchPublicationRequest(
                 dispatch,
@@ -42,6 +44,8 @@ internal sealed class StarSchemaFixture : IDisposable
     public string Directory { get; }
 
     public DispatchPublication Publication { get; }
+
+    public PowerSystem PowerSystem { get; }
 
     public void Dispose() => System.IO.Directory.Delete(Directory, recursive: true);
 

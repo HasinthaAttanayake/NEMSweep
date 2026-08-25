@@ -4,6 +4,8 @@ using System.Text;
 using System.Text.Json;
 using NEMSweep.CLI.Infrastructure;
 using NEMSweep.Contracts;
+using NEMSweep.Model.Grid;
+using NEMSweep.Model.Units;
 
 namespace NEMSweep.CLI.Scenarios;
 
@@ -36,13 +38,15 @@ internal static class StarSchemaExport
     /// one table without a consumer having to reconstruct which run a row came from.
     /// </param>
     /// <param name="writeText">Injection point for tests; defaults to writing the file.</param>
+    /// <param name="powerSystem">The realised system, for facts the artifact does not expose.</param>
     public static void Write(
         DispatchPublication publication,
+        PowerSystem powerSystem,
         string directory,
         string pointId,
         Action<string, string>? writeText = null)
     {
-        WriteDimensions(publication, directory, writeText);
+        WriteDimensions(publication, powerSystem, directory, writeText);
         WriteFacts(publication, directory, pointId, writeText);
     }
 
@@ -53,9 +57,11 @@ internal static class StarSchemaExport
     /// </summary>
     /// <param name="publication">Any run of the study; dimensions are the same across its points.</param>
     /// <param name="directory">Directory the tables are written to; created if absent.</param>
+    /// <param name="powerSystem">The realised system, for facts the artifact does not expose.</param>
     /// <param name="writeText">Injection point for tests; defaults to writing the file.</param>
     public static void WriteDimensions(
         DispatchPublication publication,
+        PowerSystem powerSystem,
         string directory,
         Action<string, string>? writeText = null)
     {
@@ -65,7 +71,7 @@ internal static class StarSchemaExport
 
         SystemDispatchResultsDTO system = publication.System;
         Write(writeText, directory, "dim_time.csv", TimeDimension(system));
-        Write(writeText, directory, "dim_region.csv", RegionDimension(system));
+        Write(writeText, directory, "dim_region.csv", RegionDimension(system, powerSystem));
         Write(writeText, directory, "dim_technology.csv", TechnologyDimension());
         Write(writeText, directory, "dim_scalar.csv", ScalarDimension());
     }
@@ -163,30 +169,24 @@ internal static class StarSchemaExport
     }
 
     /// <summary>
-    /// Regions and where they sit. Coordinates are lifted from the interconnector endpoints, which
-    /// already carry each region's solar weather site, so a consumer gets map placement without the
-    /// model publishing a second copy of the same fact.
+    /// Regions and where they sit, read from each region's resource profile. The published artifact
+    /// only exposes coordinates on interconnector endpoints, which would leave them blank for a
+    /// single-region run, and that is the run a newcomer makes first.
     /// </summary>
-    private static IEnumerable<string[]> RegionDimension(SystemDispatchResultsDTO system)
+    /// <remarks>
+    /// The coordinate is the region's solar weather site. It is there for map placement and nothing
+    /// costs against it, so treat it as approximate: a region is not a point.
+    /// </remarks>
+    private static IEnumerable<string[]> RegionDimension(
+        SystemDispatchResultsDTO system,
+        PowerSystem powerSystem)
     {
         yield return ["regionId", "latitude", "longitude"];
 
-        var located = new Dictionary<string, (double Latitude, double Longitude)>(StringComparer.Ordinal);
-        foreach (DispatchInterconnectorDTO link in system.Interconnectors)
-        {
-            located.TryAdd(link.FromRegionId, (link.FromLatitude, link.FromLongitude));
-            located.TryAdd(link.ToRegionId, (link.ToLatitude, link.ToLongitude));
-        }
-
         foreach (string regionId in system.RegionIds)
         {
-            bool known = located.TryGetValue(regionId, out (double Latitude, double Longitude) at);
-            yield return
-            [
-                regionId,
-                known ? Text(at.Latitude, 4) : string.Empty,
-                known ? Text(at.Longitude, 4) : string.Empty,
-            ];
+            GeoCoordinate at = powerSystem.RequireResourceProfile(regionId).Location;
+            yield return [regionId, Text(at.Latitude, 4), Text(at.Longitude, 4)];
         }
     }
 
