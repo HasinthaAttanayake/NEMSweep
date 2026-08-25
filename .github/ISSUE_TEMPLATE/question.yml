@@ -1,0 +1,23 @@
+name: Question about a result
+description: A number that looks wrong, or a model behaviour you want explained
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Worth reading [Limitations](https://www.nemsweep.com/) first: several figures
+        the model publishes are bookkeeping allocations rather than physical
+        measurements, and the distinction changes what a number can be used for.
+  - type: textarea
+    id: question
+    attributes:
+      label: What you are trying to work out
+    validations:
+      required: true
+  - type: textarea
+    id: figures
+    attributes:
+      label: The figures in question
+      description: >-
+        Which scalars, from which run. If it came from a sweep, name the pointId:
+        an unattributable figure is hard to chase down.

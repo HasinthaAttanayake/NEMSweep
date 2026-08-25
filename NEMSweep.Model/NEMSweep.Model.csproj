@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -9,6 +9,15 @@
          CS1591 a missing comment, CS1572/CS1573 param tags out of step with the signature,
          CS1574 a cross-reference that will not resolve. -->
     <WarningsAsErrors>$(WarningsAsErrors);CS1572;CS1573;CS1574;CS1591</WarningsAsErrors>
+  </PropertyGroup>
+
+  <!-- Stated on every assembly so the licence travels with a built artifact, not only with a clone. -->
+  <PropertyGroup>
+    <Authors>Hasintha Attanayake</Authors>
+    <Copyright>Copyright (c) 2026 Hasintha Attanayake</Copyright>
+    <PackageLicenseExpression>BSD-3-Clause</PackageLicenseExpression>
+    <PackageProjectUrl>https://www.nemsweep.com/</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/HasinthaAttanayake/NEMSweep</RepositoryUrl>
   </PropertyGroup>
 
 </Project>
