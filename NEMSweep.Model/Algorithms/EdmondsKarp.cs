@@ -12,7 +12,7 @@ internal sealed record MaxFlowResult(double Value, IReadOnlyList<double> FlowPer
 /// <remarks>
 /// This is textbook max flow. Flow is conserved at every intermediate node, so the
 /// max-flow–min-cut theorem holds and can be used as a test oracle. Transmission loss
-/// is deliberately absent here — applying a per-edge loss inside the search would break
+/// is deliberately absent here: applying a per-edge loss inside the search would break
 /// conservation and turn this into a generalized-flow problem that this algorithm does
 /// not solve. Losses belong over the decomposed result; see
 /// <see cref="FlowPathDecomposition"/>.

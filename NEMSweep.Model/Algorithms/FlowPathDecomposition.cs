@@ -25,7 +25,7 @@ internal sealed record FlowPath(IReadOnlyList<int> Nodes, double Flow)
 /// the final per-edge flow, not against the search history.
 /// </para>
 /// <para>
-/// Any residual circulation — flow on a cycle that never reaches the sink — is discarded,
+/// Any residual circulation (flow on a cycle that never reaches the sink) is discarded,
 /// because it delivers nothing. Edmonds-Karp does not produce circulation, so in practice
 /// the decomposition accounts for the whole flow.
 /// </para>
@@ -79,7 +79,7 @@ internal static class FlowPathDecomposition
                 bottleneck = Math.Min(bottleneck, remaining[parentEdge[node]]);
             }
 
-            var reversed = new List<int> { sink };
+            List<int> reversed = [sink];
             for (int node = sink; node != source; node = network.From(parentEdge[node]))
             {
                 remaining[parentEdge[node]] -= bottleneck;

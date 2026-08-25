@@ -10,7 +10,7 @@ namespace NEMSweep.Model.Algorithms;
 /// <para>
 /// Parallel edges (two edges sharing the same ordered endpoint pair) are rejected so
 /// that adjacency has a total order independent of insertion sequence. That is what
-/// makes traversal — and therefore the computed flow — deterministic. Antiparallel
+/// makes traversal (and therefore the computed flow) deterministic. Antiparallel
 /// edges (both A to B and B to A) are permitted.
 /// </para>
 /// </remarks>

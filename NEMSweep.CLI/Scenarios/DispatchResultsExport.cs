@@ -235,7 +235,6 @@ internal static class DispatchResultsExport
                 overviewPath));
         }
 
-
         DispatchCostDTO systemCost = CreateCost(dispatch.CostBreakdown);
         SystemDispatchResultsDTO system = new(
             ArtifactSchemaVersions.SystemDispatchResults,
