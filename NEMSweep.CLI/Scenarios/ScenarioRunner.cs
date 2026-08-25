@@ -20,11 +20,6 @@ internal static class ScenarioRunner
 {
     private static readonly TimeSpan HourlyResolution = TimeSpan.FromHours(1);
 
-    public static ScenarioDispatchResult RunForPublication(
-        ScenarioSettings settings,
-        string solutionRoot) =>
-        RunDispatch(settings, solutionRoot);
-
     internal static ScenarioDispatchResult RunDispatch(
         ScenarioSettings settings,
         string solutionRoot)
@@ -106,7 +101,7 @@ internal static class ScenarioRunner
             demandByRegion,
             resourcesByRegion,
             CreateDataCentreDemandComponents(settings, scenario));
-        StorageSizingOptions sizingOptions = CreateSizingOptions(settings.StorageSizing);
+        StorageSizingOptions sizingOptions = ScenarioConfig.CreateSizingOptions(settings.StorageSizing);
         StorageSizingRunResult sizingResult = Size(powerSystem, sizingOptions);
         return new ScenarioDispatchResult(
             scenario,
@@ -116,13 +111,6 @@ internal static class ScenarioRunner
             demandInputs,
             weatherInputs);
     }
-
-    private static StorageSizingOptions CreateSizingOptions(StorageSizingSettings sizing) =>
-        new(
-            Power.FromMegawatts(sizing.MaximumPowerMw),
-            Energy.FromMegawattHours(sizing.MaximumEnergyMwh),
-            sizing.TargetUsePercentage,
-            sizing.MaximumPasses);
 
     private static string ResolveOutputRoot(RepositoryPaths paths, string solutionRoot)
     {
@@ -142,14 +130,26 @@ internal static class ScenarioRunner
     }
 
     /// <summary>
+    /// The configured output root dispatch reads its inputs from. Probing for it touches the
+    /// filesystem and parses settings, so a caller resolving many inputs resolves this once and
+    /// passes it to <see cref="ResolveScenarioInputPath"/> rather than paying for it per input.
+    /// </summary>
+    /// <param name="paths">Repository paths whose solution root is probed.</param>
+    internal static string ResolveOutputRoot(RepositoryPaths paths) =>
+        ResolveOutputRoot(paths, paths.SolutionRoot);
+
+    /// <summary>
     /// Resolves a scenario input using the same configured-output-root fallback as dispatch.
     /// Provenance callers use this so they hash the exact artifact bytes dispatch consumed.
     /// </summary>
-    internal static string ResolveScenarioInputPath(RepositoryPaths paths, string configuredPath) =>
-        ResolveConfiguredPath(
-            paths,
-            ResolveOutputRoot(paths, paths.SolutionRoot),
-            configuredPath);
+    /// <param name="paths">Repository paths the configured path is resolved against.</param>
+    /// <param name="outputRoot">The root from <see cref="ResolveOutputRoot(RepositoryPaths)"/>.</param>
+    /// <param name="configuredPath">The path as written in the scenario config.</param>
+    internal static string ResolveScenarioInputPath(
+        RepositoryPaths paths,
+        string outputRoot,
+        string configuredPath) =>
+        ResolveConfiguredPath(paths, outputRoot, configuredPath);
 
     private static string ResolveConfiguredPath(
         RepositoryPaths paths,

@@ -17,6 +17,12 @@ public sealed class SystemDispatchOutcome
 {
     private const double BalanceTolerance = 1e-9;
 
+    /// <summary>
+    /// Caller-facing name of the outcomes parameter, so validation extracted out of
+    /// <see cref="CreateCore"/> still reports the argument the caller actually passed.
+    /// </summary>
+    private const string DispatchOutcomesParameter = "dispatchOutcomes";
+
     private SystemDispatchOutcome(
         PowerSystem powerSystem,
         IReadOnlyList<DispatchOutcome> regionalOutcomes,
@@ -118,60 +124,9 @@ public sealed class SystemDispatchOutcome
         ArgumentNullException.ThrowIfNull(dispatchOutcomes);
         ArgumentNullException.ThrowIfNull(interconnectorFlows);
 
-        var outcomesByRegion = new Dictionary<string, DispatchOutcome>(StringComparer.OrdinalIgnoreCase);
-        foreach (DispatchOutcome outcome in dispatchOutcomes)
-        {
-            if (outcome is null)
-            {
-                throw new ArgumentException("Dispatch outcomes cannot contain null.", nameof(dispatchOutcomes));
-            }
-
-            if (!outcomesByRegion.TryAdd(outcome.RegionId, outcome))
-            {
-                throw new ArgumentException(
-                    $"Dispatch outcomes contain duplicate region '{outcome.RegionId}'.",
-                    nameof(dispatchOutcomes));
-            }
-        }
-
-        var systemRegionsById = powerSystem.Regions.ToDictionary(
-            region => region.RegionId,
-            StringComparer.OrdinalIgnoreCase);
-        foreach ((string regionId, DispatchOutcome outcome) in outcomesByRegion)
-        {
-            if (!systemRegionsById.TryGetValue(regionId, out Region? region))
-            {
-                throw new ArgumentException(
-                    $"Dispatch outcome identifies unknown region '{outcome.RegionId}'.",
-                    nameof(dispatchOutcomes));
-            }
-
-            RequireAligned(region.Demand.TotalDemand, outcome.Demand, regionId, nameof(dispatchOutcomes));
-            RequireNonNegativeBoundaryFlows(outcome, nameof(dispatchOutcomes));
-        }
-
-        foreach (string regionId in systemRegionsById.Keys)
-        {
-            if (!outcomesByRegion.ContainsKey(regionId))
-            {
-                throw new ArgumentException(
-                    $"Dispatch outcomes are missing region '{regionId}'.",
-                    nameof(dispatchOutcomes));
-            }
-        }
-
-        DispatchOutcome reference = outcomesByRegion.Values.First();
-        if (reference.Demand.Resolution != TimeSpan.FromHours(1))
-        {
-            throw new ArgumentException(
-                "System dispatch outcomes must use hourly resolution.",
-                nameof(dispatchOutcomes));
-        }
-
-        foreach (DispatchOutcome outcome in outcomesByRegion.Values)
-        {
-            RequireAligned(reference.Demand, outcome.Demand, outcome.RegionId, nameof(dispatchOutcomes));
-        }
+        Dictionary<string, DispatchOutcome> outcomesByRegion = IndexOutcomesByRegion(dispatchOutcomes);
+        RequireOutcomesMatchSystemRegions(powerSystem, outcomesByRegion);
+        DispatchOutcome reference = RequireHourlyAlignedTimelines(outcomesByRegion);
 
         DispatchOutcome[] orderedOutcomes = powerSystem.Regions
             .Select(region => outcomesByRegion[region.RegionId])
@@ -197,6 +152,87 @@ public sealed class SystemDispatchOutcome
             SumFlows(orderedOutcomes.Select(outcome => outcome.Imports), reference.Demand),
             SumFlows(orderedOutcomes.Select(outcome => outcome.Exports), reference.Demand),
             interconnectorFlows);
+    }
+
+    /// <summary>Indexes the supplied outcomes by region, rejecting nulls and duplicates.</summary>
+    private static Dictionary<string, DispatchOutcome> IndexOutcomesByRegion(
+        IReadOnlyList<DispatchOutcome> dispatchOutcomes)
+    {
+        var outcomesByRegion = new Dictionary<string, DispatchOutcome>(StringComparer.OrdinalIgnoreCase);
+        foreach (DispatchOutcome outcome in dispatchOutcomes)
+        {
+            if (outcome is null)
+            {
+                throw new ArgumentException("Dispatch outcomes cannot contain null.", nameof(dispatchOutcomes));
+            }
+
+            if (!outcomesByRegion.TryAdd(outcome.RegionId, outcome))
+            {
+                throw new ArgumentException(
+                    $"Dispatch outcomes contain duplicate region '{outcome.RegionId}'.",
+                    nameof(dispatchOutcomes));
+            }
+        }
+
+        return outcomesByRegion;
+    }
+
+    /// <summary>
+    /// Requires the outcomes and the system's regions to be the same set, with each outcome
+    /// aligned to its own region's demand and carrying no negative boundary flow.
+    /// </summary>
+    private static void RequireOutcomesMatchSystemRegions(
+        PowerSystem powerSystem,
+        Dictionary<string, DispatchOutcome> outcomesByRegion)
+    {
+        var systemRegionsById = powerSystem.Regions.ToDictionary(
+            region => region.RegionId,
+            StringComparer.OrdinalIgnoreCase);
+        foreach ((string regionId, DispatchOutcome outcome) in outcomesByRegion)
+        {
+            if (!systemRegionsById.TryGetValue(regionId, out Region? region))
+            {
+                throw new ArgumentException(
+                    $"Dispatch outcome identifies unknown region '{outcome.RegionId}'.",
+                    DispatchOutcomesParameter);
+            }
+
+            RequireAligned(region.Demand.TotalDemand, outcome.Demand, regionId, DispatchOutcomesParameter);
+            RequireNonNegativeBoundaryFlows(outcome, DispatchOutcomesParameter);
+        }
+
+        foreach (string regionId in systemRegionsById.Keys)
+        {
+            if (!outcomesByRegion.ContainsKey(regionId))
+            {
+                throw new ArgumentException(
+                    $"Dispatch outcomes are missing region '{regionId}'.",
+                    DispatchOutcomesParameter);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Requires every outcome to share one hourly timeline, and returns the outcome the rest
+    /// of the aggregation measures against.
+    /// </summary>
+    private static DispatchOutcome RequireHourlyAlignedTimelines(
+        Dictionary<string, DispatchOutcome> outcomesByRegion)
+    {
+        DispatchOutcome reference = outcomesByRegion.Values.First();
+        if (reference.Demand.Resolution != TimeSpan.FromHours(1))
+        {
+            throw new ArgumentException(
+                "System dispatch outcomes must use hourly resolution.",
+                DispatchOutcomesParameter);
+        }
+
+        foreach (DispatchOutcome outcome in outcomesByRegion.Values)
+        {
+            RequireAligned(reference.Demand, outcome.Demand, outcome.RegionId, DispatchOutcomesParameter);
+        }
+
+        return reference;
     }
 
     /// <summary>Identity of the power system this evidence describes.</summary>

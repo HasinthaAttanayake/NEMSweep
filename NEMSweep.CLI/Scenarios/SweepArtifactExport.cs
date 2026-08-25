@@ -289,6 +289,7 @@ internal static class SweepArtifactExport
             context.Paths.SolutionRoot,
             definition.BaselineConfigFullPath(context.Paths),
             "baseline-scenario-config");
+        string outputRoot = ScenarioRunner.ResolveOutputRoot(context.Paths);
         foreach (string configPath in configPaths)
         {
             ScenarioSettings? settings;
@@ -306,12 +307,12 @@ internal static class SweepArtifactExport
                 AddInput(
                     inputs,
                     context.Paths.SolutionRoot,
-                    ScenarioRunner.ResolveScenarioInputPath(context.Paths, region.DemandFile),
+                    ScenarioRunner.ResolveScenarioInputPath(context.Paths, outputRoot, region.DemandFile),
                     "demand-data");
                 AddInput(
                     inputs,
                     context.Paths.SolutionRoot,
-                    ScenarioRunner.ResolveScenarioInputPath(context.Paths, region.WeatherFile),
+                    ScenarioRunner.ResolveScenarioInputPath(context.Paths, outputRoot, region.WeatherFile),
                     "weather-data");
             }
         }
