@@ -12,6 +12,7 @@ internal sealed class RegionalDispatchRun
     private readonly TimeSpan _resolution;
     private readonly GeneratingFleet[] _generatingFleets;
     private readonly GeneratingFleet? _hydroFleet;
+    private readonly Dictionary<GenerationTechnology, GeneratingFleet> _fleetByTechnology;
     private readonly HydroReservationState? _hydroReservation;
     private readonly Dictionary<GenerationTechnology, FlowSeries> _availableByTechnology;
     private readonly Dictionary<GenerationTechnology, GenerationBudgetState> _budgetByTechnology;
@@ -43,6 +44,7 @@ internal sealed class RegionalDispatchRun
         _hydroFleet = _generatingFleets.SingleOrDefault(
             fleet => fleet.GenerationTechnology == GenerationTechnology.Hydro);
         _hydroReservation = _hydroFleet is null ? null : new HydroReservationState();
+        _fleetByTechnology = _generatingFleets.ToDictionary(fleet => fleet.GenerationTechnology);
         _availableByTechnology = _generatingFleets.ToDictionary(
             fleet => fleet.GenerationTechnology,
             fleet => fleet.AvailableCapacityFor(region.ResourceProfile, _demand));
@@ -197,8 +199,7 @@ internal sealed class RegionalDispatchRun
             return Power.Zero;
         }
 
-        Power exportable = Power.FromMegawatts(
-            _curtailmentMwByTechnology.Values.Sum(values => values[_currentIndex]));
+        Power exportable = CurrentCurtailment();
         foreach (GeneratingFleet fleet in _generatingFleets)
         {
             if (fleet.IsIntermittentRenewable)
@@ -269,8 +270,7 @@ internal sealed class RegionalDispatchRun
     public void CompleteInterval()
     {
         RequireOpenInterval();
-        Power surplus = Power.FromMegawatts(
-            _curtailmentMwByTechnology.Values.Sum(values => values[_currentIndex]));
+        Power surplus = CurrentCurtailment();
         StorageDecision decision = _storagePolicy.Decide(
             CreateStorageContext(_intervalDeficit, surplus))
             ?? throw new InvalidOperationException("Storage policy returned no decision.");
@@ -424,6 +424,24 @@ internal sealed class RegionalDispatchRun
         }
 
         return Power.FromMegawatts(takenMw);
+    }
+
+    /// <summary>
+    /// Total curtailed output across every fleet in the open interval. A plain loop over the
+    /// cached fleet array rather than LINQ over the dictionary's values: this is read twice per
+    /// interval per region, and the LINQ form allocated a delegate and an enumerator each time.
+    /// Iterating the fleets also pins the summation order to merit order explicitly, where
+    /// before it rested on the dictionary happening to enumerate in insertion order.
+    /// </summary>
+    private Power CurrentCurtailment()
+    {
+        double totalMw = 0;
+        foreach (GeneratingFleet fleet in _generatingFleets)
+        {
+            totalMw += _curtailmentMwByTechnology[fleet.GenerationTechnology][_currentIndex];
+        }
+
+        return Power.FromMegawatts(totalMw);
     }
 
     private void RecordStateOfCharge(int index)
@@ -645,9 +663,7 @@ internal sealed class RegionalDispatchRun
         GenerationTechnology sourceTechnology = intent.ChargeSource!.Value.GenerationTechnology
             ?? throw new InvalidOperationException(
                 "Incremental-generation charging must identify a generation technology.");
-        GeneratingFleet? sourceFleet = _generatingFleets.SingleOrDefault(
-            candidate => candidate.GenerationTechnology == sourceTechnology);
-        if (sourceFleet is null)
+        if (!_fleetByTechnology.TryGetValue(sourceTechnology, out GeneratingFleet? sourceFleet))
         {
             throw new InvalidOperationException(
                 $"Storage policy named unknown generation source {sourceTechnology}.");
