@@ -20,6 +20,7 @@ internal sealed class FlowNetwork
     private readonly int[] _to;
     private readonly double[] _capacity;
     private readonly int[][] _outgoing;
+    private Dictionary<(int From, int To), int>? _edgeByEndpoints;
 
     private FlowNetwork(int nodeCount, int[] from, int[] to, double[] capacity)
     {
@@ -28,6 +29,38 @@ internal sealed class FlowNetwork
         _to = to;
         _capacity = capacity;
         _outgoing = BuildAdjacency(nodeCount, from, to);
+    }
+
+    /// <summary>
+    /// Edge index for an ordered endpoint pair. Parallel edges are rejected at construction,
+    /// so the pair identifies at most one edge. Built on first use rather than at construction:
+    /// only the persistent topology is ever asked, while a solve builds an augmented copy per
+    /// sink iteration, and indexing those up front cost more than the lookup saves.
+    /// </summary>
+    public int EdgeBetween(int from, int to) =>
+        (Volatile.Read(ref _edgeByEndpoints) ?? PublishEndpointIndex())[(from, to)];
+
+    /// <summary>
+    /// Builds the endpoint index and publishes it. Two callers racing here each build an equal
+    /// index and one wins, which is harmless; the volatile write is what stops a caller seeing
+    /// the reference before the dictionary behind it is fully built.
+    /// </summary>
+    private Dictionary<(int From, int To), int> PublishEndpointIndex()
+    {
+        Dictionary<(int From, int To), int> index = BuildEndpointIndex(_from, _to);
+        Volatile.Write(ref _edgeByEndpoints, index);
+        return index;
+    }
+
+    private static Dictionary<(int From, int To), int> BuildEndpointIndex(int[] from, int[] to)
+    {
+        var index = new Dictionary<(int From, int To), int>(from.Length);
+        for (int edge = 0; edge < from.Length; edge++)
+        {
+            index[(from[edge], to[edge])] = edge;
+        }
+
+        return index;
     }
 
     /// <summary>Number of nodes; valid node indices are 0 to NodeCount - 1.</summary>

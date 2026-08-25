@@ -103,22 +103,16 @@ internal static class PrioritisedTransferSolver
             remainingCapacity[edge] = network.Capacity(edge);
         }
 
-        var edgeByEndpoints = new Dictionary<(int From, int To), int>();
-        for (int edge = 0; edge < edgeCount; edge++)
-        {
-            edgeByEndpoints[(network.From(edge), network.To(edge))] = edge;
-        }
-
         var state = new SolveState
         {
             Network = network,
             Sources = sources,
-            EdgeByEndpoints = edgeByEndpoints,
             Retention = retention,
             LossFactorPerHop = lossFactorPerHop,
             SuperSource = superSource,
             SuperSink = superSink,
             RemainingSourceFlow = remainingSourceFlow,
+            RemainingSourceTotal = remainingSourceFlow.Sum(),
             RemainingCapacity = remainingCapacity,
             SentPerEdge = new double[edgeCount],
             LostPerEdge = new double[edgeCount],
@@ -148,12 +142,20 @@ internal static class PrioritisedTransferSolver
     {
         public FlowNetwork Network;
         public IReadOnlyList<TransferSource> Sources;
-        public Dictionary<(int From, int To), int> EdgeByEndpoints;
         public double Retention;
         public double LossFactorPerHop;
         public int SuperSource;
         public int SuperSink;
         public double[] RemainingSourceFlow;
+
+        /// <summary>
+        /// Total of <see cref="RemainingSourceFlow"/>, resummed once per iteration and read by
+        /// the two convergence checks. Deliberately a resum of the array rather than a running
+        /// subtraction: the checks compare it against a tolerance, and accumulating deductions
+        /// instead would reassociate the arithmetic and could move a borderline comparison, which
+        /// is the trajectory this change has to leave alone.
+        /// </summary>
+        public double RemainingSourceTotal;
         public double[] RemainingCapacity;
         public double[] SentPerEdge;
         public double[] LostPerEdge;
@@ -177,7 +179,7 @@ internal static class PrioritisedTransferSolver
         for (iteration = 0; iteration < iterationLimit; iteration++)
         {
             if (IsWithinDeliveryTolerance(outstanding, sink.RequiredDelivery)
-                || state.RemainingSourceFlow.Sum() <= EdmondsKarp.Tolerance)
+                || state.RemainingSourceTotal <= EdmondsKarp.Tolerance)
             {
                 break;
             }
@@ -219,6 +221,8 @@ internal static class PrioritisedTransferSolver
             {
                 state.RemainingSourceFlow[index] -= flow.FlowPerEdge[edgeCount + index];
             }
+
+            state.RemainingSourceTotal = state.RemainingSourceFlow.Sum();
         }
 
         RequireConverged(ref state, sink, outstanding, iteration, iterationLimit);
@@ -251,7 +255,7 @@ internal static class PrioritisedTransferSolver
         // along the route. Summed over the route this telescopes to sent - delivered.
         for (int step = 0; step < hopCount; step++)
         {
-            int edge = state.EdgeByEndpoints[(path.Nodes[step + 1], path.Nodes[step + 2])];
+            int edge = state.Network.EdgeBetween(path.Nodes[step + 1], path.Nodes[step + 2]);
             state.LostPerEdge[edge] +=
                 sent * Math.Pow(state.Retention, step) * state.LossFactorPerHop;
         }
@@ -276,7 +280,7 @@ internal static class PrioritisedTransferSolver
     {
         if (iteration == iterationLimit
             && !IsWithinDeliveryTolerance(outstanding, sink.RequiredDelivery)
-            && state.RemainingSourceFlow.Sum() > EdmondsKarp.Tolerance
+            && state.RemainingSourceTotal > EdmondsKarp.Tolerance
             && HasRemainingTransferCapacity(
                 state.Network,
                 state.RemainingCapacity,
