@@ -31,7 +31,8 @@ internal sealed record DispatchPublicationRequest(
     ScenarioDispatchResult Dispatch,
     StorageSizingOptions SizingOptions,
     string? ReliabilityStandardName,
-    string? RegionFileNamePrefix = null);
+    string? RegionFileNamePrefix = null,
+    DispatchModelProvenanceDTO? Provenance = null);
 
 internal sealed record DispatchPublication(
     SystemDispatchResultsDTO System,
@@ -155,7 +156,8 @@ internal static class DispatchResultsExport
             BuildInterconnectorDtos(dispatch, systemOutcome),
             new DispatchCostBasisDTO(
                 dispatch.Scenario.CostBasis.Year,
-                dispatch.Scenario.CostBasis.RealDiscountRate));
+                dispatch.Scenario.CostBasis.RealDiscountRate),
+            request.Provenance);
     }
 
     /// <summary>Pairs each solved interconnector flow with its declared scenario link.</summary>

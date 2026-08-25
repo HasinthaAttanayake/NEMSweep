@@ -67,7 +67,7 @@ public sealed class SweepFanOutTests
         using var fixture = new SweepFixture();
         fixture.WriteDefinition("""[{ "pointId": "p0", "axisValue": 0, "label": "Base", "overrides": {} }, { "pointId": "p1", "axisValue": 1, "label": "Changed", "overrides": { "name": "Changed" } }]""");
         using var output = new StringWriter();
-        var context = new CliContext(fixture.Paths, fixture.RootPath, output);
+        var context = new CliContext(fixture.Paths, fixture.Settings, output);
 
         SweepFanOutCommand.Run(context, "sweeps/test-sweep.json");
         string path = Path.Combine(fixture.RootPath, "sweeps", "test-sweep", "configs", "p0.json");
@@ -87,7 +87,7 @@ public sealed class SweepFanOutTests
         using var fixture = new SweepFixture();
         fixture.WriteDefinition("""[{ "pointId": "p0", "axisValue": 0, "label": "Base", "overrides": {} }]""");
         using var output = new StringWriter();
-        var context = new CliContext(fixture.Paths, fixture.RootPath, output);
+        var context = new CliContext(fixture.Paths, fixture.Settings, output);
 
         SweepFanOutCommand.Run(context, "sweeps/test-sweep.json");
 
@@ -118,7 +118,7 @@ public sealed class SweepFanOutTests
             } }]
             """);
 
-        SweepFanOutCommand.Run(new CliContext(fixture.Paths, fixture.RootPath, TextWriter.Null), "sweeps/test-sweep.json");
+        SweepFanOutCommand.Run(new CliContext(fixture.Paths, fixture.Settings, TextWriter.Null), "sweeps/test-sweep.json");
 
         JsonArray fleets = JsonNode.Parse(File.ReadAllText(Path.Combine(
             fixture.RootPath,
@@ -154,11 +154,14 @@ public sealed class SweepFanOutTests
               }]
             }
             """);
-            Paths = RepositoryPaths.Discover(RootPath);
+            Paths = WorkspacePaths.FromRoots(RootPath, RootPath, Path.Combine(RootPath, "out"));
         }
 
         public string RootPath { get; }
-        public RepositoryPaths Paths { get; }
+        public WorkspacePaths Paths { get; }
+
+        public CliSettings Settings { get; } =
+            new("bundle", "data", "out", "scenarios/baseline.json");
 
         public void WriteDefinition(
             string points,

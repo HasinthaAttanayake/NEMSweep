@@ -9,7 +9,7 @@ internal static class GenerationInformationCommand
     {
         IReadOnlyList<GenerationInformationRow> rows = GenerationInformationParser.Read(sourcePath);
         GenerationInformationDTO result = GenerationInformationExport.Create(sourcePath, rows);
-        string outputPath = context.Paths.WebDataPath("generation-information.json");
+        string outputPath = context.Paths.DataPath("generation-information.json");
         GenerationInformationExport.WriteJson(result, outputPath);
         context.Output.WriteLine($"Loaded {rows.Count} generation-information rows.");
         context.Output.WriteLine(

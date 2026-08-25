@@ -6,7 +6,10 @@ namespace NEMSweep.CLI.Application;
 
 internal static class SchemaDescriptionCommand
 {
-    public static int Run(CliContext context, string format)
+    /// <summary>Writes a format's JSON Schema. Needs no workspace, only somewhere to write.</summary>
+    /// <param name="output">Where the schema is written.</param>
+    /// <param name="format">Either <c>scenario</c> or <c>sweep</c>.</param>
+    public static int Run(TextWriter output, string format)
     {
         string schema = format switch
         {
@@ -15,7 +18,7 @@ internal static class SchemaDescriptionCommand
             _ => throw new ArgumentException("Schema format must be 'scenario' or 'sweep'."),
         };
 
-        context.Output.WriteLine(JsonFile.SerializeExact(JsonNode.Parse(schema)!));
+        output.WriteLine(JsonFile.SerializeExact(JsonNode.Parse(schema)!));
         return 0;
     }
 

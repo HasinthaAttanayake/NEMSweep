@@ -14,11 +14,11 @@ internal static class SweepRunCommand
     public static int Run(CliContext context, string definitionPath)
     {
         var runStopwatch = Stopwatch.StartNew();
-        SweepRunMetadata runMetadata = SweepArtifactExport.CaptureRunMetadata(context.Paths.SolutionRoot);
+        SweepRunMetadata runMetadata = SweepArtifactExport.CaptureRunMetadata(context.Paths.WorkingRoot);
         (SweepDefinition definition, JsonNode baseline) =
             SweepFanOutCommand.LoadDefinitionAndBaseline(context, definitionPath);
         string configOutputDirectory = SweepFanOutCommand.ConfigOutputDirectory(context, definition);
-        string sweepDirectory = context.Paths.WebDataPath(Path.Combine("sweeps", definition.SweepId));
+        string sweepDirectory = context.Paths.OutputPath(Path.Combine("sweeps", definition.SweepId));
         string pointsDirectory = Path.Combine(sweepDirectory, "points");
         // Both created before the first point runs: the per-point failure handler cleans up inside
         // them, so a point that fails before anything has written to either would otherwise take
@@ -64,7 +64,12 @@ internal static class SweepRunCommand
                 // beside the exact config it failed on.
                 File.Copy(configPath, publishedConfigPath, overwrite: true);
 
-                ScenarioCommand.Run(context, configPath, resultPath, $"{point.PointId}-");
+                ScenarioCommand.Run(
+                    context,
+                    configPath,
+                    resultPath,
+                    $"{point.PointId}-",
+                    ScenarioCommand.ToProvenance(runMetadata));
                 pointStopwatch.Stop();
                 SystemDispatchResultsDTO systemResult = JsonSerializer.Deserialize<SystemDispatchResultsDTO>(
                     File.ReadAllBytes(resultPath),
@@ -206,7 +211,7 @@ internal static class SweepRunCommand
                 provenance,
                 indexPoints.ToArray()),
             Path.Combine(sweepDirectory, "index.json"));
-        SweepArtifactExport.WriteManifest(context.Paths.WebDataPath("sweeps"));
+        SweepArtifactExport.WriteManifest(context.Paths.OutputPath("sweeps"));
         // Only once the new index is on disk: a series file is still referenced by the previously
         // published index until that index is replaced.
         SweepArtifactExport.PruneUnreferencedSeries(sweepDirectory, referencedSeriesPaths);

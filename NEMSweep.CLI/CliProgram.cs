@@ -1,5 +1,4 @@
 using NEMSweep.CLI.Application;
-using NEMSweep.CLI.Infrastructure;
 
 namespace NEMSweep.CLI;
 
@@ -9,10 +8,9 @@ internal static class Program
     {
         try
         {
-            RepositoryPaths paths = RepositoryPaths.Discover(AppContext.BaseDirectory);
             return new CommandRouter(
-                paths,
                 AppContext.BaseDirectory,
+                Directory.GetCurrentDirectory(),
                 Console.Out,
                 Console.Error).Run(args);
         }

@@ -283,13 +283,12 @@ internal static class SweepArtifactExport
         // reachable from each point's configPath, so listing them here would grow the provenance
         // block with the point count without adding a fact.
         var inputs = new Dictionary<string, SweepInputFileDTO>(StringComparer.OrdinalIgnoreCase);
-        AddInput(inputs, context.Paths.SolutionRoot, definitionPath, "sweep-definition");
+        AddInput(inputs, context.Paths, definitionPath, "sweep-definition");
         AddInput(
             inputs,
-            context.Paths.SolutionRoot,
+            context.Paths,
             definition.BaselineConfigFullPath(context.Paths),
             "baseline-scenario-config");
-        string outputRoot = ScenarioRunner.ResolveOutputRoot(context.Paths);
         foreach (string configPath in configPaths)
         {
             ScenarioSettings? settings;
@@ -306,13 +305,13 @@ internal static class SweepArtifactExport
             {
                 AddInput(
                     inputs,
-                    context.Paths.SolutionRoot,
-                    ScenarioRunner.ResolveScenarioInputPath(context.Paths, outputRoot, region.DemandFile),
+                    context.Paths,
+                    ScenarioRunner.ResolveScenarioInputPath(context.Paths, region.DemandFile),
                     "demand-data");
                 AddInput(
                     inputs,
-                    context.Paths.SolutionRoot,
-                    ScenarioRunner.ResolveScenarioInputPath(context.Paths, outputRoot, region.WeatherFile),
+                    context.Paths,
+                    ScenarioRunner.ResolveScenarioInputPath(context.Paths, region.WeatherFile),
                     "weather-data");
             }
         }
@@ -336,12 +335,16 @@ internal static class SweepArtifactExport
 
     private static void AddInput(
         IDictionary<string, SweepInputFileDTO> inputs,
-        string solutionRoot,
+        WorkspacePaths paths,
         string path,
         string purpose)
     {
         byte[] contents = File.ReadAllBytes(path);
-        string relativePath = Path.GetRelativePath(solutionRoot, path).Replace('\\', '/');
+
+        // Recorded relative to the data root, falling back to a bare file name for anything outside
+        // it. The digest is the reproducibility boundary, so an absolute path here would only be a
+        // machine-specific detail that goes stale the moment a directory is renamed.
+        string relativePath = paths.DescribeInputPath(path);
         string key = $"{purpose}:{relativePath}";
         inputs[key] = new SweepInputFileDTO(
             relativePath,
