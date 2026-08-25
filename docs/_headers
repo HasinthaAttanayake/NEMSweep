@@ -1,0 +1,5 @@
+# docfx writes main.css and main.js to stable filenames, which Cloudflare Pages would hold for
+# four hours after a deploy.
+
+/*
+  Cache-Control: no-cache
