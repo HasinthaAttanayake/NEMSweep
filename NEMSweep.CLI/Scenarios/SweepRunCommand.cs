@@ -28,6 +28,7 @@ internal static class SweepRunCommand
         // published is enough to hit this.
         Directory.CreateDirectory(pointsDirectory);
         Directory.CreateDirectory(Path.Combine(sweepDirectory, "configs"));
+        bool csvDimensionsWritten = false;
         var failedPointIds = new List<string>();
         var indexPoints = new List<SweepIndexPointDTO>();
         var configPaths = new List<string>();
@@ -69,7 +70,16 @@ internal static class SweepRunCommand
                     configPath,
                     resultPath,
                     $"{point.PointId}-",
-                    ScenarioCommand.ToProvenance(runMetadata));
+                    ScenarioCommand.ToProvenance(runMetadata),
+                    // Per point, because a sweep's combined generation fact would run to millions of
+                    // rows and a spreadsheet truncates past ~1,048,576 silently. A folder of
+                    // identically shaped tables recombines in any tool that wants the whole thing.
+                    Path.Combine(sweepDirectory, "csv", "points", point.PointId),
+                    point.PointId,
+                    // Dimensions are shared across the study, so only the first point to get this far
+                    // writes them; repeating the calendar per point would be megabytes of identical rows.
+                    csvDimensionsWritten ? null : Path.Combine(sweepDirectory, "csv"));
+                csvDimensionsWritten = context.Csv;
                 pointStopwatch.Stop();
                 SystemDispatchResultsDTO systemResult = JsonSerializer.Deserialize<SystemDispatchResultsDTO>(
                     File.ReadAllBytes(resultPath),
@@ -212,6 +222,14 @@ internal static class SweepRunCommand
                 indexPoints.ToArray()),
             Path.Combine(sweepDirectory, "index.json"));
         SweepArtifactExport.WriteManifest(context.Paths.OutputPath("sweeps"));
+        if (context.Csv && csvDimensionsWritten)
+        {
+            // Written last, because it describes the points as they finished: a point that failed is
+            // in the index with its status, and a consumer joining facts to it sees the same story.
+            StarSchemaExport.WritePointDimension(
+                indexPoints,
+                Path.Combine(sweepDirectory, "csv"));
+        }
         // Only once the new index is on disk: a series file is still referenced by the previously
         // published index until that index is replaced.
         SweepArtifactExport.PruneUnreferencedSeries(sweepDirectory, referencedSeriesPaths);
