@@ -1,0 +1,34 @@
+cff-version: 1.2.0
+title: NEMSweep
+message: >-
+  If you use NEMSweep in work you publish, please cite it. Citation is how a
+  method gets scrutinised rather than just used.
+type: software
+authors:
+  - given-names: Hasintha
+    family-names: Attanayake
+    # orcid: 'https://orcid.org/0000-0000-0000-0000'
+repository-code: 'https://github.com/HasinthaAttanayake/NEMSweep'
+url: 'https://www.nemsweep.com/'
+abstract: >-
+  An hourly grid dispatch model for Australia's National Electricity Market.
+  Regions are described with their demand, generation assets and storage, then
+  dispatched hour by hour across a modelled year; where a declared reliability
+  standard is not met, storage is grown until it is met or the search reports
+  what stopped it. Deterministic: the same inputs at the same commit reproduce
+  every modelled value, and every result records the SHA-256 of the input bytes
+  it was built from.
+keywords:
+  - electricity
+  - National Electricity Market
+  - dispatch model
+  - energy systems
+  - renewable energy
+  - storage sizing
+  - Australia
+license: BSD-3-Clause
+# Add once a release is archived, so a citation can point at a fixed version
+# rather than a moving branch:
+#   doi: '10.5281/zenodo.XXXXXXX'
+#   version: '0.1.0'
+#   date-released: 'YYYY-MM-DD'

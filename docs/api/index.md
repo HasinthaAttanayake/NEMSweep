@@ -8,6 +8,15 @@ The domain model: scenarios, the realised power system, dispatch, storage sizing
 typed quantities everything is expressed in. This is the library you would reference to run the
 model from your own code.
 
+**How to reference it.** By project reference from a clone, or by referencing the built assembly.
+There is no package to wait for: the licence is what grants the right, and
+[BSD-3-Clause](https://github.com/HasinthaAttanayake/NEMSweep/blob/main/LICENSE.md) permits use in
+your own software, including proprietary software, with attribution and no copyleft. NEMSweep is not
+published to NuGet, so searching there and finding nothing is not a sign that integration is closed.
+
+`NEMSweep.Model` and `NEMSweep.Contracts` have no package dependencies of their own, which is what
+makes them straightforward to embed.
+
 Namespaces worth starting from:
 
 | Namespace | What lives there |
