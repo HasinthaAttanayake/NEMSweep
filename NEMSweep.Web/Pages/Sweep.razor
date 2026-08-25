@@ -11,7 +11,7 @@
 <PageTitle>@(_index?.Name ?? "Sweep")</PageTitle>
 
 <main class="sweep-page">
-    <PageHeader Eyebrow="Scenario sweep" Title="@(_index?.Name ?? "Sweep")">
+    <PageHeader Eyebrow="@SweepEyebrow" Title="@(_index?.Name ?? "Sweep")">
         <ScopeContent>
             @if (_index is not null)
             {
@@ -24,8 +24,9 @@
                                Resolution="@Resolution(_index.Scope)" />
                 }
                 <p class="sweep-axis">
-                    @_index.Points.Length runs, one per value of @_index.Axis.Label
-                    (@_index.Axis.Unit). Everything else in the scenario is held constant.
+                    @ViewableRunCount.ToString("N0") scenarios, one per value of @_index.Axis.Label
+                    (@_index.Axis.Unit). Each is a complete year of hourly dispatch you can open on
+                    its own. Everything except that one input is held at the baseline.
                 </p>
             }
         </ScopeContent>
@@ -147,6 +148,20 @@
 </main>
 
 @code {
+    /// <summary>
+    /// A sweep is a family, so the eyebrow says how many scenarios are in it rather than repeating
+    /// the word "sweep" above a title that already carries it.
+    /// </summary>
+    private string SweepEyebrow => _index is null
+        ? "Scenario sweep"
+        : $"Scenario sweep · {ViewableRunCount:N0} runs";
+
+    private int ViewableRunCount => _index is null
+        ? 0
+        : _index.Points.Count(point =>
+            point.Status == SweepPointStatus.Succeeded
+            && !string.IsNullOrWhiteSpace(point.DetailPath));
+
     private const string CommitUrlPrefix = "https://github.com/HasinthaAttanayake/NEMSweep/commit/";
 
     [Parameter] public string SweepId { get; set; } = string.Empty;

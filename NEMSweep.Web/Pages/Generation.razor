@@ -69,7 +69,7 @@
         else
         {
             <section class="visual-grid" aria-label="Technology visualisations">
-                <ChartFrame Heading="AC capacity share" SectionIndex="01"
+                <ChartFrame Heading="AC capacity share" SectionIndex="Capacity mix"
                             Class="visual-panel" Unit="MW AC · nearest 0.1 MW"
                             Style="--chart-frame-padding-top: 0; --chart-frame-heading-padding-bottom: .65rem; --chart-frame-heading-border: 2px solid var(--color-ink); --chart-frame-heading-size: 1.15rem; --accent: var(--color-muted-generation); --accent-soft: transparent; --color-unit-border: transparent">
                     <MudChart T="double"
@@ -90,7 +90,7 @@
                     </ul>
                 </ChartFrame>
 
-                <ChartFrame Heading="Nameplate comparison" SectionIndex="02"
+                <ChartFrame Heading="Nameplate comparison" SectionIndex="DC against AC"
                             Class="visual-panel" Unit="MW · nearest 0.1 MW"
                             Style="--chart-frame-padding-top: 0; --chart-frame-heading-padding-bottom: .65rem; --chart-frame-heading-border: 2px solid var(--color-ink); --chart-frame-heading-size: 1.15rem; --accent: var(--color-muted-generation); --accent-soft: transparent; --color-unit-border: transparent">
                     <MudChart T="double"
@@ -104,7 +104,7 @@
 
             <section class="technology-section">
                 <div class="section-heading">
-                    <div><p class="section-index">03</p><h2>Technology breakdown</h2></div>
+                    <div><h2>Technology breakdown</h2></div>
                     <span>Aggregates rounded to nearest 0.1 MW / MWh</span>
                 </div>
                 <div class="table-scroll">
@@ -162,8 +162,8 @@
 
             <section class="source-section">
                 <div class="section-heading">
-                    <div><p class="section-index">04</p><h2>Filtered source table</h2></div>
-                    <span>Columns A-Z</span>
+                    <div><h2>Unit-level source rows</h2></div>
+                    <span>The columns the model reads &middot; full spreadsheet named above</span>
                 </div>
                 <div class="source-search">
                     <input type="search"
@@ -175,41 +175,28 @@
                 <MudTable Items="_filteredRows" Filter="new Func<GenerationInformationRow, bool>(RowMatchesSearch)"
                           Dense="true" Hover="true" FixedHeader="true" Height="520px" RowsPerPage="25">
                     <HeaderContent>
-                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.AemoSurveyId)">Survey ID</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.SiteName)">Site</MudTableSortLabel></MudTh>
-                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.AemoKciId ?? string.Empty)">KCI ID</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.SiteOwner ?? string.Empty)">Owner</MudTableSortLabel></MudTh>
-                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.Custodian ?? string.Empty)">Custodian</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.Region)">Region</MudTableSortLabel></MudTh>
-                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.MaxSiteCapacityAcMw ?? 0)">Max site AC</MudTableSortLabel></MudTh>
-                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.GenInfoUnitId)">Unit ID</MudTableSortLabel></MudTh>
-                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.UnitName ?? string.Empty)">Unit</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.TechnologyType)">Technology</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.TechnologyDetail ?? string.Empty)">Detail</MudTableSortLabel></MudTh>
-                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.GasTurbineFuelType ?? string.Empty)">Gas fuel</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.UnitName ?? string.Empty)">Unit</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.Duid ?? string.Empty)">DUID</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.DispatchType ?? string.Empty)">Dispatch</MudTableSortLabel></MudTh>
-                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.UnitCount ?? 0)">Unit count</MudTableSortLabel></MudTh>
-                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.UnitCapacityDcMw ?? 0)">Unit DC</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.UnitCapacityAcMw ?? 0)">Unit AC</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.AggregateNameplateCapacityDcMw ?? 0)">Agg DC</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.AggregateNameplateCapacityAcMw ?? 0)">Agg AC</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.AggregateNameplateStorageCapacityMwh ?? 0)">Agg storage</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.CommitmentStatus)">Status</MudTableSortLabel></MudTh>
-                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.FullCommercialUseDate ?? DateOnly.MinValue)">Commercial use</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.ExpectedClosureYear ?? 0)">Closure year</MudTableSortLabel></MudTh>
-                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.ClosureDate ?? DateOnly.MinValue)">Closure date</MudTableSortLabel></MudTh>
-                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.SurveyLastRequestedDate ?? DateOnly.MinValue)">Survey requested</MudTableSortLabel></MudTh>
-                        <MudTh><MudTableSortLabel SortBy="new Func<GenerationInformationRow, object>(r => r.SurveyLatestUpdateDate ?? DateOnly.MinValue)">Survey updated</MudTableSortLabel></MudTh>
                     </HeaderContent>
                     <RowTemplate>
-                        <MudTd>@context.AemoSurveyId</MudTd><MudTd>@context.SiteName</MudTd><MudTd>@context.AemoKciId</MudTd><MudTd>@context.SiteOwner</MudTd>
-                        <MudTd>@context.Custodian</MudTd><MudTd>@context.Region</MudTd><MudTd>@FormatNumber(context.MaxSiteCapacityAcMw)</MudTd><MudTd>@context.GenInfoUnitId</MudTd>
-                        <MudTd>@context.UnitName</MudTd><MudTd>@context.TechnologyType</MudTd><MudTd>@context.TechnologyDetail</MudTd><MudTd>@context.GasTurbineFuelType</MudTd>
-                        <MudTd>@context.Duid</MudTd><MudTd>@context.DispatchType</MudTd><MudTd>@FormatNumber(context.UnitCount)</MudTd><MudTd>@FormatNumber(context.UnitCapacityDcMw)</MudTd>
-                        <MudTd>@FormatNumber(context.UnitCapacityAcMw)</MudTd><MudTd>@FormatNumber(context.AggregateNameplateCapacityDcMw)</MudTd><MudTd>@FormatNumber(context.AggregateNameplateCapacityAcMw)</MudTd><MudTd>@FormatNumber(context.AggregateNameplateStorageCapacityMwh)</MudTd>
-                        <MudTd>@context.CommitmentStatus</MudTd><MudTd>@FormatDate(context.FullCommercialUseDate)</MudTd><MudTd>@context.ExpectedClosureYear</MudTd><MudTd>@FormatDate(context.ClosureDate)</MudTd>
-                        <MudTd>@FormatDate(context.SurveyLastRequestedDate)</MudTd><MudTd>@FormatDate(context.SurveyLatestUpdateDate)</MudTd>
+                        <MudTd>@context.SiteName</MudTd><MudTd>@context.SiteOwner</MudTd><MudTd>@context.Region</MudTd>
+                        <MudTd>@context.TechnologyType</MudTd><MudTd>@context.TechnologyDetail</MudTd><MudTd>@context.UnitName</MudTd>
+                        <MudTd>@context.Duid</MudTd><MudTd>@context.DispatchType</MudTd><MudTd>@FormatNumber(context.UnitCapacityAcMw)</MudTd>
+                        <MudTd>@FormatNumber(context.AggregateNameplateCapacityDcMw)</MudTd><MudTd>@FormatNumber(context.AggregateNameplateCapacityAcMw)</MudTd>
+                        <MudTd>@FormatNumber(context.AggregateNameplateStorageCapacityMwh)</MudTd>
+                        <MudTd>@context.CommitmentStatus</MudTd><MudTd>@context.ExpectedClosureYear</MudTd>
                     </RowTemplate>
                     <PagerContent><MudTablePager PageSizeOptions="@(new[] { 25, 50, 100 })" /></PagerContent>
                 </MudTable>

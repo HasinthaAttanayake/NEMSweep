@@ -36,7 +36,10 @@
                 }
                 @if (_runContext is not null)
                 {
-                    <p class="run-axis">@_runContext.Sweep.Axis.Label: @_runContext.Point.Label (@_runContext.Point.AxisValue.ToString("N0") @_runContext.Sweep.Axis.Unit)</p>
+                    <p class="run-axis">
+                        Everything else in this scenario is held at the baseline. Only
+                        @_runContext.Sweep.Axis.Label.ToLowerInvariant() moves.
+                    </p>
                 }
             }
         </ScopeContent>
@@ -545,17 +548,15 @@
             <section class="weather-bases" aria-labelledby="weather-bases-heading">
                 <p class="section-label">Weather inputs</p>
                 <h2 id="weather-bases-heading">@ScopedSources.Count regions, @ScopedSources.Count weather files</h2>
+                @* Each basis is set out in full on the weather page. Listing them again here, and
+                   again on the comparison page, put the same block on three pages. A single-region
+                   scope still shows its own basis below, because there it is the basis for the
+                   result being read. *@
                 <p class="weather-bases-note">
                     Every region in this run is simulated against its own typical meteorological
-                    year. There is no single weather basis for the system result.
+                    year, so there is no single weather basis for the system result.
+                    <a href="inputs/weather">See each region's traces and their source files</a>
                 </p>
-                @foreach (KeyValuePair<string, DispatchSourcesDTO> source in ScopedSources)
-                {
-                    <div class="weather-region">
-                        <h3>@RegionNames.Full(source.Key)</h3>
-                        <WeatherBasisNote Basis="source.Value.WeatherBasis" />
-                    </div>
-                }
             </section>
         }
         else
@@ -832,8 +833,32 @@
     private string SweepPageRoute => string.IsNullOrWhiteSpace(RegionQuery)
         ? SweepPaths.PageRoute(_runContext!.Sweep.SweepId)
         : $"{SweepPaths.PageRoute(_runContext!.Sweep.SweepId)}?region={Uri.EscapeDataString(RegionQuery)}";
-    private string PageTitleText => _runContext is null ? "Dispatch" : _runContext.Sweep.Name;
-    private string PageEyebrow => _runContext is null ? "Merit-order simulation" : "Sweep run";
+    /// <summary>
+    /// The page names the scenario, not the family it came from. Titling a run with its sweep's
+    /// name put the same heading on all 25 of them, so a reader could not tell from the page which
+    /// one they had open; the sweep is named in the eyebrow above it instead.
+    /// </summary>
+    private string PageTitleText => _runContext is null
+        ? "The baseline scenario"
+        : $"{_runContext.Sweep.Axis.Label} {_runContext.Point.AxisValue:N0} {_runContext.Sweep.Axis.Unit}";
+
+    private string PageEyebrow => _runContext is null
+        ? "Baseline scenario · merit-order simulation"
+        : $"Scenario {RunNumber:N0} of {ViewableRunCount:N0} · {_runContext.Sweep.Name}";
+
+    /// <summary>Position among the runs a reader can open, matching the sidebar's own count.</summary>
+    private int RunNumber => _runContext is null
+        ? 0
+        : Array.FindIndex(ViewableRuns, point =>
+            string.Equals(point.PointId, _runContext.Point.PointId, StringComparison.Ordinal)) + 1;
+
+    private int ViewableRunCount => ViewableRuns.Length;
+
+    private SweepIndexPointDTO[] ViewableRuns => _runContext is null
+        ? []
+        : [.. _runContext.Sweep.Points.Where(point =>
+            point.Status == SweepPointStatus.Succeeded
+            && !string.IsNullOrWhiteSpace(point.DetailPath))];
 
     private string? SweepCommitSha => _runContext?.Sweep.Provenance.GitCommitSha;
     private string? SweepCommitUrl => SweepCommitSha is null

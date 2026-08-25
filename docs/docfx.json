@@ -43,17 +43,21 @@
     "output": "_site",
     "template": [
       "default",
-      "modern"
+      "modern",
+      "template"
     ],
     "globalMetadata": {
       "_appName": "NEMSweep",
       "_appTitle": "NEMSweep",
+      "_appLogoPath": "images/logo.svg",
+      "_appFaviconPath": "images/favicon.svg",
       "_enableSearch": true,
       "_disableContribution": false,
       "_gitContribute": {
         "repo": "https://github.com/HasinthaAttanayake/NEMSweep",
         "branch": "main"
-      }
+      },
+      "_appFooter": "<div class=\"nem-footer\"><div class=\"nem-footer-brand\"><img src=\"/images/logo.svg\" alt=\"\" width=\"22\" height=\"22\" /><span>NEM<em>Sweep</em></span></div><p class=\"nem-footer-line\">An open dispatch, reliability and cost model for Australia\u2019s National Electricity Market. Figures in these pages are modelled build-and-run costs, not retail prices.</p><p class=\"nem-footer-links\"><a href=\"https://nemsweep.com/\">Open the model</a><a href=\"https://github.com/HasinthaAttanayake/NEMSweep\">Source</a><a href=\"https://github.com/HasinthaAttanayake/NEMSweep/blob/main/LICENSE.md\">BSD 3-Clause licence</a></p></div>"
     },
     "postProcessors": [
       "ExtractSearchIndex"

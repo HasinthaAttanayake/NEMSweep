@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="NEMSweep">
+  <title>NEMSweep</title>
+  <rect width="24" height="24" rx="5" fill="#141b2d"/>
+  <g fill="#e39a3c" transform="translate(2.1 -1.1) scale(0.82)">
+    <path d="M6.77 20.14L20.64 18.27A17.4 17.4 0 0 0 19.92 15.14L6.63 19.53Z"/>
+    <path d="M6.26 18.76L19.89 10.01A19.6 19.6 0 0 0 17.66 7.16L5.87 18.27Z"/>
+    <path d="M5.22 17.73L12.06 6.91A16.2 16.2 0 0 0 9.39 5.55L4.66 17.44Z" opacity="0.72"/>
+    <path d="M4.01 17.25L5.69 8.01A12.8 12.8 0 0 0 3.33 7.8L3.38 17.2Z" opacity="0.5"/>
+    <circle cx="3.4" cy="20.6" r="2.1"/>
+  </g>
+</svg>

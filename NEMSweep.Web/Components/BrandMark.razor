@@ -1,0 +1,34 @@
+@* The NEMSweep mark: four tapered wedges swept from one origin node. The node is the common
+   baseline every run starts from, the wedges are scenarios fanned across a quarter turn, and their
+   unequal lengths are the outcomes those scenarios reach. Drawn in currentColor so the one
+   definition serves the dark sidebar and the light marketing header. *@
+
+<span class="brand @Class">
+    <svg class="brand-mark @(Size < 32 ? "is-small" : null)"
+         width="@Size"
+         height="@Size"
+         viewBox="0 0 24 24"
+         fill="currentColor"
+         aria-hidden="true"
+         focusable="false">
+        <path d="M6.77 20.14L20.64 18.27A17.4 17.4 0 0 0 19.92 15.14L6.63 19.53Z" />
+        <path d="M6.26 18.76L19.89 10.01A19.6 19.6 0 0 0 17.66 7.16L5.87 18.27Z" />
+        <path class="wedge-back" d="M5.22 17.73L12.06 6.91A16.2 16.2 0 0 0 9.39 5.55L4.66 17.44Z" opacity="0.72" />
+        <path class="wedge-back" d="M4.01 17.25L5.69 8.01A12.8 12.8 0 0 0 3.33 7.8L3.38 17.2Z" opacity="0.5" />
+        <circle cx="3.4" cy="20.6" r="2.1" />
+    </svg>
+    @if (ShowWordmark)
+    {
+        <span class="brand-name">NEM<span>Sweep</span></span>
+    }
+</span>
+
+@code {
+    /// <summary>Edge length of the square mark, in CSS pixels.</summary>
+    [Parameter] public int Size { get; set; } = 28;
+
+    /// <summary>Whether the wordmark is set beside the mark. False leaves the mark on its own.</summary>
+    [Parameter] public bool ShowWordmark { get; set; }
+
+    [Parameter] public string? Class { get; set; }
+}

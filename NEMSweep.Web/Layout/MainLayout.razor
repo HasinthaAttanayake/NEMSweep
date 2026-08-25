@@ -1,9 +1,11 @@
 ﻿@inherits LayoutComponentBase
 
-<MudThemeProvider Theme="_theme" />
+<MudThemeProvider Theme="@AppTheme.Instance" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
+
+<a class="skip-link" href="#content">Skip to content</a>
 
 <div class="page">
     <div class="sidebar">
@@ -12,32 +14,33 @@
 
     <main>
         <div class="top-row px-4">
-            <a class="repository-link"
+            @* This bar used to hold a single GitHub link. It is the one piece of chrome on every
+               results page, so it carries the path from reading a result to running one instead. *@
+            <a class="top-row-link"
+               href="@DocumentationLinks.Home"
+               target="_blank"
+               rel="noopener noreferrer">
+                <MudIcon Icon="@Icons.Material.Filled.MenuBook" Size="Size.Small" />
+                Docs
+            </a>
+            <a class="top-row-link"
                href="https://github.com/HasinthaAttanayake/NEMSweep"
                target="_blank"
                rel="noopener noreferrer">
                 <MudIcon Icon="@Icons.Material.Filled.Code" Size="Size.Small" />
-                GitHub repository
+                GitHub
+            </a>
+            <a class="top-row-cta"
+               href="@DocumentationLinks.LlmWorkflow"
+               target="_blank"
+               rel="noopener noreferrer">
+                <MudIcon Icon="@Icons.Material.Filled.PlayArrow" Size="Size.Small" />
+                Run your own scenario
             </a>
         </div>
 
-        <article class="content px-4">
+        <article class="content px-4" id="content" tabindex="-1">
             @Body
         </article>
     </main>
 </div>
-
-@code {
-    // MudBlazor's stock primary is a purple unrelated to the site's own palette. Every page picks
-    // its own accent for its content (demand teal, generation red, wind green — see the per-page
-    // --accent custom property), but MudBlazor components have one global theme, so this is set to
-    // --color-demand: the accent Home, Regions, Sweep and Dispatch already default to, and the one
-    // a reader sees right beside these same components (the loading spinner, the header buttons).
-    private static readonly MudTheme _theme = new()
-    {
-        PaletteLight = new PaletteLight
-        {
-            Primary = "#176b5b",
-        },
-    };
-}

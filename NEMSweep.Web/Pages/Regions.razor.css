@@ -1,6 +1,6 @@
 .regions-page {
-    --accent: var(--color-demand);
-    --accent-soft: var(--color-demand-soft);
+    --accent: var(--color-brand);
+    --accent-soft: var(--color-brand-accent-soft);
     max-width: 1180px;
     margin: 0 auto;
     padding: var(--space-page-top) var(--space-page-x) var(--space-page-bottom);
@@ -243,15 +243,18 @@
     font-size: 0.8rem;
 }
 
-.weather-region {
-    margin-top: 1.25rem;
+.weather-summary {
+    max-width: var(--measure);
+    margin: 0;
+    color: var(--color-home-copy);
+    font-size: 0.92rem;
+    line-height: 1.65;
 }
 
-.weather-region h3 {
-    margin: 0 0 0.4rem;
-    font-family: var(--font-display);
-    font-size: 1.05rem;
+.weather-summary a {
+    color: var(--accent);
     font-weight: 600;
+    white-space: nowrap;
 }
 
 @media (max-width: 760px) {

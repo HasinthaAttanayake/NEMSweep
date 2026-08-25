@@ -1,4 +1,4 @@
-.dispatch-page { --accent: var(--color-demand); --accent-soft: var(--color-demand-soft); max-width: 1180px; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; color: var(--color-ink); }
+.dispatch-page { --accent: var(--color-brand); --accent-soft: var(--color-brand-accent-soft); max-width: 1180px; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; color: var(--color-ink); }
 .dispatch-controls { display: flex; align-items: flex-end; gap: .75rem; }
 .run-navigation { display: flex; flex-wrap: wrap; gap: .5rem; }
 .run-navigation a, .run-config-link a { color: var(--accent); font-size: .82rem; font-weight: 700; }
@@ -71,8 +71,6 @@
 .weather-bases { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--color-border); }
 .weather-bases h2 { margin: 0; font-family: var(--font-display); font-size: 1.35rem; font-weight: 600; }
 .weather-bases-note { max-width: 640px; margin: .35rem 0 0; color: var(--color-muted); font-size: .85rem; line-height: 1.55; }
-.weather-region { margin-top: 1.15rem; }
-.weather-region h3 { margin: 0 0 .4rem; font-family: var(--font-display); font-size: 1.02rem; font-weight: 600; }
 .assumption-band { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem 2rem; margin-top: 1rem; padding: 1.25rem 0; border-top: 1px solid var(--color-border); }
 .assumption-band div { min-width: 0; }
 .assumption-band span, .assumption-band strong, .assumption-band small { display: block; }

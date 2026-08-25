@@ -11,8 +11,6 @@
     --color-surface-table: #f2f4f5;
     --color-solar: #d97706;
     --color-solar-soft: #fff7e6;
-    --color-solar-zenith: #c85d16;
-    --color-solar-zenith-soft: #fff4e8;
     --color-wind: #087f5b;
     --color-wind-soft: #e9f7f1;
     --color-temperature: #b33a3a;
@@ -43,9 +41,33 @@
     --color-positive-soft: #e8f5f1;
     --color-negative-soft: #fdeeea;
     --color-notice-soft: #fdf4e3;
-    --font-body: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    --font-display: Georgia, "Times New Roman", serif;
+    --font-body: Inter, 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --font-display: 'Source Serif 4', Georgia, "Times New Roman", serif;
     --type-eyebrow: 0.78rem;
+    /* Brand chrome. Deliberately separate from the data palette above: the colours below dress
+       the sidebar, the dark bands, the buttons and the mark, and none of them ever encodes a
+       measured quantity. A chart's teal always means demand, never "this is a NEMSweep page". */
+    --color-ink-surface: #141b2d;
+    --color-ink-surface-raised: #1e2740;
+    --color-on-ink: #f2f4f8;
+    --color-on-ink-muted: #b3bcd0;
+    --color-on-ink-accent: #e39a3c;
+    --color-brand: #141b2d;
+    --color-brand-hover: #26314c;
+    /* The amber above fails contrast as text on white, so light surfaces get this darker ochre
+       instead of the accent they sit beside on dark. */
+    --color-brand-accent: #9a5b12;
+    --color-brand-accent-soft: #fbf2e6;
+    --color-brand-rule: #c8cedd;
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 16px;
+    /* Tinted with the ink colour rather than pure black: a neutral-black shadow reads as grime
+       over the warm-grey surfaces this palette uses. */
+    --shadow-sm: 0 1px 2px rgba(23, 33, 43, 0.06), 0 1px 3px rgba(23, 33, 43, 0.05);
+    --shadow-md: 0 2px 4px rgba(23, 33, 43, 0.05), 0 6px 16px rgba(23, 33, 43, 0.08);
+    --shadow-lg: 0 4px 8px rgba(23, 33, 43, 0.05), 0 16px 40px rgba(23, 33, 43, 0.12);
+    --measure: 68ch;
     --space-page-x: 1.25rem;
     --space-page-top: 1.5rem;
     --space-page-bottom: 3rem;
@@ -72,12 +94,119 @@
     scroll-margin-top: calc(var(--sticky-header-height) + 0.75rem);
 }
 
+html {
+    /* Anchors in the marketing nav and the chart reveals in nem.js both scroll the document, and
+       both read better as a movement than as a jump. */
+    scroll-behavior: smooth;
+    /* Tells the browser which palette to render form controls and scrollbars against. */
+    color-scheme: light;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+}
+
+::selection {
+    background: rgba(227, 154, 60, 0.3);
+    color: var(--color-ink);
+}
+
+/* Headings set their own line breaks badly at the sizes this site uses, leaving one word alone on
+   the last line of a two-line heading. */
+h1, h2, h3 {
+    text-wrap: balance;
+}
+
+/* The sidebar is ink, so a default light scrollbar sits on it as a bright stripe. */
+.sidebar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+
+.sidebar ::-webkit-scrollbar {
+    width: 8px;
+}
+
+.sidebar ::-webkit-scrollbar-thumb {
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.22);
+}
+
+.sidebar ::-webkit-scrollbar-track {
+    background: transparent;
+}
+
 html, body {
     font-family: var(--font-body);
+    /* Inter's default figures are proportional, which makes a column of MWh values ragged. */
+    font-feature-settings: 'cv05' 1;
+    -webkit-font-smoothing: antialiased;
 }
 
 h1:focus {
     outline: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Focus
+
+   Nothing in this stylesheet defined a focus ring, so keyboard focus fell back
+   to the browser default and then to nothing at all wherever a component set
+   outline: none. The double ring holds on both grounds the site uses: the
+   accent reads on white, the white halo reads on the ink sidebar.
+   --------------------------------------------------------------------------- */
+
+/* Written out rather than wrapped in :where(): MudBlazor ships a:focus-visible { outline: none },
+   and a :where() selector contributes no specificity, so the reset won and focus stayed invisible.
+   These match its specificity and app.css loads after it. */
+a:focus-visible,
+button:focus-visible,
+[role="button"]:focus-visible,
+summary:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid var(--color-brand-accent);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.85);
+    border-radius: 2px;
+}
+
+/* On the ink surfaces the halo has to be the dark ground instead, or it draws a white box. */
+.sidebar a:focus-visible,
+.sidebar button:focus-visible,
+.sweep-band a:focus-visible,
+.sweep-band button:focus-visible {
+    outline-color: var(--color-on-ink-accent);
+    box-shadow: 0 0 0 4px rgba(20, 27, 45, 0.9);
+}
+
+/* The first focusable element on every app page, so a keyboard reader is not walked through the
+   whole sidebar before reaching the content. Visible only while focused. */
+.skip-link {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    z-index: 100;
+    padding: 0.6rem 1rem;
+    background: var(--color-brand);
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none;
+    transform: translateY(-200%);
+}
+
+.skip-link:focus {
+    transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .skip-link {
+        transition: transform 0.15s ease;
+    }
 }
 
 a, .btn-link {
@@ -141,39 +270,85 @@ a, .btn-link {
         content: "An error has occurred."
     }
 
-.loading-progress {
+/* ---------------------------------------------------------------------------
+   Boot splash
+
+   Runs before Blazor has started, so it can use nothing but this stylesheet.
+   The width of .boot-fill is driven by --blazor-load-percentage, which the
+   framework sets on the document as assemblies arrive, so the bar is honest.
+   --------------------------------------------------------------------------- */
+
+.boot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.9rem;
     position: absolute;
-    display: block;
-    width: 8rem;
-    height: 8rem;
-    inset: 20vh 0 auto 0;
-    margin: 0 auto 0 auto;
+    inset: 0;
+    justify-content: center;
+    padding: 2rem;
+    background: var(--color-surface);
 }
 
-    .loading-progress circle {
-        fill: none;
-        stroke: #e0e0e0;
-        stroke-width: 0.6rem;
-        transform-origin: 50% 50%;
-        transform: rotate(-90deg);
-    }
-
-        .loading-progress circle:last-child {
-            stroke: #1b6ec2;
-            stroke-dasharray: calc(3.141 * var(--blazor-load-percentage, 0%) * 0.8), 500%;
-            transition: stroke-dasharray 0.05s ease-in-out;
-        }
-
-.loading-progress-text {
-    position: absolute;
-    text-align: center;
-    font-weight: bold;
-    inset: calc(20vh + 3.25rem) 0 auto 0.2rem;
+.boot-mark {
+    color: var(--color-brand);
+    /* The wedges arrive in sequence, which is the mark drawing itself rather than a spinner
+       standing in for one. */
+    animation: boot-mark-in 0.5s ease-out both;
 }
 
-    .loading-progress-text:after {
-        content: var(--blazor-load-percentage-text, "Loading");
-    }
+.boot-name {
+    margin: 0;
+    color: var(--color-ink);
+    font-family: var(--font-display);
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.boot-name span {
+    color: var(--color-brand-accent);
+    font-weight: 400;
+}
+
+.boot-track {
+    width: min(210px, 60vw);
+    height: 2px;
+    margin-top: 0.35rem;
+    background: var(--color-border);
+    overflow: hidden;
+}
+
+.boot-fill {
+    width: var(--blazor-load-percentage, 0%);
+    height: 100%;
+    background: var(--color-on-ink-accent);
+    transition: width 0.2s ease-out;
+}
+
+.boot-caption {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
+}
+
+.boot-caption::after {
+    /* Blazor publishes the rounded percentage as a quoted string in this property. */
+    content: var(--blazor-load-percentage-text, "");
+    margin-left: 0.35rem;
+    font-variant-numeric: tabular-nums;
+}
+
+@keyframes boot-mark-in {
+    from { opacity: 0; transform: translateY(4px) scale(0.94); }
+    to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .boot-mark { animation: none; }
+    .boot-fill { transition: none; }
+}
 
 code {
     color: #c02d76;
@@ -186,6 +361,13 @@ code {
 
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
+}
+
+/* MudBlazor's snackbar provider is a fixed, top-right container that is present and sized even
+   with no snackbar in it, and at narrow widths its own margins push it past the viewport and give
+   the whole page a horizontal scrollbar. */
+.mud-snackbar-location-top-right {
+    max-width: 100vw;
 }
 
 /* ---------------------------------------------------------------------------

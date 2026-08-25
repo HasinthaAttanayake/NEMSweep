@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" role="img" aria-label="NEMSweep">
+  <title>NEMSweep</title>
+  <!-- The documentation site's own copy of the mark. Deliberately duplicated rather than shared
+       with NEMSweep.Web, because the two sites deploy separately and the web project is expected
+       to move out of this repository. Keep the geometry in step with NEMSweep.Web/wwwroot/brand.
+
+       docfx renders this through an <img>, so the mark cannot inherit a colour from the page and
+       cannot see docfx's own data-bs-theme. It carries its own media query instead, which matches
+       docfx's default "auto" theme. A reader who overrides that toggle gets the other pairing, so
+       both colours are chosen to stay legible on both grounds rather than only on their own:
+       ochre is 4.9:1 on white and 3.1:1 on the dark header, amber is 6.6:1 and 2.4:1. -->
+  <style>
+    .mark { fill: #9a5b12; }
+    @media (prefers-color-scheme: dark) {
+      .mark { fill: #e39a3c; }
+    }
+  </style>
+  <g class="mark">
+    <path d="M6.77 20.14L20.64 18.27A17.4 17.4 0 0 0 19.92 15.14L6.63 19.53Z"/>
+    <path d="M6.26 18.76L19.89 10.01A19.6 19.6 0 0 0 17.66 7.16L5.87 18.27Z"/>
+    <path d="M5.22 17.73L12.06 6.91A16.2 16.2 0 0 0 9.39 5.55L4.66 17.44Z" opacity="0.72"/>
+    <path d="M4.01 17.25L5.69 8.01A12.8 12.8 0 0 0 3.33 7.8L3.38 17.2Z" opacity="0.5"/>
+    <circle cx="3.4" cy="20.6" r="2.1"/>
+  </g>
+</svg>
