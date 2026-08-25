@@ -165,7 +165,7 @@ internal sealed class CommandRouter
         writer.WriteLine("  --data-root <dir>   where inputs are read from  (env NEMSWEEP_DATA_ROOT)");
         writer.WriteLine("  --output <dir>      where results are written   (env NEMSWEEP_OUTPUT)");
         writer.WriteLine("  --csv               also write the star schema CSV tables");
-        writer.WriteLine("  --format <text|json>  how a command reports its result");
+        writer.WriteLine("  --format <text|json>  report as JSON (--validate-scenario)");
         writer.WriteLine();
         writer.WriteLine("  Scenario and sweep runs:");
         writer.WriteLine("  nemsweep --validate-scenario [scenario-config.json]");

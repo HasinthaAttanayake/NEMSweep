@@ -131,11 +131,11 @@ internal static class ScenarioCommand
             StarSchemaExport.WriteFacts(publication, factDirectory, pointId ?? settings.Id);
             if (csvDirectory is null)
             {
-                StarSchemaExport.WriteDimensions(publication, factDirectory);
+                StarSchemaExport.WriteDimensions(publication, dispatch.PowerSystem, factDirectory);
             }
             else if (dimensionDirectory is not null)
             {
-                StarSchemaExport.WriteDimensions(publication, dimensionDirectory);
+                StarSchemaExport.WriteDimensions(publication, dispatch.PowerSystem, dimensionDirectory);
             }
         }
 

@@ -48,7 +48,10 @@ internal sealed record CliOptions(
 
             if (index + 1 >= args.Length)
             {
-                throw new ArgumentException($"{argument} requires a directory.");
+                throw new ArgumentException(
+                    argument is FormatFlag
+                        ? $"{argument} requires 'text' or 'json'."
+                        : $"{argument} requires a directory.");
             }
 
             string value = args[++index];
