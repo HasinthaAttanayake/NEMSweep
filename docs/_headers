@@ -1,0 +1,10 @@
+# Same reason as NEMSweep.Web/wwwroot/_headers: Cloudflare Pages defaults static assets to
+# max-age=14400, and docfx writes its stylesheet and script to stable filenames, so a theme change
+# would not reach a returning reader for four hours.
+#
+# docfx fingerprints its own bundled chunks under public/ but not public/main.css or main.js, which
+# are exactly the two files this project overrides, so the whole site revalidates rather than
+# picking out the few that cannot.
+
+/*
+  Cache-Control: no-cache

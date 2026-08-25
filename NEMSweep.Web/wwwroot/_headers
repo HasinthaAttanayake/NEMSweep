@@ -1,5 +1,21 @@
-/data/sweeps/*/series/*
+# Cloudflare Pages defaults every static asset to max-age=14400. For four hours after a deploy a
+# returning browser therefore keeps its own copy of anything with a stable filename without asking
+# the server, which is why a change to app.css or the scoped-style bundle appears to not have
+# shipped until the reader empties their cache.
+#
+# The rule below is the safe default: revalidate. Browsers still keep the file and still get a 304
+# when it has not changed, so this costs headers rather than payload. Only paths whose name changes
+# with their content are exempted after it. Rules are applied in order and a later rule wins, so
+# the exemptions have to follow the default rather than precede it.
+
+/*
+  Cache-Control: no-cache
+
+# Every file the Blazor runtime loads carries a content hash in its name, verified across all 57
+# requests the app makes at boot. A new build writes new names, so these can never go stale.
+/_framework/*
   Cache-Control: public, max-age=31536000, immutable
 
-/data/*
-  Cache-Control: no-cache
+# A sweep's interval series are written once under a sweep id and are never rewritten in place.
+/data/sweeps/*/series/*
+  Cache-Control: public, max-age=31536000, immutable
