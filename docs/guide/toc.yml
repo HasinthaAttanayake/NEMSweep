@@ -10,6 +10,8 @@
   href: scenarios.md
 - name: Input bundles
   href: input-bundles.md
+- name: Schemas
+  href: schemas.md
 - name: Outputs and provenance
   href: outputs.md
 - name: CSV tables

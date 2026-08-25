@@ -32,8 +32,18 @@ internal static class ScenarioScaffoldCommand
     /// finishes cleanly rather than greeting a newcomer with an unserved-energy warning they have no
     /// context for yet. Replace it: that is the point of the file.
     /// </remarks>
+    /// <summary>
+    /// Where an editor fetches the schema from. The repository is the host: the raw endpoint serves
+    /// with a permissive cross-origin header and editors do not mind that it is text/plain, so
+    /// hosting the file anywhere else would be presentation rather than capability.
+    /// </summary>
+    private static readonly string SchemaUrl =
+        "https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/"
+        + $"scenario-v{ArtifactSchemaVersions.ScenarioConfig}.json";
+
     private static readonly string Scaffold = $$"""
         {
+          "$schema": "{{SchemaUrl}}",
           "schemaVersion": {{ArtifactSchemaVersions.ScenarioConfig}},
           "id": "my-scenario",
           "name": "My scenario",

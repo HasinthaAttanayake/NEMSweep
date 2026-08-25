@@ -12,12 +12,14 @@ namespace NEMSweep.CLI.Application;
 /// <param name="Output">Standard output.</param>
 /// <param name="Error">Standard error, when the caller supplied one.</param>
 /// <param name="Csv">Whether this run also writes the star schema CSV tables.</param>
+/// <param name="Format">How a command reports its result.</param>
 internal sealed record CliContext(
     WorkspacePaths Paths,
     CliSettings Settings,
     TextWriter Output,
     TextWriter? Error = null,
-    bool Csv = false)
+    bool Csv = false,
+    OutputFormat Format = OutputFormat.Text)
 {
     /// <summary>The settings this invocation's workspace was resolved from.</summary>
     public CliSettings LoadSettings() => Settings;

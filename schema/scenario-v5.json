@@ -1,0 +1,354 @@
+{
+  "$defs": {
+    "costBasis": {
+      "additionalProperties": false,
+      "properties": {
+        "realDiscountRate": {
+          "type": "number"
+        },
+        "year": {
+          "maximum": 2100,
+          "minimum": 2000,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "year",
+        "realDiscountRate"
+      ],
+      "type": "object"
+    },
+    "generatingFleet": {
+      "additionalProperties": false,
+      "properties": {
+        "costParameters": {
+          "$ref": "#/$defs/generationCosts"
+        },
+        "monthlyCapacityFactors": {
+          "items": {
+            "$ref": "#/$defs/monthlyCapacityFactor"
+          },
+          "type": "array"
+        },
+        "nameplateCapacityMw": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "technology": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "technologyProfile": {
+          "$ref": "#/$defs/generationProfile"
+        }
+      },
+      "required": [
+        "technology",
+        "nameplateCapacityMw",
+        "costParameters",
+        "technologyProfile"
+      ],
+      "type": "object"
+    },
+    "generationCosts": {
+      "additionalProperties": false,
+      "properties": {
+        "capitalCostAudPerMw": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "fixedOperatingCostAudPerMwYear": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "fuelPriceAudPerGj": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "variableOperatingCostAudPerMwh": {
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "capitalCostAudPerMw",
+        "fixedOperatingCostAudPerMwYear",
+        "variableOperatingCostAudPerMwh",
+        "fuelPriceAudPerGj"
+      ],
+      "type": "object"
+    },
+    "generationProfile": {
+      "additionalProperties": false,
+      "properties": {
+        "heatRateGjPerMwh": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "technicalLifeYears": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "heatRateGjPerMwh",
+        "technicalLifeYears"
+      ],
+      "type": "object"
+    },
+    "interconnector": {
+      "additionalProperties": false,
+      "properties": {
+        "capacityMw": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "capitalCostAudPerKmPerMw": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "fixedOperatingCostAudPerKmPerMwYear": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "fromRegionId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "routeLengthKm": {
+          "exclusiveMinimum": 0,
+          "type": "number"
+        },
+        "technicalLifeYears": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "toRegionId": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "fromRegionId",
+        "toRegionId",
+        "capacityMw",
+        "routeLengthKm",
+        "capitalCostAudPerKmPerMw",
+        "fixedOperatingCostAudPerKmPerMwYear",
+        "technicalLifeYears"
+      ],
+      "type": "object"
+    },
+    "monthlyCapacityFactor": {
+      "additionalProperties": false,
+      "properties": {
+        "capacityFactor": {
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "type": "number"
+        },
+        "month": {
+          "format": "date",
+          "type": "string"
+        }
+      },
+      "required": [
+        "month",
+        "capacityFactor"
+      ],
+      "type": "object"
+    },
+    "region": {
+      "additionalProperties": false,
+      "properties": {
+        "dataCentreNameplateMw": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "demandFile": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "generatingFleets": {
+          "items": {
+            "$ref": "#/$defs/generatingFleet"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "regionId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "storageFleets": {
+          "items": {
+            "$ref": "#/$defs/storageFleet"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "weatherFile": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "regionId",
+        "generatingFleets",
+        "storageFleets",
+        "demandFile",
+        "weatherFile"
+      ],
+      "type": "object"
+    },
+    "storageCosts": {
+      "additionalProperties": false,
+      "properties": {
+        "energyCapitalCostAudPerMwh": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "fixedOperatingCostAudPerMwYear": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "powerCapitalCostAudPerMw": {
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "powerCapitalCostAudPerMw",
+        "energyCapitalCostAudPerMwh",
+        "fixedOperatingCostAudPerMwYear"
+      ],
+      "type": "object"
+    },
+    "storageFleet": {
+      "additionalProperties": false,
+      "properties": {
+        "costParameters": {
+          "$ref": "#/$defs/storageCosts"
+        },
+        "initialEnergyCapacityMwh": {
+          "type": "number"
+        },
+        "initialPowerCapacityMw": {
+          "type": "number"
+        },
+        "technology": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "technologyProfile": {
+          "$ref": "#/$defs/storageProfile"
+        }
+      },
+      "required": [
+        "technology",
+        "initialEnergyCapacityMwh",
+        "initialPowerCapacityMw",
+        "costParameters",
+        "technologyProfile"
+      ],
+      "type": "object"
+    },
+    "storageProfile": {
+      "additionalProperties": false,
+      "properties": {
+        "roundTripEfficiency": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        "technicalLifeYears": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "technicalLifeYears",
+        "roundTripEfficiency"
+      ],
+      "type": "object"
+    },
+    "storageSizing": {
+      "additionalProperties": false,
+      "properties": {
+        "maximumEnergyMwh": {
+          "type": "number"
+        },
+        "maximumPasses": {
+          "type": "integer"
+        },
+        "maximumPowerMw": {
+          "type": "number"
+        },
+        "reliabilityStandardName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "targetUsePercentage": {
+          "exclusiveMinimum": 0,
+          "maximum": 100,
+          "type": "number"
+        }
+      },
+      "required": [
+        "maximumPowerMw",
+        "maximumEnergyMwh"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://nemsweep.com/schemas/scenario-config.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "costBasis": {
+      "$ref": "#/$defs/costBasis"
+    },
+    "id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "interconnectors": {
+      "items": {
+        "$ref": "#/$defs/interconnector"
+      },
+      "type": "array"
+    },
+    "name": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "provenance": {
+      "type": "object"
+    },
+    "regions": {
+      "items": {
+        "$ref": "#/$defs/region"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": 5
+    },
+    "storageSizing": {
+      "$ref": "#/$defs/storageSizing"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "id",
+    "name",
+    "costBasis",
+    "regions",
+    "storageSizing"
+  ],
+  "title": "NEMSweep scenario configuration",
+  "type": "object"
+}

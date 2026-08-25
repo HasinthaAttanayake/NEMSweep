@@ -26,6 +26,10 @@ public sealed class SweepFanOutTests
     [InlineData("[]", "at least one point is required")]
     [InlineData("[{ \"pointId\": \"unsafe_id\", \"axisValue\": 0, \"label\": \"Base\", \"overrides\": {} }]", "point 'unsafe_id' must have a filename-safe id")]
     [InlineData("[{ \"pointId\": \"p0\", \"axisValue\": 0, \"label\": \" \", \"overrides\": {} }]", "point 'p0': label is required")]
+    // Nothing reads axisValue, so a wrong one mislabels a chart rather than failing a run. Two points
+    // claiming one position is the shape a copy-pasted point takes, and the only axis mistake that
+    // can be caught without knowing what the overrides mean.
+    [InlineData("[{ \"pointId\": \"p0\", \"axisValue\": 500, \"label\": \"A\", \"overrides\": {} }, { \"pointId\": \"p1\", \"axisValue\": 500, \"label\": \"B\", \"overrides\": {} }]", "share axis value 500")]
     public void Load_RejectsInvalidPoints(string points, string expectedMessage)
     {
         using var fixture = new SweepFixture();
