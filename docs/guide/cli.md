@@ -4,10 +4,36 @@
 by zero to three positional arguments, matched by a pattern in
 `NEMSweep.CLI/Application/CommandRouter.cs`. This page documents every command it routes.
 
-Paths you pass on the command line for a scenario config, a sweep definition or an input bundle
-are resolved relative to the **solution root**, not to your current working directory
-(`RepositoryPaths.ResolveConfiguredPath`). An absolute path is used as given. The single-source
-import commands are the exception, and each section below says so.
+Paths you pass on the command line are resolved relative to your **current working directory**
+(`WorkspacePaths.ResolveConfiguredPath`). An absolute path is used as given. Nothing searches for a
+repository, so the executable runs from wherever you put it.
+
+## The workspace
+
+Every run reads inputs from one directory and writes results to another. Neither is discovered:
+you supply them, and each takes the first of three sources.
+
+| Root | What it holds | Command line | Environment | Setting |
+|---|---|---|---|---|
+| Data | Demand, weather and generation artifacts a scenario reads. Also where `--ingest` writes them. | `--data-root <dir>` | `NEMSWEEP_DATA_ROOT` | `dataRoot` |
+| Output | `results*.json` and everything under `sweeps/`. | `--output <dir>` | `NEMSWEEP_OUTPUT` | `outputRoot` |
+
+The environment variables exist because a container's settings file sits in a read-only image
+layer, so a flag or a variable is the only way to redirect a run there.
+
+Both overrides may appear anywhere on the command line. They are stripped before the command itself
+is matched, so they never occupy one of a command's positional arguments:
+
+```bash
+nemsweep --run-scenario scenarios/my-scenario.json --output ./study
+```
+
+```bash
+nemsweep --output ./study --run-scenario scenarios/my-scenario.json
+```
+
+`--help`, `--version` and `--describe-schema` answer without a workspace at all, so they work before
+you have written any settings file.
 
 ## Exit codes
 
@@ -54,10 +80,15 @@ sizing storage against the scenario's reliability standard. Writes `results.json
 `results-overview.json`, and a `results-{region}.json` and `results-{region}-overview.json` pair per
 region.
 
-Results are published to `NEMSweep.Web/wwwroot/data` (`RepositoryPaths.DispatchResultsPath`), which is
-fixed. The configured `outputRoot` governs where a scenario's demand and weather **inputs** are
-looked for, not where its results are written, so pointing `outputRoot` elsewhere does not move
-`results.json`.
+Results are published to the **output root**, and the demand and weather artifacts the scenario
+names are read from the **data root**. Point either wherever you need it:
+
+```bash
+nemsweep --run-scenario scenarios/my-scenario.json --data-root ./reference --output ./study
+```
+
+A scenario names its inputs by file name, and the data root is the single place they are looked
+for. An absolute path in a scenario config is used as given.
 
 Publication is staged and atomic: the previous versions of these files are moved aside first and
 only deleted once every new file has landed, so a failure partway through leaves the prior
@@ -77,7 +108,10 @@ dotnet run --project NEMSweep.CLI -- --fan-out-sweep sweeps/my-sweep.json
 | sweep definition path | no | n/a |
 
 Reads a sweep definition and, for each point, merges the point's overrides onto the baseline
-scenario config to produce `sweeps/{sweepId}/configs/{pointId}.json` under the solution root.
+scenario config to produce `sweeps/{sweepId}/configs/{pointId}.json` under your working directory.
+That is a working area beside the sweep definition, deliberately separate from the published sweep
+directory: a run copies each config from here to there, and one location serving both would have it
+copy a file onto itself.
 Every generated point config is then loaded and validated as a scenario config before the command
 succeeds. This makes `--fan-out-sweep` the command to run first while you are developing a sweep:
 a bad override surfaces immediately, against every point, without running any dispatch.
@@ -105,7 +139,7 @@ status files, the sweep index and the manifest each land as they are produced. A
 can therefore leave a partially updated `sweeps/{sweepId}/` directory. Rerun the sweep to bring it
 back to a consistent state.
 
-Published under `NEMSweep.Web/wwwroot/data/sweeps/{sweepId}/`: `index.json` (the sweep index),
+Published under `{outputRoot}/sweeps/{sweepId}/`: `index.json` (the sweep index),
 `points/{pointId}.json` and `points/{pointId}.status.json` for each point, a copy of each point's
 `configs/{pointId}.json`, and any base-demand series the points reference under `series/`.
 `sweeps/index.json` (the manifest of all published sweeps) is rewritten from what is on disk after
@@ -168,7 +202,9 @@ dotnet run --project NEMSweep.CLI -- --ingest path/to/input-bundle
 
 Runs the identical validation `--validate-inputs` performs, then, only if that validation
 succeeds, writes every artifact: `demand-{region}.json` per region, `weather-{region}.json` per
-region, and `generation-information.json`, all under `outputRoot`. If validation fails, `--ingest`
+region, and `generation-information.json`, all under the **data root**. Ingest produces the
+artifacts scenarios read, so it writes where they are read from; only results belong under the
+output root. If validation fails, `--ingest`
 writes nothing, which is the same guarantee `--validate-inputs` gives you with the write step
 appended when the bundle is good.
 
@@ -194,12 +230,12 @@ dotnet run --project NEMSweep.CLI -- --import-demand path/to/output-directory
 
 | Argument | Optional | Default |
 |---|---|---|
-| output directory | yes | `outputRoot` from the loaded CLI settings |
+| output directory | yes | the data root |
 
 Reads operational-demand archives from the input bundle at `inputBundleRoot` and writes
-`demand-{region}.json` for each region found, to the given output directory (or `outputRoot`).
-Unlike the scenario, sweep and input-bundle paths above, an explicit output directory here is
-resolved relative to your current working directory, not the solution root.
+`demand-{region}.json` for each region found, to the given output directory, or to the data root
+when you do not name one. Like every other path on the command line, an explicit directory here is
+resolved relative to your current working directory.
 
 ### `--generation-information`
 
@@ -211,9 +247,8 @@ dotnet run --project NEMSweep.CLI -- --generation-information path/to/workbook.x
 |---|---|---|
 | workbook path | no | n/a |
 
-Reads a generation-information workbook and writes `generation-information.json` under
-`NEMSweep.Web/wwwroot/data`. The workbook path is used as given, so it is relative to your current
-working directory unless it is absolute, rather than resolved against the solution root.
+Reads a generation-information workbook and writes `generation-information.json` under the data
+root. The workbook path is relative to your current working directory unless it is absolute.
 
 ### `--epw-report`
 
@@ -232,8 +267,8 @@ dotnet run --project NEMSweep.CLI -- --epw-report NSW1 path/to/solar.epw path/to
 | wind EPW path | yes | the solar EPW path (one file used for both) |
 
 The region argument is validated against the five NEM regions (`NSW1`, `QLD1`, `SA1`, `TAS1`,
-`VIC1`); anything else is rejected before any file is read. The EPW paths, like the
-generation-information workbook path, are used as given rather than resolved against the solution
-root. Writes `weather-{region}.json` under `NEMSweep.Web/wwwroot/data`, and prints the provenance
-report, including the daylight DNI source shares, along with a count of each series constructed.
+`VIC1`); anything else is rejected before any file is read, and before settings are loaded. The EPW
+paths are relative to your current working directory unless they are absolute. Writes
+`weather-{region}.json` under the data root, and prints the provenance report, including the
+daylight DNI source shares, along with a count of each series constructed.
 

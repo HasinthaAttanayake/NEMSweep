@@ -102,8 +102,21 @@ dotnet run --project .\NEMSweep.CLI\NEMSweep.CLI.csproj -- --help
 dotnet run --project .\NEMSweep.Web\NEMSweep.Web.csproj
 ```
 
-Copy `NEMSweep.CLI/appsettings.example.json` to `NEMSweep.CLI/appsettings.local.json` for machine-local input
-and output paths. The local file is ignored by Git; the example is the fallback when it is absent.
+Copy `NEMSweep.CLI/appsettings.example.json` to `NEMSweep.CLI/appsettings.local.json` for
+machine-local input and output paths. The local file is ignored by Git; the example is the fallback
+when it is absent, so a fresh clone runs without configuring anything.
+
+A run reads its inputs from a **data root** and writes results to an **output root**. The committed
+example reads the artifacts this repository already carries and writes to a gitignored `out/`, so an
+ordinary run never disturbs the published results. Override either per run:
+
+```powershell
+dotnet run --project .\NEMSweep.CLI\NEMSweep.CLI.csproj -- --run-scenario --output .\my-study
+```
+
+`NEMSWEEP_DATA_ROOT` and `NEMSWEEP_OUTPUT` do the same thing for environments where editing a
+settings file is awkward. Nothing searches for the repository, so the built executable runs from
+wherever you put it.
 
 The full walkthrough covering configuration, the first scenario run and every command is in
 [Getting started](docs/guide/index.md) and the [CLI reference](docs/guide/cli.md).
