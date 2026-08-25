@@ -54,86 +54,22 @@ internal static class DispatchResultsExport
         string finalResultsPath = Path.GetFullPath(resultsPath);
         string outputDirectory = Path.GetDirectoryName(finalResultsPath)
             ?? throw new InvalidOperationException("Results path has no directory.");
-        string stagingDirectory = Path.Combine(
-            outputDirectory,
-            $".dispatch-results-{Guid.NewGuid():N}");
-        string backupDirectory = Path.Combine(stagingDirectory, "previous");
-        Directory.CreateDirectory(stagingDirectory);
+        string overviewFileName = $"{Path.GetFileNameWithoutExtension(resultsPath)}-overview.json";
 
-        try
+        using var writer = new StagedFileSetWriter(outputDirectory);
+        writer.Stage(Path.GetFileName(finalResultsPath), JsonFile.Serialize(publication.System), writeText);
+        writer.Stage(overviewFileName, JsonFile.Serialize(publication.Overview), writeText);
+        foreach ((string fileName, RegionDispatchResultsDTO result) in publication.Regions)
         {
-            string systemPath = Path.Combine(stagingDirectory, "results.json");
-            string overviewFileName = $"{Path.GetFileNameWithoutExtension(resultsPath)}-overview.json";
-            string overviewPath = Path.Combine(stagingDirectory, overviewFileName);
-            WriteText(publication.System, systemPath, writeText);
-            WriteText(publication.Overview, overviewPath, writeText);
-            foreach ((string fileName, RegionDispatchResultsDTO result) in publication.Regions)
-            {
-                WriteText(result, Path.Combine(stagingDirectory, fileName), writeText);
-            }
-
-            foreach ((string fileName, RegionDispatchOverviewDTO overview) in publication.RegionOverviews)
-            {
-                WriteText(overview, Path.Combine(stagingDirectory, fileName), writeText);
-            }
-
-            var targets = new List<(string Staged, string Final)>
-            {
-                (systemPath, finalResultsPath),
-                (overviewPath, Path.Combine(outputDirectory, overviewFileName)),
-            };
-            targets.AddRange(publication.Regions.Select(region =>
-                (Path.Combine(stagingDirectory, region.Key), Path.Combine(outputDirectory, region.Key))));
-            targets.AddRange(publication.RegionOverviews.Select(region =>
-                (Path.Combine(stagingDirectory, region.Key), Path.Combine(outputDirectory, region.Key))));
-            Directory.CreateDirectory(backupDirectory);
-            var backups = new List<(string Backup, string Final)>();
-            try
-            {
-                foreach ((_, string finalPath) in targets)
-                {
-                    if (File.Exists(finalPath))
-                    {
-                        string backupPath = Path.Combine(backupDirectory, Path.GetFileName(finalPath));
-                        File.Move(finalPath, backupPath);
-                        backups.Add((backupPath, finalPath));
-                    }
-                }
-
-                foreach ((string stagedPath, string finalPath) in targets)
-                {
-                    File.Move(stagedPath, finalPath);
-                }
-            }
-            catch
-            {
-                foreach ((_, string finalPath) in targets)
-                {
-                    if (File.Exists(finalPath))
-                    {
-                        File.Delete(finalPath);
-                    }
-                }
-
-                foreach ((string backupPath, string finalPath) in backups)
-                {
-                    if (File.Exists(backupPath))
-                    {
-                        File.Move(backupPath, finalPath);
-                    }
-                }
-
-                throw;
-            }
-        }
-        finally
-        {
-            if (Directory.Exists(stagingDirectory))
-            {
-                Directory.Delete(stagingDirectory, recursive: true);
-            }
+            writer.Stage(fileName, JsonFile.Serialize(result), writeText);
         }
 
+        foreach ((string fileName, RegionDispatchOverviewDTO overview) in publication.RegionOverviews)
+        {
+            writer.Stage(fileName, JsonFile.Serialize(overview), writeText);
+        }
+
+        writer.Commit();
         return publication;
     }
 
@@ -158,91 +94,46 @@ internal static class DispatchResultsExport
         foreach (Region region in dispatch.PowerSystem.Regions)
         {
             string regionId = region.RegionId;
-            RegionalSizingResult regionalSizing = sizingResult.Regions.Single(
-                result => string.Equals(
-                    result.DispatchOutcome.RegionId,
-                    regionId,
-                    StringComparison.OrdinalIgnoreCase));
-            RegionCostBreakdown regionalCost = dispatch.CostBreakdown.Regions.Single(
-                cost => string.Equals(cost.RegionId, regionId, StringComparison.OrdinalIgnoreCase));
-            DispatchInputArtifactDTO demandInput = dispatch.DemandInputs[regionId].Artifact;
-            DispatchInputArtifactDTO weatherInput = dispatch.WeatherInputs[regionId].Artifact;
-            OperationalDemandData demandData = dispatch.DemandInputs[regionId].Value;
-            DispatchSourcesDTO sources = new(
-                demandInput,
-                weatherInput,
-                WeatherBasis.Create(dispatch.WeatherInputs[regionId].Value),
-                demandData.SourceArchives.ToArray());
-            DispatchEvidence evidence = CreateEvidence(new DispatchExportRequest(
-                demandData,
-                demandInput,
-                weatherInput,
-                sources.WeatherBasis,
-                dispatch.Scenario,
-                sizingResult,
-                request.SizingOptions,
-                request.ReliabilityStandardName,
-                dispatch.CostBreakdown,
-                regionId,
-                IncomingTransmissionLossesMw(systemOutcome, regionId)));
-            DispatchCostDTO cost = CreateCost(regionalCost);
-            RegionDispatchResultsDTO detail = new(
-                ArtifactSchemaVersions.RegionDispatchResults,
+            RegionPublication published = BuildRegionPublication(
+                request,
+                systemOutcome,
                 runId,
-                regionId,
-                evidence.Scenario.PeriodStart,
-                evidence.Scenario.PeriodEnd,
-                evidence.Scenario.Resolution,
-                sources,
-                evidence.PowerSystem,
-                evidence.DataSeries,
-                evidence.Metrics,
-                evidence.Reliability,
-                evidence.StorageSizing,
-                cost);
-            string detailPath = $"{request.RegionFileNamePrefix ?? "results-"}{regionId.ToLowerInvariant()}.json";
-            Dictionary<string, double> deliveredGenerationByTechnologyMwh =
-                evidence.DataSeries.DeliveredGenerationByTechnologyMw.ToDictionary(
-                    entry => entry.Key,
-                    entry => entry.Value.Sum() * evidence.Scenario.Resolution.TotalHours,
-                    StringComparer.OrdinalIgnoreCase);
-            string overviewPath = $"{Path.GetFileNameWithoutExtension(detailPath)}-overview.json";
-            RegionDispatchOverviewDTO regionOverview = new(
-                ArtifactSchemaVersions.RegionDispatchOverview,
-                runId,
-                regionId,
-                evidence.Scenario.PeriodStart,
-                evidence.Scenario.PeriodEnd,
-                evidence.Scenario.Resolution,
-                sources,
-                evidence.PowerSystem,
-                evidence.Metrics,
-                evidence.Reliability,
-                evidence.StorageSizing,
-                cost,
-                deliveredGenerationByTechnologyMwh,
-                evidence.DataSeries.TransmissionLossesMw.Sum() * evidence.Scenario.Resolution.TotalHours);
-            regions.Add(detailPath, detail);
-            regionOverviews.Add(overviewPath, regionOverview);
-            sourcesByRegion.Add(regionId, sources);
-            summaries.Add(regionId, new RegionDispatchSummaryDTO(
-                evidence.Metrics,
-                evidence.Reliability,
-                evidence.StorageSizing,
-                cost,
-                deliveredGenerationByTechnologyMwh,
-                detailPath,
-                overviewPath));
+                regionId);
+            regions.Add(published.DetailFileName, published.Detail);
+            regionOverviews.Add(published.OverviewFileName, published.Overview);
+            sourcesByRegion.Add(regionId, published.Sources);
+            summaries.Add(regionId, published.Summary);
         }
 
-        DispatchCostDTO systemCost = CreateCost(dispatch.CostBreakdown);
-        SystemDispatchResultsDTO system = new(
+        SystemDispatchResultsDTO system = BuildSystemResults(
+            request,
+            systemOutcome,
+            systemReliability,
+            runId,
+            sourcesByRegion,
+            summaries);
+        SystemDispatchOverviewDTO overview = BuildOverview(system);
+        return new DispatchPublication(system, overview, regions, regionOverviews);
+    }
+
+    /// <summary>Assembles the whole-system artifact from the per-region indexes just built.</summary>
+    private static SystemDispatchResultsDTO BuildSystemResults(
+        DispatchPublicationRequest request,
+        SystemDispatchOutcome systemOutcome,
+        SystemReliabilityAssessment systemReliability,
+        string runId,
+        Dictionary<string, DispatchSourcesDTO> sourcesByRegion,
+        Dictionary<string, RegionDispatchSummaryDTO> summaries)
+    {
+        ScenarioDispatchResult dispatch = request.Dispatch;
+        string[] regionIds = dispatch.PowerSystem.Regions.Select(region => region.RegionId).ToArray();
+        return new SystemDispatchResultsDTO(
             ArtifactSchemaVersions.SystemDispatchResults,
             runId,
             systemOutcome.Start,
             systemOutcome.Start.AddTicks(systemOutcome.Resolution.Ticks * systemOutcome.Length),
             systemOutcome.Resolution,
-            dispatch.PowerSystem.Regions.Select(region => region.RegionId).ToArray(),
+            regionIds,
             sourcesByRegion,
             summaries,
             CreateSystemSeries(systemOutcome, dispatch.PowerSystem),
@@ -252,44 +143,56 @@ internal static class DispatchResultsExport
                 systemReliability.AchievedUsePercentage,
                 systemReliability.WithinTarget,
                 request.ReliabilityStandardName),
-            CreateSystemStorageSizingOutcome(request, sizingResult),
-            systemCost,
+            CreateSystemStorageSizingOutcome(request, dispatch.SizingResult),
+            CreateCost(dispatch.CostBreakdown),
             new DispatchTopologyDTO(
-                dispatch.PowerSystem.Regions.Select(region => region.RegionId).ToArray(),
+                regionIds,
                 dispatch.PowerSystem.Interconnectors.Select(link => new DispatchTopologyLinkDTO(
                     LinkId(link.FromRegionId, link.ToRegionId),
                     link.FromRegionId,
                     link.ToRegionId,
                     link.Capacity.Megawatts)).ToArray()),
-            systemOutcome.InterconnectorFlows.Select(flow =>
-            {
-                // Route length is the declared scenario value, not a distance derived from the
-                // endpoints; lat/lon are still read off the weather site purely for map placement.
-                ScenarioInterconnector scenarioLink = dispatch.Scenario.Interconnectors.Single(link =>
-                    string.Equals(link.FromRegionId, flow.Interconnector.FromRegionId, StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(link.ToRegionId, flow.Interconnector.ToRegionId, StringComparison.OrdinalIgnoreCase));
-                GeoCoordinate from = dispatch.PowerSystem
-                    .RequireResourceProfile(flow.Interconnector.FromRegionId).Location;
-                GeoCoordinate to = dispatch.PowerSystem
-                    .RequireResourceProfile(flow.Interconnector.ToRegionId).Location;
-                return new DispatchInterconnectorDTO(
-                    LinkId(flow.Interconnector.FromRegionId, flow.Interconnector.ToRegionId),
-                    flow.Interconnector.FromRegionId,
-                    flow.Interconnector.ToRegionId,
-                    flow.Interconnector.Capacity.Megawatts,
-                    ValuesOf(flow.Flow),
-                    ValuesOf(flow.Losses),
-                    scenarioLink.RouteLength.Kilometres,
-                    from.Latitude,
-                    from.Longitude,
-                    to.Latitude,
-                    to.Longitude,
-                    scenarioLink.CostParameters.CapitalCost.AudPerKmPerMw,
-                    scenarioLink.CostParameters.FixedOperatingCost.AudPerKmPerMwYear,
-                    scenarioLink.TechnicalLifeYears);
-            }).ToArray(),
-            new DispatchCostBasisDTO(dispatch.Scenario.CostBasis.Year, dispatch.Scenario.CostBasis.RealDiscountRate));
-        SystemDispatchOverviewDTO overview = new(
+            BuildInterconnectorDtos(dispatch, systemOutcome),
+            new DispatchCostBasisDTO(
+                dispatch.Scenario.CostBasis.Year,
+                dispatch.Scenario.CostBasis.RealDiscountRate));
+    }
+
+    /// <summary>Pairs each solved interconnector flow with its declared scenario link.</summary>
+    private static DispatchInterconnectorDTO[] BuildInterconnectorDtos(
+        ScenarioDispatchResult dispatch,
+        SystemDispatchOutcome systemOutcome) =>
+        systemOutcome.InterconnectorFlows.Select(flow =>
+        {
+            // Route length is the declared scenario value, not a distance derived from the
+            // endpoints; lat/lon are still read off the weather site purely for map placement.
+            ScenarioInterconnector scenarioLink = dispatch.Scenario.Interconnectors.Single(link =>
+                string.Equals(link.FromRegionId, flow.Interconnector.FromRegionId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(link.ToRegionId, flow.Interconnector.ToRegionId, StringComparison.OrdinalIgnoreCase));
+            GeoCoordinate from = dispatch.PowerSystem
+                .RequireResourceProfile(flow.Interconnector.FromRegionId).Location;
+            GeoCoordinate to = dispatch.PowerSystem
+                .RequireResourceProfile(flow.Interconnector.ToRegionId).Location;
+            return new DispatchInterconnectorDTO(
+                LinkId(flow.Interconnector.FromRegionId, flow.Interconnector.ToRegionId),
+                flow.Interconnector.FromRegionId,
+                flow.Interconnector.ToRegionId,
+                flow.Interconnector.Capacity.Megawatts,
+                ValuesOf(flow.Flow),
+                ValuesOf(flow.Losses),
+                scenarioLink.RouteLength.Kilometres,
+                from.Latitude,
+                from.Longitude,
+                to.Latitude,
+                to.Longitude,
+                scenarioLink.CostParameters.CapitalCost.AudPerKmPerMw,
+                scenarioLink.CostParameters.FixedOperatingCost.AudPerKmPerMwYear,
+                scenarioLink.TechnicalLifeYears);
+        }).ToArray();
+
+    /// <summary>Projects the system artifact down to the fields the overview publishes.</summary>
+    private static SystemDispatchOverviewDTO BuildOverview(SystemDispatchResultsDTO system) =>
+        new(
             ArtifactSchemaVersions.SystemDispatchOverview,
             system.RunId,
             system.PeriodStart,
@@ -303,7 +206,102 @@ internal static class DispatchResultsExport
             system.StorageSizing,
             system.Cost,
             system.Topology);
-        return new DispatchPublication(system, overview, regions, regionOverviews);
+
+    /// <summary>One region's slice of a publication: the two artifacts and the two index entries.</summary>
+    private sealed record RegionPublication(
+        string DetailFileName,
+        RegionDispatchResultsDTO Detail,
+        string OverviewFileName,
+        RegionDispatchOverviewDTO Overview,
+        DispatchSourcesDTO Sources,
+        RegionDispatchSummaryDTO Summary);
+
+    /// <summary>
+    /// Builds the detail artifact, the overview artifact, and the summary the system artifact
+    /// indexes them by, for one region.
+    /// </summary>
+    private static RegionPublication BuildRegionPublication(
+        DispatchPublicationRequest request,
+        SystemDispatchOutcome systemOutcome,
+        string runId,
+        string regionId)
+    {
+        ScenarioDispatchResult dispatch = request.Dispatch;
+        StorageSizingRunResult sizingResult = dispatch.SizingResult;
+        RegionCostBreakdown regionalCost = dispatch.CostBreakdown.Regions.Single(
+            cost => string.Equals(cost.RegionId, regionId, StringComparison.OrdinalIgnoreCase));
+        DispatchInputArtifactDTO demandInput = dispatch.DemandInputs[regionId].Artifact;
+        DispatchInputArtifactDTO weatherInput = dispatch.WeatherInputs[regionId].Artifact;
+        OperationalDemandData demandData = dispatch.DemandInputs[regionId].Value;
+        DispatchSourcesDTO sources = new(
+            demandInput,
+            weatherInput,
+            WeatherBasis.Create(dispatch.WeatherInputs[regionId].Value),
+            demandData.SourceArchives.ToArray());
+        DispatchEvidence evidence = CreateEvidence(new DispatchExportRequest(
+            demandData,
+            demandInput,
+            weatherInput,
+            sources.WeatherBasis,
+            dispatch.Scenario,
+            sizingResult,
+            request.SizingOptions,
+            request.ReliabilityStandardName,
+            dispatch.CostBreakdown,
+            regionId,
+            IncomingTransmissionLossesMw(systemOutcome, regionId)));
+        DispatchCostDTO cost = CreateCost(regionalCost);
+        RegionDispatchResultsDTO detail = new(
+            ArtifactSchemaVersions.RegionDispatchResults,
+            runId,
+            regionId,
+            evidence.Scenario.PeriodStart,
+            evidence.Scenario.PeriodEnd,
+            evidence.Scenario.Resolution,
+            sources,
+            evidence.PowerSystem,
+            evidence.DataSeries,
+            evidence.Metrics,
+            evidence.Reliability,
+            evidence.StorageSizing,
+            cost);
+        string detailPath = $"{request.RegionFileNamePrefix ?? "results-"}{regionId.ToLowerInvariant()}.json";
+        Dictionary<string, double> deliveredGenerationByTechnologyMwh =
+            evidence.DataSeries.DeliveredGenerationByTechnologyMw.ToDictionary(
+                entry => entry.Key,
+                entry => entry.Value.Sum() * evidence.Scenario.Resolution.TotalHours,
+                StringComparer.OrdinalIgnoreCase);
+        string overviewPath = $"{Path.GetFileNameWithoutExtension(detailPath)}-overview.json";
+        RegionDispatchOverviewDTO regionOverview = new(
+            ArtifactSchemaVersions.RegionDispatchOverview,
+            runId,
+            regionId,
+            evidence.Scenario.PeriodStart,
+            evidence.Scenario.PeriodEnd,
+            evidence.Scenario.Resolution,
+            sources,
+            evidence.PowerSystem,
+            evidence.Metrics,
+            evidence.Reliability,
+            evidence.StorageSizing,
+            cost,
+            deliveredGenerationByTechnologyMwh,
+            evidence.DataSeries.TransmissionLossesMw.Sum() * evidence.Scenario.Resolution.TotalHours);
+
+        return new RegionPublication(
+            detailPath,
+            detail,
+            overviewPath,
+            regionOverview,
+            sources,
+            new RegionDispatchSummaryDTO(
+                evidence.Metrics,
+                evidence.Reliability,
+                evidence.StorageSizing,
+                cost,
+                deliveredGenerationByTechnologyMwh,
+                detailPath,
+                overviewPath));
     }
 
     private static string LinkId(string fromRegionId, string toRegionId) =>
@@ -325,9 +323,6 @@ internal static class DispatchResultsExport
 
         return losses;
     }
-
-    private static void WriteText<T>(T value, string path, Action<string, string> writeText) =>
-        writeText(path, JsonFile.Serialize(value));
 
     private static DispatchSeriesDTO CreateSystemSeries(
         SystemDispatchOutcome outcome,

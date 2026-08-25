@@ -109,120 +109,188 @@ internal static class PrioritisedTransferSolver
             edgeByEndpoints[(network.From(edge), network.To(edge))] = edge;
         }
 
-        var sentPerEdge = new double[edgeCount];
-        var lostPerEdge = new double[edgeCount];
-        var deliveredPerSink = new double[sinksInPriorityOrder.Count];
-        var deliveries = new List<TransferDelivery>();
-        double totalSent = 0;
-        double totalDelivered = 0;
+        var state = new SolveState
+        {
+            Network = network,
+            Sources = sources,
+            EdgeByEndpoints = edgeByEndpoints,
+            Retention = retention,
+            LossFactorPerHop = lossFactorPerHop,
+            SuperSource = superSource,
+            SuperSink = superSink,
+            RemainingSourceFlow = remainingSourceFlow,
+            RemainingCapacity = remainingCapacity,
+            SentPerEdge = new double[edgeCount],
+            LostPerEdge = new double[edgeCount],
+            DeliveredPerSink = new double[sinksInPriorityOrder.Count],
+            Deliveries = [],
+        };
 
         for (int sinkIndex = 0; sinkIndex < sinksInPriorityOrder.Count; sinkIndex++)
         {
-            TransferSink sink = sinksInPriorityOrder[sinkIndex];
-            double outstanding = sink.RequiredDelivery;
-            int iterationLimit = RequiredIterations(network, retention, sink.RequiredDelivery);
-            int iteration;
-
-            for (iteration = 0; iteration < iterationLimit; iteration++)
-            {
-                if (IsWithinDeliveryTolerance(outstanding, sink.RequiredDelivery)
-                    || remainingSourceFlow.Sum() <= EdmondsKarp.Tolerance)
-                {
-                    break;
-                }
-
-                FlowNetwork augmented = BuildAugmentedNetwork(
-                    network,
-                    remainingCapacity,
-                    sources,
-                    remainingSourceFlow,
-                    sink.Node,
-                    outstanding,
-                    superSource,
-                    superSink);
-
-                MaxFlowResult flow = EdmondsKarp.MaxFlow(augmented, superSource, superSink);
-                if (flow.Value <= EdmondsKarp.Tolerance)
-                {
-                    break;
-                }
-
-                IReadOnlyList<FlowPath> paths = FlowPathDecomposition.Decompose(
-                    augmented,
-                    flow.FlowPerEdge,
-                    superSource,
-                    superSink);
-
-                foreach (FlowPath path in paths)
-                {
-                    // Strip the virtual super-source and super-sink from each end.
-                    int hopCount = path.Nodes.Count - 3;
-                    int sourceNode = path.Nodes[1];
-                    double sent = path.Flow;
-                    double delivered = sent * Math.Pow(retention, hopCount);
-
-                    deliveries.Add(new TransferDelivery(
-                        sourceNode,
-                        sink.Node,
-                        hopCount,
-                        sent,
-                        delivered));
-
-                    // Loss on each edge is the loss factor times what actually enters it,
-                    // which decays along the route. Summed over the route this telescopes
-                    // to sent - delivered.
-                    for (int step = 0; step < hopCount; step++)
-                    {
-                        int edge = edgeByEndpoints[
-                            (path.Nodes[step + 1], path.Nodes[step + 2])];
-                        lostPerEdge[edge] +=
-                            sent * Math.Pow(retention, step) * lossFactorPerHop;
-                    }
-
-                    outstanding -= delivered;
-                    deliveredPerSink[sinkIndex] += delivered;
-                    totalSent += sent;
-                    totalDelivered += delivered;
-                }
-
-                for (int edge = 0; edge < edgeCount; edge++)
-                {
-                    sentPerEdge[edge] += flow.FlowPerEdge[edge];
-                    remainingCapacity[edge] -= flow.FlowPerEdge[edge];
-                }
-
-                for (int index = 0; index < sources.Count; index++)
-                {
-                    remainingSourceFlow[index] -= flow.FlowPerEdge[edgeCount + index];
-                }
-            }
-
-            if (iteration == iterationLimit
-                && !IsWithinDeliveryTolerance(outstanding, sink.RequiredDelivery)
-                && remainingSourceFlow.Sum() > EdmondsKarp.Tolerance
-                && HasRemainingTransferCapacity(
-                    network,
-                    remainingCapacity,
-                    sources,
-                    remainingSourceFlow,
-                    sink.Node,
-                    outstanding,
-                    superSource,
-                    superSink))
-            {
-                throw new InvalidOperationException(
-                    $"Transfer to sink {sink.Node} did not converge within {iterationLimit} "
-                    + "gross-up solves while capacity remained available.");
-            }
+            SolveForSink(ref state, sinksInPriorityOrder[sinkIndex], sinkIndex);
         }
 
         return new TransferResult(
-            sentPerEdge,
-            lostPerEdge,
-            deliveredPerSink,
-            deliveries,
-            totalSent,
-            totalDelivered);
+            state.SentPerEdge,
+            state.LostPerEdge,
+            state.DeliveredPerSink,
+            state.Deliveries,
+            state.TotalSent,
+            state.TotalDelivered);
+    }
+
+    /// <summary>
+    /// Everything one prioritised solve carries across its sinks. A <c>ref struct</c> so that
+    /// grouping the state costs no allocation: this runs once per dispatch interval.
+    /// </summary>
+    private ref struct SolveState
+    {
+        public FlowNetwork Network;
+        public IReadOnlyList<TransferSource> Sources;
+        public Dictionary<(int From, int To), int> EdgeByEndpoints;
+        public double Retention;
+        public double LossFactorPerHop;
+        public int SuperSource;
+        public int SuperSink;
+        public double[] RemainingSourceFlow;
+        public double[] RemainingCapacity;
+        public double[] SentPerEdge;
+        public double[] LostPerEdge;
+        public double[] DeliveredPerSink;
+        public List<TransferDelivery> Deliveries;
+        public double TotalSent;
+        public double TotalDelivered;
+    }
+
+    /// <summary>
+    /// Serves one sink to its requirement, or to whatever the remaining capacity allows.
+    /// See the type remarks for why a sink needs repeated gross-up solves rather than one.
+    /// </summary>
+    private static void SolveForSink(ref SolveState state, TransferSink sink, int sinkIndex)
+    {
+        int edgeCount = state.Network.EdgeCount;
+        double outstanding = sink.RequiredDelivery;
+        int iterationLimit = RequiredIterations(state.Network, state.Retention, sink.RequiredDelivery);
+        int iteration;
+
+        for (iteration = 0; iteration < iterationLimit; iteration++)
+        {
+            if (IsWithinDeliveryTolerance(outstanding, sink.RequiredDelivery)
+                || state.RemainingSourceFlow.Sum() <= EdmondsKarp.Tolerance)
+            {
+                break;
+            }
+
+            FlowNetwork augmented = BuildAugmentedNetwork(
+                state.Network,
+                state.RemainingCapacity,
+                state.Sources,
+                state.RemainingSourceFlow,
+                sink.Node,
+                outstanding,
+                state.SuperSource,
+                state.SuperSink);
+
+            MaxFlowResult flow = EdmondsKarp.MaxFlow(augmented, state.SuperSource, state.SuperSink);
+            if (flow.Value <= EdmondsKarp.Tolerance)
+            {
+                break;
+            }
+
+            IReadOnlyList<FlowPath> paths = FlowPathDecomposition.Decompose(
+                augmented,
+                flow.FlowPerEdge,
+                state.SuperSource,
+                state.SuperSink);
+
+            foreach (FlowPath path in paths)
+            {
+                outstanding -= AccountForPath(ref state, path, sink, sinkIndex);
+            }
+
+            for (int edge = 0; edge < edgeCount; edge++)
+            {
+                state.SentPerEdge[edge] += flow.FlowPerEdge[edge];
+                state.RemainingCapacity[edge] -= flow.FlowPerEdge[edge];
+            }
+
+            for (int index = 0; index < state.Sources.Count; index++)
+            {
+                state.RemainingSourceFlow[index] -= flow.FlowPerEdge[edgeCount + index];
+            }
+        }
+
+        RequireConverged(ref state, sink, outstanding, iteration, iterationLimit);
+    }
+
+    /// <summary>
+    /// Books one decomposed route: records the delivery, attributes per-edge loss, and returns
+    /// what arrived so the caller can retire it from the sink's outstanding requirement.
+    /// </summary>
+    private static double AccountForPath(
+        ref SolveState state,
+        FlowPath path,
+        TransferSink sink,
+        int sinkIndex)
+    {
+        // Strip the virtual super-source and super-sink from each end.
+        int hopCount = path.Nodes.Count - 3;
+        int sourceNode = path.Nodes[1];
+        double sent = path.Flow;
+        double delivered = sent * Math.Pow(state.Retention, hopCount);
+
+        state.Deliveries.Add(new TransferDelivery(
+            sourceNode,
+            sink.Node,
+            hopCount,
+            sent,
+            delivered));
+
+        // Loss on each edge is the loss factor times what actually enters it, which decays
+        // along the route. Summed over the route this telescopes to sent - delivered.
+        for (int step = 0; step < hopCount; step++)
+        {
+            int edge = state.EdgeByEndpoints[(path.Nodes[step + 1], path.Nodes[step + 2])];
+            state.LostPerEdge[edge] +=
+                sent * Math.Pow(state.Retention, step) * state.LossFactorPerHop;
+        }
+
+        state.DeliveredPerSink[sinkIndex] += delivered;
+        state.TotalSent += sent;
+        state.TotalDelivered += delivered;
+        return delivered;
+    }
+
+    /// <summary>
+    /// Rejects a sink that exhausted its iteration budget while flow could still have reached
+    /// it. Stopping short with no route left is a normal outcome; stopping short with one
+    /// available is a solver defect and must not be published as a transfer result.
+    /// </summary>
+    private static void RequireConverged(
+        ref SolveState state,
+        TransferSink sink,
+        double outstanding,
+        int iteration,
+        int iterationLimit)
+    {
+        if (iteration == iterationLimit
+            && !IsWithinDeliveryTolerance(outstanding, sink.RequiredDelivery)
+            && state.RemainingSourceFlow.Sum() > EdmondsKarp.Tolerance
+            && HasRemainingTransferCapacity(
+                state.Network,
+                state.RemainingCapacity,
+                state.Sources,
+                state.RemainingSourceFlow,
+                sink.Node,
+                outstanding,
+                state.SuperSource,
+                state.SuperSink))
+        {
+            throw new InvalidOperationException(
+                $"Transfer to sink {sink.Node} did not converge within {iterationLimit} "
+                + "gross-up solves while capacity remained available.");
+        }
     }
 
     private static int RequiredIterations(

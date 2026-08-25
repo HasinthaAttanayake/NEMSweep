@@ -50,7 +50,7 @@ internal static class JsonFile
     public static string SerializeExact(JsonNode value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        return CanonicalizeExact(value).ToJsonString(ReadableWriteOptions);
+        return Canonicalize(value, propertyName: null, round: false).ToJsonString(ReadableWriteOptions);
     }
 
     public static string SerializeExact<T>(T value)
@@ -64,10 +64,17 @@ internal static class JsonFile
     {
         JsonNode node = JsonSerializer.SerializeToNode(value, WriteOptions)
             ?? throw new InvalidOperationException("JSON serialization produced no value.");
-        return Canonicalize(node, propertyName: null);
+        return Canonicalize(node, propertyName: null, round: true);
     }
 
-    public static void Write<T>(T value, string path)
+    public static void Write<T>(T value, string path) =>
+        WriteToPath(path, Serialize(value));
+
+    public static void WriteExact(JsonNode value, string path) =>
+        WriteToPath(path, SerializeExact(value));
+
+    /// <summary>Writes <paramref name="contents"/>, creating the target directory if needed.</summary>
+    private static void WriteToPath(string path, string contents)
     {
         string? directory = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(directory))
@@ -75,48 +82,16 @@ internal static class JsonFile
             Directory.CreateDirectory(directory);
         }
 
-        File.WriteAllText(path, Serialize(value));
+        File.WriteAllText(path, contents);
     }
 
-    public static void WriteExact(JsonNode value, string path)
-    {
-        string? directory = Path.GetDirectoryName(path);
-        if (!string.IsNullOrEmpty(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
-
-        File.WriteAllText(path, SerializeExact(value));
-    }
-
-    private static JsonNode CanonicalizeExact(JsonNode node)
-    {
-        if (node is JsonObject sourceObject)
-        {
-            var result = new JsonObject();
-            foreach ((string name, JsonNode? child) in sourceObject.OrderBy(pair => pair.Key, StringComparer.Ordinal))
-            {
-                result[name] = child is null ? null : CanonicalizeExact(child);
-            }
-
-            return result;
-        }
-
-        if (node is JsonArray sourceArray)
-        {
-            var result = new JsonArray();
-            foreach (JsonNode? item in sourceArray)
-            {
-                result.Add(item is null ? null : CanonicalizeExact(item));
-            }
-
-            return result;
-        }
-
-        return node.DeepClone();
-    }
-
-    private static JsonNode Canonicalize(JsonNode node, string? propertyName)
+    /// <summary>
+    /// Orders every object's properties so a rerun produces a comparable file, and where
+    /// <paramref name="round"/> is set, rounds each numeric leaf to the precision its property
+    /// name implies. Rounding off is the "exact" form, used where a value must survive
+    /// untouched; the property name is still threaded through but goes unread.
+    /// </summary>
+    private static JsonNode Canonicalize(JsonNode node, string? propertyName, bool round)
     {
         if (node is JsonObject sourceObject)
         {
@@ -124,7 +99,7 @@ internal static class JsonFile
             foreach ((string name, JsonNode? child) in sourceObject.OrderBy(pair => pair.Key, StringComparer.Ordinal))
             {
                 string childPropertyName = HasExplicitUnit(propertyName) ? propertyName! : name;
-                result[name] = child is null ? null : Canonicalize(child, childPropertyName);
+                result[name] = child is null ? null : Canonicalize(child, childPropertyName, round);
             }
 
             return result;
@@ -135,13 +110,13 @@ internal static class JsonFile
             var result = new JsonArray();
             foreach (JsonNode? item in sourceArray)
             {
-                result.Add(item is null ? null : Canonicalize(item, propertyName));
+                result.Add(item is null ? null : Canonicalize(item, propertyName, round));
             }
 
             return result;
         }
 
-        if (node is JsonValue value && propertyName is not null)
+        if (round && node is JsonValue value && propertyName is not null)
         {
             int decimalPlaces = DecimalPlaces(propertyName);
             if (value.TryGetValue<double>(out double doubleValue))
