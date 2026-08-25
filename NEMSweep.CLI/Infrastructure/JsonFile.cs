@@ -133,7 +133,10 @@ internal static class JsonFile
         return node.DeepClone();
     }
 
-    private static int DecimalPlaces(string propertyName) =>
+    /// <summary>Decimal places a value is published with, by the unit its name carries. Shared so the
+    /// CSV tables round the same way the JSON does and a figure cannot differ between them.</summary>
+    /// <param name="propertyName">The value's property or column name.</param>
+    internal static int DecimalPlaces(string propertyName) =>
         propertyName.Equals("TransmissionSlcotAudPerMwh", StringComparison.OrdinalIgnoreCase) ? 4
         : propertyName.Contains("Aud", StringComparison.OrdinalIgnoreCase) ? 2
         : propertyName.EndsWith("Mw", StringComparison.OrdinalIgnoreCase)
