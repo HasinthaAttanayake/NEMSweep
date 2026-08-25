@@ -14,22 +14,30 @@ main {
 }
 
 .sidebar {
-    background: #18342f;
-    border-right: 1px solid #102723;
+    background: var(--color-ink-surface-raised);
+    border-right: 1px solid var(--color-ink-surface);
 }
 
 .top-row {
-    background-color: #f7f7f7;
-    border-bottom: 1px solid #d6d5d5;
-    justify-content: flex-end;
-    height: 3.5rem;
     display: flex;
     align-items: center;
+    justify-content: flex-end;
+    gap: 1.25rem;
+    height: 3.5rem;
+    border-bottom: 1px solid var(--color-border);
+    background-color: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .top-row {
+        background-color: var(--color-surface);
+    }
 }
 
     .top-row ::deep a, .top-row ::deep .btn-link {
         white-space: nowrap;
-        margin-left: 1.5rem;
         text-decoration: none;
     }
 
@@ -37,27 +45,48 @@ main {
         text-decoration: underline;
     }
 
-    .top-row ::deep a:first-child {
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-.top-row ::deep .repository-link {
+.top-row ::deep .top-row-link {
     display: inline-flex;
     align-items: center;
-    gap: 0.45rem;
-    color: #244940;
-    font-size: 0.88rem;
-    font-weight: 700;
+    gap: 0.4rem;
+    margin-left: 0;
+    color: var(--color-muted);
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.top-row ::deep .top-row-link:hover {
+    color: var(--color-brand-accent);
+    text-decoration: none;
+}
+
+/* The one action on every results page that leads out of reading and into running. */
+.top-row ::deep .top-row-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-left: 0;
+    padding: 0.4rem 0.85rem;
+    border-radius: var(--radius-sm);
+    background: var(--color-brand);
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.top-row ::deep .top-row-cta:hover {
+    background: var(--color-brand-hover);
+    text-decoration: none;
 }
 
 @media (max-width: 640.98px) {
     .top-row {
-        justify-content: space-between;
+        gap: 0.85rem;
     }
 
-    .top-row ::deep a, .top-row ::deep .btn-link {
-        margin-left: 0;
+    /* The two secondary links fall away before the action does. */
+    .top-row ::deep .top-row-link {
+        display: none;
     }
 }
 
@@ -77,12 +106,6 @@ main {
         position: sticky;
         top: 0;
         z-index: 1;
-    }
-
-    .top-row.auth ::deep a:first-child {
-        flex: 1;
-        text-align: right;
-        width: 0;
     }
 
     .top-row, article {

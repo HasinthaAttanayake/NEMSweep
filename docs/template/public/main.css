@@ -1,0 +1,236 @@
+/* NEMSweep documentation theme.
+ *
+ * docfx's modern template is Bootstrap 5, so almost everything here is a variable override rather
+ * than a rule that has to out-specify the shipped stylesheet. The intent is continuity: a reader
+ * moving between nemsweep.com and the docs should not feel they have changed product. The docs
+ * keep their own copy of the fonts and colours for the same reason as the logo - the two sites
+ * build and deploy separately.
+ */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap");
+
+:root {
+    --nem-ink: #141b2d;
+    --nem-ink-raised: #1e2740;
+    --nem-amber: #e39a3c;
+    --nem-ochre: #9a5b12;
+    --nem-on-ink: #f2f4f8;
+    --nem-on-ink-muted: #b3bcd0;
+
+    --bs-body-font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
+    --bs-body-color: #26303f;
+    /* Bootstrap 5.3 composes link colour from the -rgb triplet and an opacity, so setting only
+       --bs-link-color leaves anchors on the framework default. */
+    --bs-link-color: var(--nem-ochre);
+    --bs-link-color-rgb: 154, 91, 18;
+    --bs-link-hover-color: var(--nem-ink);
+    --bs-link-hover-color-rgb: 20, 27, 45;
+    --bs-border-color: #dce1e8;
+    --bs-code-color: #8a3d6b;
+}
+
+[data-bs-theme="dark"] {
+    --bs-body-color: #d6dbe6;
+    --bs-body-bg: #12161f;
+    --bs-link-color: var(--nem-amber);
+    --bs-link-color-rgb: 227, 154, 60;
+    --bs-link-hover-color: #f2b567;
+    --bs-link-hover-color-rgb: 242, 181, 103;
+    --bs-border-color: #2a3243;
+    --bs-code-color: #e79ac2;
+}
+
+/* Type ---------------------------------------------------------------------
+   Headings in the display serif, as on the app. docfx's default scale is flat
+   (h1 at 26.8px, weight 500), which reads as a paragraph in bold rather than
+   as a title. */
+
+h1, h2, h3, h4, h5, h6, .navbar-brand {
+    font-family: "Source Serif 4", Georgia, serif;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+}
+
+article h1 {
+    margin-bottom: 1rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 2px solid var(--bs-border-color);
+    font-size: 2.1rem;
+    font-weight: 700;
+}
+
+article h2 {
+    margin-top: 2.4rem;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+article h3 {
+    margin-top: 1.9rem;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+/* A docs page is read, not scanned, and docfx lets the column run to about 92 characters. */
+article {
+    max-width: 74ch;
+    line-height: 1.7;
+}
+
+/* API reference pages are tables and signatures rather than prose, and a reading measure
+   squeezes them. */
+article:has(.api) , article:has(table) {
+    max-width: none;
+}
+
+/* Navbar -------------------------------------------------------------------
+   Ink, in both themes, so the docs carry the same masthead as the app's
+   sidebar. Everything inside it has to be re-stated for that ground. */
+
+.navbar {
+    background-color: var(--nem-ink) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.navbar .navbar-brand,
+.navbar .nav-link,
+.navbar .btn,
+.navbar .icon-link {
+    color: var(--nem-on-ink) !important;
+}
+
+.navbar .nav-link {
+    color: var(--nem-on-ink-muted) !important;
+    font-family: var(--bs-body-font-family);
+    font-size: 0.9rem;
+}
+
+.navbar .nav-link:hover,
+.navbar .nav-link.active {
+    color: var(--nem-on-ink) !important;
+}
+
+.navbar .navbar-brand {
+    font-weight: 700;
+}
+
+/* docfx's search box inherits the page surface, which disappears against the ink bar. */
+.navbar #search-query,
+.navbar .form-control {
+    background-color: rgba(255, 255, 255, 0.09);
+    border-color: rgba(255, 255, 255, 0.16);
+    color: var(--nem-on-ink);
+}
+
+.navbar #search-query::placeholder,
+.navbar .form-control::placeholder {
+    color: rgba(179, 188, 208, 0.75);
+}
+
+.navbar #search-query:focus,
+.navbar .form-control:focus {
+    background-color: rgba(255, 255, 255, 0.14);
+    border-color: var(--nem-amber);
+    box-shadow: none;
+    color: var(--nem-on-ink);
+}
+
+/* Navigation ---------------------------------------------------------------
+   The current page is marked with a rule in the accent rather than by colour
+   alone, matching the app's sidebar. */
+
+.toc .nav-link.active,
+.affix .nav-link.active {
+    border-left: 2px solid var(--nem-ochre);
+    color: var(--bs-emphasis-color);
+    font-weight: 600;
+}
+
+[data-bs-theme="dark"] .toc .nav-link.active,
+[data-bs-theme="dark"] .affix .nav-link.active {
+    border-left-color: var(--nem-amber);
+}
+
+/* Code ---------------------------------------------------------------------
+   Ruled rather than floated, matching the app's tables and figures. */
+
+pre {
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--bs-border-color);
+    border-left: 3px solid var(--nem-ochre);
+    border-radius: 0;
+}
+
+[data-bs-theme="dark"] pre {
+    border-left-color: var(--nem-amber);
+}
+
+/* Tables read as data here, as they do on the app. */
+article table {
+    font-variant-numeric: tabular-nums;
+}
+
+/* Focus --------------------------------------------------------------------
+   Matches the app's ring so keyboard focus behaves the same across both. */
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible {
+    outline: 2px solid var(--nem-ochre);
+    outline-offset: 2px;
+}
+
+[data-bs-theme="dark"] a:focus-visible,
+[data-bs-theme="dark"] button:focus-visible,
+.navbar a:focus-visible,
+.navbar button:focus-visible {
+    outline-color: var(--nem-amber);
+}
+
+/* Footer -------------------------------------------------------------------
+   docfx's default footer is its own attribution line. docfx is MIT, which asks
+   for the notice when redistributing docfx itself rather than in sites built
+   with it, so this replaces it outright with the project's own. */
+
+footer {
+    margin-top: 3rem;
+    border-top: 1px solid var(--bs-border-color);
+    font-size: 0.87rem;
+}
+
+.nem-footer {
+    padding: 0.5rem 0 0.75rem;
+}
+
+.nem-footer-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: "Source Serif 4", Georgia, serif;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--bs-emphasis-color);
+}
+
+.nem-footer-brand em {
+    font-style: normal;
+    font-weight: 400;
+    color: var(--nem-ochre);
+}
+
+[data-bs-theme="dark"] .nem-footer-brand em {
+    color: var(--nem-amber);
+}
+
+.nem-footer-line {
+    max-width: 68ch;
+    margin: 0.6rem 0 0;
+    line-height: 1.6;
+}
+
+.nem-footer-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.4rem;
+    margin: 0.85rem 0 0;
+}

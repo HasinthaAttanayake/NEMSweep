@@ -1,6 +1,6 @@
 .sweep-page {
-    --accent: var(--color-demand);
-    --accent-soft: var(--color-demand-soft);
+    --accent: var(--color-brand);
+    --accent-soft: var(--color-brand-accent-soft);
     max-width: 1180px;
     margin: 0 auto;
     padding: var(--space-page-top) var(--space-page-x) var(--space-page-bottom);

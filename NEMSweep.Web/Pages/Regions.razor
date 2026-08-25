@@ -8,14 +8,15 @@
 <PageTitle>System and states</PageTitle>
 
 <main class="regions-page">
-    <PageHeader Eyebrow="Comparison" Title="System and states">
+    <PageHeader Eyebrow="Baseline scenario · region by region" Title="System and states">
         <ScopeContent>
             @if (_analysis is not null)
             {
                 <ScopeLine Region="@ScopeRegions" Period="@Period" Resolution="@Resolution" />
                 <p class="scope-note">
-                    One dispatch run, read two ways. The system figures are what the whole
-                    interconnected fleet did; the regional figures are what each state did inside it.
+                    One scenario, read two ways. The system figures are what the whole
+                    interconnected fleet did; the regional figures are what each state did inside
+                    it. Every sweep on this site starts from this scenario and moves one input.
                 </p>
             }
         </ScopeContent>
@@ -375,18 +376,19 @@
                figures under a different heading. *@
             <SizingTrajectory Sizing="_analysis.Result.StorageSizing" Scope="the system" Id="sizing-system" />
 
+            @* The full weather basis for every region is set out on the weather page. Restating
+               all of it here, and again on the dispatch page, put the same block on three pages.
+               This names the files and points at the one page that carries them. *@
             <section class="region-section" aria-labelledby="weather-heading">
                 <div class="section-heading">
                     <p class="section-label">Inputs</p>
                     <h2 id="weather-heading">Each region is simulated against its own weather</h2>
                 </div>
-                @foreach (KeyValuePair<string, DispatchSourcesDTO> source in _analysis.Result.DataSourcesByRegion)
-                {
-                    <div class="weather-region">
-                        <h3>@RegionNames.Full(source.Key)</h3>
-                        <WeatherBasisNote Basis="source.Value.WeatherBasis" />
-                    </div>
-                }
+                <p class="weather-summary">
+                    @_analysis.Result.DataSourcesByRegion.Count regions, each dispatched against its
+                    own solar and wind traces.
+                    <a href="inputs/weather">See the traces and their source files</a>
+                </p>
             </section>
 
             <ProvenanceFooter Inputs="@ProvenanceInputs"

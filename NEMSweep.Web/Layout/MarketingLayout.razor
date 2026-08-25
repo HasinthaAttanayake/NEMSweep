@@ -1,0 +1,92 @@
+@inherits LayoutComponentBase
+
+@* The landing page's own shell. Every other route keeps MainLayout's sidebar: a reader who has
+   arrived at a result needs the whole navigation tree beside them, but a reader arriving cold
+   needs the proposition first and the file tree second. *@
+
+<MudThemeProvider Theme="@AppTheme.Instance" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<a class="skip-link" href="#content">Skip to content</a>
+
+<div class="marketing">
+    <header class="marketing-bar">
+        <div class="marketing-bar-inner">
+            <a class="marketing-brand" href="" aria-label="NEMSweep home">
+                <BrandMark Size="28" ShowWordmark="true" />
+            </a>
+
+            <nav class="marketing-nav" aria-label="Page sections">
+                <a href="#problem">Why it exists</a>
+                <a href="#why-sweep">Why sweep</a>
+                <a href="#sweeps">Sweeps</a>
+                <a href="#case-study">Baseline</a>
+                <a href="#method">Method</a>
+            </nav>
+
+            <div class="marketing-actions">
+                <a class="marketing-link"
+                   href="@DocumentationLinks.Home"
+                   target="_blank"
+                   rel="noopener noreferrer">Docs</a>
+                <a class="marketing-link"
+                   href="https://github.com/HasinthaAttanayake/NEMSweep"
+                   target="_blank"
+                   rel="noopener noreferrer">GitHub</a>
+                <a class="marketing-cta" href="regions">
+                    Open the model
+                    <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" />
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main id="content" tabindex="-1">
+        @Body
+    </main>
+
+    <footer class="marketing-footer">
+        <div class="marketing-footer-inner">
+            <div class="footer-brand">
+                <BrandMark Size="26" ShowWordmark="true" />
+                <p>
+                    An open dispatch, reliability and cost model for Australia's National
+                    Electricity Market. Change the assumptions, see what moves.
+                </p>
+            </div>
+
+            <div class="footer-links">
+                <div>
+                    <h2>Results</h2>
+                    <a href="regions">System and states</a>
+                    <a href="dispatch">Hourly dispatch</a>
+                </div>
+                <div>
+                    <h2>Inputs</h2>
+                    <a href="inputs/demand">Demand</a>
+                    <a href="inputs/weather">Weather</a>
+                    <a href="inputs/generation">Generation</a>
+                </div>
+                <div>
+                    <h2>Documentation</h2>
+                    <a href="@DocumentationLinks.Home" target="_blank" rel="noopener noreferrer">Guide and concepts</a>
+                    <a href="@DocumentationLinks.Limitations" target="_blank" rel="noopener noreferrer">Assumptions and limitations</a>
+                    <a href="@DocumentationLinks.LlmWorkflow" target="_blank" rel="noopener noreferrer">Design a sweep with an LLM</a>
+                </div>
+                <div>
+                    <h2>Project</h2>
+                    <a href="https://github.com/HasinthaAttanayake/NEMSweep" target="_blank" rel="noopener noreferrer">Source</a>
+                    <a href="https://github.com/users/HasinthaAttanayake/projects/11" target="_blank" rel="noopener noreferrer">Roadmap</a>
+                    <a href="https://github.com/HasinthaAttanayake/NEMSweep/blob/main/LICENSE.md" target="_blank" rel="noopener noreferrer">BSD 3-Clause licence</a>
+                </div>
+            </div>
+        </div>
+        <p class="footer-note">
+            Figures on this site are modelled build-and-run costs, not retail prices. Read the
+            <a href="@DocumentationLinks.Limitations" target="_blank" rel="noopener noreferrer">limitations</a>
+            before quoting any of them.
+        </p>
+    </footer>
+</div>

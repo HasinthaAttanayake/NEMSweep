@@ -1,0 +1,235 @@
+.marketing {
+    --bar-height: 3.5rem;
+    --shell: 1180px;
+    --gutter: clamp(1.25rem, 4vw, 3rem);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    color: var(--color-ink);
+    background: var(--color-surface);
+}
+
+/* Header --------------------------------------------------------------------
+   Clear rather than solid. The page is light and the hero is light, so a light
+   bar lets the content pass under it instead of capping the page with a slab.
+   It stays ours through what sits on it - the serif wordmark, the ochre in it,
+   and a filled ink action - rather than through the bar's own colour. */
+
+.marketing-bar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    /* Clear: untinted white at low opacity, carried by the blur rather than by a fill. Content
+       stays visible passing under it instead of being covered. */
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border-bottom: 1px solid var(--color-border);
+}
+
+/* Without backdrop-filter the bar would be translucent text over live content, so it goes opaque. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .marketing-bar {
+        background: var(--color-surface);
+    }
+}
+
+.marketing-bar-inner {
+    display: flex;
+    align-items: center;
+    gap: 2.25rem;
+    width: 100%;
+    max-width: var(--shell);
+    height: var(--bar-height);
+    margin: 0 auto;
+    padding: 0 var(--gutter);
+    box-sizing: border-box;
+}
+
+.marketing-brand {
+    color: var(--color-ink);
+    text-decoration: none;
+    --brand-accent: var(--color-brand-accent);
+}
+
+/* Left-aligned, immediately after the brand: this is a table of contents for one page, not a
+   product menu that wants centring. */
+.marketing-nav {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.marketing-nav a {
+    position: relative;
+    padding: 0.15rem 0;
+    color: var(--color-home-copy);
+    font-size: 0.85rem;
+    text-decoration: none;
+}
+
+.marketing-nav a:hover {
+    color: var(--color-brand);
+}
+
+.marketing-nav a:hover::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 -0.3rem 0;
+    height: 1px;
+    background: var(--color-brand-accent);
+}
+
+.marketing-actions {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    margin-left: auto;
+}
+
+.marketing-link {
+    color: var(--color-home-copy);
+    font-size: 0.85rem;
+    text-decoration: none;
+}
+
+.marketing-link:hover {
+    color: var(--color-brand);
+}
+
+/* Filled rather than outlined: on a light bar an outline reads as a disabled control, and this is
+   the one action in the chrome. */
+.marketing-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 0.95rem;
+    border: 1px solid var(--color-brand);
+    background: var(--color-brand);
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.marketing-cta:hover {
+    background: var(--color-brand-hover);
+    border-color: var(--color-brand-hover);
+}
+
+main {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Footer ------------------------------------------------------------------- */
+
+.marketing-footer {
+    margin-top: 4rem;
+    padding: 3rem 0 2rem;
+    border-top: 3px solid var(--color-ink-surface);
+    background: var(--color-surface-muted);
+}
+
+.marketing-footer-inner {
+    display: grid;
+    grid-template-columns: minmax(240px, 1fr) 2fr;
+    gap: 2.5rem;
+    max-width: var(--shell);
+    margin: 0 auto;
+    padding: 0 var(--gutter);
+    box-sizing: border-box;
+}
+
+.footer-brand {
+    --brand-accent: var(--color-brand-accent);
+}
+
+.footer-brand p {
+    max-width: 34ch;
+    margin: 1rem 0 0;
+    color: var(--color-home-copy);
+    font-size: 0.88rem;
+    line-height: 1.65;
+}
+
+.footer-links {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+    gap: 1.75rem;
+}
+
+.footer-links h2 {
+    margin: 0 0 0.75rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-muted);
+    font-family: var(--font-body);
+    font-size: 0.67rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.footer-links a {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--color-home-copy);
+    font-size: 0.87rem;
+    text-decoration: none;
+}
+
+.footer-links a:hover {
+    color: var(--color-brand-accent);
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+}
+
+.footer-note {
+    max-width: var(--shell);
+    margin: 2.5rem auto 0;
+    padding: 1.5rem var(--gutter) 0;
+    border-top: 1px solid var(--color-border);
+    box-sizing: border-box;
+    color: var(--color-muted);
+    font-size: 0.8rem;
+    line-height: 1.6;
+}
+
+.footer-note a {
+    color: var(--color-brand-accent);
+}
+
+@media (max-width: 900px) {
+    .marketing-nav {
+        display: none;
+    }
+}
+
+@media (max-width: 640px) {
+    .marketing-link {
+        display: none;
+    }
+}
+
+/* At 320px the wordmark, the gutter and a full-width action do not fit together. The action is
+   what the bar is for, so the arrow and some padding go rather than the label or the brand. */
+@media (max-width: 420px) {
+    .marketing-bar-inner {
+        gap: 0.75rem;
+        padding: 0 0.85rem;
+    }
+
+    .marketing-cta {
+        padding: 0.4rem 0.65rem;
+        font-size: 0.8rem;
+    }
+
+    .marketing-cta ::deep .mud-icon-root {
+        display: none;
+    }
+
+    .marketing-footer-inner {
+        grid-template-columns: 1fr;
+    }
+}

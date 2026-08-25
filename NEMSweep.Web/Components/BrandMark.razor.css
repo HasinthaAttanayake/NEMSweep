@@ -1,0 +1,32 @@
+.brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    line-height: 1;
+}
+
+.brand-mark {
+    flex: 0 0 auto;
+    /* The mark's own origin node sits low in its box, so it optically rides high beside a cap
+       height. A hair of translation seats it on the wordmark's baseline. */
+    transform: translateY(1px);
+}
+
+.brand-name {
+    font-family: var(--font-display);
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+}
+
+.brand-name span {
+    font-weight: 400;
+    color: var(--brand-accent, currentColor);
+}
+
+/* The depth fade reads as detail at 44px and as dirt at 26px, where a 0.5-opacity wedge is two
+   pixels of half-tone. The small lockup is flat instead. */
+.brand-mark.is-small ::deep .wedge-back {
+    opacity: 1;
+}

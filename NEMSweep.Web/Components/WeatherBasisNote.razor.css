@@ -30,6 +30,11 @@
     line-height: 1.55;
 }
 
+.weather-basis-location,
+.weather-basis-description {
+    overflow-wrap: anywhere;
+}
+
 .weather-basis-source {
     margin-top: 0.4rem !important;
     color: var(--color-muted);

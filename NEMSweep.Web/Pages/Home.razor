@@ -1,4 +1,5 @@
 @page "/"
+@layout MarketingLayout
 @using System.Globalization
 @using NEMSweep.Contracts
 @using NEMSweep.Web.Components.Viz
@@ -11,236 +12,138 @@
 <PageTitle>NEMSweep</PageTitle>
 
 <div class="home-page">
-    <header class="project-header">
-        <p class="eyebrow">Open National Electricity Market model</p>
-        <h1>How will Australia's Energy Grid Support Data Centres?</h1>
-        <p class="lead">
-            Add just 500 MW of data centre capacity across the eastern states, with FY25-26 generation and transmission assets held constant, and the National Energy Market (NEM) needs
-            2,035 MWh of new storage infrastructure to hold its reliability standard.
-        </p>
-        <p class="lead">
-            That's just one scenario. Bring your own demand, generation and storage fleets, economic assumptions and see what moves.
-        </p>
-        <div class="project-actions">
-            <MudButton Variant="Variant.Filled"
-                       Color="Color.Primary"
-                       Href="#case-study"
-                       StartIcon="@Icons.Material.Filled.QueryStats">
-                See the current case study
-            </MudButton>
-            <MudButton Variant="Variant.Outlined"
-                       Color="Color.Primary"
-                       Href="@DocumentationLinks.Home"
-                       Target="_blank"
-                       rel="noopener noreferrer"
-                       StartIcon="@Icons.Material.Filled.MenuBook">
-                Read the documentation
-            </MudButton>
-        </div>
-        <p class="project-links">
-            <a href="https://github.com/users/HasinthaAttanayake/projects/11" target="_blank" rel="noopener noreferrer">Track the project</a>
-            <span aria-hidden="true">·</span>
-            <a href="https://github.com/HasinthaAttanayake/NEMSweep" target="_blank" rel="noopener noreferrer">View source</a>
-        </p>
-    </header>
+    <header class="hero">
+        <div class="shell">
+            <p class="eyebrow">Open source &middot; grid adequacy and investment cases</p>
+            <h1>Ask the grid a question. Get the whole year back.</h1>
+            <p class="lead">
+                NEMSweep runs a full year of hourly dispatch across all five NEM regions, sizes the
+                storage each scenario needs to hold the reliability standard, and prices what that
+                costs. Built for the people who have to defend a grid plan or an investment case
+                under load growth.
+            </p>
 
-    <section class="claims-band" aria-label="How to read these figures">
-        <p class="claim">
-            <strong>Use it to compare, not to quote.</strong>
-            The gap between two scenarios is the trustworthy output. Any single figure carries the
-            model's assumptions with it, so treat the comparison as the finding and the level as an
-            estimate.
-        </p>
-        <p class="claim">
-            <strong>These are build-and-run costs, not bills.</strong>
-            What the system costs to construct and operate per unit of energy delivered. Retail,
-            network and scheme costs are not in here, so nothing on this page is a price anyone
-            pays.
-        </p>
-        <p class="claim">
-            <strong>You can show your working.</strong>
-            Every figure traces to a published run and to the exact data behind it, and every
-            assumption sits in an
-            <a href="@DocumentationLinks.Assumptions" target="_blank" rel="noopener noreferrer">assumptions register</a>
-            that a test suite checks against the code on every change.
-        </p>
-    </section>
-
-    <section class="problem-section" aria-labelledby="problem-heading">
-        <div class="section-heading">
-            <div>
-                <p class="section-label">Why this exists</p>
-                <h2 id="problem-heading">Most modelling of the transition asks you to trust it</h2>
-            </div>
-        </div>
-        <div class="problem-cards">
-            <article class="problem-card">
-                <h3>A headline number that improves as the system fails</h3>
-                <p>
-                    Cost per megawatt-hour is measured against the energy actually served, so
-                    demand the grid never met simply leaves the denominator. Quote that figure
-                    alone and a system in shortfall reads as one getting cheaper.
-                </p>
-            </article>
-            <article class="problem-card">
-                <h3>One national average, five different grids</h3>
-                <p>
-                    NSW, QLD, VIC, SA and TAS carry different resource mixes, demand shapes and
-                    transmission constraints. A blended national figure hides all of it.
-                </p>
-            </article>
-            <article class="problem-card">
-                <h3>Assumptions that drift without anyone noticing</h3>
-                <p>
-                    A model's constants get tweaked for one run and the documentation never catches
-                    up, so a report can go stale silently and nobody downstream can tell.
-                </p>
-            </article>
-        </div>
-        <p class="problem-resolution">
-            NEMSweep answers each of these directly: cost is always reported beside the unserved
-            energy behind it, and dispatch is simulated per region and reported per region rather
-            than blended into a national figure.
-        </p>
-    </section>
-
-    @if (_system is not null && _analysis is not null)
-    {
-        <section id="case-study" class="headline-section" aria-labelledby="headline-heading">
-            <div class="section-heading">
-                <div>
-                    <p class="section-label">Case study &middot; latest run</p>
-                    <h2 id="headline-heading">What the current run costs</h2>
-                </div>
-                <p>@ScopeSentence</p>
-            </div>
-
-            <MetricStrip Items="@HeadlineMetrics" AriaLabel="Current run headline figures"
-                         Style="--metric-value-size: 1.5rem;" />
-
-            @if (_analysis.SystemMix.TotalMwh > 0)
+            @* The headline finding, read live from the published sweep rather than written down,
+               so re-running the sweep updates the claim instead of dating it. *@
+            @if (BreakingPoint is { } breaking)
             {
-                <div class="headline-mix">
-                    <MixBar Segments="@_analysis.SystemMix.Segments()"
-                            Label="Delivered energy by technology"
-                            Detail="@($"{PlotFormat.Compact(_analysis.SystemMix.TotalMwh)} MWh delivered")"
-                            AriaLabel="System delivered generation by technology" />
-                </div>
+                <p class="hero-claim">
+                    <span>In the published sweep</span>
+                    @breaking
+                </p>
             }
 
-            <div class="headline-links">
-                <a href="regions">Compare the states</a>
-                <a href="dispatch">Open the hourly dispatch</a>
+            <div class="hero-actions">
+                <a class="button-primary" href="@(PrimarySweepRoute ?? "regions")">
+                    @(PrimarySweepRoute is null ? "Open the baseline run" : "Open the sweep")
+                    <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" />
+                </a>
+                <a class="button-secondary"
+                   href="@DocumentationLinks.LlmWorkflow"
+                   target="_blank"
+                   rel="noopener noreferrer">
+                    <MudIcon Icon="@Icons.Material.Filled.PlayArrow" Size="Size.Small" />
+                    Run your own scenario
+                </a>
             </div>
-        </section>
 
-        <FindingCards Findings="@_analysis.Findings"
-                      Eyebrow="Read this first"
-                      Heading="What the current run found"
-                      Description="Generated from the run's own figures each time this page loads, not written by hand. The most significant are shown here; the comparison page carries them all with the tables behind them."
-                      Limit="3"
-                      EvidenceHref="regions"
-                      EvidenceText="See the figures behind this"
-                      Class="home-findings" />
-    }
-    else
-    {
-        @* Loading has a spinner and every other non-success state says why. Dropping the section
-           silently would leave the page looking as though the run simply has no headline. *@
-        <section id="case-study" class="headline-section" aria-labelledby="headline-heading">
+            @if (_analysis is not null)
+            {
+                <div class="hero-metrics">
+                    <p class="figure-label">The baseline run &middot; @ScopeShort</p>
+                    <MetricStrip Items="@HeadlineMetrics"
+                                 AriaLabel="Baseline run headline figures"
+                                 Style="--metric-value-size: 1.45rem;" />
+                </div>
+            }
+        </div>
+    </header>
+
+    <section id="problem" class="section" aria-labelledby="problem-heading">
+        <div class="shell">
             <div class="section-heading">
+                <p class="section-number">01</p>
                 <div>
-                    <p class="section-label">Case study &middot; latest run</p>
-                    <h2 id="headline-heading">What the current run costs</h2>
+                    <p class="section-label">Why this exists</p>
+                    <h2 id="problem-heading">Most modelling of the transition asks you to trust it</h2>
                 </div>
             </div>
-            <ArtifactLoadStateView State="_systemState"><span /></ArtifactLoadStateView>
-        </section>
-    }
 
-    @* What the model can do, read out of the artifacts rather than described in prose, so this
-       section moves when the model does instead of going quietly stale. *@
-    @if (_modelState is not null)
-    {
-        <section class="state-section" aria-labelledby="state-heading">
+            <div class="ruled-list">
+                <article>
+                    <h3>A headline number that improves as the system fails</h3>
+                    <p>
+                        Cost per megawatt-hour is measured against the energy actually served, so
+                        demand the grid never met simply leaves the denominator. Quote that figure
+                        alone and a system in shortfall reads as one getting cheaper.
+                    </p>
+                </article>
+                <article>
+                    <h3>One national average, five different grids</h3>
+                    <p>
+                        NSW, QLD, VIC, SA and TAS carry different resource mixes, demand shapes and
+                        transmission constraints. A blended national figure hides all of it.
+                    </p>
+                </article>
+                <article>
+                    <h3>Assumptions that drift without anyone noticing</h3>
+                    <p>
+                        A model's constants get tweaked for one run and the documentation never
+                        catches up, so a report can go stale silently and nobody downstream can tell.
+                    </p>
+                </article>
+            </div>
+
+            <p class="pull">
+                NEMSweep answers each of these directly: cost is always reported beside the unserved
+                energy behind it, and dispatch is simulated per region and reported per region rather
+                than blended into a national figure.
+            </p>
+        </div>
+    </section>
+
+    @* Why a sweep is worth running, stated as the questions one answers. Each answer column is
+       filled from the published sweep's own index where it has loaded, so the section is a
+       demonstration rather than a claim. *@
+    <section id="why-sweep" class="section" aria-labelledby="why-sweep-heading">
+        <div class="shell">
             <div class="section-heading">
+                <p class="section-number">02</p>
                 <div>
-                    <p class="section-label">How it works</p>
-                    <h2 id="state-heading">What the dispatch model does</h2>
+                    <p class="section-label">What a sweep is for</p>
+                    <h2 id="why-sweep-heading">One run tells you what happened. A sweep tells you when it breaks.</h2>
                 </div>
                 <p>
-                    Every line below is read from the artifacts the latest run produced, not
-                    written by hand, so it describes what ran rather than what might.
+                    A single scenario answers one question at one value. Holding everything else
+                    constant and moving one input answers a more useful question: how far can this
+                    go before the grid stops holding, and what does each step cost?
                 </p>
             </div>
 
-            <ul class="capabilities">
-                @foreach (ModelCapability capability in _modelState.Capabilities)
+            <ol class="question-list">
+                @foreach (SweepQuestion question in Questions)
                 {
-                    <li class="@(capability.IsPresent ? "is-present" : "is-absent")">
-                        <MudIcon Icon="@(capability.IsPresent ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.RadioButtonUnchecked)"
-                                 Size="Size.Small" />
-                        <span>
-                            <strong>@capability.Name</strong>
-                            <small>@capability.Detail</small>
-                        </span>
+                    <li>
+                        <p class="question-ask">@question.Ask</p>
+                        <p class="question-reports">
+                            <span>Reported as</span>
+                            @question.Reports
+                        </p>
+                        @if (question.Answer is { } answer)
+                        {
+                            <p class="question-answer">
+                                <span>In the published sweep</span>
+                                @answer
+                            </p>
+                        }
                     </li>
                 }
-            </ul>
+            </ol>
 
-            <p class="schema-line">
-                Artifact schemas in this build:
-                @string.Join(" · ", _modelState.SchemaVersions.Select(entry => $"{entry.Key} v{entry.Value}"))
+            <p class="pull">
+                None of these are answerable from one run, and none of them require a new model.
+                They require the same model run again along one axis.
             </p>
-        </section>
-    }
-
-    <section class="question-section">
-        <div>
-            <p class="section-label">Research focus</p>
-            <h2>Questions the model is built to test</h2>
-        </div>
-
-        <ol>
-            <li>
-                How much storage does the NEM have to build to keep meeting its reliability
-                standard as data centres arrive, under the Australian Government's
-                <a href="https://www.industry.gov.au/publications/expectations-data-centres-and-ai-infrastructure-developers"
-                   target="_blank"
-                   rel="noopener noreferrer">expectations for developers</a>, and where does
-                storage stop being the answer at all?
-            </li>
-            <li>What could electricity cost in 2030 if Australia achieves its 82% renewable generation target?</li>
-        </ol>
-    </section>
-
-    <section class="docs-cta" aria-labelledby="docs-cta-heading">
-        <div class="docs-cta-copy">
-            <p class="section-label">Documentation</p>
-            <h2 id="docs-cta-heading">Every figure here traces back to a documented assumption</h2>
-            <p>
-                The guide, the concept pages behind dispatch and storage sizing, the full
-                assumptions and limitations register, and how to run your own sweeps with an LLM
-                all live on their own site &mdash; read it before you quote a number from this one.
-            </p>
-        </div>
-        <div class="docs-cta-actions">
-            <MudButton Variant="Variant.Filled"
-                       Color="Color.Primary"
-                       Href="@DocumentationLinks.Home"
-                       Target="_blank"
-                       rel="noopener noreferrer"
-                       StartIcon="@Icons.Material.Filled.MenuBook">
-                Open the documentation
-            </MudButton>
-            <MudButton Variant="Variant.Outlined"
-                       Color="Color.Primary"
-                       Href="@DocumentationLinks.Limitations"
-                       Target="_blank"
-                       rel="noopener noreferrer"
-                       StartIcon="@Icons.Material.Filled.Rule">
-                Assumptions and limitations
-            </MudButton>
         </div>
     </section>
 
@@ -249,165 +152,338 @@
     @if (_manifestState.Status is ArtifactLoadStatus.Failed or ArtifactLoadStatus.InvalidData
         or ArtifactLoadStatus.NotFound)
     {
-        <section class="explore-section">
-            <div class="section-heading">
-                <div>
-                    <p class="section-label">Scenario sweeps</p>
-                    <h2>Compare runs across one varying input</h2>
+        <section id="sweeps" class="section">
+            <div class="shell">
+                <div class="section-heading">
+                    <p class="section-number">03</p>
+                    <div>
+                        <p class="section-label">Published sweeps</p>
+                        <h2>Compare runs across one varying input</h2>
+                    </div>
                 </div>
+                <ArtifactLoadStateView State="_manifestState"><span /></ArtifactLoadStateView>
             </div>
-            <ArtifactLoadStateView State="_manifestState"><span /></ArtifactLoadStateView>
         </section>
     }
     else if (_sweeps.Count > 0)
     {
-        <section class="explore-section">
-            <div class="section-heading">
-                <div>
-                    <p class="section-label">Scenario sweeps</p>
-                    <h2>Compare runs across one varying input</h2>
+        @* The one band on the page that inverts. A sweep is the product, so it gets the weight. *@
+        <section id="sweeps" class="section sweep-band" aria-labelledby="sweeps-heading">
+            <div class="shell">
+                <div class="section-heading">
+                    <p class="section-number">03</p>
+                    <div>
+                        <p class="section-label">Published sweeps</p>
+                        <h2 id="sweeps-heading">Every scenario here is openable as a full year</h2>
+                    </div>
+                    <p>
+                        A sweep is not a chart of summary figures. Each point is a complete dispatch
+                        run you can open, read hour by hour, and compare against any other point.
+                    </p>
                 </div>
-                <p>
-                    Each sweep holds the whole scenario constant and moves one input. The headline is
-                    what that input bought, and what it cost.
-                </p>
-            </div>
 
-            <div class="sweep-cards">
-                @foreach (SweepSummary summary in _sweeps)
-                {
-                    <a class="sweep-card" href="@SweepPaths.PageRoute(summary.Index.SweepId)">
-                        <p class="sweep-card-kind">@summary.Index.Axis.Label · @summary.Index.Axis.Unit</p>
-                        <h3>@summary.Index.Name</h3>
-                        @if (summary.Analysis.Findings.Count > 0)
-                        {
-                            <p class="sweep-card-finding">@summary.Analysis.Findings[0].Headline</p>
-                        }
-                        <dl class="sweep-card-facts">
-                            <div>
-                                <dt>Runs</dt>
-                                <dd>@summary.Index.Points.Length.ToString("N0")</dd>
+                <div class="sweep-list">
+                    @foreach (SweepSummary summary in _sweeps)
+                    {
+                        <a class="sweep-entry" href="@SweepPaths.PageRoute(summary.Index.SweepId)">
+                            <div class="sweep-entry-head">
+                                <p class="sweep-entry-kind">@summary.Index.Axis.Label · @summary.Index.Axis.Unit</p>
+                                <h3>@summary.Index.Name</h3>
+                                @if (summary.Analysis.Findings.Count > 0)
+                                {
+                                    <p class="sweep-entry-finding">@summary.Analysis.Findings[0].Headline</p>
+                                }
                             </div>
-                            @if (summary.Analysis.First is { } first && summary.Analysis.Last is { } last)
-                            {
+                            <dl class="sweep-entry-facts">
                                 <div>
-                                    <dt>Levelised cost</dt>
-                                    <dd>@PlotFormat.Money(first.Scalars.SlcoeAudPerMwh) → @PlotFormat.Money(last.Scalars.SlcoeAudPerMwh)</dd>
+                                    <dt>Scenarios</dt>
+                                    <dd>@summary.Index.Points.Length.ToString("N0")</dd>
                                 </div>
-                                <div>
-                                    <dt>Annual cost</dt>
-                                    <dd>@PlotFormat.MoneyTotal((decimal)first.TotalAnnualCostAud) → @PlotFormat.MoneyTotal((decimal)last.TotalAnnualCostAud)</dd>
-                                </div>
-                                @* Both shown beside the cost figures deliberately. Storage is
-                                   rebuilt until the run holds the reliability standard, so a run
-                                   can report as within target only because it built its way there.
-                                   Unserved demand also leaves the levelised-cost denominator, so
-                                   a sweep can read as getting cheaper while the grid fails.
-                                   The sizing outcome carries the rest: notRequired means the fleet
-                                   held, resized means storage was built to hold it, and anything
-                                   else means storage stopped closing the gap, so what is left is
-                                   generation or transmission investment. Which of the two is not
-                                   something sizing decides: only energyLimited proves a system-wide
-                                   energy shortfall, and the others report a bound the search hit. *@
-                                @if (StorageBuild(first, last) is { } storageBuild)
+                                @if (summary.Analysis.First is { } first && summary.Analysis.Last is { } last)
                                 {
                                     <div>
-                                        <dt>Storage energy built</dt>
-                                        <dd>@storageBuild</dd>
+                                        <dt>Levelised cost</dt>
+                                        <dd>@PlotFormat.Money(first.Scalars.SlcoeAudPerMwh) → @PlotFormat.Money(last.Scalars.SlcoeAudPerMwh)</dd>
+                                    </div>
+                                    <div>
+                                        <dt>Annual cost</dt>
+                                        <dd>@PlotFormat.MoneyTotal((decimal)first.TotalAnnualCostAud) → @PlotFormat.MoneyTotal((decimal)last.TotalAnnualCostAud)</dd>
+                                    </div>
+                                    @* Both shown beside the cost figures deliberately. Storage is
+                                       rebuilt until the run holds the reliability standard, so a run
+                                       can report as within target only because it built its way there.
+                                       Unserved demand also leaves the levelised-cost denominator, so
+                                       a sweep can read as getting cheaper while the grid fails.
+                                       The sizing outcome carries the rest: notRequired means the fleet
+                                       held, resized means storage was built to hold it, and anything
+                                       else means storage stopped closing the gap, so what is left is
+                                       generation or transmission investment. Which of the two is not
+                                       something sizing decides: only energyLimited proves a system-wide
+                                       energy shortfall, and the others report a bound the search hit. *@
+                                    @if (StorageBuild(first, last) is { } storageBuild)
+                                    {
+                                        <div>
+                                            <dt>Storage energy built</dt>
+                                            <dd>@storageBuild</dd>
+                                        </div>
+                                    }
+                                    <div>
+                                        <dt>Unserved energy</dt>
+                                        <dd>@UnservedShare(first) → @UnservedShare(last)</dd>
                                     </div>
                                 }
-                                <div>
-                                    <dt>Unserved energy</dt>
-                                    <dd>@UnservedShare(first) → @UnservedShare(last)</dd>
-                                </div>
-                            }
-                            @if (summary.Analysis.ConstrainedPoints.Count > 0)
-                            {
-                                <div class="sweep-card-constraint">
-                                    <dt>Without results</dt>
-                                    <dd>@summary.Analysis.ConstrainedPoints.Count.ToString("N0") runs</dd>
-                                </div>
-                            }
-                        </dl>
-                        <span class="sweep-card-open">
-                            Open the sweep
-                            <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" />
-                        </span>
+                                @if (summary.Analysis.ConstrainedPoints.Count > 0)
+                                {
+                                    <div class="sweep-entry-constraint">
+                                        <dt>Without results</dt>
+                                        <dd>@summary.Analysis.ConstrainedPoints.Count.ToString("N0") runs</dd>
+                                    </div>
+                                }
+                            </dl>
+                            <span class="sweep-entry-open">
+                                Open the sweep
+                                <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" />
+                            </span>
+                        </a>
+                    }
+                </div>
+
+                <div class="sweep-invitation">
+                    <div>
+                        <h3>Sweep something else</h3>
+                        <p>
+                            A sweep is a JSON definition against a published contract. Pick an input,
+                            give it a range, and the runner fans out the year at every point.
+                        </p>
+                    </div>
+                    <a class="button-invert"
+                       href="@DocumentationLinks.LlmWorkflow"
+                       target="_blank"
+                       rel="noopener noreferrer">
+                        Design a sweep
+                        <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" />
                     </a>
-                }
+                </div>
             </div>
         </section>
     }
 
-    <section class="explore-section">
-        <div class="section-heading">
-            <div>
-                <p class="section-label">Trace it back</p>
-                <h2>Every result rests on a published input</h2>
-            </div>
-            <p>
-                Each result on this site names the exact artifact bytes it was computed from. These
-                are those inputs, and the method behind them.
-            </p>
-        </div>
+    @if (_system is not null && _analysis is not null)
+    {
+        <section id="case-study" class="section" aria-labelledby="headline-heading">
+            <div class="shell">
+                <div class="section-heading">
+                    <p class="section-number">04</p>
+                    <div>
+                        <p class="section-label">The baseline scenario</p>
+                        <h2 id="headline-heading">The fleet as it stands, dispatched for a year</h2>
+                    </div>
+                    <p>@ScopeSentence</p>
+                </div>
 
-        <div class="explore-links">
-            <a href="regions">
-                <MudIcon Icon="@Icons.Material.Filled.Map" />
-                <span>
-                    <strong>System and states</strong>
-                    <small>Where the cost, the spill and the shortfall actually sit</small>
-                </span>
-                <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
-            </a>
-            <a href="dispatch">
-                <MudIcon Icon="@Icons.Material.Filled.AreaChart" />
-                <span>
-                    <strong>Hourly dispatch</strong>
-                    <small>Generation, storage, reliability, and annual system cost</small>
-                </span>
-                <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
-            </a>
-            <a href="inputs/demand">
-                <MudIcon Icon="@Icons.Material.Filled.ElectricBolt" />
-                <span>
-                    <strong>Operational demand</strong>
-                    <small>Actual demand by year, month, or day</small>
-                </span>
-                <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
-            </a>
-            <a href="inputs/weather">
-                <MudIcon Icon="@Icons.Material.Filled.WbSunny" />
-                <span>
-                    <strong>Weather resources</strong>
-                    <small>Solar, wind, temperature, and modelled generation</small>
-                </span>
-                <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
-            </a>
-            <a href="inputs/generation">
-                <MudIcon Icon="@Icons.Material.Filled.Factory" />
-                <span>
-                    <strong>Generation fleet</strong>
-                    <small>Installed capacity and source units by technology</small>
-                </span>
-                <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
-            </a>
-            <a href="solar-zenith">
-                <MudIcon Icon="@Icons.Material.Filled.ShowChart" />
-                <span>
-                    <strong>Solar geometry</strong>
-                    <small>Hourly solar zenith for the weather location</small>
-                </span>
-                <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
-            </a>
-            <a href="@DocumentationLinks.LlmWorkflow" target="_blank" rel="noopener noreferrer">
-                <MudIcon Icon="@Icons.Material.Filled.SmartToy" />
-                <span>
-                    <strong>Design a sweep with an LLM</strong>
-                    <small>The published contract a model can run against, and the guardrails</small>
-                </span>
-                <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
-            </a>
+                @if (_analysis.SystemMix.TotalMwh > 0)
+                {
+                    <figure class="figure">
+                        <MixBar Segments="@_analysis.SystemMix.Segments()"
+                                Label="Delivered energy by technology"
+                                Detail="@($"{PlotFormat.Compact(_analysis.SystemMix.TotalMwh)} MWh delivered")"
+                                AriaLabel="System delivered generation by technology" />
+                        <figcaption>
+                            Figure 1 &middot; Delivered energy by technology across the baseline year.
+                            Every scenario above departs from this fleet.
+                        </figcaption>
+                    </figure>
+                }
+
+                <div class="inline-links">
+                    <a href="regions">Compare the states</a>
+                    <a href="dispatch">Open the hourly dispatch</a>
+                </div>
+            </div>
+        </section>
+
+        <div class="shell">
+            <FindingCards Findings="@_analysis.Findings"
+                          Eyebrow="Read this first"
+                          Heading="What the baseline run found"
+                          Description="Generated from the run's own figures each time this page loads, not written by hand. The most significant are shown here; the comparison page carries them all with the tables behind them."
+                          Limit="3"
+                          EvidenceHref="regions"
+                          EvidenceText="See the figures behind this"
+                          Class="home-findings" />
+        </div>
+    }
+    else
+    {
+        @* Loading has a spinner and every other non-success state says why. Dropping the section
+           silently would leave the page looking as though the run simply has no headline. *@
+        <section id="case-study" class="section" aria-labelledby="headline-heading">
+            <div class="shell">
+                <div class="section-heading">
+                    <p class="section-number">04</p>
+                    <div>
+                        <p class="section-label">The baseline scenario</p>
+                        <h2 id="headline-heading">The fleet as it stands, dispatched for a year</h2>
+                    </div>
+                </div>
+                <ArtifactLoadStateView State="_systemState"><span /></ArtifactLoadStateView>
+            </div>
+        </section>
+    }
+
+    @* What the model can do, read out of the artifacts rather than described in prose, so this
+       section moves when the model does instead of going quietly stale. *@
+    @if (_modelState is not null)
+    {
+        <section id="method" class="section" aria-labelledby="state-heading">
+            <div class="shell">
+                <div class="section-heading">
+                    <p class="section-number">05</p>
+                    <div>
+                        <p class="section-label">How it works</p>
+                        <h2 id="state-heading">What the dispatch model does</h2>
+                    </div>
+                    <p>
+                        Every line below is read from the artifacts the latest run produced, not
+                        written by hand, so it describes what ran rather than what might.
+                    </p>
+                </div>
+
+                <ul class="capabilities">
+                    @foreach (ModelCapability capability in _modelState.Capabilities)
+                    {
+                        <li class="@(capability.IsPresent ? "is-present" : "is-absent")">
+                            <MudIcon Icon="@(capability.IsPresent ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.RadioButtonUnchecked)"
+                                     Size="Size.Small" />
+                            <span>
+                                <strong>@capability.Name</strong>
+                                <small>@capability.Detail</small>
+                            </span>
+                        </li>
+                    }
+                </ul>
+
+                <p class="schema-line">
+                    Artifact schemas in this build:
+                    @string.Join(" · ", _modelState.SchemaVersions.Select(entry => $"{entry.Key} v{entry.Value}"))
+                </p>
+            </div>
+        </section>
+    }
+
+    <section class="section" aria-labelledby="explore-heading">
+        <div class="shell">
+            <div class="section-heading">
+                <p class="section-number">06</p>
+                <div>
+                    <p class="section-label">Trace it back</p>
+                    <h2 id="explore-heading">Every result rests on a published input</h2>
+                </div>
+                <p>
+                    Each result on this site names the exact artifact bytes it was computed from.
+                    These are those inputs, and the method behind them.
+                </p>
+            </div>
+
+            <div class="explore-links">
+                <a href="regions">
+                    <span>
+                        <strong>System and states</strong>
+                        <small>Where the cost, the spill and the shortfall actually sit</small>
+                    </span>
+                    <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
+                </a>
+                <a href="dispatch">
+                    <span>
+                        <strong>Hourly dispatch</strong>
+                        <small>Generation, storage, reliability, and annual system cost</small>
+                    </span>
+                    <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
+                </a>
+                <a href="inputs/demand">
+                    <span>
+                        <strong>Operational demand</strong>
+                        <small>Actual demand by year, month, or day</small>
+                    </span>
+                    <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
+                </a>
+                <a href="inputs/weather">
+                    <span>
+                        <strong>Weather resources</strong>
+                        <small>Solar, wind, temperature, and modelled generation</small>
+                    </span>
+                    <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
+                </a>
+                <a href="inputs/generation">
+                    <span>
+                        <strong>Generation fleet</strong>
+                        <small>Installed capacity and source units by technology</small>
+                    </span>
+                    <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
+                </a>
+                <a href="@DocumentationLinks.LlmWorkflow" target="_blank" rel="noopener noreferrer">
+                    <span>
+                        <strong>Design a sweep with an LLM</strong>
+                        <small>The published contract a model can run against, and the guardrails</small>
+                    </span>
+                    <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <section class="section section-close" aria-labelledby="close-heading">
+        <div class="shell">
+            <div class="section-heading">
+                <p class="section-number">07</p>
+                <div>
+                    <p class="section-label">Before you quote a figure</p>
+                    <h2 id="close-heading">Three things these numbers are not</h2>
+                </div>
+            </div>
+
+            <div class="claims-band">
+                <p class="claim">
+                    <strong>Not a forecast.</strong>
+                    The gap between two scenarios is the trustworthy output; any single level carries
+                    the model's assumptions with it.
+                </p>
+                <p class="claim">
+                    <strong>Not a bill.</strong>
+                    These are build-and-run costs. Retail, network and scheme costs are not in here,
+                    so nothing on this site is a price anyone pays.
+                </p>
+                <p class="claim">
+                    <strong>Not unexamined.</strong>
+                    Every figure traces to a published run and to an
+                    <a href="@DocumentationLinks.Assumptions" target="_blank" rel="noopener noreferrer">assumptions register</a>
+                    a test suite checks against the code on every change.
+                </p>
+            </div>
+
+            <div class="docs-cta">
+                <p>
+                    The guide, the concept pages behind dispatch and storage sizing, the full
+                    assumptions and limitations register, and how to run your own sweeps with an LLM
+                    all live on their own site.
+                </p>
+                <div class="docs-cta-actions">
+                    <a class="button-primary"
+                       href="@DocumentationLinks.Home"
+                       target="_blank"
+                       rel="noopener noreferrer">
+                        <MudIcon Icon="@Icons.Material.Filled.MenuBook" Size="Size.Small" />
+                        Open the documentation
+                    </a>
+                    <a class="button-secondary"
+                       href="@DocumentationLinks.Limitations"
+                       target="_blank"
+                       rel="noopener noreferrer">
+                        <MudIcon Icon="@Icons.Material.Filled.Rule" Size="Size.Small" />
+                        Assumptions and limitations
+                    </a>
+                </div>
+            </div>
         </div>
     </section>
 </div>
@@ -421,12 +497,43 @@
     private SystemAnalysis? _analysis;
     private ModelState? _modelState;
 
+    /// <summary>One question a sweep answers, what reports it, and what the published sweep said.</summary>
+    private sealed record SweepQuestion(string Ask, string Reports, string? Answer);
+
+    /// <summary>
+    /// The first sweep's own headline: the axis value at which the reliability standard stops
+    /// holding. This is the most arresting thing the model produces and it belongs in the hero,
+    /// but it is a result, so it is read from the sweep index rather than written into the copy.
+    /// </summary>
+    private string? BreakingPoint
+    {
+        get
+        {
+            SweepAnalysis? sweep = _sweeps.FirstOrDefault()?.Analysis;
+            SweepRun? breach = sweep?.Runs.FirstOrDefault(run => run.OutsideReliabilityTarget);
+            return sweep is null || breach is null
+                ? null
+                : $"the NEM holds its reliability standard up to {PlotFormat.Compact(breach.AxisValue)} "
+                    + $"{sweep.AxisUnit} of {sweep.AxisLabel.ToLowerInvariant()}. Past that, building "
+                    + "more storage stops closing the gap.";
+        }
+    }
+
+    /// <summary>The sweep the hero's primary action opens, once a sweep index has loaded.</summary>
+    private string? PrimarySweepRoute => _sweeps.Count > 0
+        ? SweepPaths.PageRoute(_sweeps[0].Index.SweepId)
+        : null;
+
     private string ScopeSentence => _system is null
         ? string.Empty
         : $"{RegionNames.StateList(_system.RegionIds)}, "
             + $"{_system.PeriodStart:MMM yyyy} to {_system.PeriodEnd.AddTicks(-1):MMM yyyy}, "
             + $"simulated at {_system.Resolution.TotalHours:N0}-hour resolution against a typical "
             + "meteorological year.";
+
+    private string ScopeShort => _system is null
+        ? string.Empty
+        : $"{_system.RegionIds.Length} regions, {_system.PeriodStart:MMM yyyy} to {_system.PeriodEnd.AddTicks(-1):MMM yyyy}";
 
     private IReadOnlyList<MetricStripItem> HeadlineMetrics => _analysis is null
         ?
@@ -438,6 +545,57 @@
             new("Renewable share", RenewableShare, "of delivered energy"),
             new("Reliability", ReliabilityHeadline, ReliabilityDetail),
         ];
+
+    /// <summary>
+    /// The four questions the site exists to answer, each paired with the measure that answers it
+    /// and, where the sweep index has loaded, what the published sweep actually reported. The
+    /// answers are read from the sweep rather than written down, so a sweep that is re-run with
+    /// different numbers updates this section instead of contradicting it.
+    /// </summary>
+    private IReadOnlyList<SweepQuestion> Questions
+    {
+        get
+        {
+            SweepAnalysis? sweep = _sweeps.FirstOrDefault()?.Analysis;
+            SweepRun? first = sweep?.First;
+            SweepRun? last = sweep?.Last;
+            SweepRun? breach = sweep?.Runs.FirstOrDefault(run => run.OutsideReliabilityTarget);
+            string unit = sweep?.AxisUnit ?? string.Empty;
+            int breached = sweep?.Runs.Count(run => run.OutsideReliabilityTarget) ?? 0;
+
+            return
+            [
+                new(
+                    "Does the fleet we already have still hold?",
+                    "Storage sizing outcome and unserved energy, checked per region and for the system at every point on the axis.",
+                    breach is null
+                        ? sweep is null ? null : "every published scenario held the standard."
+                        : $"the standard holds up to {PlotFormat.Compact(breach.AxisValue)} {unit}, and is missed from there on."),
+                new(
+                    "If it does not, how much storage has to be built?",
+                    "Installed storage energy before and after sizing, for every scenario in the sweep.",
+                    first is not null && last is not null && StorageBuild(first, last) is { } build
+                        ? $"storage grows {build} across the axis."
+                        : null),
+                new(
+                    "What does that do to the cost of energy?",
+                    "Levelised cost per MWh served and the whole annual system bill, reported side by side.",
+                    first is not null && last is not null
+                        ? $"the annual bill moves {PlotFormat.MoneyTotal((decimal)first.TotalAnnualCostAud)} → "
+                            + $"{PlotFormat.MoneyTotal((decimal)last.TotalAnnualCostAud)}."
+                        : null),
+                new(
+                    "Where does storage stop being the answer?",
+                    "The scenarios that miss the standard even after sizing has built all the storage it is allowed to.",
+                    sweep is null
+                        ? null
+                        : breached == 0
+                            ? "no published scenario reached that point."
+                            : $"{breached:N0} of {sweep.Runs.Count:N0} scenarios miss the standard even after resizing, "
+                                + "so what is left is generation or transmission."),
+            ];
+        }
+    }
 
     /// <summary>
     /// Read from the sizing outcome rather than <c>Reliability.WithinTarget</c>: the target is

@@ -1,123 +1,223 @@
-﻿@using NEMSweep.Contracts
+@using NEMSweep.Contracts
 @using NEMSweep.Web.Services
+@implements IDisposable
 @inject SweepManifestLoader SweepManifestLoader
 @inject SweepIndexLoader SweepIndexLoader
+@inject NavigationManager Navigation
 
-<div class="top-row">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="" aria-label="NEMSweep home">
-            <span class="brand-mark" aria-hidden="true">
-                <MudIcon Icon="@Icons.Material.Filled.ElectricBolt" Size="Size.Small" />
-            </span>
-            <span class="brand-name">Nem<span>Sim</span></span>
-        </a>
-        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-    </div>
+@* The sidebar is organised by what a route *is*, not by what it is called. Every route the site
+   serves is one scenario, a family of scenarios, or an input shared by all of them, and the three
+   used to sit in one flat list where a 25-run sweep looked like a sibling of "Demand". *@
+
+<div class="nav-head">
+    <a class="navbar-brand" href="" aria-label="NEMSweep home">
+        <BrandMark Size="26" ShowWordmark="true" />
+    </a>
+    <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+        <span class="navbar-toggler-icon"></span>
+    </button>
 </div>
 
 <div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <MudIcon Icon="@Icons.Material.Filled.Home" Size="Size.Small" />
-                Overview
+    @* What the reader currently has open, stated before anything they could navigate to. *@
+    <section class="scenario-card scenario-@_scope.Kind.ToString().ToLowerInvariant()"
+             aria-label="Current scenario">
+        <p class="scenario-kind">@KindLabel</p>
+        <p class="scenario-title">@_scope.Title</p>
+        <p class="scenario-detail">@_scope.Detail</p>
+
+        @if (_scope.Kind is ScenarioKind.Baseline && _sweeps.Count > 0)
+        {
+            <a class="scenario-onward" href="@SweepPaths.PageRoute(_sweeps[0].SweepId)">
+                Sweep from here
+                <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" />
+            </a>
+        }
+
+        @if (_scope.Kind is ScenarioKind.SweepRun)
+        {
+            <p class="scenario-position">Scenario @_scope.RunNumber of @_scope.RunCount</p>
+            <nav class="scenario-steps" aria-label="Step through this sweep">
+                @if (_scope.PreviousRoute is { } previous)
+                {
+                    <a href="@previous" aria-label="Previous scenario in this sweep">←</a>
+                }
+                else
+                {
+                    <span aria-hidden="true">←</span>
+                }
+                <a class="scenario-steps-all" href="@_scope.SweepRoute">All @_scope.RunCount</a>
+                @if (_scope.NextRoute is { } next)
+                {
+                    <a href="@next" aria-label="Next scenario in this sweep">→</a>
+                }
+                else
+                {
+                    <span aria-hidden="true">→</span>
+                }
+            </nav>
+        }
+    </section>
+
+    <nav class="nav">
+        @if (_scope.Kind is ScenarioKind.SweepRun)
+        {
+            @* A run offers the same two views the baseline does, pointed at this run's own routes.
+               The view already open is marked as current rather than linked: a link back to the
+               page the reader is standing on is the most prominent dead end a sidebar can have. *@
+            <p class="nav-section-label">This scenario</p>
+            <span class="nav-link is-current" aria-current="page">
+                <MudIcon Icon="@Icons.Material.Filled.AreaChart" Size="Size.Small" />
+                Hourly dispatch
+            </span>
+            <NavLink class="nav-link" href="@_scope.SweepRoute">
+                <MudIcon Icon="@Icons.Material.Filled.Insights" Size="Size.Small" />
+                All @_scope.RunCount scenarios, compared
             </NavLink>
-        </div>
-        <p class="nav-section-label">Results</p>
-        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="regions">
+                <MudIcon Icon="@Icons.Material.Filled.KeyboardReturn" Size="Size.Small" />
+                Back to the baseline
+            </NavLink>
+        }
+        else if (_scope.Kind is ScenarioKind.SweepOverview)
+        {
+            <p class="nav-section-label">This sweep</p>
+            <span class="nav-link is-current" aria-current="page">
+                <MudIcon Icon="@Icons.Material.Filled.Insights" Size="Size.Small" />
+                All @_scope.RunCount scenarios, compared
+            </span>
+            <NavLink class="nav-link" href="regions">
+                <MudIcon Icon="@Icons.Material.Filled.KeyboardReturn" Size="Size.Small" />
+                Back to the baseline
+            </NavLink>
+        }
+        else
+        {
+            <p class="nav-section-label">Baseline scenario</p>
             <NavLink class="nav-link" href="regions">
                 <MudIcon Icon="@Icons.Material.Filled.Map" Size="Size.Small" />
                 System and states
             </NavLink>
-        </div>
-        <div class="nav-item px-3">
             <NavLink class="nav-link" href="dispatch">
                 <MudIcon Icon="@Icons.Material.Filled.AreaChart" Size="Size.Small" />
                 Hourly dispatch
             </NavLink>
-        </div>
-        @* One entry per published sweep, named by its own artifact. Nothing appears for a sweep
-           whose index will not load. *@
+        }
+
+        <p class="nav-section-label">
+            Sweeps
+            @if (_sweeps.Count > 0)
+            {
+                <span class="nav-section-count">@_sweeps.Count</span>
+            }
+        </p>
+        @if (_sweeps.Count == 0)
+        {
+            <p class="nav-empty">None published yet</p>
+        }
         @foreach (SweepIndexDTO sweep in _sweeps)
         {
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="@SweepPaths.PageRoute(sweep.SweepId)">
-                    <MudIcon Icon="@Icons.Material.Filled.Insights" Size="Size.Small" />
+            <NavLink class="nav-link nav-link-sweep" href="@SweepPaths.PageRoute(sweep.SweepId)">
+                <MudIcon Icon="@Icons.Material.Filled.Insights" Size="Size.Small" />
+                <span>
                     @sweep.Name
-                </NavLink>
-            </div>
+                    <small>@ViewableCount(sweep) scenarios · @sweep.Axis.Label</small>
+                </span>
+            </NavLink>
         }
-        <p class="nav-section-label">Inputs</p>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link input-link" href="inputs/demand">
-                <MudIcon Icon="@Icons.Material.Filled.ElectricBolt" Size="Size.Small" />
-                Demand
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link input-link" href="inputs/weather">
-                <MudIcon Icon="@Icons.Material.Filled.WbSunny" Size="Size.Small" />
-                Weather
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link input-link" href="inputs/generation">
-                <MudIcon Icon="@Icons.Material.Filled.Factory" Size="Size.Small" />
-                Generation
-            </NavLink>
-        </div>
-        <p class="nav-section-label">Method</p>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="solar-zenith">
-                <MudIcon Icon="@Icons.Material.Filled.ShowChart" Size="Size.Small" />
-                Solar geometry
-            </NavLink>
-        </div>
+
+        <p class="nav-section-label">Shared inputs</p>
+        <NavLink class="nav-link" href="inputs/demand">
+            <MudIcon Icon="@Icons.Material.Filled.ElectricBolt" Size="Size.Small" />
+            Demand
+        </NavLink>
+        <NavLink class="nav-link" href="inputs/weather">
+            <MudIcon Icon="@Icons.Material.Filled.WbSunny" Size="Size.Small" />
+            Weather
+        </NavLink>
+        <NavLink class="nav-link" href="inputs/generation">
+            <MudIcon Icon="@Icons.Material.Filled.Factory" Size="Size.Small" />
+            Generation
+        </NavLink>
+
         <p class="nav-section-label">Documentation</p>
-        <div class="nav-item px-3">
-            <a class="nav-link" href="@DocumentationLinks.Home" target="_blank" rel="noopener noreferrer">
-                <MudIcon Icon="@Icons.Material.Filled.MenuBook" Size="Size.Small" />
-                Guide and concepts
-            </a>
-        </div>
-        <div class="nav-item px-3">
-            <a class="nav-link" href="@DocumentationLinks.Limitations" target="_blank" rel="noopener noreferrer">
-                <MudIcon Icon="@Icons.Material.Filled.Rule" Size="Size.Small" />
-                Assumptions and limitations
-            </a>
-        </div>
+        <a class="nav-link" href="@DocumentationLinks.Home" target="_blank" rel="noopener noreferrer">
+            <MudIcon Icon="@Icons.Material.Filled.MenuBook" Size="Size.Small" />
+            Guide and concepts
+        </a>
+        <a class="nav-link" href="@DocumentationLinks.Limitations" target="_blank" rel="noopener noreferrer">
+            <MudIcon Icon="@Icons.Material.Filled.Rule" Size="Size.Small" />
+            Assumptions and limitations
+        </a>
     </nav>
+
+    <div class="nav-foot">
+        <a href="@DocumentationLinks.LlmWorkflow" target="_blank" rel="noopener noreferrer">
+            <MudIcon Icon="@Icons.Material.Filled.PlayArrow" Size="Size.Small" />
+            Run your own scenario
+        </a>
+    </div>
 </div>
 
 @code {
     private bool collapseNavMenu = true;
     private List<SweepIndexDTO> _sweeps = [];
+    private ScenarioScope _scope = ScenarioScope.Resolve(null, []);
 
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
 
+    private string KindLabel => _scope.Kind switch
+    {
+        ScenarioKind.Baseline => "Scenario",
+        ScenarioKind.SweepRun => "Scenario",
+        ScenarioKind.SweepOverview => "Sweep",
+        ScenarioKind.SharedInput => "Input",
+        _ => "NEMSweep",
+    };
+
+    private static int ViewableCount(SweepIndexDTO sweep) =>
+        sweep.Points.Count(point =>
+            point.Status == SweepPointStatus.Succeeded
+            && !string.IsNullOrWhiteSpace(point.DetailPath));
+
     protected override async Task OnInitializedAsync()
     {
-        ArtifactLoadResult<SweepManifestDTO> manifest = await SweepManifestLoader.LoadAsync();
-        if (!manifest.IsSuccess)
-        {
-            return;
-        }
+        Navigation.LocationChanged += OnLocationChanged;
 
-        foreach (SweepManifestEntryDTO entry in manifest.Value!.Sweeps)
+        ArtifactLoadResult<SweepManifestDTO> manifest = await SweepManifestLoader.LoadAsync();
+        if (manifest.IsSuccess)
         {
-            ArtifactLoadResult<SweepIndexDTO> index =
-                await SweepIndexLoader.LoadAsync(SweepPaths.IndexPath(entry));
-            if (index.IsSuccess)
+            foreach (SweepManifestEntryDTO entry in manifest.Value!.Sweeps)
             {
-                _sweeps.Add(index.Value!);
+                ArtifactLoadResult<SweepIndexDTO> index =
+                    await SweepIndexLoader.LoadAsync(SweepPaths.IndexPath(entry));
+                if (index.IsSuccess)
+                {
+                    _sweeps.Add(index.Value!);
+                }
             }
         }
+
+        // Resolved after the indexes are in hand: a sweep route cannot be named before its index
+        // has loaded, and until then the card would show an id rather than the sweep's own name.
+        UpdateScope();
     }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        UpdateScope();
+        StateHasChanged();
+    }
+
+    private void UpdateScope() =>
+        _scope = ScenarioScope.Resolve(
+            Navigation.ToBaseRelativePath(Navigation.Uri).Split('?')[0],
+            _sweeps);
 
     private void ToggleNavMenu()
     {
         collapseNavMenu = !collapseNavMenu;
     }
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
 }
