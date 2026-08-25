@@ -42,6 +42,14 @@ dotnet run --project NEMSweep.CLI -- --describe-schema sweep
 These are the authoritative field contracts. Paste both into context. Do not paraphrase them:
 paraphrase is where field names get invented.
 
+They are also committed, so a model that can fetch a URL does not need you to paste anything:
+
+- `https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/scenario-v5.json`
+- `https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/sweep-v1.json`
+
+CI regenerates both and fails if they have drifted from the validator, so the published file cannot
+go stale against what the tool actually accepts. See [Schemas](../guide/schemas.md).
+
 ### 2. The baseline scenario
 
 The scenario the sweep will patch, for example `scenarios/nem-fy2026-all-regions.json`. The model
@@ -146,6 +154,20 @@ Fan-out writes every point's materialised config **and validates each one, stopp
 failure**. A hallucinated field, a bad region ID or a wrong schema version all fail here, in
 seconds, before any dispatch happens. Feed the error back to the model and regenerate.
 
+For a single config, and for a loop that runs without you reading it, validate on its own and ask
+for the answer as an object:
+
+```bash
+dotnet run --project NEMSweep.CLI -- --validate-scenario scenarios/generated.json --format json
+```
+
+```json
+{"valid":false,"path":"scenarios/generated.json","error":{"stage":"Input","code":"invalidConfig","message":"The JSON property 'nameplateMw' could not be mapped ..."}}
+```
+
+The message names the offending property, so the correction is mechanical. This is what makes the
+regenerate loop above reliable rather than a matter of the model parsing prose it was handed.
+
 Once fan-out is clean, or once you are past the iterate-and-regenerate stage entirely:
 
 ```bash
@@ -162,9 +184,12 @@ An LLM will produce a fluent, confident reading of a sweep whether or not the sw
 These are the failure modes worth watching for.
 
 **Check `axisValue` against `overrides` yourself.** The model will produce a definition where the
-label says +3,000 MW and the overrides add 2,900. Nothing in NEMSweep catches it, because nothing in
-NEMSweep reads `axisValue`. Every chart downstream will be wrong. This is the single highest-value
-manual check.
+label says +3,000 MW and the overrides add 2,900. Nothing in NEMSweep reads `axisValue`, so the run
+succeeds and every chart downstream is wrong. This remains the single highest-value manual check.
+
+One part of it is now caught for you: two points cannot share an axis value, which is the shape a
+copy-pasted point takes. Agreement between the value and what the overrides actually change still
+cannot be checked generically, because the overrides can change anything.
 
 **Do not let it interpret levels.** NEMSweep's biases are systematic and known; see
 [Limitations](../assumptions/limitations.md). A comparison between two points is well supported; an
