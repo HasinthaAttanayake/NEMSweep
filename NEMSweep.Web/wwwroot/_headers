@@ -1,5 +1,13 @@
-/data/sweeps/*/series/*
+# Cloudflare Pages defaults static assets to max-age=14400, so anything with a stable filename
+# survives a deploy. Revalidate by default; only content-addressed paths are cached hard.
+
+/*
+  Cache-Control: no-cache
+
+# Fingerprinted by the Blazor SDK.
+/_framework/*
   Cache-Control: public, max-age=31536000, immutable
 
-/data/*
-  Cache-Control: no-cache
+# Written once under a sweep id, never rewritten.
+/data/sweeps/*/series/*
+  Cache-Control: public, max-age=31536000, immutable
