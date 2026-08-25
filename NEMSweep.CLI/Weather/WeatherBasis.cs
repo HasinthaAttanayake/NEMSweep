@@ -6,7 +6,7 @@ namespace NEMSweep.CLI.Weather;
 /// <summary>
 /// Describes what a scenario's weather input represents. Scenario runs map an EPW-derived typical
 /// meteorological year onto the dispatch period by calendar hour, so every run against this input
-/// is a typical-year run — a fact a reader needs stated before treating a storage or reliability
+/// is a typical-year run, a fact a reader needs stated before treating a storage or reliability
 /// result as covering extreme conditions.
 /// </summary>
 internal static class WeatherBasis

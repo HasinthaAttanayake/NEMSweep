@@ -19,7 +19,7 @@ internal static class JsonFile
 
     /// <summary>
     /// How a published artifact is written. Indentation is roughly seventy percent of the bytes in
-    /// one of these — a quarter of a gigabyte across a sweep — spent on whitespace that nothing
+    /// one of these (a quarter of a gigabyte across a sweep) spent on whitespace that nothing
     /// reads: the CLI writes them, the site fetches them, and no one edits them by hand. It also
     /// puts every value on its own line, which turns a rerun into millions of changed lines and is
     /// what stops a diff being reviewable at all.

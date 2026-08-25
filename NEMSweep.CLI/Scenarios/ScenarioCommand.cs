@@ -2,6 +2,8 @@ using System.Text.Json;
 using NEMSweep.CLI.Application;
 using NEMSweep.CLI.Configuration;
 using NEMSweep.Contracts;
+using NEMSweep.Model.StorageSizing;
+using NEMSweep.Model.Units;
 
 namespace NEMSweep.CLI.Scenarios;
 
@@ -54,9 +56,9 @@ internal static class ScenarioCommand
             settings,
             context.Paths.SolutionRoot);
         StorageSizingSettings sizing = settings.StorageSizing;
-        var sizingOptions = new NEMSweep.Model.StorageSizing.StorageSizingOptions(
-            NEMSweep.Model.Units.Power.FromMegawatts(sizing.MaximumPowerMw),
-            NEMSweep.Model.Units.Energy.FromMegawattHours(sizing.MaximumEnergyMwh),
+        var sizingOptions = new StorageSizingOptions(
+            Power.FromMegawatts(sizing.MaximumPowerMw),
+            Energy.FromMegawattHours(sizing.MaximumEnergyMwh),
             sizing.TargetUsePercentage,
             sizing.MaximumPasses);
         DispatchPublication publication;
@@ -97,9 +99,9 @@ internal static class ScenarioCommand
             settings,
             context.Paths.SolutionRoot);
         StorageSizingSettings sizing = settings.StorageSizing;
-        var sizingOptions = new NEMSweep.Model.StorageSizing.StorageSizingOptions(
-            NEMSweep.Model.Units.Power.FromMegawatts(sizing.MaximumPowerMw),
-            NEMSweep.Model.Units.Energy.FromMegawattHours(sizing.MaximumEnergyMwh),
+        var sizingOptions = new StorageSizingOptions(
+            Power.FromMegawatts(sizing.MaximumPowerMw),
+            Energy.FromMegawattHours(sizing.MaximumEnergyMwh),
             sizing.TargetUsePercentage,
             sizing.MaximumPasses);
         DispatchPublication publication;
