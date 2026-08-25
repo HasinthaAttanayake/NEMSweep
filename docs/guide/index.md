@@ -4,8 +4,12 @@ This page takes you from a fresh clone to a dispatch result on screen.
 
 ## Prerequisites
 
-NEMSweep targets `net10.0` (see `NEMSweep.Model/NEMSweep.Model.csproj`), so you need the .NET 10 SDK installed.
-Nothing else is required to build, test or run the CLI.
+NEMSweep targets `net10.0` (see `NEMSweep.Model/NEMSweep.Model.csproj`), so you need the .NET 10 SDK
+installed. Nothing else is required to build, test or run the CLI.
+
+If you would rather not install a toolchain, there is a container image instead, and the rest of
+this page still applies to it: same commands, same workspace, mounts in place of directories. See
+[Running the container](container.md).
 
 ## Clone, build, test
 
