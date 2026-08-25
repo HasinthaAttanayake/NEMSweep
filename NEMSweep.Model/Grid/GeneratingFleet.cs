@@ -123,10 +123,47 @@ public sealed class GeneratingFleet
     /// </summary>
     public bool IsIntermittentRenewable => GenerationTechnology is GenerationTechnology.Solar or GenerationTechnology.Wind; // TODO: move to TechnologyProfile as appropriate
 
+    /// <summary>
+    /// Available capacity for the last timeline and resource profile this fleet was asked about.
+    /// A storage sizing search re-dispatches the same fleets over the same weather many times
+    /// over (a hundred passes is routine), and for Solar and Wind this result is an entire
+    /// power curve over the horizon that depends on nothing the search varies. Caching it here
+    /// works because the answer is a pure function of the fleet's own immutable nameplate, the
+    /// resource profile, and the timeline's shape, and because <see cref="FlowSeries"/> is
+    /// immutable, so every pass can safely be handed the same instance.
+    /// </summary>
+    private CachedAvailableCapacity? _availableCapacityCache;
+
+    /// <summary>
+    /// One cache fill, as a single immutable object. The key and the curve have to be read as a
+    /// unit: the same fleet can be dispatched concurrently, and a multi-field cache read could
+    /// otherwise mix the key of one fill with the curve of another and return the wrong series.
+    /// One reference read and one reference write are each atomic, so an entry is either seen
+    /// whole or not at all.
+    /// </summary>
+    private sealed record CachedAvailableCapacity(
+        RegionalResourceProfile? Profile,
+        DateTimeOffset Start,
+        TimeSpan Resolution,
+        int Length,
+        FlowSeries Capacity);
+
     internal FlowSeries AvailableCapacityFor(
         RegionalResourceProfile? resourceProfile,
         FlowSeries dispatchTimeline)
     {
+        // Keyed on the profile by reference (resizing storage carries the same profile through)
+        // and on the timeline by shape, because each pass rebuilds an equal-but-distinct series.
+        CachedAvailableCapacity? cached = Volatile.Read(ref _availableCapacityCache);
+        if (cached is not null
+            && ReferenceEquals(cached.Profile, resourceProfile)
+            && cached.Start == dispatchTimeline.Start
+            && cached.Resolution == dispatchTimeline.Resolution
+            && cached.Length == dispatchTimeline.Length)
+        {
+            return cached.Capacity;
+        }
+
         FlowSeries availableCapacity = GenerationTechnology switch
         {
             GenerationTechnology.Solar => SolarCapacity(RequireResourceProfile(resourceProfile)),
@@ -138,6 +175,14 @@ public sealed class GeneratingFleet
         };
 
         dispatchTimeline.RequireAligned(availableCapacity);
+        Volatile.Write(
+            ref _availableCapacityCache,
+            new CachedAvailableCapacity(
+                resourceProfile,
+                dispatchTimeline.Start,
+                dispatchTimeline.Resolution,
+                dispatchTimeline.Length,
+                availableCapacity));
         return availableCapacity;
     }
 
