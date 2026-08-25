@@ -3,6 +3,8 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using NEMSweep.CLI.Infrastructure;
 using NEMSweep.Contracts;
+using NEMSweep.Model.StorageSizing;
+using NEMSweep.Model.Units;
 
 namespace NEMSweep.CLI.Configuration;
 
@@ -30,6 +32,21 @@ internal static class ScenarioConfig
             ?? throw new FormatException("Scenario config is empty.");
         Validate(scenario);
         return scenario;
+    }
+
+    /// <summary>
+    /// Maps the configured storage-sizing block onto the model's options. The one place this
+    /// mapping lives, so a dispatch run and the artifact it publishes cannot describe different
+    /// bounds.
+    /// </summary>
+    public static StorageSizingOptions CreateSizingOptions(StorageSizingSettings sizing)
+    {
+        ArgumentNullException.ThrowIfNull(sizing);
+        return new StorageSizingOptions(
+            Power.FromMegawatts(sizing.MaximumPowerMw),
+            Energy.FromMegawattHours(sizing.MaximumEnergyMwh),
+            sizing.TargetUsePercentage,
+            sizing.MaximumPasses);
     }
 
     private static void Validate(ScenarioSettings scenario)
@@ -106,60 +123,72 @@ internal static class ScenarioConfig
                 throw new FormatException($"scenario.regions region '{region.RegionId}' must define storageFleets.");
             }
 
-            foreach (GeneratingFleetSettings? fleet in region.GeneratingFleets)
-            {
-                string technology = fleet?.Technology ?? "<blank>";
-                if (fleet is null || string.IsNullOrWhiteSpace(fleet.Technology))
-                {
-                    throw new FormatException($"scenario.regions region '{region.RegionId}' generating fleet technology '{technology}' must not be blank.");
-                }
-
-                if (fleet.CostParameters is null || fleet.TechnologyProfile is null)
-                {
-                    throw new FormatException($"scenario.regions region '{region.RegionId}' generating fleet technology '{fleet.Technology}' must define costParameters and technologyProfile.");
-                }
-
-                ValidateNonNegative(fleet.NameplateCapacityMw, region.RegionId, fleet.Technology, "nameplateCapacityMw");
-                ValidateNonNegative(fleet.TechnologyProfile.HeatRateGjPerMwh, region.RegionId, fleet.Technology, "heatRateGjPerMwh");
-                ValidateCosts(region.RegionId, fleet.Technology, fleet.CostParameters);
-                if (fleet.MonthlyCapacityFactors is not null)
-                {
-                    foreach (MonthlyCapacityFactorSettings? factor in fleet.MonthlyCapacityFactors)
-                    {
-                        if (factor is null || double.IsNaN(factor.CapacityFactor) || double.IsInfinity(factor.CapacityFactor)
-                            || factor.CapacityFactor <= 0 || factor.CapacityFactor > 1)
-                        {
-                            double value = factor?.CapacityFactor ?? double.NaN;
-                            throw new FormatException($"scenario.regions region '{region.RegionId}' generating fleet technology '{fleet.Technology}' field 'capacityFactor' value {value} must be finite, greater than 0, and at most 1.");
-                        }
-                    }
-                }
-            }
-
-            foreach (StorageFleetSettings? fleet in region.StorageFleets)
-            {
-                string technology = fleet?.Technology ?? "<blank>";
-                if (fleet is null || string.IsNullOrWhiteSpace(fleet.Technology))
-                {
-                    throw new FormatException($"scenario.regions region '{region.RegionId}' storage fleet technology '{technology}' must not be blank.");
-                }
-
-                if (fleet.CostParameters is null || fleet.TechnologyProfile is null)
-                {
-                    throw new FormatException($"scenario.regions region '{region.RegionId}' storage fleet technology '{fleet.Technology}' must define costParameters and technologyProfile.");
-                }
-
-                double efficiency = fleet.TechnologyProfile.RoundTripEfficiency;
-                if (double.IsNaN(efficiency) || double.IsInfinity(efficiency) || efficiency < 0 || efficiency > 1)
-                {
-                    throw new FormatException($"scenario.regions region '{region.RegionId}' storage fleet technology '{fleet.Technology}' field 'roundTripEfficiency' must be finite and between 0 and 1.");
-                }
-
-                ValidateCosts(region.RegionId, fleet.Technology, fleet.CostParameters);
-            }
+            ValidateGeneratingFleets(region);
+            ValidateStorageFleets(region);
         }
 
         ValidateInterconnectors(scenario.Interconnectors, regionIds);
+    }
+
+
+    /// <summary>Validates one region's generating fleets and their cost and technology blocks.</summary>
+    private static void ValidateGeneratingFleets(ScenarioRegionSettings region)
+    {
+        foreach (GeneratingFleetSettings? fleet in region.GeneratingFleets)
+        {
+            string technology = fleet?.Technology ?? "<blank>";
+            if (fleet is null || string.IsNullOrWhiteSpace(fleet.Technology))
+            {
+                throw new FormatException($"scenario.regions region '{region.RegionId}' generating fleet technology '{technology}' must not be blank.");
+            }
+
+            if (fleet.CostParameters is null || fleet.TechnologyProfile is null)
+            {
+                throw new FormatException($"scenario.regions region '{region.RegionId}' generating fleet technology '{fleet.Technology}' must define costParameters and technologyProfile.");
+            }
+
+            ValidateNonNegative(fleet.NameplateCapacityMw, region.RegionId, fleet.Technology, "nameplateCapacityMw");
+            ValidateNonNegative(fleet.TechnologyProfile.HeatRateGjPerMwh, region.RegionId, fleet.Technology, "heatRateGjPerMwh");
+            ValidateCosts(region.RegionId, fleet.Technology, fleet.CostParameters);
+            if (fleet.MonthlyCapacityFactors is not null)
+            {
+                foreach (MonthlyCapacityFactorSettings? factor in fleet.MonthlyCapacityFactors)
+                {
+                    if (factor is null || double.IsNaN(factor.CapacityFactor) || double.IsInfinity(factor.CapacityFactor)
+                        || factor.CapacityFactor <= 0 || factor.CapacityFactor > 1)
+                    {
+                        double value = factor?.CapacityFactor ?? double.NaN;
+                        throw new FormatException($"scenario.regions region '{region.RegionId}' generating fleet technology '{fleet.Technology}' field 'capacityFactor' value {value} must be finite, greater than 0, and at most 1.");
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>Validates one region's storage fleets and their cost and technology blocks.</summary>
+    private static void ValidateStorageFleets(ScenarioRegionSettings region)
+    {
+        foreach (StorageFleetSettings? fleet in region.StorageFleets)
+        {
+            string technology = fleet?.Technology ?? "<blank>";
+            if (fleet is null || string.IsNullOrWhiteSpace(fleet.Technology))
+            {
+                throw new FormatException($"scenario.regions region '{region.RegionId}' storage fleet technology '{technology}' must not be blank.");
+            }
+
+            if (fleet.CostParameters is null || fleet.TechnologyProfile is null)
+            {
+                throw new FormatException($"scenario.regions region '{region.RegionId}' storage fleet technology '{fleet.Technology}' must define costParameters and technologyProfile.");
+            }
+
+            double efficiency = fleet.TechnologyProfile.RoundTripEfficiency;
+            if (double.IsNaN(efficiency) || double.IsInfinity(efficiency) || efficiency < 0 || efficiency > 1)
+            {
+                throw new FormatException($"scenario.regions region '{region.RegionId}' storage fleet technology '{fleet.Technology}' field 'roundTripEfficiency' must be finite and between 0 and 1.");
+            }
+
+            ValidateCosts(region.RegionId, fleet.Technology, fleet.CostParameters);
+        }
     }
 
     private static void ValidateInterconnectors(
