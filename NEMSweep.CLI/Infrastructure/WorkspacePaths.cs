@@ -77,16 +77,24 @@ internal sealed class WorkspacePaths
         DataPath($"weather-{regionId.ToLowerInvariant()}.json");
 
     /// <summary>
-    /// Expresses a path relative to the data root for provenance, falling back to the file name when
-    /// it sits outside. Provenance records the digest as the reproducibility boundary, so a path that
-    /// names an absolute location on one machine is noise that goes stale.
+    /// Expresses a path for provenance: relative to the data root where the artifact came from
+    /// there, otherwise relative to the working root, which is what keeps a scenario config or sweep
+    /// definition citing the directory it lives in. Falls back to the bare file name for anything
+    /// under neither. The digest is the reproducibility boundary, so an absolute path here would only
+    /// record where one machine happened to keep a file.
     /// </summary>
     /// <param name="fullPath">The absolute path an artifact was read from.</param>
-    public string DescribeInputPath(string fullPath)
+    public string DescribeInputPath(string fullPath) =>
+        RelativeTo(DataRoot, fullPath)
+        ?? RelativeTo(WorkingRoot, fullPath)
+        ?? Path.GetFileName(fullPath);
+
+    /// <summary>Path relative to a root, or <see langword="null"/> when it falls outside it.</summary>
+    private static string? RelativeTo(string root, string fullPath)
     {
-        string relative = Path.GetRelativePath(DataRoot, fullPath);
+        string relative = Path.GetRelativePath(root, fullPath);
         return relative.StartsWith("..", StringComparison.Ordinal) || Path.IsPathRooted(relative)
-            ? Path.GetFileName(fullPath)
+            ? null
             : relative.Replace(Path.DirectorySeparatorChar, '/');
     }
 
