@@ -12,13 +12,13 @@ internal static class ScenarioCommand
     public static int Run(CliContext context)
     {
         string path = context.Paths.ResolveConfiguredPath(context.LoadSettings().DefaultScenarioPath);
-        return RunPublication(context, path);
+        return RunPublication(context, LoadScenario(path));
     }
 
     public static int Run(CliContext context, string scenarioConfigPath)
     {
         string path = context.Paths.ResolveConfiguredPath(scenarioConfigPath);
-        return RunPublication(context, path);
+        return RunPublication(context, LoadScenario(path));
     }
 
     public static int Run(
@@ -49,71 +49,31 @@ internal static class ScenarioCommand
         }
     }
 
-    private static int RunPublication(CliContext context, string scenarioConfigPath)
-    {
-        ScenarioSettings settings = LoadScenario(scenarioConfigPath);
-        ScenarioDispatchResult dispatch = ScenarioRunner.RunForPublication(
-            settings,
-            context.Paths.SolutionRoot);
-        StorageSizingSettings sizing = settings.StorageSizing;
-        var sizingOptions = new StorageSizingOptions(
-            Power.FromMegawatts(sizing.MaximumPowerMw),
-            Energy.FromMegawattHours(sizing.MaximumEnergyMwh),
-            sizing.TargetUsePercentage,
-            sizing.MaximumPasses);
-        DispatchPublication publication;
-        try
-        {
-            publication = DispatchResultsExport.WritePublication(
-                new DispatchPublicationRequest(
-                    dispatch,
-                    sizingOptions,
-                    sizing.ReliabilityStandardName),
-                context.Paths.DispatchResultsPath);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            throw new ScenarioRunException(
-                SweepFailureStage.Export,
-                "resultsUnwritable",
-                exception.Message,
-                exception);
-        }
-
-        context.Output.WriteLine(
-            $"Dispatched {dispatch.SizingResult.Regions[0].DispatchOutcome.Demand.Length} hourly intervals for "
-            + $"{string.Join(", ", dispatch.PowerSystem.Regions.Select(region => region.RegionId))}.");
-        context.Output.WriteLine(
-            $"Wrote scenario results to: {Path.GetFullPath(context.Paths.DispatchResultsPath)}");
-        WarnIfOutsideReliabilityTarget(context, publication);
-        return 0;
-    }
-
+    /// <summary>
+    /// Runs a scenario and publishes it. The default run writes to the repository's dispatch
+    /// results path and reports where it wrote; a sweep point supplies its own path and prefix
+    /// and stays quiet, because a fan-out would otherwise print a line per point.
+    /// </summary>
     private static int RunPublication(
         CliContext context,
         ScenarioSettings settings,
-        string resultsPath,
-        string regionFileNamePrefix)
+        string? resultsPath = null,
+        string? regionFileNamePrefix = null)
     {
-        ScenarioDispatchResult dispatch = ScenarioRunner.RunForPublication(
+        ScenarioDispatchResult dispatch = ScenarioRunner.RunDispatch(
             settings,
             context.Paths.SolutionRoot);
-        StorageSizingSettings sizing = settings.StorageSizing;
-        var sizingOptions = new StorageSizingOptions(
-            Power.FromMegawatts(sizing.MaximumPowerMw),
-            Energy.FromMegawattHours(sizing.MaximumEnergyMwh),
-            sizing.TargetUsePercentage,
-            sizing.MaximumPasses);
+        string finalResultsPath = resultsPath ?? context.Paths.DispatchResultsPath;
         DispatchPublication publication;
         try
         {
             publication = DispatchResultsExport.WritePublication(
                 new DispatchPublicationRequest(
                     dispatch,
-                    sizingOptions,
-                    sizing.ReliabilityStandardName,
+                    ScenarioConfig.CreateSizingOptions(settings.StorageSizing),
+                    settings.StorageSizing.ReliabilityStandardName,
                     regionFileNamePrefix),
-                resultsPath);
+                finalResultsPath);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
@@ -122,6 +82,15 @@ internal static class ScenarioCommand
                 "resultsUnwritable",
                 exception.Message,
                 exception);
+        }
+
+        if (resultsPath is null)
+        {
+            context.Output.WriteLine(
+                $"Dispatched {dispatch.SizingResult.Regions[0].DispatchOutcome.Demand.Length} hourly intervals for "
+                + $"{string.Join(", ", dispatch.PowerSystem.Regions.Select(region => region.RegionId))}.");
+            context.Output.WriteLine(
+                $"Wrote scenario results to: {Path.GetFullPath(finalResultsPath)}");
         }
 
         WarnIfOutsideReliabilityTarget(context, publication);
