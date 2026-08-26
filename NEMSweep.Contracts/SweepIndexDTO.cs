@@ -44,8 +44,11 @@ public sealed record SweepAxisDTO(
 /// because a heterogeneous sweep has no single scope and stating one would be false.
 /// </summary>
 /// <param name="RegionIds">Every region covered by any point in the sweep, sorted ordinally.</param>
-/// <param name="PeriodStart">Inclusive start of the dispatch period, in NEM market time (UTC+10).</param>
-/// <param name="PeriodEnd">Exclusive end of the dispatch period, in NEM market time (UTC+10).</param>
+/// <param name="PeriodStart">
+/// Inclusive start of the dispatch period. Its UTC offset is the market-time offset every point's
+/// results share (the NEM's is UTC+10).
+/// </param>
+/// <param name="PeriodEnd">Exclusive end of the dispatch period, carrying the same market-time offset as <see cref="PeriodStart"/>.</param>
 /// <param name="Resolution">Duration of one dispatch interval, shared by every point's results.</param>
 /// <param name="WeatherBasis">Weather basis every point's results were dispatched against.</param>
 public sealed record SweepScopeDTO(
@@ -283,7 +286,7 @@ public sealed record SweepPointScalarResultsDTO(
 /// repeating it. Content-addressed by the SHA-256 of this artifact's own serialised bytes.
 /// </summary>
 /// <param name="SchemaVersion">Schema version of this artifact.</param>
-/// <param name="Start">Timestamp of the first value, in NEM market time (UTC+10).</param>
+/// <param name="Start">Timestamp of the first value, carrying the run's market-time offset (the NEM's is UTC+10).</param>
 /// <param name="Resolution">Duration of one interval.</param>
 /// <param name="ValuesMw">
 /// Interval-average power for each interval, in MW, starting at <see cref="Start"/>. Integrates to

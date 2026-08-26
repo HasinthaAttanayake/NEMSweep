@@ -37,8 +37,11 @@ public sealed record DispatchResultsDTO(
 /// <param name="Id">Scenario identifier.</param>
 /// <param name="Name">Human-readable scenario name.</param>
 /// <param name="Region">The single NEM region this scenario dispatches.</param>
-/// <param name="PeriodStart">Start of the dispatched period, in NEM market time (UTC+10).</param>
-/// <param name="PeriodEnd">End of the dispatched period, in NEM market time (UTC+10).</param>
+/// <param name="PeriodStart">
+/// Start of the dispatched period. Its UTC offset is the run's market-time offset (the NEM's is
+/// UTC+10), which every series in this artifact shares.
+/// </param>
+/// <param name="PeriodEnd">End of the dispatched period, carrying the same market-time offset as <see cref="PeriodStart"/>.</param>
 /// <param name="Resolution">Interval length of every series in this artifact.</param>
 public sealed record DispatchScenarioDTO(
     string Id,

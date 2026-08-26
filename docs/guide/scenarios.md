@@ -175,7 +175,11 @@ is `routeLengthKm`, not anything derived from a region's weather file.
 
 ## Time
 
-Scenario periods run in NEM market time, UTC+10, with no daylight saving adjustment.
+A scenario period runs in market time: one fixed UTC offset with no daylight saving
+adjustment, carried on both period bounds and shared by every series in the run. The
+offset is whatever the demand artifact declares, which for AEMO operational demand is
+the NEM's UTC+10. Point the model at a single-timezone market by ingesting that market's
+demand and weather under its own offset instead.
 
 ## See also
 

@@ -369,7 +369,7 @@ public sealed class EpwParserTests
     }
 
     [Fact]
-    public void ReadValidated_ThrowsRatherThanShifting_WhenTimeZoneIsEight()
+    public void ReadValidated_ThrowsRatherThanShifting_WhenTimeZoneIsFarFromTarget()
     {
         string path = WriteFullYearFixture(timeZone: 8);
 
@@ -377,7 +377,43 @@ public sealed class EpwParserTests
         {
             var act = () => EpwParser.ReadValidated(path);
 
-            act.Should().Throw<FormatException>().WithMessage("*TimeZone must be 10*got 8*");
+            act.Should().Throw<FormatException>()
+                .WithMessage("*TimeZone 8*more than 1 hour(s) from the target market-time offset 10*");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void ReadValidated_AcceptsSource_WhenWithinASensibleShiftOfANonNemTarget()
+    {
+        string path = WriteFullYearFixture(timeZone: 8);
+
+        try
+        {
+            var act = () => EpwParser.ReadValidated(path, marketOffsetHours: 8);
+
+            act.Should().NotThrow();
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void ReadTimeSeries_StampsTracesWithTheTargetMarketOffset()
+    {
+        string path = WriteFullYearFixture(timeZone: 8);
+
+        try
+        {
+            RegionalResourceProfile weather = EpwParser.ReadTimeSeries(path, marketOffsetHours: 8);
+
+            weather.DirectNormalRadiation.Start.Offset.Should().Be(TimeSpan.FromHours(8));
+            weather.SolarZenith.Start.Offset.Should().Be(TimeSpan.FromHours(8));
         }
         finally
         {

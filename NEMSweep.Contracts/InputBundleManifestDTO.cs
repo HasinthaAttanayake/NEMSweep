@@ -30,8 +30,11 @@ public sealed record InputBundleManifestDTO(
     string[] Regions);
 
 /// <summary>Calendar period a bundle's inputs are intended to cover.</summary>
-/// <param name="Start">Inclusive start of the period.</param>
-/// <param name="End">Exclusive end of the period; must be after <see cref="Start"/>.</param>
+/// <param name="Start">
+/// Inclusive start of the period. Its UTC offset is the market-time offset the ingested demand and
+/// weather are normalised to (the NEM's is UTC+10); <see cref="End"/> must carry the same offset.
+/// </param>
+/// <param name="End">Exclusive end of the period; must be after <see cref="Start"/> and carry the same offset.</param>
 public sealed record InputBundlePeriodDTO(
     DateTimeOffset Start,
     DateTimeOffset End);

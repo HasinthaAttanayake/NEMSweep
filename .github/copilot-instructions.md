@@ -17,8 +17,11 @@
 - Implement only the currently requested validated layer; do not add speculative
   market concepts or abstractions for future roadmap items.
 - Preserve explicit electricity units in names and contracts (`Mw`, `Mwh`,
-  `AudPerMwh`). Preserve fixed NEM market time (UTC+10) unless a timestamp records
-  artifact creation, which uses UTC.
+  `AudPerMwh`). A run has one market-time offset: a single fixed UTC offset, no
+  daylight saving, taken from the scenario period bounds
+  (`Scenario.MarketTimeOffset`) and defaulting to the NEM's UTC+10. Every model
+  series and period bound in a run must share it; a timestamp that records
+  artifact creation uses UTC instead.
 - Add or update focused xUnit tests beside the affected project. Tests use
   FluentAssertions and mirror production feature folders.
 - Run the narrow affected test project first, then run

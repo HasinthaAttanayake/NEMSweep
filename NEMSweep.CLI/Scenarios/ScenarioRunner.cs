@@ -375,6 +375,16 @@ internal static class ScenarioRunner
             throw new FormatException("Scenario weather must use hourly resolution.");
         }
 
+        // The weather artifact is mapped onto the demand timeline by calendar hour, so its market
+        // time must be the demand's. A +10 artifact silently combined with +8 demand would shift
+        // the whole solar day by two hours with nothing to flag it.
+        if (weather.Start.Offset != timeline.Start.Offset)
+        {
+            throw new FormatException(
+                $"Scenario weather carries market-time offset {weather.Start.Offset}, "
+                + $"not the demand timeline's {timeline.Start.Offset}.");
+        }
+
         SolarWeatherData solar = weather.Solar;
         WindWeatherData wind = weather.Wind;
         int sourceLength = solar.GlobalHorizontalRadiationWhPerSquareMetre.Length;

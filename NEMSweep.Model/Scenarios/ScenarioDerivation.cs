@@ -110,6 +110,14 @@ public static class ScenarioDerivation
                     nameof(baseDemandByRegion));
             }
 
+            if (hourlyDemand.Start.Offset != scenario.MarketTimeOffset)
+            {
+                throw new ArgumentException(
+                    $"Demand for region '{plan.RegionId}' carries market-time offset "
+                    + $"{hourlyDemand.Start.Offset}, not the scenario's {scenario.MarketTimeOffset}.",
+                    nameof(baseDemandByRegion));
+            }
+
             resourcesByRegion.TryGetValue(plan.RegionId, out RegionalResourceProfile? resourceProfile);
             componentsByRegion.TryGetValue(
                 plan.RegionId,

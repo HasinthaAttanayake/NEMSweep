@@ -10,7 +10,10 @@ namespace NEMSweep.Contracts;
 /// </remarks>
 /// <param name="SchemaVersion">Schema version of this artifact.</param>
 /// <param name="RegionId">NEM region this weather resource applies to (for example <c>NSW1</c>).</param>
-/// <param name="Start">Timestamp of the first interval in every series, in NEM market time (UTC+10).</param>
+/// <param name="Start">
+/// Timestamp of the first interval in every series. Its UTC offset is the market-time offset the
+/// series are normalised to (the NEM's is UTC+10).
+/// </param>
 /// <param name="Resolution">Duration of one interval, shared by every series in this artifact.</param>
 /// <param name="Solar">Solar resource and traced generation for this region.</param>
 /// <param name="Wind">Wind resource and traced generation for this region.</param>

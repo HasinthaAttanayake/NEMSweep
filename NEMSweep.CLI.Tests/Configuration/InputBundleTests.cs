@@ -140,6 +140,45 @@ public sealed class InputBundleTests
         act.Should().Throw<FormatException>().WithMessage("*manifest.json*");
     }
 
+    [Fact]
+    public void Load_PeriodBoundsOnDifferentOffsets_ThrowsFormatExceptionNamingManifest()
+    {
+        using var fixture = new BundleFixture();
+        fixture.ManifestOverrides["period"] =
+            """{"start":"2026-01-01T00:00:00+10:00","end":"2026-01-01T22:00:00+08:00"}""";
+
+        var act = () => fixture.Load();
+
+        act.Should().Throw<FormatException>()
+            .WithMessage("*manifest.json*same market-time offset*");
+    }
+
+    [Fact]
+    public void Load_PeriodOffsetOutsideTheUsableRange_ThrowsFormatExceptionNamingManifest()
+    {
+        using var fixture = new BundleFixture();
+        fixture.ManifestOverrides["period"] =
+            """{"start":"2026-01-01T00:00:00+08:37","end":"2026-01-02T00:00:00+08:37"}""";
+
+        var act = () => fixture.Load();
+
+        act.Should().Throw<FormatException>()
+            .WithMessage("*manifest.json*not a usable market-time offset*");
+    }
+
+    [Fact]
+    public void Load_PeriodOnANonNemOffset_IsAccepted()
+    {
+        using var fixture = new BundleFixture();
+        fixture.AddRootWeather("NSW1", "weather.epw");
+        fixture.ManifestOverrides["period"] =
+            """{"start":"2026-01-01T00:00:00+08:00","end":"2026-01-02T00:00:00+08:00"}""";
+
+        InputBundle bundle = fixture.Load();
+
+        bundle.Manifest.Period.Start.Offset.Should().Be(TimeSpan.FromHours(8));
+    }
+
     private sealed class BundleFixture : IDisposable
     {
         public BundleFixture()
@@ -189,7 +228,9 @@ public sealed class InputBundleTests
             };
             foreach ((string key, string value) in ManifestOverrides)
             {
-                manifest[key] = value == "null" || value == "[]" ? JsonSerializer.Deserialize<JsonElement>(value) : value;
+                manifest[key] = value == "null" || value == "[]" || value.StartsWith('{')
+                    ? JsonSerializer.Deserialize<JsonElement>(value)
+                    : value;
             }
 
             File.WriteAllText(Path.Combine(RootPath, "manifest.json"), JsonSerializer.Serialize(manifest));
