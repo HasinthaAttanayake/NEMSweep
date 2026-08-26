@@ -6,6 +6,14 @@ namespace NEMSweep.CLI.Application;
 
 internal static class SchemaDescriptionCommand
 {
+    /// <summary>
+    /// Where the committed schemas are served from. `$id` is a schema's identity, so it has to be
+    /// the versioned URL the file actually lives at: a single unversioned identity would have a
+    /// later version collide with this one in every tool that caches by `$id`.
+    /// </summary>
+    private const string PublishedRoot =
+        "https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema";
+
     /// <summary>Writes a format's JSON Schema. Needs no workspace, only somewhere to write.</summary>
     /// <param name="output">Where the schema is written.</param>
     /// <param name="format">Either <c>scenario</c> or <c>sweep</c>.</param>
@@ -25,7 +33,7 @@ internal static class SchemaDescriptionCommand
     private static readonly string ScenarioSchema = $$"""
         {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
-          "$id": "https://nemsweep.com/schemas/scenario-config.schema.json",
+          "$id": "{{PublishedRoot}}/scenario-v{{ArtifactSchemaVersions.ScenarioConfig}}.json",
           "title": "NEMSweep scenario configuration",
           "type": "object",
           "additionalProperties": false,
@@ -157,7 +165,7 @@ internal static class SchemaDescriptionCommand
     private static readonly string SweepSchema = $$"""
         {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
-          "$id": "https://nemsweep.com/schemas/sweep-definition.schema.json",
+          "$id": "{{PublishedRoot}}/sweep-v{{ArtifactSchemaVersions.SweepDefinition}}.json",
           "title": "NEMSweep sweep definition",
           "type": "object",
           "additionalProperties": false,

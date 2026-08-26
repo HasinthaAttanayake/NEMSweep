@@ -18,6 +18,27 @@ internal static class JsonFile
     };
 
     /// <summary>
+    /// Reads a configuration file strictly, tolerating a <c>$schema</c> hint at the root. Strictness
+    /// is what makes an invented field fail loudly in seconds rather than being ignored, so it stays;
+    /// but <c>$schema</c> is how every editor is told which schema to validate against, and rejecting
+    /// it would mean choosing between autocomplete and a file that loads. It is removed rather than
+    /// modelled, because it describes the document rather than forming part of it, and so must not
+    /// reach provenance or a serialised copy.
+    /// </summary>
+    /// <typeparam name="T">The configuration type being read.</typeparam>
+    /// <param name="utf8Bytes">The file's bytes.</param>
+    internal static T? ReadConfig<T>(byte[] utf8Bytes)
+    {
+        JsonNode? node = JsonNode.Parse(utf8Bytes);
+        if (node is JsonObject root)
+        {
+            root.Remove("$schema");
+        }
+
+        return node is null ? default : node.Deserialize<T>(StrictReadOptions);
+    }
+
+    /// <summary>
     /// How a published artifact is written. Indentation is roughly seventy percent of the bytes in
     /// one of these (a quarter of a gigabyte across a sweep) spent on whitespace that nothing
     /// reads: the CLI writes them, the site fetches them, and no one edits them by hand. It also
