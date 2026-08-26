@@ -1,16 +1,22 @@
+using System.Text;
 using System.Text.Json.Nodes;
 
 namespace NEMSweep.CLI.Infrastructure;
 
 internal static class JsonMergePatch
 {
-    private static readonly IReadOnlyDictionary<string, string> KeyedArrayKeys =
-        new Dictionary<string, string>(StringComparer.Ordinal)
+    /// <summary>
+    /// Arrays merged by key rather than replaced wholesale. Most take a single key field; an
+    /// interconnector is only identified by both of its endpoints, so it takes two.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, string[]> KeyedArrayKeys =
+        new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
-            ["regions"] = "regionId",
-            ["regions[].generatingFleets"] = "technology",
-            ["regions[].storageFleets"] = "technology",
-            ["monthlyCapacityFactors"] = "month",
+            ["regions"] = ["regionId"],
+            ["regions[].generatingFleets"] = ["technology"],
+            ["regions[].storageFleets"] = ["technology"],
+            ["monthlyCapacityFactors"] = ["month"],
+            ["interconnectors"] = ["fromRegionId", "toRegionId"],
         };
 
     public static JsonNode Apply(JsonNode target, JsonNode patch)
@@ -41,13 +47,13 @@ internal static class JsonMergePatch
 
             string propertyPath = path.Length == 0 ? propertyName : $"{path}.{propertyName}";
             if (patchValue is JsonArray patchArray
-                && TryGetKeyProperty(propertyPath, out string keyProperty))
+                && TryGetKeyProperties(propertyPath, out string[] keyProperties))
             {
                 result[propertyName] = MergeKeyedArray(
                     result[propertyName] as JsonArray,
                     patchArray,
                     propertyPath,
-                    keyProperty);
+                    keyProperties);
                 continue;
             }
 
@@ -63,32 +69,33 @@ internal static class JsonMergePatch
         JsonArray? target,
         JsonArray patch,
         string path,
-        string keyProperty)
+        string[] keyProperties)
     {
         JsonArray result = target is null ? [] : (JsonArray)target.DeepClone();
         var targetIndexesByKey = new Dictionary<string, int>(StringComparer.Ordinal);
         for (int index = 0; index < result.Count; index++)
         {
-            JsonObject targetItem = RequireKeyedItem(result[index], path, index, keyProperty);
-            string key = KeyOf(targetItem[keyProperty]!, path, index, keyProperty);
+            JsonObject targetItem = RequireKeyedItem(result[index], path, index, keyProperties);
+            string key = KeyOf(targetItem, path, index, keyProperties);
             if (!targetIndexesByKey.TryAdd(key, index))
             {
                 throw new FormatException(
-                    $"JSON keyed array '{path}' contains duplicate key '{key}' in target item {index}.");
+                    $"JSON keyed array '{path}' contains duplicate key {key} in target item {index}.");
             }
         }
 
         for (int index = 0; index < patch.Count; index++)
         {
-            JsonObject patchItem = RequireKeyedItem(patch[index], path, index, keyProperty);
-            string key = KeyOf(patchItem[keyProperty]!, path, index, keyProperty);
+            JsonObject patchItem = RequireKeyedItem(patch[index], path, index, keyProperties);
+            string key = KeyOf(patchItem, path, index, keyProperties);
             bool remove = ReadRemoveFlag(patchItem, path, index);
             if (remove)
             {
-                if (patchItem.Count != 2)
+                if (patchItem.Count != keyProperties.Length + 1)
                 {
                     throw new FormatException(
-                        $"JSON keyed array '{path}' remove item {index} must contain only '{keyProperty}' and '$remove'.");
+                        $"JSON keyed array '{path}' remove item {index} must contain only "
+                        + $"{DescribeKeys(keyProperties)} and '$remove'.");
                 }
 
                 if (targetIndexesByKey.TryGetValue(key, out int targetIndex))
@@ -125,32 +132,48 @@ internal static class JsonMergePatch
         JsonNode? item,
         string path,
         int index,
-        string keyProperty)
+        string[] keyProperties)
     {
         if (item is not JsonObject itemObject)
         {
             throw new FormatException(
-                $"JSON keyed array '{path}' item {index} must be an object containing '{keyProperty}'.");
+                $"JSON keyed array '{path}' item {index} must be an object containing "
+                + $"{DescribeKeys(keyProperties)}.");
         }
 
-        if (!itemObject.ContainsKey(keyProperty) || itemObject[keyProperty] is null)
+        foreach (string keyProperty in keyProperties)
         {
-            throw new FormatException(
-                $"JSON keyed array '{path}' item {index} must contain a non-null '{keyProperty}'.");
+            if (!itemObject.ContainsKey(keyProperty) || itemObject[keyProperty] is null)
+            {
+                throw new FormatException(
+                    $"JSON keyed array '{path}' item {index} must contain a non-null '{keyProperty}'.");
+            }
         }
 
         return itemObject;
     }
 
-    private static string KeyOf(JsonNode key, string path, int index, string keyProperty)
+    /// <summary>
+    /// A stable, collision-free identity for a keyed item. Each field is rendered as its JSON token
+    /// and length-prefixed, so no two distinct field tuples can produce the same string.
+    /// </summary>
+    private static string KeyOf(JsonObject item, string path, int index, string[] keyProperties)
     {
-        if (key is JsonObject or JsonArray)
+        var key = new StringBuilder();
+        foreach (string keyProperty in keyProperties)
         {
-            throw new FormatException(
-                $"JSON keyed array '{path}' item {index} field '{keyProperty}' must be a scalar value.");
+            JsonNode field = item[keyProperty]!;
+            if (field is JsonObject or JsonArray)
+            {
+                throw new FormatException(
+                    $"JSON keyed array '{path}' item {index} field '{keyProperty}' must be a scalar value.");
+            }
+
+            string token = field.ToJsonString();
+            key.Append(token.Length).Append(':').Append(token);
         }
 
-        return key.ToJsonString();
+        return key.ToString();
     }
 
     private static bool ReadRemoveFlag(JsonObject item, string path, int index)
@@ -175,22 +198,25 @@ internal static class JsonMergePatch
         return remove;
     }
 
-    private static bool TryGetKeyProperty(string path, out string keyProperty)
+    private static string DescribeKeys(string[] keyProperties) =>
+        string.Join(", ", keyProperties.Select(key => $"'{key}'"));
+
+    private static bool TryGetKeyProperties(string path, out string[] keyProperties)
     {
-        if (KeyedArrayKeys.TryGetValue(path, out string? exactKeyProperty)
-            && exactKeyProperty is not null)
+        if (KeyedArrayKeys.TryGetValue(path, out string[]? exactKeyProperties)
+            && exactKeyProperties is not null)
         {
-            keyProperty = exactKeyProperty;
+            keyProperties = exactKeyProperties;
             return true;
         }
 
         if (path.EndsWith(".monthlyCapacityFactors", StringComparison.Ordinal))
         {
-            keyProperty = "month";
+            keyProperties = ["month"];
             return true;
         }
 
-        keyProperty = string.Empty;
+        keyProperties = [];
         return false;
     }
 }

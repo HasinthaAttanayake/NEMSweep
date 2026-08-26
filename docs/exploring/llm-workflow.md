@@ -69,12 +69,14 @@ Give it verbatim:
 >
 > 1. `null` as a value deletes that property, as RFC 7386 specifies.
 > 2. Any array not named below is replaced wholesale, as RFC 7386 specifies.
-> 3. Four arrays are merged **by key** rather than replaced wholesale: `regions` keyed by
+> 3. Five arrays are merged **by key** rather than replaced wholesale: `regions` keyed by
 >    `regionId`; `regions[].generatingFleets` and `regions[].storageFleets` keyed by `technology`;
->    `monthlyCapacityFactors` keyed by `month`. So a point can change one fleet in one region
->    without restating the whole scenario.
+>    `monthlyCapacityFactors` keyed by `month`; `interconnectors` keyed by `fromRegionId` and
+>    `toRegionId` together, so a directed link is matched only by an item naming both of its
+>    endpoints. So a point can change one fleet in one region, or one interconnector, without
+>    restating the whole scenario.
 > 4. `{"<key>": "...", "$remove": true}` deletes a keyed array element. The object must contain
->    exactly those two properties.
+>    exactly the key field or fields and `$remove`, nothing else.
 
 One thing that is not a merge-patch rule but that a model needs told anyway: `axisValue` is a
 display value for the x-axis only. Nothing in the model reads it. The actual parameter change lives
@@ -106,7 +108,7 @@ Baseline scenario I am patching:
 <paste scenarios/nem-fy2026-all-regions.json>
 
 MERGE-PATCH RULES
-<paste the four numbered rules above, verbatim, plus the axisValue note>
+<paste the numbered rules above, verbatim, plus the axisValue note>
 
 TASK
 Produce a sweep definition that varies <ONE THING> from <LOW> to <HIGH> across

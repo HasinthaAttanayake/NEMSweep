@@ -191,7 +191,7 @@ public sealed class CommandRouterTests
 
     [Theory]
     [InlineData("scenario", "regionId", "demandFile", "weatherFile", "dataCentreNameplateMw", "fromRegionId", "toRegionId", "capacityMw")]
-    [InlineData("sweep", "overrides", "regions", "regionId", "$remove")]
+    [InlineData("sweep", "overrides", "regions", "regionId", "interconnectors", "fromRegionId", "toRegionId", "$remove")]
     public void DescribeSchema_WritesDeterministicStrictSchema(
         string format,
         params string[] expectedProperties)
@@ -214,6 +214,32 @@ public sealed class CommandRouterTests
             firstOutput.ToString().Should().Contain($"\"{property}\"");
         }
         firstError.ToString().Should().BeEmpty();
+    }
+
+    // A keyed-array element is found by its key, and JsonMergePatch rejects a null key outright, so
+    // the published schema must not validate an override point the merge can never apply.
+    [Theory]
+    [InlineData("regionOverride", "regionId")]
+    [InlineData("interconnectorOverride", "fromRegionId")]
+    [InlineData("interconnectorOverride", "toRegionId")]
+    [InlineData("generatingFleetOverride", "technology")]
+    [InlineData("storageFleetOverride", "technology")]
+    [InlineData("monthlyCapacityFactorOverride", "month")]
+    public void DescribeSchema_SweepKeyedArrayKeyFieldsAreNotNullable(string definition, string keyField)
+    {
+        using var fixture = new CliFixture();
+        using var output = new StringWriter();
+        var application = new CommandRouter(fixture.RootPath, fixture.RootPath, output, TextWriter.Null);
+
+        application.Run(["--describe-schema", "sweep"]).Should().Be(0);
+
+        using JsonDocument document = JsonDocument.Parse(output.ToString());
+        JsonElement type = document.RootElement
+            .GetProperty("$defs").GetProperty(definition)
+            .GetProperty("properties").GetProperty(keyField)
+            .GetProperty("type");
+        type.ValueKind.Should().Be(JsonValueKind.String);
+        type.GetString().Should().Be("string");
     }
 
     [Fact]

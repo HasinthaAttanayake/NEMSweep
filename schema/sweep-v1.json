@@ -46,10 +46,7 @@
           ]
         },
         "technology": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": "string"
         },
         "technologyProfile": {
           "$ref": "#/$defs/generationProfileOverride"
@@ -114,6 +111,55 @@
         "null"
       ]
     },
+    "interconnectorOverride": {
+      "additionalProperties": false,
+      "properties": {
+        "$remove": {
+          "const": true
+        },
+        "capacityMw": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "capitalCostAudPerKmPerMw": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "fixedOperatingCostAudPerKmPerMwYear": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "fromRegionId": {
+          "type": "string"
+        },
+        "routeLengthKm": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "technicalLifeYears": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "toRegionId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "fromRegionId",
+        "toRegionId"
+      ],
+      "type": "object"
+    },
     "monthlyCapacityFactorOverride": {
       "additionalProperties": false,
       "properties": {
@@ -128,10 +174,7 @@
         },
         "month": {
           "format": "date",
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": "string"
         }
       },
       "required": [
@@ -167,10 +210,7 @@
           ]
         },
         "regionId": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": "string"
         },
         "storageFleets": {
           "items": {
@@ -202,6 +242,15 @@
         "id": {
           "type": [
             "string",
+            "null"
+          ]
+        },
+        "interconnectors": {
+          "items": {
+            "$ref": "#/$defs/interconnectorOverride"
+          },
+          "type": [
+            "array",
             "null"
           ]
         },
@@ -287,10 +336,7 @@
           ]
         },
         "technology": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": "string"
         },
         "technologyProfile": {
           "$ref": "#/$defs/storageProfileOverride"

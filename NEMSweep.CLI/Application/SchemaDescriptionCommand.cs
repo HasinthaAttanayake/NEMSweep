@@ -204,6 +204,7 @@ internal static class SchemaDescriptionCommand
                 "costBasis": { "$ref": "#/$defs/costBasisOverride" },
                 "regions": { "type": ["array", "null"], "items": { "$ref": "#/$defs/regionOverride" } },
                 "storageSizing": { "$ref": "#/$defs/storageSizingOverride" },
+                "interconnectors": { "type": ["array", "null"], "items": { "$ref": "#/$defs/interconnectorOverride" } },
                 "provenance": { "type": ["object", "null"] }
               }
             },
@@ -222,17 +223,27 @@ internal static class SchemaDescriptionCommand
             "regionOverride": {
               "type": "object", "additionalProperties": false, "required": ["regionId"],
               "properties": {
-                "regionId": { "type": ["string", "null"] },
+                "regionId": { "type": "string" },
                 "generatingFleets": { "type": ["array", "null"], "items": { "$ref": "#/$defs/generatingFleetOverride" } },
                 "storageFleets": { "type": ["array", "null"], "items": { "$ref": "#/$defs/storageFleetOverride" } },
                 "demandFile": { "type": ["string", "null"] }, "weatherFile": { "type": ["string", "null"] },
                 "dataCentreNameplateMw": { "type": ["number", "null"] }, "$remove": { "const": true }
               }
             },
+            "interconnectorOverride": {
+              "type": "object", "additionalProperties": false, "required": ["fromRegionId", "toRegionId"],
+              "properties": {
+                "fromRegionId": { "type": "string" }, "toRegionId": { "type": "string" },
+                "capacityMw": { "type": ["number", "null"] }, "routeLengthKm": { "type": ["number", "null"] },
+                "capitalCostAudPerKmPerMw": { "type": ["number", "null"] },
+                "fixedOperatingCostAudPerKmPerMwYear": { "type": ["number", "null"] },
+                "technicalLifeYears": { "type": ["integer", "null"] }, "$remove": { "const": true }
+              }
+            },
             "generatingFleetOverride": {
               "type": "object", "additionalProperties": false, "required": ["technology"],
               "properties": {
-                "technology": { "type": ["string", "null"] }, "nameplateCapacityMw": { "type": ["number", "null"] },
+                "technology": { "type": "string" }, "nameplateCapacityMw": { "type": ["number", "null"] },
                 "costParameters": { "$ref": "#/$defs/generationCostsOverride" }, "technologyProfile": { "$ref": "#/$defs/generationProfileOverride" },
                 "monthlyCapacityFactors": { "type": ["array", "null"], "items": { "$ref": "#/$defs/monthlyCapacityFactorOverride" } }, "$remove": { "const": true }
               }
@@ -240,7 +251,7 @@ internal static class SchemaDescriptionCommand
             "storageFleetOverride": {
               "type": "object", "additionalProperties": false, "required": ["technology"],
               "properties": {
-                "technology": { "type": ["string", "null"] }, "initialEnergyCapacityMwh": { "type": ["number", "null"] },
+                "technology": { "type": "string" }, "initialEnergyCapacityMwh": { "type": ["number", "null"] },
                 "initialPowerCapacityMw": { "type": ["number", "null"] }, "costParameters": { "$ref": "#/$defs/storageCostsOverride" },
                 "technologyProfile": { "$ref": "#/$defs/storageProfileOverride" }, "$remove": { "const": true }
               }
@@ -269,7 +280,7 @@ internal static class SchemaDescriptionCommand
             },
             "monthlyCapacityFactorOverride": {
               "type": "object", "additionalProperties": false, "required": ["month"],
-              "properties": { "month": { "type": ["string", "null"], "format": "date" }, "capacityFactor": { "type": ["number", "null"] }, "$remove": { "const": true } }
+              "properties": { "month": { "type": "string", "format": "date" }, "capacityFactor": { "type": ["number", "null"] }, "$remove": { "const": true } }
             }
           }
         }

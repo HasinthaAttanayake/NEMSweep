@@ -49,7 +49,7 @@ a mismatch for you.
 ## JSON merge-patch semantics
 
 Each point's `overrides` is applied to the baseline scenario config as an RFC 7386 JSON merge patch,
-with two deliberate extensions, both about arrays: four named arrays merge by key rather than being
+with two deliberate extensions, both about arrays: five named arrays merge by key rather than being
 replaced, and a reserved `$remove` shape deletes a keyed element. This is currently documented
 nowhere else, so it is worth being precise about.
 
@@ -77,7 +77,7 @@ entirely, rather than setting it to null. Objects are merged key by key, recursi
 value is an array and it is not one of the keyed arrays below, the whole array in the patch replaces
 the whole array in the target.
 
-**Four arrays are the exception** and are merged by key rather than replaced outright, so a point
+**Five arrays are the exception** and are merged by key rather than replaced outright, so a point
 can change one element without restating the rest of the array:
 
 | Array | Key field |
@@ -86,10 +86,13 @@ can change one element without restating the rest of the array:
 | `regions[].generatingFleets` | `technology` |
 | `regions[].storageFleets` | `technology` |
 | `monthlyCapacityFactors` | `month` |
+| `interconnectors` | `fromRegionId` and `toRegionId` together |
 
 For each of these, a patch item whose key matches an existing target item is merged into that item
 (recursively, by the same rules); a patch item whose key does not match any existing item is
-appended as a new item.
+appended as a new item. An interconnector is identified by both of its endpoints, so a patch item
+matches only the link running in that exact direction: patching `NSW1` to `QLD1` leaves the
+`QLD1` to `NSW1` entry alone.
 
 ```json
 // baseline region
@@ -103,8 +106,8 @@ This is exactly the shape used by the worked example below, and by `sweeps/datac
 in this repository: each point overrides `dataCentreNameplateMw` on a handful of regions without
 needing to repeat every region's generating and storage fleets.
 
-**Deleting a keyed array element** uses a reserved shape: an object containing *only* the key field
-and `"$remove": true`.
+**Deleting a keyed array element** uses a reserved shape: an object containing *only* the key
+field, or fields, and `"$remove": true`.
 
 ```json
 // remove the Wind fleet from NSW1 without touching any other fleet
@@ -120,7 +123,16 @@ and `"$remove": true`.
 }
 ```
 
-An object with `$remove: true` plus any other property, other than the key field, is rejected. The
+```json
+// drop the NSW1-to-SA1 interconnector, leaving every other link in place
+{
+  "interconnectors": [
+    { "fromRegionId": "NSW1", "toRegionId": "SA1", "$remove": true }
+  ]
+}
+```
+
+An object with `$remove: true` plus any other property, other than a key field, is rejected. The
 merge cannot tell whether you meant to remove the item or edit it.
 
 ## Workflow: fan out, then run
