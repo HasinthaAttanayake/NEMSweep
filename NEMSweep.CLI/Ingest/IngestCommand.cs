@@ -11,8 +11,10 @@ internal static class IngestCommand
     public static int Run(CliContext context, string? bundlePath = null)
     {
         ValidatedInputs validated = ValidateInputsCommand.Validate(context, bundlePath);
-        CliSettings settings = context.LoadSettings();
-        string outputDirectory = context.Paths.ResolveConfiguredPath(settings.OutputRoot);
+
+        // Ingest produces the artifacts scenarios read, so it writes to the data root rather than
+        // the output root. Results are the only thing that belongs under the output root.
+        string outputDirectory = context.Paths.DataRoot;
         Directory.CreateDirectory(outputDirectory);
 
         foreach (OperationalDemandData demand in validated.DemandByRegion.Values)

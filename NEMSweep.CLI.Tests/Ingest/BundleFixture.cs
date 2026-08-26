@@ -51,17 +51,18 @@ internal sealed class BundleFixture : IDisposable
         File.WriteAllText(Path.Combine(RootPath, "appsettings.local.json"), JsonSerializer.Serialize(new
         {
             inputBundleRoot = "bundle",
+            dataRoot = "output",
             outputRoot = "output",
             defaultScenarioPath = "unused.json",
         }));
         File.WriteAllText(Path.Combine(RootPath, "NEMSweep.slnx"), string.Empty);
-        Paths = RepositoryPaths.Discover(RootPath);
+        Paths = WorkspacePaths.FromRoots(RootPath, OutputRoot, OutputRoot);
     }
 
     public string RootPath { get; }
     public string BundlePath { get; }
     public string OutputRoot { get; }
-    private RepositoryPaths Paths { get; }
+    private WorkspacePaths Paths { get; }
 
     public void ReplaceDemandRows(string region, int rowDays)
     {
@@ -84,7 +85,7 @@ internal sealed class BundleFixture : IDisposable
     {
         using var output = new StringWriter();
         using var error = new StringWriter();
-        int exitCode = new CommandRouter(Paths, RootPath, output, error).Run(args);
+        int exitCode = new CommandRouter(RootPath, RootPath, output, error).Run(args);
         return (exitCode, output.ToString(), error.ToString());
     }
 

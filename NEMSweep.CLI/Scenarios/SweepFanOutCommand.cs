@@ -46,8 +46,16 @@ internal static class SweepFanOutCommand
         return (definition, baseline);
     }
 
+    /// <summary>
+    /// Where fan-out materialises point configs. This is a working area beside the sweep definition,
+    /// deliberately not the published sweep directory: a run copies each config from here to there,
+    /// and one directory serving both would have it copy a file onto itself.
+    /// </summary>
+    /// <param name="context">The invocation's workspace.</param>
+    /// <param name="definition">The sweep being fanned out.</param>
     internal static string ConfigOutputDirectory(CliContext context, SweepDefinition definition) =>
-        Path.Combine(context.Paths.SolutionRoot, "sweeps", definition.SweepId, "configs");
+        context.Paths.ResolveConfiguredPath(
+            Path.Combine("sweeps", definition.SweepId, "configs"));
 
     /// <summary>
     /// Applies one point's overrides to the sweep baseline and writes the resulting scenario config.

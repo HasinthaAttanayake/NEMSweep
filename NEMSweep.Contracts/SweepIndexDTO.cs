@@ -60,10 +60,12 @@ public sealed record SweepScopeDTO(
 /// same commit run against the same inputs reproduces identical artifacts; either changing makes no
 /// such guarantee.
 /// </summary>
-/// <param name="GitCommitSha">Git commit the model was built from when the sweep was run.</param>
+/// <param name="GitCommitSha">Git commit the model was built at, stamped into the binary by its build.</param>
 /// <param name="WorkingTreeDirty">
-/// True when the working tree had uncommitted changes at run time, so <see cref="GitCommitSha"/>
-/// alone does not fully pin the code that produced this sweep.
+/// True when the run was made from a checkout standing on <see cref="GitCommitSha"/> that had
+/// uncommitted changes, so the commit alone does not fully pin the code that produced this sweep.
+/// False when the run was made from a binary built elsewhere, where the source tree is not present
+/// to inspect.
 /// </param>
 /// <param name="ResolvedDefinitionSha256">
 /// SHA-256, in lowercase hex, of the sweep definition after resolution (with defaults applied and

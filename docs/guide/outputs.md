@@ -1,7 +1,9 @@
 # Outputs and provenance
 
-This page is for reading the JSON NEMSweep produces, or consuming it programmatically. Every
-artifact described here lives under `NEMSweep.Web/wwwroot/data` and is written by `NEMSweep.CLI`.
+This page is for reading the JSON NEMSweep produces, or consuming it programmatically. Everything
+here is written by `NEMSweep.CLI`, under the **output root** for results and sweeps and under the
+**data root** for the imported inputs a scenario reads. Both are yours to choose; see the
+[CLI reference](cli.md#the-workspace).
 
 ## Artifact map
 
@@ -82,10 +84,23 @@ parsed (`DispatchInputArtifactDTO` in `NEMSweep.Contracts/DispatchResultsDTO.cs`
 configured file path, is the reproducibility boundary: a path can be overwritten with different
 content later, but the digest identifies the bytes that actually produced this result.
 
-A sweep's `index.json` additionally records the git commit SHA the model was built from when the
-sweep ran, and a flag for whether the working tree had uncommitted changes at that time. A sweep
-result therefore states not just which input bytes it read but which version of the model produced
-it.
+A whole-system result also records the model build behind it, in a `provenance` block carrying the
+git commit SHA and a flag for whether the working tree had uncommitted changes. A sweep `index.json`
+records the same for the sweep as a whole. Digests pin the bytes a run consumed, but publishing a
+result is a manual step, so without the commit a file copied somewhere else could not say which
+version of the model read them.
+
+The commit is the one the binary was built at, stamped in by its build, not whatever commit the
+directory you ran from happens to be standing on. That distinction matters once the CLI is installed
+or run as a container, where the two are unrelated. The dirty flag is only ever true when the run
+was made from a checkout standing on that same commit, because that is the only case where the
+source the binary was built from is in front of the tool to inspect. The block is absent when the
+binary was built outside a checkout and so carries no commit to report.
+
+Provenance paths in a sweep index are recorded relative to the data root, or to the working
+directory for the sweep definition and baseline config, which is what keeps them citing
+`sweeps/…` and `scenarios/…` rather than a location on one machine. The digest remains the
+reproducibility boundary; the path is there to say where the run was configured from.
 
 ## Writing conventions
 
@@ -132,7 +147,10 @@ updated `sweeps/{sweepId}/` directory. Rerunning the sweep restores it.
 
 ## These files are generated
 
-Everything under `NEMSweep.Web/wwwroot/data` is a committed, generated artifact. Do not hand-edit it.
-Regenerate it by rerunning the command that produced it (`--ingest` for the input artifacts,
-`--run-scenario` or `--run-sweep` for results), so the file on disk stays traceable to the inputs
-and commit that produced it.
+Every file described here is generated. Do not hand-edit one. Regenerate it by rerunning the
+command that produced it (`--ingest` for the input artifacts, `--run-scenario` or `--run-sweep` for
+results), so what is on disk stays traceable to the inputs and commit behind it.
+
+The set committed under `NEMSweep.Web/wwwroot/data` is what the results site displays. Publishing to
+it is a deliberate act: point `--output` there when you intend to update the site, and let ordinary
+runs land in your own directory the rest of the time.

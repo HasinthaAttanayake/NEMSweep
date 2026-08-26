@@ -42,18 +42,24 @@ cp NEMSweep.CLI/appsettings.example.json NEMSweep.CLI/appsettings.local.json
 Because the local file is gitignored, editing it never produces a diff for anyone else, and
 because the example is the fallback, the CLI works out of the box even if you skip this step.
 
-The three settings, from `NEMSweep.CLI/Configuration/CliSettings.cs`:
+The four settings, from `NEMSweep.CLI/Configuration/CliSettings.cs`:
 
 | Setting | Meaning |
 |---|---|
 | `inputBundleRoot` | Where `--validate-inputs` and `--ingest` look for an input bundle by default. |
-| `outputRoot` | Where `--ingest` writes its artifacts, and the first place a scenario run looks for the demand and weather files a scenario references. Normally `NEMSweep.Web/wwwroot/data`, the directory the web site reads from. It does **not** control where scenario results are published. |
+| `dataRoot` | Where a scenario's demand and weather artifacts are read from, and where `--ingest` writes them. |
+| `outputRoot` | Where results and sweep artifacts are written. |
 | `defaultScenarioPath` | The scenario configuration `--run-scenario` uses when you do not pass one explicitly. |
 
-All three are plain strings resolved relative to the solution root at run time, so you can point
-`inputBundleRoot` or `outputRoot` at a directory outside the repository without NEMSweep caring where
-your shell happens to be. The [CLI reference](cli.md) covers how command-line paths are resolved
-the same way.
+All four are plain strings resolved relative to your current working directory at run time, so any
+of them can point outside the repository. `dataRoot` and `outputRoot` can also be overridden per run
+with `--data-root` and `--output`, or with `NEMSWEEP_DATA_ROOT` and `NEMSWEEP_OUTPUT`; the
+[CLI reference](cli.md) covers the precedence.
+
+The committed example ships `dataRoot` pointing at `NEMSweep.Web/wwwroot/data`, because that is
+where this repository currently keeps its artifacts, and `outputRoot` pointing at a gitignored
+`out/`. A fresh clone therefore runs without configuration, and your results land somewhere that
+does not disturb the committed ones.
 
 ## First run
 
@@ -63,16 +69,23 @@ dotnet run --project NEMSweep.CLI -- --run-scenario
 
 With no argument, this loads the scenario at `defaultScenarioPath`. That is the committed
 `scenarios/nem-fy2026-all-regions.json`, which dispatches all five NEM regions together over
-directed interconnectors. It reads the committed demand and weather artifacts for each region
-(`demand-{region}.json` and `weather-{region}.json`, looked for under `outputRoot` first and then
-under the solution root) and dispatches every hour of the modelled year, sizing storage against the
-scenario's reliability standard as it goes.
+directed interconnectors. It reads `demand-{region}.json` and `weather-{region}.json` for each
+region from the data root, and dispatches every hour of the modelled year, sizing storage against
+the scenario's reliability standard as it goes.
 
 It writes `results.json`, `results-overview.json`, and a `results-{region}.json` and
-`results-{region}-overview.json` pair for each region. Results always go to
-`NEMSweep.Web/wwwroot/data`, which is a fixed path rather than the configured `outputRoot`; changing
-`outputRoot` moves where inputs are read from, not where results land. Publication is atomic, so a
-failed run never leaves a half-written artifact in place.
+`results-{region}-overview.json` pair for each region, all under the output root, which is `out/`
+unless you say otherwise. Publication is atomic, so a failed run never leaves a half-written
+artifact in place.
+
+To send a run somewhere else, name it:
+
+```bash
+dotnet run --project NEMSweep.CLI -- --run-scenario --output ./my-study
+```
+
+That is also how the results the site displays are refreshed: point `--output` at the web project
+when you intend to update what it shows, and nowhere near it the rest of the time.
 
 A single scenario run dispatches a modelled year in one pass per storage-sizing iteration, so it
 finishes quickly enough to iterate on locally rather than being something you queue and walk away
@@ -88,9 +101,9 @@ reading closely.
 dotnet run --project NEMSweep.Web
 ```
 
-`NEMSweep.Web` is a Blazor WebAssembly site that reads the JSON artifacts under
-`NEMSweep.Web/wwwroot/data`, the same files `--run-scenario` writes and `--ingest` writes to by default.
-Open the URL it prints to browse the results you just generated.
+`NEMSweep.Web` is a Blazor WebAssembly site that reads the JSON artifacts committed under
+`NEMSweep.Web/wwwroot/data`. A default run writes to `out/` and so does not change what the site
+shows; rerun with `--output NEMSweep.Web/wwwroot/data` when you mean to publish a result to it.
 
 ## Validation runs worth knowing about
 

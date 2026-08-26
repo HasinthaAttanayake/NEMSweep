@@ -297,6 +297,10 @@ NEMSweep.CLI/appsettings.local.json
 data/
 !NEMSweep.Web/wwwroot/data/
 
+# Default output root for local runs. Results are published by pointing --output at wherever
+# they belong; nothing here is meant to be committed.
+out/
+
 # Generated files
 dist/
 

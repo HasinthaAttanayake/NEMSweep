@@ -23,9 +23,9 @@ That is why a sweep is meaningful. When you vary one input across twenty points 
 requirement moves, the input moved it. There is no run-to-run noise for the effect to hide in, and
 nothing to average.
 
-It also means a result is checkable. A sweep records the git commit SHA, whether the working tree
-was dirty when it ran, and the SHA-256 of every input file it consumed. Anyone with the repository
-can reproduce your numbers exactly, or show that they cannot.
+It also means a result is checkable. A sweep records the commit the model was built at, whether the
+working tree was dirty when it ran, and the SHA-256 of every input file it consumed. Anyone with the
+repository can reproduce your numbers exactly, or show that they cannot.
 
 The corollary is that the model reports a **realisation**, not an expectation. It has no
 distribution to sample and gives no confidence intervals. See

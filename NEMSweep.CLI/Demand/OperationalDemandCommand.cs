@@ -17,8 +17,8 @@ internal static class OperationalDemandCommand
             inputBundle.Manifest.Period.Start,
             inputBundle.Manifest.Period.End);
         string outputDirectory = string.IsNullOrWhiteSpace(outputDirectoryPath)
-            ? context.Paths.ResolveConfiguredPath(settings.OutputRoot)
-            : Path.GetFullPath(outputDirectoryPath);
+            ? context.Paths.DataRoot
+            : context.Paths.ResolveConfiguredPath(outputDirectoryPath);
         Directory.CreateDirectory(outputDirectory);
 
         foreach (OperationalDemandData demandData in demandByRegion.Values)

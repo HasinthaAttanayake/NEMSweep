@@ -50,6 +50,43 @@ public sealed class SystemAndRegionDispatchResultsContractTests
         json.Should().Contain("\"shortfallEnergyGwh\"");
         json.Should().Contain("\"bindingIntervalIndices\"");
         json.Should().Contain("\"peakUnservedIntervalIndex\"");
+        json.Should().Contain("\"gitCommitSha\"");
+        json.Should().Contain("\"workingTreeDirty\":false");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void SystemDispatchResults_RoundTripsTheModelBuildThatProducedIt(bool workingTreeDirty)
+    {
+        DateTimeOffset start = new(2026, 7, 1, 0, 0, 0, TimeSpan.FromHours(10));
+        SystemDispatchResultsDTO result = CreateSystemResult(start) with
+        {
+            Provenance = new DispatchModelProvenanceDTO(new string('c', 40), workingTreeDirty),
+        };
+
+        string json = JsonSerializer.Serialize(result, CamelCaseOptions);
+        SystemDispatchResultsDTO? roundTripped = JsonSerializer.Deserialize<SystemDispatchResultsDTO>(
+            json,
+            CaseInsensitiveOptions);
+
+        roundTripped!.Provenance.Should().BeEquivalentTo(result.Provenance);
+        json.Should().Contain($"\"gitCommitSha\":\"{new string('c', 40)}\"");
+        json.Should().Contain(
+            $"\"workingTreeDirty\":{workingTreeDirty.ToString().ToLowerInvariant()}");
+    }
+
+    [Fact]
+    public void SystemDispatchResults_OmitsTheModelBuildWhenTheBinaryCarriesNoCommit()
+    {
+        DateTimeOffset start = new(2026, 7, 1, 0, 0, 0, TimeSpan.FromHours(10));
+        SystemDispatchResultsDTO result = CreateSystemResult(start) with { Provenance = null };
+
+        string json = JsonSerializer.Serialize(result, CamelCaseOptions);
+
+        json.Should().Contain("\"provenance\":null");
+        JsonSerializer.Deserialize<SystemDispatchResultsDTO>(json, CaseInsensitiveOptions)!
+            .Provenance.Should().BeNull();
     }
 
     [Fact]
@@ -176,7 +213,9 @@ public sealed class SystemAndRegionDispatchResultsContractTests
                 -33.9,
                 151.2,
                 -37.8,
-                144.9)]);
+                144.9)],
+            CostBasis: null,
+            Provenance: new DispatchModelProvenanceDTO(new string('c', 40), false));
     }
 
     private static RegionDispatchResultsDTO CreateRegionResult(DateTimeOffset start, string regionId) =>
