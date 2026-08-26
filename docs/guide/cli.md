@@ -172,6 +172,25 @@ Prints a JSON Schema (draft 2020-12) for the requested format to standard output
 machine-readable contract for a scenario config or a sweep definition. Hand it to a validation
 tool, or to an LLM you want to generate scenarios or sweeps for you.
 
+### `--new-scenario`
+
+```bash
+dotnet run --project NEMSweep.CLI -- --new-scenario > scenarios/mine.json
+```
+
+| Argument | Optional | Default |
+|---|---|---|
+| none | n/a | n/a |
+
+Prints the smallest scenario configuration that will actually run: one region, one generating fleet,
+one storage fleet. Written to standard output rather than to a file, so it composes with a redirect
+and never overwrites anything by surprise. Like `--describe-schema` it needs no workspace, so it
+works before you have written a settings file.
+
+The published `scenarios/nem-fy2026-all-regions.json` stays the worked example of a real system.
+`scenarios/starter-nsw1.json` sits between the two: the same NSW1 assets on their own, short enough
+to read in one go.
+
 ## Input bundles
 
 An input bundle is a folder of source data (demand archives, EPW weather files and a generation

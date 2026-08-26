@@ -4,13 +4,15 @@
   href: cli.md
 - name: Running the container
   href: container.md
-- name: Input bundles
-  href: input-bundles.md
-- name: Scenario configuration
-  href: scenarios.md
 - name: Sweeps
   href: sweeps.md
+- name: Scenario configuration
+  href: scenarios.md
+- name: Input bundles
+  href: input-bundles.md
 - name: Outputs and provenance
   href: outputs.md
 - name: CSV tables
   href: csv-tables.md
+- name: Glossary
+  href: glossary.md

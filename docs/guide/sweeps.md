@@ -165,6 +165,34 @@ The sweep as a whole is not published atomically. Point results, status files, t
 the manifest are written as the run proceeds, so an interrupted sweep can leave a partially updated
 `sweeps/<sweepId>/` directory. Rerun the sweep to bring it back into a consistent state.
 
+## How long it takes
+
+Runtime is the cost of one dispatch pass multiplied by the number of passes the storage sizing search
+takes. The scenario sets the first: a pass walks every interval of every region, so more regions,
+more fleets or a finer resolution make each pass dearer. The search sets the second, and it is the
+one that varies wildly, from a single pass to dozens between neighbouring points on the same axis.
+Within one sweep the scenario is fixed and the search is what you are watching.
+
+Measured on ordinary hardware, for the published 25-point data-centre sweep over all five regions
+at hourly resolution. A scenario of a different size will not match these:
+
+| | Time |
+|---|---|
+| A point needing no storage (`notRequired`) | about 2 seconds |
+| A typical point that resizes | 15 to 20 seconds |
+| The hardest point in the sweep | about 60 seconds |
+| The whole 25-point sweep | about 8 minutes |
+
+So a single scenario is something you iterate on, and a sweep is something you start and come back
+to. A slow point is usually sitting on a transition where the search has to work rather than
+misbehaving. If you are still shaping a definition, `--fan-out-sweep` validates every point in
+seconds without dispatching any of them, which is the loop to stay in until the definition is
+right.
+
+A point that takes much longer than its neighbours is usually telling you something: the sizing
+search is working hard near a transition, and that is often the interesting part of the axis rather
+than a problem.
+
 ## A complete minimal worked example
 
 A two-point sweep varying storage capital cost, run against the committed FY2026 example scenario.
