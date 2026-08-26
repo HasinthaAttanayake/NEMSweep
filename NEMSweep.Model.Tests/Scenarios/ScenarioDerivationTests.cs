@@ -115,6 +115,86 @@ public sealed class ScenarioDerivationTests
     }
 
     [Fact]
+    public void Derive_RealisesTheSystem_AtANonNemMarketOffset()
+    {
+        var start = new DateTimeOffset(2025, 7, 1, 0, 0, 0, TimeSpan.FromHours(8));
+        var scenario = new Scenario(
+            new ScenarioId("wem-baseline"),
+            "WEM baseline",
+            start,
+            start.AddHours(2),
+            [new ScenarioRegion("SWIS", [Fleet(GenerationTechnology.Coal, 100)])],
+            CostBasis);
+
+        PowerSystem system = ScenarioDerivation.Derive(
+            scenario,
+            new Dictionary<string, FlowSeries>
+            {
+                ["SWIS"] = new(start, TimeSpan.FromHours(1), [80, 90]),
+            });
+
+        scenario.MarketTimeOffset.Should().Be(TimeSpan.FromHours(8));
+        system.Regions.Single().Demand.TotalDemand.Start.Offset.Should().Be(TimeSpan.FromHours(8));
+    }
+
+    [Fact]
+    public void Derive_RejectsDemandOnADifferentMarketOffsetThanTheScenario()
+    {
+        var scenario = new Scenario(
+            new ScenarioId("nsw1-baseline"),
+            "NSW1 baseline",
+            Start,
+            Start.AddHours(1),
+            [new ScenarioRegion("NSW1", [Fleet(GenerationTechnology.Coal, 100)])],
+            CostBasis);
+        // Same instant as the scenario start, declared on a different offset.
+        var demand = new FlowSeries(
+            new DateTimeOffset(2025, 6, 30, 23, 0, 0, TimeSpan.FromHours(9)),
+            TimeSpan.FromHours(1),
+            [100]);
+
+        var act = () => ScenarioDerivation.Derive(
+            scenario,
+            new Dictionary<string, FlowSeries> { ["NSW1"] = demand });
+
+        act.Should().Throw<ArgumentException>()
+            .WithParameterName("baseDemandByRegion")
+            .WithMessage("*market-time offset*");
+    }
+
+    [Fact]
+    public void Construction_RejectsAPeriodOffsetThatIsNotAUsableMarketOffset()
+    {
+        var oddOffset = TimeSpan.FromMinutes(517); // +08:37, not a quarter-hour.
+        var act = () => new Scenario(
+            new ScenarioId("nsw1-baseline"),
+            "NSW1 baseline",
+            new DateTimeOffset(2025, 7, 1, 0, 0, 0, oddOffset),
+            new DateTimeOffset(2025, 7, 1, 2, 0, 0, oddOffset),
+            [new ScenarioRegion("NSW1", [Fleet(GenerationTechnology.Coal, 100)])],
+            CostBasis);
+
+        act.Should().Throw<ArgumentException>()
+            .WithParameterName("periodStart")
+            .WithMessage("*fixed market-time offset*");
+    }
+
+    [Fact]
+    public void Construction_RejectsPeriodBoundsOnDifferentOffsets()
+    {
+        var act = () => new Scenario(
+            new ScenarioId("nsw1-baseline"),
+            "NSW1 baseline",
+            new DateTimeOffset(2025, 7, 1, 0, 0, 0, TimeSpan.FromHours(10)),
+            new DateTimeOffset(2025, 7, 1, 2, 0, 0, TimeSpan.FromHours(8)),
+            [new ScenarioRegion("NSW1", [Fleet(GenerationTechnology.Coal, 100)])],
+            CostBasis);
+
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("*same market-time offset*");
+    }
+
+    [Fact]
     public void Derive_RealisesOnlyInitiallyInstalledStorage()
     {
         var storageCosts = new StorageCostParameters(

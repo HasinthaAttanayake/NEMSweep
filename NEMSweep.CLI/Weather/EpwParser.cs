@@ -62,18 +62,31 @@ internal sealed class EpwGapException : Exception
 internal static class EpwParser
 {
     internal const int SyntheticNonLeapYear = 2001;
+
+    /// <summary>The NEM's market-time offset in hours, and the default when a caller does not state one.</summary>
+    internal const double DefaultMarketOffsetHours = 10;
+
+    /// <summary>
+    /// How far the source time zone may sit from the target market-time offset and still be
+    /// interpolated onto the grid. One hour covers the NEM's own ACST (9.5) sources.
+    /// </summary>
+    private const double MaximumShiftHours = 1;
+
     private const int LeapCapableValidationYear = 2000;
     private const double EpwWindMeasurementHeightMetres = 10;
-    private static readonly TimeSpan NemOffset = TimeSpan.FromHours(10);
     private static readonly TimeSpan HourlyResolution = TimeSpan.FromHours(1);
     internal static readonly DateTimeOffset SyntheticNonLeapStart =
-        new(SyntheticNonLeapYear, 1, 1, 0, 0, 0, NemOffset);
+        SyntheticNonLeapStartAt(DefaultMarketOffsetHours);
     private static readonly CsvConfiguration CsvConfiguration = new(CultureInfo.InvariantCulture)
     {
         HasHeaderRecord = false,
         IgnoreBlankLines = false,
         TrimOptions = TrimOptions.Trim,
     };
+
+    /// <summary>Start of the synthetic non-leap year at a given market-time offset.</summary>
+    internal static DateTimeOffset SyntheticNonLeapStartAt(double marketOffsetHours) =>
+        new(SyntheticNonLeapYear, 1, 1, 0, 0, 0, TimeSpan.FromHours(marketOffsetHours));
 
     public static EpwHeader ReadHeader(string path)
     {
@@ -194,55 +207,60 @@ internal static class EpwParser
         return new EpwFile(header, rows);
     }
 
-    public static EpwFile ReadValidated(string path)
+    public static EpwFile ReadValidated(string path, double marketOffsetHours = DefaultMarketOffsetHours)
     {
         EpwFile epw = ReadRows(path);
-        ValidateStructure(epw);
+        ValidateStructure(epw, marketOffsetHours);
         return epw;
     }
 
-    public static RegionalResourceProfile ReadTimeSeries(string path)
+    public static RegionalResourceProfile ReadTimeSeries(
+        string path,
+        double marketOffsetHours = DefaultMarketOffsetHours)
     {
-        return ReadTimeSeries(ReadValidated(path));
+        return ReadTimeSeries(ReadValidated(path, marketOffsetHours), marketOffsetHours);
     }
 
-    public static RegionalResourceProfile ReadTimeSeries(EpwFile epw)
+    public static RegionalResourceProfile ReadTimeSeries(
+        EpwFile epw,
+        double marketOffsetHours = DefaultMarketOffsetHours)
     {
-        double[] globalHorizontalRadiation = ShiftToNemTime(
-            epw.Rows.Select(row => row.GlobalHorizontalRadiation).ToArray(), epw.Header.TimeZone);
-        double[] directNormalRadiation = ShiftToNemTime(
-            epw.Rows.Select(row => row.DirectNormalRadiation).ToArray(), epw.Header.TimeZone);
-        double[] diffuseHorizontalRadiation = ShiftToNemTime(
-            epw.Rows.Select(row => row.DiffuseHorizontalRadiation).ToArray(), epw.Header.TimeZone);
-        double[] dryBulbTemperature = ShiftToNemTime(
-            epw.Rows.Select(row => row.DryBulbTemperature).ToArray(), epw.Header.TimeZone);
-        double[] windSpeed = ShiftToNemTime(
-            epw.Rows.Select(row => row.WindSpeed).ToArray(), epw.Header.TimeZone);
+        double[] globalHorizontalRadiation = ShiftToMarketTime(
+            epw.Rows.Select(row => row.GlobalHorizontalRadiation).ToArray(), epw.Header.TimeZone, marketOffsetHours);
+        double[] directNormalRadiation = ShiftToMarketTime(
+            epw.Rows.Select(row => row.DirectNormalRadiation).ToArray(), epw.Header.TimeZone, marketOffsetHours);
+        double[] diffuseHorizontalRadiation = ShiftToMarketTime(
+            epw.Rows.Select(row => row.DiffuseHorizontalRadiation).ToArray(), epw.Header.TimeZone, marketOffsetHours);
+        double[] dryBulbTemperature = ShiftToMarketTime(
+            epw.Rows.Select(row => row.DryBulbTemperature).ToArray(), epw.Header.TimeZone, marketOffsetHours);
+        double[] windSpeed = ShiftToMarketTime(
+            epw.Rows.Select(row => row.WindSpeed).ToArray(), epw.Header.TimeZone, marketOffsetHours);
 
+        DateTimeOffset start = SyntheticNonLeapStartAt(marketOffsetHours);
         TraceSeries globalHorizontalRadiationSeries = TraceSeries.GlobalHorizontalRadiation(
-            SyntheticNonLeapStart,
+            start,
             HourlyResolution,
             globalHorizontalRadiation);
         TraceSeries directNormalRadiationSeries = TraceSeries.DirectNormalRadiation(
-            SyntheticNonLeapStart,
+            start,
             HourlyResolution,
             directNormalRadiation);
         TraceSeries diffuseHorizontalRadiationSeries = TraceSeries.DiffuseHorizontalRadiation(
-            SyntheticNonLeapStart,
+            start,
             HourlyResolution,
             diffuseHorizontalRadiation);
         SolarZenithSeries solarZenithSeries = SolarZenithSeries.Calculate(
-            SyntheticNonLeapStart,
+            start,
             HourlyResolution,
             epw.Rows.Count,
             epw.Header.Latitude,
             epw.Header.Longitude);
         TraceSeries dryBulbTemperatureSeries = TraceSeries.DryBulbTemperature(
-            SyntheticNonLeapStart,
+            start,
             HourlyResolution,
             dryBulbTemperature);
         TraceSeries windSpeedSeries = TraceSeries.WindSpeed(
-            SyntheticNonLeapStart,
+            start,
             HourlyResolution,
             windSpeed,
             EpwWindMeasurementHeightMetres);
@@ -274,7 +292,7 @@ internal static class EpwParser
     public static EpwProvenanceReport ReadProvenance(EpwFile epw) =>
         EpwProvenance.Create(epw);
 
-    private static void ValidateStructure(EpwFile epw)
+    private static void ValidateStructure(EpwFile epw, double marketOffsetHours)
     {
         if (epw.Header.RecordsPerHour != 1)
         {
@@ -340,21 +358,27 @@ internal static class EpwParser
             }
         }
 
-        if (epw.Header.TimeZone != 10 && epw.Header.TimeZone != 9.5)
+        if (Math.Abs(epw.Header.TimeZone - marketOffsetHours) > MaximumShiftHours)
         {
             throw new FormatException(
-                $"LOCATION TimeZone must be 10 (AEST) or 9.5 (ACST) for NEM time; got {epw.Header.TimeZone}.");
+                $"LOCATION TimeZone {epw.Header.TimeZone} is more than {MaximumShiftHours:0.#} hour(s) "
+                + $"from the target market-time offset {marketOffsetHours}; a larger shift would blend "
+                + "readings that are hours apart.");
         }
     }
 
     /// <summary>
-    /// Interpolates an hourly civil-time series onto the NEM-market-time (AEST) grid. South
-    /// Australia's stations record in ACST (9.5), half an hour behind market time; every other NEM
-    /// region already reports at 10. A no-op when the source is already at 10.
+    /// Interpolates an hourly civil-time series onto the market-time grid at
+    /// <paramref name="marketOffsetHours"/>. For the NEM (target 10), South Australia's stations
+    /// record in ACST (9.5), half an hour behind; every other region already reports at 10. A no-op
+    /// when the source already sits at the target offset.
     /// </summary>
-    private static double[] ShiftToNemTime(double[] values, double sourceTimeZone)
+    private static double[] ShiftToMarketTime(
+        double[] values,
+        double sourceTimeZone,
+        double marketOffsetHours)
     {
-        double shiftHours = NemOffset.TotalHours - sourceTimeZone;
+        double shiftHours = marketOffsetHours - sourceTimeZone;
         if (shiftHours == 0)
         {
             return values;

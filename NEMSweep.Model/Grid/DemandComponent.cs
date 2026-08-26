@@ -8,14 +8,14 @@ public readonly record struct DemandComponent
     /// <summary>Validates and creates a labelled demand component.</summary>
     /// <param name="name">Non-blank label, unique within a region's components case-insensitively.</param>
     /// <param name="demand">
-    /// Non-negative demand series in MW, starting in NEM market time (UTC+10).
+    /// Non-negative demand series in MW, carrying the run's market-time offset.
     /// </param>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="demand"/> is negative at some interval.</exception>
     public DemandComponent(string name, FlowSeries demand)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(demand);
-        NemTime.Require(demand.Start, nameof(demand));
+        MarketTime.Require(demand.Start, nameof(demand));
 
         for (int index = 0; index < demand.Length; index++)
         {

@@ -349,10 +349,12 @@ artifact. They do not replace the demand artifact digest.
 
 ## Time and units
 
-Scenario periods and model series use fixed NEM market time (UTC+10). Result
-generation timestamps use UTC because they describe when an artifact was
-created; seeing `+10:00` period bounds and a `+00:00` generated timestamp in the
-same result is intentional.
+A run has one market-time offset: a single fixed UTC offset, no daylight saving,
+that every demand, weather and dispatch series is normalised to. It is taken from
+the scenario period bounds (`Scenario.MarketTimeOffset`), which must both carry
+it, and defaults to the NEM's UTC+10. Result generation timestamps use UTC
+because they describe when an artifact was created; seeing `+10:00` period bounds
+and a `+00:00` generated timestamp in the same result is intentional.
 
 Money and cost-rate quantities use `decimal`; measured physical quantities use
 `double`. They meet only inside typed conversion methods, where finite,

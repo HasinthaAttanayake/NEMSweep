@@ -14,13 +14,45 @@ namespace NEMSweep.Model.Tests.Series
         private static DateTimeOffset NemStart => new(2026, 1, 1, 0, 0, 0, NemOffset);
 
         [Fact]
-        public void Construction_Rejects_StartNotInNemTime()
+        public void Construction_Rejects_StartWithImplausibleMarketOffset()
         {
-            var utcStart = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+            var oddStart = new DateTimeOffset(
+                2026, 1, 1, 0, 0, 0, TimeSpan.FromMinutes(37));
 
-            var act = () => new FlowSeries(utcStart, HalfHour, new[] { 1.0, 2.0 });
+            var act = () => new FlowSeries(oddStart, HalfHour, new[] { 1.0, 2.0 });
 
-            act.Should().Throw<ArgumentException>().WithMessage("*NEM market time*");
+            act.Should().Throw<ArgumentException>().WithMessage("*fixed market-time offset*");
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(8)]
+        [InlineData(-5)]
+        public void Construction_Accepts_AnyFixedMarketOffset(int offsetHours)
+        {
+            var start = new DateTimeOffset(
+                2026, 1, 1, 0, 0, 0, TimeSpan.FromHours(offsetHours));
+
+            var act = () => new FlowSeries(start, HalfHour, new[] { 1.0, 2.0 });
+
+            act.Should().NotThrow();
+        }
+
+        [Fact]
+        public void RequireAligned_Rejects_SeriesOnADifferentMarketOffset()
+        {
+            var atTen = new FlowSeries(
+                new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.FromHours(10)),
+                HalfHour,
+                new[] { 1.0, 2.0 });
+            var sameInstantAtNine = new FlowSeries(
+                new DateTimeOffset(2025, 12, 31, 23, 0, 0, TimeSpan.FromHours(9)),
+                HalfHour,
+                new[] { 1.0, 2.0 });
+
+            var act = () => atTen.Add(sameInstantAtNine);
+
+            act.Should().Throw<ArgumentException>().WithMessage("*market-time offset*");
         }
 
         [Fact]

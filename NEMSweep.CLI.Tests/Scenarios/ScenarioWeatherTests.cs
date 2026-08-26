@@ -21,6 +21,20 @@ public sealed class ScenarioWeatherTests
     }
 
     [Fact]
+    public void ReadWeatherForTimeline_RejectsWeatherOnADifferentMarketOffsetThanTheTimeline()
+    {
+        WeatherDataDTO weather = Weather(8760, 8760);
+        FlowSeries timeline = Timeline(
+            new DateTimeOffset(2001, 1, 1, 0, 0, 0, TimeSpan.FromHours(8)),
+            8760);
+
+        var act = () => ScenarioRunner.ReadWeatherForTimeline(weather, timeline);
+
+        act.Should().Throw<FormatException>()
+            .WithMessage("*market-time offset*not the demand timeline's*");
+    }
+
+    [Fact]
     public void ReadWeatherForTimeline_NamesMissingLeapDay()
     {
         WeatherDataDTO weather = Weather(8760, 8760);

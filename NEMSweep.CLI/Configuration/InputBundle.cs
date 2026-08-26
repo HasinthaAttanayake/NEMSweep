@@ -1,6 +1,7 @@
 using System.Text.Json;
 using NEMSweep.CLI.Infrastructure;
 using NEMSweep.Contracts;
+using NEMSweep.Model.Series;
 
 namespace NEMSweep.CLI.Configuration;
 
@@ -171,6 +172,20 @@ internal sealed record InputBundle(
         if (manifest.Period.End <= manifest.Period.Start)
         {
             throw new FormatException("Input bundle manifest field 'period.end' in 'manifest.json' must be after 'period.start'.");
+        }
+
+        if (manifest.Period.Start.Offset != manifest.Period.End.Offset)
+        {
+            throw new FormatException(
+                "Input bundle manifest 'period.start' and 'period.end' in 'manifest.json' must carry the same "
+                + $"market-time offset; got {manifest.Period.Start.Offset} and {manifest.Period.End.Offset}.");
+        }
+
+        if (!MarketTime.IsValidOffset(manifest.Period.Start.Offset))
+        {
+            throw new FormatException(
+                $"Input bundle manifest 'period' offset {manifest.Period.Start.Offset} in 'manifest.json' is not a "
+                + "usable market-time offset; it must be within [-12:00, +14:00] at quarter-hour granularity.");
         }
 
         if (manifest.Regions is null || manifest.Regions.Length == 0)

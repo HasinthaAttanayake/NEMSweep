@@ -23,7 +23,6 @@ internal sealed class OperationalDemandDataQualityException : Exception
 internal static class OperationalDemandParser
 {
     internal static readonly TimeSpan Resolution = TimeSpan.FromMinutes(30);
-    private static readonly TimeSpan NemOffset = TimeSpan.FromHours(10);
     private static readonly CsvConfiguration CsvConfiguration = new(CultureInfo.InvariantCulture)
     {
         HasHeaderRecord = false,
@@ -44,17 +43,14 @@ internal static class OperationalDemandParser
             throw new ArgumentException("At least one region must be requested.", nameof(regionIds));
         }
 
-        if (periodStart.Offset != NemOffset)
+        // AEMO's INTERVAL_DATETIME column is a bare wall clock in market time. The period bounds
+        // declare which market-time offset that is (UTC+10 for the NEM); both bounds must agree so
+        // there is a single offset to stamp the parsed timestamps with.
+        if (periodStart.Offset != periodEnd.Offset)
         {
             throw new ArgumentException(
-                "The operational-demand period start must use NEM market time (UTC+10).",
-                nameof(periodStart));
-        }
-
-        if (periodEnd.Offset != NemOffset)
-        {
-            throw new ArgumentException(
-                "The operational-demand period end must use NEM market time (UTC+10).",
+                "The operational-demand period start and end must carry the same market-time offset; "
+                + $"got {periodStart.Offset} and {periodEnd.Offset}.",
                 nameof(periodEnd));
         }
 
@@ -246,7 +242,8 @@ internal static class OperationalDemandParser
                 "yyyy/MM/dd HH:mm:ss",
                 CultureInfo.InvariantCulture,
                 DateTimeStyles.None);
-            DateTimeOffset intervalStart = new DateTimeOffset(intervalEndLocal, NemOffset) - Resolution;
+            DateTimeOffset intervalStart =
+                new DateTimeOffset(intervalEndLocal, periodStart.Offset) - Resolution;
             if (intervalStart < periodStart || intervalStart >= periodEnd)
             {
                 continue;
