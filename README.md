@@ -17,7 +17,7 @@ artifacts are not byte-identical across reruns, because each run stamps a fresh 
 
 **Documentation:** [how to run it, what it assumes, and how to explore the scenario
 space](docs/index.md)
-**Live results site:** [https://nemsweep.pages.dev/](https://nemsweep.pages.dev/)
+**Live results site:** [https://www.nemsweep.com/](https://www.nemsweep.com/)
 
 > **Under active construction**
 >
@@ -81,6 +81,21 @@ Follow progress on the
 
 `NEMSweep.CLI.Tests` mirrors the same feature folders. The implemented aggregate roots and
 domain-service boundaries are tracked in the [domain model](docs/domain-model.md).
+
+## Licence and data
+
+The code is [BSD-3-Clause](LICENSE.md): use it in your own software, including proprietary software,
+with attribution and no copyleft. `NEMSweep.Model` and `NEMSweep.Contracts` have no package
+dependencies, so a project reference from a clone, or a reference to the built assembly, is all it
+takes to embed them.
+
+**The data is not covered by that licence.** Demand, generation and weather artifacts derive from
+AEMO and EnergyPlus Weather sources with their own terms. See [DATA-LICENSE.md](DATA-LICENSE.md)
+before redistributing any of it. The artifacts this repository carries are an illustrative example,
+not a dataset.
+
+Using NEMSweep in published work? [CITATION.cff](CITATION.cff) has the citation metadata.
+Contributions welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Local development
 

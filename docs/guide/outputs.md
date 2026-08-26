@@ -155,6 +155,13 @@ The set committed under `NEMSweep.Web/wwwroot/data` is what the results site dis
 it is a deliberate act: point `--output` there when you intend to update the site, and let ordinary
 runs land in your own directory the rest of the time.
 
+**That set is an illustrative example, not a dataset.** It is one FY2026 run and one sweep, retained
+so the site has something to show and so a clone runs without first sourcing upstream data. The
+provenance block on it is real, which is exactly why it is worth saying plainly: a demo carrying
+input digests and a commit can read as more authoritative than it is. Run your own scenario before
+quoting a figure, and see [DATA-LICENSE.md](https://github.com/HasinthaAttanayake/NEMSweep/blob/main/DATA-LICENSE.md)
+for the terms on the data behind it.
+
 ## CSV
 
 Everything on this page is JSON, which is the contract but not something you can open. Add `--csv`
