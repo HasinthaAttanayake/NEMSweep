@@ -12,24 +12,48 @@ internal static class ScenarioCommand
     public static int Run(CliContext context)
     {
         string path = context.Paths.ResolveConfiguredPath(context.LoadSettings().DefaultScenarioPath);
-        return RunPublication(context, LoadScenario(path));
+        return RunPublication(context, LoadScenario(path), provenance: CaptureProvenance(context));
     }
 
     public static int Run(CliContext context, string scenarioConfigPath)
     {
         string path = context.Paths.ResolveConfiguredPath(scenarioConfigPath);
-        return RunPublication(context, LoadScenario(path));
+        return RunPublication(context, LoadScenario(path), provenance: CaptureProvenance(context));
     }
 
+    /// <summary>
+    /// Runs one sweep point. The caller passes the provenance it captured for the whole sweep, so a
+    /// fan-out shells out to git once rather than twice per point.
+    /// </summary>
+    /// <param name="context">The invocation's workspace and settings.</param>
+    /// <param name="scenarioConfigPath">Materialised config for this point.</param>
+    /// <param name="resultsPath">Where this point's result is written.</param>
+    /// <param name="regionFileNamePrefix">Prefix that keeps point region files distinct.</param>
+    /// <param name="provenance">Model build captured once for the sweep.</param>
     public static int Run(
         CliContext context,
         string scenarioConfigPath,
         string resultsPath,
-        string regionFileNamePrefix)
+        string regionFileNamePrefix,
+        DispatchModelProvenanceDTO? provenance = null)
     {
         string path = context.Paths.ResolveConfiguredPath(scenarioConfigPath);
-        return RunPublication(context, LoadScenario(path), resultsPath, regionFileNamePrefix);
+        return RunPublication(context, LoadScenario(path), resultsPath, regionFileNamePrefix, provenance);
     }
+
+    /// <summary>Reads the model build this run was made from, reporting absence rather than
+    /// inventing a value when there is no git working tree.</summary>
+    private static DispatchModelProvenanceDTO? CaptureProvenance(CliContext context) =>
+        ToProvenance(SweepArtifactExport.CaptureRunMetadata(
+            context.Paths.WorkingRoot,
+            context.Paths.OutputRoot));
+
+    /// <summary>Maps captured run metadata onto the published provenance shape.</summary>
+    /// <param name="metadata">Metadata captured for a scenario or sweep run.</param>
+    internal static DispatchModelProvenanceDTO? ToProvenance(SweepRunMetadata metadata) =>
+        metadata.GitCommitSha is "unavailable"
+            ? null
+            : new DispatchModelProvenanceDTO(metadata.GitCommitSha, metadata.WorkingTreeDirty);
 
     /// <summary>Reads a scenario config, attributing any failure to the input stage.</summary>
     private static ScenarioSettings LoadScenario(string path)
@@ -50,19 +74,18 @@ internal static class ScenarioCommand
     }
 
     /// <summary>
-    /// Runs a scenario and publishes it. The default run writes to the repository's dispatch
-    /// results path and reports where it wrote; a sweep point supplies its own path and prefix
-    /// and stays quiet, because a fan-out would otherwise print a line per point.
+    /// Runs a scenario and publishes it. The default run writes to the workspace's results path and
+    /// reports where it wrote; a sweep point supplies its own path and prefix and stays quiet,
+    /// because a fan-out would otherwise print a line per point.
     /// </summary>
     private static int RunPublication(
         CliContext context,
         ScenarioSettings settings,
         string? resultsPath = null,
-        string? regionFileNamePrefix = null)
+        string? regionFileNamePrefix = null,
+        DispatchModelProvenanceDTO? provenance = null)
     {
-        ScenarioDispatchResult dispatch = ScenarioRunner.RunDispatch(
-            settings,
-            context.Paths.SolutionRoot);
+        ScenarioDispatchResult dispatch = ScenarioRunner.RunDispatch(settings, context.Paths);
         string finalResultsPath = resultsPath ?? context.Paths.DispatchResultsPath;
         DispatchPublication publication;
         try
@@ -72,7 +95,8 @@ internal static class ScenarioCommand
                     dispatch,
                     ScenarioConfig.CreateSizingOptions(settings.StorageSizing),
                     settings.StorageSizing.ReliabilityStandardName,
-                    regionFileNamePrefix),
+                    regionFileNamePrefix,
+                    provenance),
                 finalResultsPath);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)

@@ -15,11 +15,83 @@ namespace NEMSweep.CLI.Scenarios;
 
 internal static class SweepArtifactExport
 {
-    public static SweepRunMetadata CaptureRunMetadata(string solutionRoot)
+    /// <summary>
+    /// Reads the model build a run was made from: the commit, and whether anything uncommitted was
+    /// in play when it ran.
+    /// </summary>
+    /// <param name="workingRoot">Directory git is asked about.</param>
+    /// <param name="outputRoot">
+    /// Where this run writes. Changes under it are excluded from the dirty check, because a
+    /// publication pass necessarily modifies its own output: without this, the first artifact of a
+    /// regeneration reports a clean tree and every later one reports a dirty one, which says
+    /// something about the order files were written rather than about the model.
+    /// </param>
+    public static SweepRunMetadata CaptureRunMetadata(string workingRoot, string? outputRoot = null)
     {
-        string? commitSha = TryRunGit(solutionRoot, "rev-parse", "HEAD");
-        string? status = TryRunGit(solutionRoot, "status", "--porcelain");
-        return new SweepRunMetadata(commitSha ?? "unavailable", !string.IsNullOrWhiteSpace(status));
+        string? commitSha = TryRunGit(workingRoot, "rev-parse", "HEAD");
+        string? status = TryRunGit(workingRoot, "status", "--porcelain");
+        return new SweepRunMetadata(
+            commitSha ?? "unavailable",
+            HasSourceChanges(status, workingRoot, outputRoot));
+    }
+
+    /// <summary>Whether any reported change lies outside the directory this run publishes to.</summary>
+    /// <param name="status">Porcelain status output, or <see langword="null"/> when git is absent.</param>
+    /// <param name="workingRoot">Root the status paths are relative to.</param>
+    /// <param name="outputRoot">Directory whose contents this run is writing.</param>
+    internal static bool HasSourceChanges(string? status, string workingRoot, string? outputRoot)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+        {
+            return false;
+        }
+
+        if (outputRoot is null)
+        {
+            return true;
+        }
+
+        string published = Path.GetFullPath(outputRoot);
+        foreach (string line in status.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            string path = StatusPath(line);
+            if (path.Length == 0)
+            {
+                continue;
+            }
+
+            string full = Path.GetFullPath(path, workingRoot);
+            if (!full.StartsWith(published, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>The path out of one porcelain status line.</summary>
+    /// <remarks>
+    /// Read relative to the first space rather than from a fixed column. Porcelain pads the status
+    /// field to two characters, so an unstaged modification begins with one, and the caller trims
+    /// the output as a whole: that strips the leading space from the first line only, which a
+    /// fixed-offset read turns into a mangled path on exactly one entry.
+    /// </remarks>
+    /// <param name="line">One line of <c>git status --porcelain</c> output.</param>
+    private static string StatusPath(string line)
+    {
+        string trimmed = line.Trim();
+        int separator = trimmed.IndexOf(' ', StringComparison.Ordinal);
+        if (separator < 0)
+        {
+            return string.Empty;
+        }
+
+        string path = trimmed[(separator + 1)..].Trim().Trim('"');
+
+        // A rename reads "old -> new"; the new path is the one that exists.
+        int renamedTo = path.IndexOf(" -> ", StringComparison.Ordinal);
+        return renamedTo >= 0 ? path[(renamedTo + 4)..] : path;
     }
 
     public static string ExternalizeBaseDemand(string pointResultPath, string sweepDirectory)
@@ -283,13 +355,12 @@ internal static class SweepArtifactExport
         // reachable from each point's configPath, so listing them here would grow the provenance
         // block with the point count without adding a fact.
         var inputs = new Dictionary<string, SweepInputFileDTO>(StringComparer.OrdinalIgnoreCase);
-        AddInput(inputs, context.Paths.SolutionRoot, definitionPath, "sweep-definition");
+        AddInput(inputs, context.Paths, definitionPath, "sweep-definition");
         AddInput(
             inputs,
-            context.Paths.SolutionRoot,
+            context.Paths,
             definition.BaselineConfigFullPath(context.Paths),
             "baseline-scenario-config");
-        string outputRoot = ScenarioRunner.ResolveOutputRoot(context.Paths);
         foreach (string configPath in configPaths)
         {
             ScenarioSettings? settings;
@@ -306,13 +377,13 @@ internal static class SweepArtifactExport
             {
                 AddInput(
                     inputs,
-                    context.Paths.SolutionRoot,
-                    ScenarioRunner.ResolveScenarioInputPath(context.Paths, outputRoot, region.DemandFile),
+                    context.Paths,
+                    ScenarioRunner.ResolveScenarioInputPath(context.Paths, region.DemandFile),
                     "demand-data");
                 AddInput(
                     inputs,
-                    context.Paths.SolutionRoot,
-                    ScenarioRunner.ResolveScenarioInputPath(context.Paths, outputRoot, region.WeatherFile),
+                    context.Paths,
+                    ScenarioRunner.ResolveScenarioInputPath(context.Paths, region.WeatherFile),
                     "weather-data");
             }
         }
@@ -336,12 +407,16 @@ internal static class SweepArtifactExport
 
     private static void AddInput(
         IDictionary<string, SweepInputFileDTO> inputs,
-        string solutionRoot,
+        WorkspacePaths paths,
         string path,
         string purpose)
     {
         byte[] contents = File.ReadAllBytes(path);
-        string relativePath = Path.GetRelativePath(solutionRoot, path).Replace('\\', '/');
+
+        // Recorded relative to the data root, falling back to a bare file name for anything outside
+        // it. The digest is the reproducibility boundary, so an absolute path here would only be a
+        // machine-specific detail that goes stale the moment a directory is renamed.
+        string relativePath = paths.DescribeInputPath(path);
         string key = $"{purpose}:{relativePath}";
         inputs[key] = new SweepInputFileDTO(
             relativePath,

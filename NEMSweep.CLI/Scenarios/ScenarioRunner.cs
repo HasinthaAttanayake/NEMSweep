@@ -22,10 +22,8 @@ internal static class ScenarioRunner
 
     internal static ScenarioDispatchResult RunDispatch(
         ScenarioSettings settings,
-        string solutionRoot)
+        WorkspacePaths paths)
     {
-        RepositoryPaths paths = RepositoryPaths.Discover(solutionRoot);
-        string outputRoot = ResolveOutputRoot(paths, solutionRoot);
         var demandInputs = new Dictionary<string, LoadedInput<OperationalDemandData>>(
             StringComparer.OrdinalIgnoreCase);
         var demandByRegion = new Dictionary<string, FlowSeries>(StringComparer.OrdinalIgnoreCase);
@@ -33,7 +31,7 @@ internal static class ScenarioRunner
 
         foreach (ScenarioRegionSettings regionSettings in settings.Regions)
         {
-            string demandPath = ResolveConfiguredPath(paths, outputRoot, regionSettings.DemandFile);
+            string demandPath = ResolveScenarioInputPath(paths, regionSettings.DemandFile);
             LoadedInput<OperationalDemandData> demandInput = ReadInput(() => ReadDemand(demandPath));
             if (!string.Equals(
                     demandInput.Value.Region,
@@ -75,7 +73,7 @@ internal static class ScenarioRunner
             StringComparer.OrdinalIgnoreCase);
         foreach (ScenarioRegionSettings regionSettings in settings.Regions)
         {
-            string weatherPath = ResolveConfiguredPath(paths, outputRoot, regionSettings.WeatherFile);
+            string weatherPath = ResolveScenarioInputPath(paths, regionSettings.WeatherFile);
             LoadedInput<WeatherDataDTO> weatherInput = ReadInput(() => ReadWeather(weatherPath));
             if (!string.Equals(
                     weatherInput.Value.RegionId,
@@ -112,60 +110,17 @@ internal static class ScenarioRunner
             weatherInputs);
     }
 
-    private static string ResolveOutputRoot(RepositoryPaths paths, string solutionRoot)
-    {
-        string settingsDirectory = solutionRoot;
-        string settingsPath = Path.Combine(settingsDirectory, "appsettings.local.json");
-        if (!File.Exists(settingsPath)
-            && !File.Exists(Path.Combine(settingsDirectory, "appsettings.example.json")))
-        {
-            settingsDirectory = Path.Combine(solutionRoot, "NEMSweep.CLI");
-            settingsPath = Path.Combine(settingsDirectory, "appsettings.local.json");
-        }
-
-        return File.Exists(settingsPath)
-            || File.Exists(Path.Combine(settingsDirectory, "appsettings.example.json"))
-            ? paths.ResolveConfiguredPath(CliSettings.Load(settingsDirectory).OutputRoot)
-            : solutionRoot;
-    }
-
     /// <summary>
-    /// The configured output root dispatch reads its inputs from. Probing for it touches the
-    /// filesystem and parses settings, so a caller resolving many inputs resolves this once and
-    /// passes it to <see cref="ResolveScenarioInputPath"/> rather than paying for it per input.
+    /// Resolves a scenario input against the data root. A scenario names its artifacts by file name,
+    /// so the data root is the single place they are looked for; an absolute path is used as given.
+    /// Provenance callers use this too, so they hash the exact bytes dispatch consumed.
     /// </summary>
-    /// <param name="paths">Repository paths whose solution root is probed.</param>
-    internal static string ResolveOutputRoot(RepositoryPaths paths) =>
-        ResolveOutputRoot(paths, paths.SolutionRoot);
-
-    /// <summary>
-    /// Resolves a scenario input using the same configured-output-root fallback as dispatch.
-    /// Provenance callers use this so they hash the exact artifact bytes dispatch consumed.
-    /// </summary>
-    /// <param name="paths">Repository paths the configured path is resolved against.</param>
-    /// <param name="outputRoot">The root from <see cref="ResolveOutputRoot(RepositoryPaths)"/>.</param>
+    /// <param name="paths">Workspace the configured path is resolved against.</param>
     /// <param name="configuredPath">The path as written in the scenario config.</param>
-    internal static string ResolveScenarioInputPath(
-        RepositoryPaths paths,
-        string outputRoot,
-        string configuredPath) =>
-        ResolveConfiguredPath(paths, outputRoot, configuredPath);
-
-    private static string ResolveConfiguredPath(
-        RepositoryPaths paths,
-        string outputRoot,
-        string configuredPath)
-    {
-        if (Path.IsPathRooted(configuredPath))
-        {
-            return Path.GetFullPath(configuredPath);
-        }
-
-        string outputPath = Path.GetFullPath(configuredPath, outputRoot);
-        return File.Exists(outputPath)
-            ? outputPath
-            : paths.ResolveConfiguredPath(configuredPath);
-    }
+    internal static string ResolveScenarioInputPath(WorkspacePaths paths, string configuredPath) =>
+        Path.IsPathRooted(configuredPath)
+            ? Path.GetFullPath(configuredPath)
+            : Path.GetFullPath(configuredPath, paths.DataRoot);
 
     private static bool SameTimeline(FlowSeries first, FlowSeries second) =>
         first.Start == second.Start

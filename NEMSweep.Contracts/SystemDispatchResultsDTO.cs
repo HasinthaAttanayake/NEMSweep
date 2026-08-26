@@ -24,7 +24,18 @@ public sealed record SystemDispatchResultsDTO(
     DispatchCostDTO Cost,
     [property: JsonRequired] DispatchTopologyDTO Topology,
     [property: JsonRequired] DispatchInterconnectorDTO[] Interconnectors,
-    DispatchCostBasisDTO? CostBasis = null);
+    DispatchCostBasisDTO? CostBasis = null,
+    DispatchModelProvenanceDTO? Provenance = null);
+
+/// <summary>
+/// The model build that produced a result. <see cref="DispatchSourcesDTO"/> already pins the input
+/// bytes a run consumed, but without the commit a result published by hand cannot say which version
+/// of the model read them. Absent when the run was not made from a git working tree, which is the
+/// normal case for a released container.
+/// </summary>
+public sealed record DispatchModelProvenanceDTO(
+    [property: JsonRequired] string GitCommitSha,
+    [property: JsonRequired] bool WorkingTreeDirty);
 
 /// <summary>Declared directed network topology for a whole-system dispatch result.</summary>
 public sealed record DispatchTopologyDTO(

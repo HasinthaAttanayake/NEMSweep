@@ -91,7 +91,7 @@ public sealed class ScenarioRunnerMultiRegionTests
     {
         using var fixture = new RunnerFixture { IncludeInterconnector = true };
         fixture.WriteScenario();
-        var context = new CliContext(fixture.Paths, fixture.RootPath, TextWriter.Null);
+        var context = new CliContext(fixture.Paths, fixture.Settings, TextWriter.Null);
 
         ScenarioCommand.Run(context, "scenario.json").Should().Be(0);
 
@@ -168,7 +168,7 @@ public sealed class ScenarioRunnerMultiRegionTests
             MaximumEnergyMwh = 200,
         };
         fixture.WriteScenario();
-        var context = new CliContext(fixture.Paths, fixture.RootPath, TextWriter.Null);
+        var context = new CliContext(fixture.Paths, fixture.Settings, TextWriter.Null);
 
         ScenarioCommand.Run(context, "scenario.json").Should().Be(0);
 
@@ -192,7 +192,7 @@ public sealed class ScenarioRunnerMultiRegionTests
     {
         using var fixture = new RunnerFixture();
         fixture.WriteScenario();
-        var context = new CliContext(fixture.Paths, fixture.RootPath, TextWriter.Null);
+        var context = new CliContext(fixture.Paths, fixture.Settings, TextWriter.Null);
 
         ScenarioCommand.Run(context, "scenario.json").Should().Be(0);
 
@@ -258,7 +258,7 @@ public sealed class ScenarioRunnerMultiRegionTests
             File.WriteAllText(Path.Combine(RootPath, "NEMSweep.slnx"), string.Empty);
             File.WriteAllText(
                 Path.Combine(RootPath, "NEMSweep.CLI", "appsettings.local.json"),
-                "{\"inputBundleRoot\":\"unused\",\"outputRoot\":\"output\",\"defaultScenarioPath\":\"unused\"}");
+                "{\"inputBundleRoot\":\"unused\",\"dataRoot\":\"output\",\"outputRoot\":\"results\",\"defaultScenarioPath\":\"unused\"}");
             WriteDemand("nsw1", "NSW1", fixtureStart, 10);
             WriteDemand("vic1", "VIC1", VicStart, 20);
             WriteWeather("nsw1", "NSW1");
@@ -267,7 +267,11 @@ public sealed class ScenarioRunnerMultiRegionTests
 
         public string RootPath { get; }
         public string OutputRoot { get; }
-        public RepositoryPaths Paths => RepositoryPaths.Discover(RootPath);
+        public WorkspacePaths Paths =>
+            WorkspacePaths.FromRoots(RootPath, OutputRoot, Path.Combine(RootPath, "results"));
+
+        public CliSettings Settings { get; } =
+            new("bundle", "output", "results", "unused.json");
         public string DemandRegionForNsw { get; init; } = "NSW1";
         public string WeatherRegionForNsw { get; init; } = "NSW1";
         public DateTimeOffset VicStart { get; init; } = fixtureStart;
@@ -296,7 +300,7 @@ public sealed class ScenarioRunnerMultiRegionTests
                 WriteDemand("vic1", "VIC1", VicStart, 20);
             }
 
-            return ScenarioRunner.RunDispatch(CreateSettings(), RootPath);
+            return ScenarioRunner.RunDispatch(CreateSettings(), Paths);
         }
 
         public DispatchPublicationRequest CreatePublicationRequest(ScenarioDispatchResult dispatch) =>

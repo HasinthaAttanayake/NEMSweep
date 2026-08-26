@@ -1,22 +1,20 @@
 using System.Text.Json;
 using AwesomeAssertions;
 using NEMSweep.CLI.Configuration;
-using NEMSweep.CLI.Infrastructure;
 
 namespace NEMSweep.CLI.Tests.Configuration;
 
 public sealed class CliSettingsTests
 {
     [Fact]
-    public void ExampleFile_ContainsOnlyTheThreeCliSettings()
+    public void ExampleFile_ContainsOnlyTheFourCliSettings()
     {
-        RepositoryPaths paths = RepositoryPaths.Discover(AppContext.BaseDirectory);
-        using JsonDocument document = JsonDocument.Parse(File.ReadAllBytes(
-            Path.Combine(paths.SolutionRoot, "NEMSweep.CLI", "appsettings.example.json")));
+        using JsonDocument document = JsonDocument.Parse(
+            File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "appsettings.example.json")));
 
         document.RootElement.EnumerateObject().Select(property => property.Name)
             .Should().BeEquivalentTo(
-                ["inputBundleRoot", "outputRoot", "defaultScenarioPath"],
+                ["inputBundleRoot", "dataRoot", "outputRoot", "defaultScenarioPath"],
                 options => options.WithStrictOrdering());
     }
 
@@ -24,12 +22,18 @@ public sealed class CliSettingsTests
     public void Load_UsesExampleWhenLocalFileIsAbsent()
     {
         using var fixture = new SettingsFixture();
-        fixture.Write("appsettings.example.json", "example-inputs", "example-output", "example-scenario.json");
+        fixture.Write(
+            "appsettings.example.json",
+            "example-inputs",
+            "example-data",
+            "example-output",
+            "example-scenario.json");
 
         CliSettings settings = CliSettings.Load(fixture.RootPath);
 
         settings.Should().Be(new CliSettings(
             "example-inputs",
+            "example-data",
             "example-output",
             "example-scenario.json"));
     }
@@ -44,11 +48,17 @@ public sealed class CliSettingsTests
 
         public string RootPath { get; }
 
-        public void Write(string fileName, string inputBundleRoot, string outputRoot, string defaultScenarioPath)
+        public void Write(
+            string fileName,
+            string inputBundleRoot,
+            string dataRoot,
+            string outputRoot,
+            string defaultScenarioPath)
         {
             File.WriteAllText(
                 Path.Combine(RootPath, fileName),
-                JsonSerializer.Serialize(new { inputBundleRoot, outputRoot, defaultScenarioPath }));
+                JsonSerializer.Serialize(
+                    new { inputBundleRoot, dataRoot, outputRoot, defaultScenarioPath }));
         }
 
         public void Dispose() => Directory.Delete(RootPath, recursive: true);
