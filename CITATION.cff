@@ -1,0 +1,45 @@
+cff-version: 1.2.0
+title: NEMSweep
+message: >-
+  If you use NEMSweep in work you publish, please cite it. Citation is how a
+  method gets scrutinised rather than just used.
+type: software
+authors:
+  - given-names: Hasintha
+    family-names: Attanayake
+    # orcid: 'https://orcid.org/0000-0000-0000-0000'
+repository-code: 'https://github.com/HasinthaAttanayake/NEMSweep'
+url: 'https://www.nemsweep.com/'
+abstract: >-
+  An hourly grid dispatch model for Australia's National Electricity Market.
+  Regions are described with their demand, generation assets and storage, then
+  dispatched hour by hour across a modelled year; where a declared reliability
+  standard is not met, storage is grown until it is met or the search reports
+  what stopped it. Deterministic: the same inputs at the same commit reproduce
+  every modelled value, and every result records the SHA-256 of the input bytes
+  it was built from.
+keywords:
+  - electricity
+  - National Electricity Market
+  - dispatch model
+  - energy systems
+  - renewable energy
+  - storage sizing
+  - Australia
+license: BSD-3-Clause
+# No DOI yet, and that is a decision rather than an omission.
+#
+# Minting one means archiving a snapshot of this repository permanently and
+# publicly, and the snapshot would include the demand, generation and weather
+# artifacts under NEMSweep.Web/wwwroot/data. Those derive from AEMO and
+# EnergyPlus Weather sources whose redistribution terms are still open; see
+# DATA-LICENSE.md. An archive is deliberately hard to withdraw, so it is the
+# wrong place to resolve that question after the fact.
+#
+# When the terms are settled, the fields below complete the record. Archiving a
+# tree without the data artifacts is also a reasonable answer, and arguably the
+# better one: what is worth citing is the model, not one illustrative run.
+#
+#   doi: '10.5281/zenodo.XXXXXXX'
+#   version: '0.1.0'
+#   date-released: 'YYYY-MM-DD'

@@ -33,7 +33,7 @@ changed moved it.
 The published work so far uses NEMSweep for one question: what happens to system cost and reliability
 as large new loads are added to the grid, and at what point does new storage become necessary. The
 published study frames those loads as data centres, but any load increase behaves the same way. You
-can see the results on the [results site](https://nemsweep.pages.dev/).
+can see the results on the [results site](https://www.nemsweep.com/).
 
 That is one slice of a much larger space. Because the model is deterministic and every assumption
 is either a scenario input or a documented constant, the same framework answers questions it was
@@ -66,6 +66,6 @@ Those are load-bearing limitations, not disclaimers. Read
 ## Project status
 
 NEMSweep is being built in public, one validated layer at a time. The
-[results site](https://nemsweep.pages.dev/) shows the current state of that work, and the
+[results site](https://www.nemsweep.com/) shows the current state of that work, and the
 [repository](https://github.com/HasinthaAttanayake/NEMSweep) carries the model, the CLI that produces
 the artifacts, and the committed inputs those artifacts were built from.
