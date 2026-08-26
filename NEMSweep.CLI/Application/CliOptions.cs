@@ -7,10 +7,12 @@ namespace NEMSweep.CLI.Application;
 /// </summary>
 /// <param name="DataRoot">Value of <c>--data-root</c>, or <see langword="null"/> when absent.</param>
 /// <param name="OutputRoot">Value of <c>--output</c>, or <see langword="null"/> when absent.</param>
-internal sealed record CliOptions(string? DataRoot, string? OutputRoot)
+/// <param name="Csv">Whether <c>--csv</c> was given, asking for the star schema alongside the JSON.</param>
+internal sealed record CliOptions(string? DataRoot, string? OutputRoot, bool Csv = false)
 {
     private const string DataRootFlag = "--data-root";
     private const string OutputFlag = "--output";
+    private const string CsvFlag = "--csv";
 
     /// <summary>Splits a command line into workspace overrides and the command's own arguments.</summary>
     /// <param name="args">The raw command line.</param>
@@ -19,11 +21,18 @@ internal sealed record CliOptions(string? DataRoot, string? OutputRoot)
     {
         string? dataRoot = null;
         string? outputRoot = null;
+        bool csv = false;
         var rest = new List<string>(args.Length);
 
         for (int index = 0; index < args.Length; index++)
         {
             string argument = args[index];
+            if (argument is CsvFlag)
+            {
+                csv = true;
+                continue;
+            }
+
             if (argument is not (DataRootFlag or OutputFlag))
             {
                 rest.Add(argument);
@@ -46,6 +55,6 @@ internal sealed record CliOptions(string? DataRoot, string? OutputRoot)
         }
 
         remaining = [.. rest];
-        return new CliOptions(dataRoot, outputRoot);
+        return new CliOptions(dataRoot, outputRoot, csv);
     }
 }
