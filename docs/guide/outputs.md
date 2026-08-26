@@ -154,3 +154,9 @@ results), so what is on disk stays traceable to the inputs and commit behind it.
 The set committed under `NEMSweep.Web/wwwroot/data` is what the results site displays. Publishing to
 it is a deliberate act: point `--output` there when you intend to update the site, and let ordinary
 runs land in your own directory the rest of the time.
+
+## CSV
+
+Everything on this page is JSON, which is the contract but not something you can open. Add `--csv`
+to a run and it also writes a star schema of CSV tables projected from these same values, rounded
+by the same rule. See [CSV tables](csv-tables.md).
