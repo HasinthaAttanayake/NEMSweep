@@ -24,7 +24,7 @@ public sealed class PowerSystemCostBreakdownTests
         const decimal fuelPricePerGj = 2m;
         const double heatRateGjPerMwh = 3;
         Power nameplateCapacity = Power.FromMegawatts(10);
-        Energy deliveredEnergy = Energy.FromMegawattHours(180);
+        Energy energyServed = Energy.FromMegawattHours(180);
         Money totalCapex = Money.FromAud(capitalCostPerMw * 10);
         Money annualisedCapex = LevelisedCostCalculator.Annuitise(totalCapex, 0m, 10);
         Money annualFixedOpex = Money.FromAud(fixedOperatingCostPerMwYear * 10);
@@ -59,15 +59,15 @@ public sealed class PowerSystemCostBreakdownTests
             scenario,
             RunResult(DispatchOutcomeWithCurtailment()));
 
-        breakdown.DeliveredEnergy.Should().Be(deliveredEnergy,
+        breakdown.EnergyServed.Should().Be(energyServed,
             "load served through storage discharge must remain in the system denominator");
         breakdown.TotalAnnualisedCost.Should().Be(expectedAnnualCost);
         breakdown.TotalAnnualisedGenerationCost.Should().Be(expectedAnnualCost,
             "the 190 MWh gross generation includes 40 MWh used to charge storage");
         breakdown.SystemLevelisedCostOfGeneration.Should()
-            .Be(expectedAnnualCost.Per(deliveredEnergy));
+            .Be(expectedAnnualCost.Per(energyServed));
         breakdown.SystemLevelisedCostOfElectricity.Should()
-            .Be(expectedAnnualCost.Per(deliveredEnergy));
+            .Be(expectedAnnualCost.Per(energyServed));
         breakdown.SystemLevelisedCostOfStorage.Should().Be(default(EnergyPrice));
         breakdown.SystemLevelisedCostOfTransmission.Should().Be(default(EnergyPrice));
     }
@@ -80,7 +80,7 @@ public sealed class PowerSystemCostBreakdownTests
         const decimal fixedOperatingCostPerMwYear = 10m;
         Power storagePower = Power.FromMegawatts(10);
         Energy storageEnergy = Energy.FromMegawattHours(40);
-        Energy deliveredEnergy = Energy.FromMegawattHours(180);
+        Energy energyServed = Energy.FromMegawattHours(180);
         Money storageCapex = Money.FromAud(
             (powerCapitalCostPerMw * 10) + (energyCapitalCostPerMwh * 40));
         Money expectedAnnualStorageCost = LevelisedCostCalculator.Annuitise(
@@ -109,15 +109,15 @@ public sealed class PowerSystemCostBreakdownTests
 
         breakdown.TotalAnnualisedStorageCost.Should().Be(expectedAnnualStorageCost);
         breakdown.SystemLevelisedCostOfStorage.Should()
-            .Be(expectedAnnualStorageCost.Per(deliveredEnergy));
+            .Be(expectedAnnualStorageCost.Per(energyServed));
         breakdown.TotalAnnualisedCost.Should().Be(
             breakdown.TotalAnnualisedGenerationCost + expectedAnnualStorageCost);
         breakdown.SystemLevelisedCostOfElectricity.Should().Be(
-            breakdown.TotalAnnualisedCost.Per(deliveredEnergy));
+            breakdown.TotalAnnualisedCost.Per(energyServed));
     }
 
     [Fact]
-    public void Calculate_SeparatesRegionalCostsUsingEachRegionsDeliveredEnergy()
+    public void Calculate_SeparatesRegionalCostsUsingEachRegionsEnergyServed()
     {
         Scenario scenario = TwoRegionScenario();
         DispatchOutcome nswOutcome = DispatchOutcomeFor("NSW1", deliveredMegawattHours: 1);
@@ -159,11 +159,11 @@ public sealed class PowerSystemCostBreakdownTests
             nsw.AnnualisedStorageCost + vic.AnnualisedStorageCost);
         breakdown.TotalAnnualisedCost.Should().Be(
             nsw.TotalAnnualisedCost + vic.TotalAnnualisedCost);
-        breakdown.DeliveredEnergy.Should().Be(nsw.DeliveredEnergy + vic.DeliveredEnergy);
+        breakdown.EnergyServed.Should().Be(nsw.EnergyServed + vic.EnergyServed);
         nsw.LevelisedCostOfElectricity.Should().NotBe(vic.LevelisedCostOfElectricity,
-            "each region must use its own delivered energy denominator");
+            "each region must use its own energy-served denominator");
         breakdown.SystemLevelisedCostOfElectricity.Should().Be(
-            breakdown.TotalAnnualisedCost.Per(breakdown.DeliveredEnergy));
+            breakdown.TotalAnnualisedCost.Per(breakdown.EnergyServed));
     }
 
     [Fact]
@@ -179,7 +179,7 @@ public sealed class PowerSystemCostBreakdownTests
         region.AnnualisedGenerationCost.Should().Be(breakdown.TotalAnnualisedGenerationCost);
         region.AnnualisedStorageCost.Should().Be(breakdown.TotalAnnualisedStorageCost);
         region.TotalAnnualisedCost.Should().Be(breakdown.TotalAnnualisedCost);
-        region.DeliveredEnergy.Should().Be(breakdown.DeliveredEnergy);
+        region.EnergyServed.Should().Be(breakdown.EnergyServed);
         region.LevelisedCostOfGeneration.Should().Be(breakdown.SystemLevelisedCostOfGeneration);
         region.LevelisedCostOfStorage.Should().Be(breakdown.SystemLevelisedCostOfStorage);
         region.LevelisedCostOfElectricity.Should().Be(breakdown.SystemLevelisedCostOfElectricity);
@@ -222,7 +222,7 @@ public sealed class PowerSystemCostBreakdownTests
             RunResult(outcome));
 
         act.Should().Throw<ArgumentOutOfRangeException>()
-            .WithParameterName("deliveredEnergy")
+            .WithParameterName("energyServed")
             .WithMessage("*region 'NSW1'*");
     }
 
@@ -255,7 +255,7 @@ public sealed class PowerSystemCostBreakdownTests
             expectedTransmissionCost,
             "cost scales with both the NSW1-VIC1 weather-site distance and the 700 MW directed capacity");
         breakdown.SystemLevelisedCostOfTransmission.Should().Be(
-            expectedTransmissionCost.Per(breakdown.DeliveredEnergy));
+            expectedTransmissionCost.Per(breakdown.EnergyServed));
         breakdown.TotalAnnualisedCost.Should().Be(
             breakdown.TotalAnnualisedGenerationCost
             + breakdown.TotalAnnualisedStorageCost

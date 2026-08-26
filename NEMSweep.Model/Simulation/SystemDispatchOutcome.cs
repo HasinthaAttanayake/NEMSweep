@@ -54,7 +54,7 @@ public sealed class SystemDispatchOutcome
         StateOfChargeByTechnology = new ReadOnlyDictionary<StorageTechnology, StockSeries>(
             new Dictionary<StorageTechnology, StockSeries>(stateOfChargeByTechnology));
         Unserved = unserved;
-        DeliveredToLoad = demand.Subtract(unserved);
+        EnergyServed = demand.Subtract(unserved);
         Imports = imports;
         Exports = exports;
         InterconnectorFlows = Array.AsReadOnly(interconnectorFlows.ToArray());
@@ -67,9 +67,9 @@ public sealed class SystemDispatchOutcome
         ValidateTransmissionLosses(derivedLosses, solverLosses, interconnectorFlows);
         ValidateEnergyIdentity();
         FlowSeries reliabilityZero = ZeroFlow();
-        var reliabilityDelivered = new Dictionary<GenerationTechnology, FlowSeries>
+        var reliabilityServed = new Dictionary<GenerationTechnology, FlowSeries>
         {
-            [GenerationTechnology.Coal] = DeliveredToLoad,
+            [GenerationTechnology.Coal] = EnergyServed,
         };
         var reliabilityZeroByTechnology = new Dictionary<GenerationTechnology, FlowSeries>
         {
@@ -77,9 +77,9 @@ public sealed class SystemDispatchOutcome
         };
         Reliability = ReliabilityMetrics.FromOutcome(new DispatchOutcome(
             "SYSTEM",
-            reliabilityDelivered,
+            reliabilityServed,
             reliabilityZeroByTechnology,
-            reliabilityDelivered,
+            reliabilityServed,
             reliabilityZeroByTechnology,
             Demand,
             Unserved,
@@ -294,10 +294,10 @@ public sealed class SystemDispatchOutcome
     public FlowSeries Unserved { get; }
 
     /// <summary>
-    /// Demand less unserved demand, in MW: the load actually served. Integrated over the run,
+    /// Energy served: demand less unserved demand, in MW. Integrated over the run,
     /// this is the denominator of every levelised cost the model publishes.
     /// </summary>
-    public FlowSeries DeliveredToLoad { get; }
+    public FlowSeries EnergyServed { get; }
 
     /// <summary>Total power received by regions from other regions, in MW, net of losses.</summary>
     public FlowSeries Imports { get; }

@@ -400,8 +400,8 @@ loss allocation.
 ### Every levelised figure is divided by energy served
 
 **Where:** `PowerSystemCostBreakdown`, `RegionCostBreakdown`
-**Impact:** the denominator is `DispatchOutcome.DeliveredToLoad`, meaning demand minus unserved,
-never generation. A regional levelised cost uses only that region's served energy, never the system
+**Impact:** the denominator is `DispatchOutcome.EnergyServed`, meaning demand minus unserved,
+never generation. A regional levelised cost uses only that region's energy served, never the system
 total.
 
 ## Next

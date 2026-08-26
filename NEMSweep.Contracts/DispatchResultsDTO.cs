@@ -258,8 +258,8 @@ public sealed record DispatchMetricsDTO(
 
 /// <summary>
 /// Annualised and levelised cost evidence for a single-scenario dispatch run. These are modelled
-/// estimates, not audited figures. Every levelised (SLCoE) rate divides by delivered-to-load
-/// energy, i.e. demand minus unserved energy, not by gross generation.
+/// estimates, not audited figures. Every levelised (SLCoE) rate divides by energy served,
+/// i.e. demand minus unserved energy, not by gross generation.
 /// </summary>
 /// <param name="Status">
 /// Legacy free-text cost-calculation status, always <c>"calculated"</c> in current writers. Not
@@ -269,11 +269,11 @@ public sealed record DispatchMetricsDTO(
 /// <param name="AnnualisedGenerationCostAud">Total annualised generation capex, fixed OPEX, variable OPEX, and fuel cost, in AUD/year.</param>
 /// <param name="AnnualisedStorageCostAud">Total annualised storage capex and fixed OPEX, in AUD/year.</param>
 /// <param name="TotalAnnualisedCostAud">Generation plus storage annualised cost, in AUD/year. Excludes transmission; see <see cref="AnnualisedTransmissionCostAud"/>.</param>
-/// <param name="GenerationSlcoeAudPerMwh">Annualised generation cost divided by delivered-to-load energy, in AUD/MWh.</param>
-/// <param name="StorageSlcoeAudPerMwh">Annualised storage cost divided by delivered-to-load energy, in AUD/MWh. Not a standalone levelised cost of storage; storage charging energy is already priced into generation VOM and fuel cost.</param>
+/// <param name="GenerationSlcoeAudPerMwh">Annualised generation cost divided by energy served, in AUD/MWh.</param>
+/// <param name="StorageSlcoeAudPerMwh">Annualised storage cost divided by energy served, in AUD/MWh. Not a standalone levelised cost of storage; storage charging energy is already priced into generation VOM and fuel cost.</param>
 /// <param name="SlcoeAudPerMwh">Total system levelised cost of electricity: generation plus storage SLCoE, in AUD/MWh.</param>
 /// <param name="AnnualisedTransmissionCostAud">Annualised transmission cost, in AUD/year; zero when <see cref="TransmissionCostStatus"/> is <see cref="Contracts.TransmissionCostStatus.NotModelled"/>.</param>
-/// <param name="TransmissionSlcotAudPerMwh">Annualised transmission cost divided by delivered-to-load energy, in AUD/MWh.</param>
+/// <param name="TransmissionSlcotAudPerMwh">Annualised transmission cost divided by energy served, in AUD/MWh.</param>
 /// <param name="TransmissionCostStatus">Whether transmission cost was calculated for this run or left out of scope.</param>
 /// <param name="NetImportedEnergyMwh">Imported energy minus exported energy over the period, in MWh; always zero for this unlinked single-region artifact.</param>
 /// <param name="GenerationCostContributions">Annualised and levelised generation cost broken down by technology; sums to <see cref="AnnualisedGenerationCostAud"/>.</param>

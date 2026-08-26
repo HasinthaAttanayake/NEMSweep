@@ -9,7 +9,7 @@ public sealed class CostQuantityTests
     public void RawValues_EncodeEachEconomicMeaning()
     {
         Money.FromAud(12.34m).Aud.Should().Be(12.34m);
-        EnergyPrice.FromAudPerMwhDelivered(56.78m).AudPerMwhDelivered.Should().Be(56.78m);
+        EnergyPrice.FromAudPerMwhServed(56.78m).AudPerMwhServed.Should().Be(56.78m);
         GenerationEnergyCost.FromAudPerMwhGenerated(4.5m).AudPerMwhGenerated.Should().Be(4.5m);
         PowerCapacityCost.FromAudPerMwCapacity(2.3m).AudPerMwCapacity.Should().Be(2.3m);
         EnergyCapacityCost.FromAudPerMwhCapacity(3.4m).AudPerMwhCapacity.Should().Be(3.4m);
@@ -116,21 +116,21 @@ public sealed class CostQuantityTests
     }
 
     [Fact]
-    public void Money_PerDeliveredEnergy_ReturnsSlcoe()
+    public void Money_PerEnergyServed_ReturnsSlcoe()
     {
         EnergyPrice slcoe = Money.FromAud(1_250m).Per(Energy.FromMegawattHours(10));
 
-        slcoe.Should().Be(EnergyPrice.FromAudPerMwhDelivered(125m));
+        slcoe.Should().Be(EnergyPrice.FromAudPerMwhServed(125m));
     }
 
     [Fact]
-    public void EnergyPrice_MultipliedByDeliveredEnergy_ReturnsMoney()
+    public void EnergyPrice_MultipliedByEnergyServed_ReturnsMoney()
     {
-        EnergyPrice price = EnergyPrice.FromAudPerMwhDelivered(125m);
-        Energy deliveredEnergy = Energy.FromMegawattHours(10);
+        EnergyPrice price = EnergyPrice.FromAudPerMwhServed(125m);
+        Energy energyServed = Energy.FromMegawattHours(10);
 
-        (price * deliveredEnergy).Should().Be(Money.FromAud(1_250m));
-        (deliveredEnergy * price).Should().Be(Money.FromAud(1_250m));
+        (price * energyServed).Should().Be(Money.FromAud(1_250m));
+        (energyServed * price).Should().Be(Money.FromAud(1_250m));
     }
 
     [Theory]

@@ -1,43 +1,43 @@
 namespace NEMSweep.Model.Units;
 
 /// <summary>
-/// Money per unit of energy delivered to load, in AUD/MWh delivered.
+/// Money per unit of energy served, in AUD/MWh served.
 /// <para>
 /// This is the output unit of system levelised cost of energy (SLCoE). It is
 /// deliberately distinct from <see cref="GenerationEnergyCost"/>, which prices
-/// gross generator output rather than energy delivered to load.
+/// gross generator output rather than energy served.
 /// </para>
 /// </summary>
 public readonly record struct EnergyPrice
 {
-    /// <summary>The price in AUD per MWh delivered to load.</summary>
-    public decimal AudPerMwhDelivered { get; }
+    /// <summary>The price in AUD per MWh served.</summary>
+    public decimal AudPerMwhServed { get; }
 
-    private EnergyPrice(decimal audPerMwhDelivered) =>
-        AudPerMwhDelivered = audPerMwhDelivered;
+    private EnergyPrice(decimal audPerMwhServed) =>
+        AudPerMwhServed = audPerMwhServed;
 
-    /// <summary>Creates a price from AUD per MWh delivered to load.</summary>
-    public static EnergyPrice FromAudPerMwhDelivered(decimal audPerMwhDelivered) =>
-        new(audPerMwhDelivered);
-
-    /// <summary>
-    /// Cost of delivered energy: AUD = AUD/MWh delivered × MWh delivered.
-    /// Delivered energy must be non-negative and finite.
-    /// </summary>
-    public Money For(Energy deliveredEnergy) => Money.FromAud(
-        AudPerMwhDelivered * DecimalPhysicalBoundary.RequireNonNegativeFinite(
-            deliveredEnergy.MegawattHours,
-            nameof(deliveredEnergy)));
+    /// <summary>Creates a price from AUD per MWh served.</summary>
+    public static EnergyPrice FromAudPerMwhServed(decimal audPerMwhServed) =>
+        new(audPerMwhServed);
 
     /// <summary>
-    /// Cost of delivered energy: AUD = AUD/MWh delivered × MWh delivered.
+    /// Cost of energy served: AUD = AUD/MWh served × MWh served.
+    /// Energy served must be non-negative and finite.
     /// </summary>
-    public static Money operator *(EnergyPrice price, Energy deliveredEnergy) =>
-        price.For(deliveredEnergy);
+    public Money For(Energy energyServed) => Money.FromAud(
+        AudPerMwhServed * DecimalPhysicalBoundary.RequireNonNegativeFinite(
+            energyServed.MegawattHours,
+            nameof(energyServed)));
 
     /// <summary>
-    /// Cost of delivered energy: AUD = MWh delivered × AUD/MWh delivered.
+    /// Cost of energy served: AUD = AUD/MWh served × MWh served.
     /// </summary>
-    public static Money operator *(Energy deliveredEnergy, EnergyPrice price) =>
-        price * deliveredEnergy;
+    public static Money operator *(EnergyPrice price, Energy energyServed) =>
+        price.For(energyServed);
+
+    /// <summary>
+    /// Cost of energy served: AUD = MWh served × AUD/MWh served.
+    /// </summary>
+    public static Money operator *(Energy energyServed, EnergyPrice price) =>
+        price * energyServed;
 }
