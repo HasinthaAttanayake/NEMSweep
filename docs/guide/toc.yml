@@ -2,6 +2,8 @@
   href: index.md
 - name: CLI reference
   href: cli.md
+- name: Running the container
+  href: container.md
 - name: Input bundles
   href: input-bundles.md
 - name: Scenario configuration

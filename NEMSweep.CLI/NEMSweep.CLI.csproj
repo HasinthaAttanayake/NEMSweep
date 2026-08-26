@@ -39,6 +39,34 @@
     </ItemGroup>
   </Target>
 
+  <!--
+    Container image, built by the SDK rather than a Dockerfile, so there is no daemon in the build
+    and no second description of the app to keep in step.
+
+    Framework-dependent on a chiseled runtime base: a .NET security fix then becomes a rebase rather
+    than a recompile, the runtime layer is shared, and chiseled keeps the CVE surface small enough
+    to clear a registry scanner and runs as a non-root user by default, which is what stops
+    bind-mounted output landing root-owned.
+
+    Deliberately not trimmed and not AOT: ClosedXML and OpenXml resolve types by reflection, so
+    trimming would break workbook and archive ingestion at run time while the build stayed green.
+  -->
+  <PropertyGroup>
+    <EnableSdkContainerSupport>true</EnableSdkContainerSupport>
+    <ContainerFamily>noble-chiseled</ContainerFamily>
+    <ContainerRepository>hasinthaattanayake/nemsweep</ContainerRepository>
+    <RuntimeIdentifiers>linux-x64;linux-arm64</RuntimeIdentifiers>
+    <ContainerRuntimeIdentifiers>linux-x64;linux-arm64</ContainerRuntimeIdentifiers>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The image's own defaults for the two roots, so a run is a pair of mounts and nothing else.
+         Data lives outside the image by design; the settings file baked into it sits in a
+         read-only layer, which is why these are environment variables. -->
+    <ContainerEnvironmentVariable Include="NEMSWEEP_DATA_ROOT" Value="/data" />
+    <ContainerEnvironmentVariable Include="NEMSWEEP_OUTPUT" Value="/out" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="ClosedXML" Version="0.105.1" />
     <PackageReference Include="CsvHelper" Version="33.1.0" />
