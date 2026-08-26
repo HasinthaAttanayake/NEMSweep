@@ -1,8 +1,12 @@
 # Schemas
 
-A scenario config and a sweep definition each have a published JSON Schema (draft 2020-12). Point an
-editor at one and you get autocomplete on field names, validation as you type, and hover
-documentation. For hand-editing JSON that is the difference between guessing and being guided.
+The `NEMSweep.CLI` scenario config and sweep definition each have a published JSON Schema
+(draft 2020-12). Point an editor at one and you get autocomplete on field names, validation as you
+type, and hover documentation. For hand-editing JSON that is the difference between guessing and
+being guided.
+
+The schemas describe the two CLI input formats. They say nothing about the framework, which has no
+JSON interface of its own.
 
 ## Use them
 

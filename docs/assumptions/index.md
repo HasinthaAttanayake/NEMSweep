@@ -4,7 +4,9 @@ There are two kinds of assumption in a NEMSweep result, and confusing them is th
 misread one.
 
 **Model assumptions** are baked into the code. You cannot change them by editing a scenario, and
-every run carries them. They are the subject of this page.
+every run carries them. They are the subject of this page. Most are framework constants in
+`NEMSweep.Model`; a few, marked in place, are properties of the input data the published example
+was built from (the typical-year weather, operational demand) rather than of the framework code.
 
 **Scenario parameters** are values *you* supply: discount rate, capital costs, round-trip
 efficiencies, technical lives, fuel prices, installed capacities. NEMSweep makes no claim about them;
@@ -84,15 +86,35 @@ averaging regional percentages, which would weight a small region equally with a
 
 ## Dispatch
 
-### Hourly intervals, one modelled year
+### Fixed one-hour timestep
 
-**Where:** `SystemDispatchOutcome.CreateCore` requires hourly resolution; the scenario declares a
-period.
-**Why:** demand data arrives half-hourly and weather hourly; hourly is the coarsest resolution both
-support and the finest the weather justifies.
+**Where:** `DemandProfile.Resolution` is fixed at one hour; `DispatchOutcome` and
+`SystemDispatchOutcome` reject any other resolution. A framework constant, not a CLI or data choice:
+half-hourly demand input is resampled to the hourly timestep before the grid model sees it.
+**Why:** one hour is the coarsest step the demand and weather inputs both support, and the finest
+the typical-year weather justifies.
 **Impact:** sub-hourly ramping and within-hour variability are invisible. Storage requirements
 driven by minute-scale events are not captured at all.
 **Revisit when:** you need to model frequency support or fast response, which this model cannot do.
+
+### One fixed market-time offset per run, no daylight saving
+
+**Where:** `MarketTime` accepts any fixed offset in `[-12:00, +14:00]` at quarter-hour granularity;
+`Scenario` requires both period bounds to carry the same one, and `TimeSeries.RequireAligned`
+rejects a run that mixes offsets. The offset is `Scenario.MarketTimeOffset`.
+**Why:** a market runs on one clock all year. Modelling that as a single fixed offset keeps
+calendar-hour alignment trivial and rules out daylight-saving ambiguity.
+**Impact:** the model cannot represent a grid that genuinely spans two timezones, and it applies no
+daylight-saving shift. The published example uses the NEM's UTC+10; a caller ingesting another
+single-timezone market's demand and weather gets that market's offset instead.
+**Revisit when:** you need per-region clocks or daylight-saving handling, neither of which this
+model does.
+
+### The cost engine prices exactly one modelled year
+
+**Where:** `PowerSystemCostCalculator` rejects a scenario whose period is not exactly one year.
+**Impact:** dispatch and storage sizing accept any period, but a priced result covers one year, so
+the annuitised figures compare a year of build-and-run cost against a year of energy served.
 
 ### Interval outer loop, region inner loop
 
@@ -100,7 +122,7 @@ driven by minute-scale events are not captured at all.
 **Why:** so every region sits at the same hour at the same time and a surplus in one can serve a
 deficit in another within that hour.
 **Impact:** a system with no interconnectors produces results identical to dispatching each region
-alone. Adding a link changes results only through transfer, never through the loop structure.
+alone. Adding a link changes a result only through transfer, never through the loop structure.
 
 ### Order within an interval: generation, then transfer, then storage
 
@@ -178,8 +200,8 @@ introduces one.
 ### Only Battery is sizeable; pumped hydro is fixed
 
 **Where:** `StorageSizingService`, `StorageSizingSearch`
-**Why:** new pumped hydro is a site-specific project with a fixed reservoir, not a quantity that can
-be scaled freely. Batteries are, to a first approximation, purchasable in arbitrary quantity.
+**Why:** new pumped hydro is a site-specific project with a fixed reservoir, not a quantity that
+scales freely. A battery fleet does scale in arbitrary increments.
 **Impact:** a scenario that would be better served by more pumped hydro will instead be given
 batteries, at battery economics.
 
@@ -259,17 +281,19 @@ excludes the tail events that drive storage and reliability. See
 
 **Where:** the input bundle's `weather/{REGION}/solar` and `weather/{REGION}/wind`
 **Why:** the best solar resource and the best wind resource in a region are rarely co-located.
-**Impact:** the solar site doubles as the region's location for transmission costing, which is the
-approximation described above. There is no single weather basis for a whole-system result: each
-region is simulated against its own typical year.
+**Impact:** the solar site's coordinates drive that region's solar-geometry calculation and are
+published as the region's location in `dim_region` and on each result. They are not used for
+transmission cost, which takes a declared route length, and not for the network map, which draws
+each region at its coastline centroid. There is no single weather basis for a whole-system result;
+each region is simulated against its own typical year.
 
 ### Demand is operational demand, exogenous and inelastic
 
 **Where:** AEMO actual operational demand archives; `DemandProfile`
 **Impact:** rooftop PV is already netted out. See
-[Limitations §2](limitations.md#2-the-82-renewable-target-is-not-the-same-target-on-a-grid-scale-basis).
+[Limitations §2](limitations.md#2-renewable-share-is-measured-on-operational-demand-not-a-rooftop-inclusive-basis).
 Demand does not respond to price or to scarcity. Additive components, such as a data-centre load,
-are added on top as flat full-load-factor flows unless a shape is supplied.
+are added on top as flat full-load-factor flows.
 
 ### The model is deterministic
 
@@ -379,15 +403,15 @@ spatial diversity between turbines.
 **Where:** `LevelisedCostCalculator`
 **Why:** so a single modelled year can carry its share of assets that last decades.
 **Impact:** the discount rate is real, not nominal. Costs are stated in the scenario's real-dollar
-year, so inflation must not be applied twice. At a zero rate the annuity formula is undefined and
-recovery degenerates to straight-line, `1/n`.
+year, so inflation must not be applied twice. At a zero rate the capital recovery factor is
+undefined and recovery degenerates to straight-line, `1/n`.
 
 ### One year of operating cost, on gross generation
 
 **Where:** `PowerSystemCostCalculator`
 **Impact:** variable operating cost and fuel are charged on **gross** generated energy, which is
 why storage charging losses are already priced and the storage component adds no charging energy of
-its own. The storage figure is annualised storage asset cost over served energy; it is **not** a
+its own. The storage figure is annualised storage asset cost over energy served; it is **not** a
 standalone levelised cost of storage.
 
 ### Transmission is charged once, at system level
@@ -400,9 +424,11 @@ loss allocation.
 ### Every levelised figure is divided by energy served
 
 **Where:** `PowerSystemCostBreakdown`, `RegionCostBreakdown`
-**Impact:** the denominator is `DispatchOutcome.EnergyServed`, meaning demand minus unserved,
-never generation. A regional levelised cost uses only that region's energy served, never the system
-total.
+**Impact:** the denominator is energy served, meaning demand minus unserved energy, never
+generation. It is published as the scalar `energyServedMwh` and held in code as
+`DispatchOutcome.EnergyServed`. A regional levelised cost uses only that region's energy served,
+never the system total. Do not confuse energy served (the cost denominator) with delivered
+generation (`deliveredGenerationMwh`), which is the generation that reached load.
 
 ## Next
 

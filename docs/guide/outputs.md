@@ -1,8 +1,9 @@
 # Outputs and provenance
 
-This page is for reading the JSON NEMSweep produces, or consuming it programmatically. Everything
-here is written by `NEMSweep.CLI`, under the **output root** for results and sweeps and under the
-**data root** for the imported inputs a scenario reads. Both are yours to choose; see the
+This page is for reading the JSON NEMSweep produces, or consuming it programmatically. Every
+artifact described here is written by `NEMSweep.CLI`: the framework itself returns objects, not
+files. Results and sweeps go under the **output root**, and the imported inputs a scenario reads go
+under the **data root**. Both are yours to choose; see the
 [CLI reference](cli.md#the-workspace).
 
 ## Artifact map

@@ -1,10 +1,14 @@
 # Scenario configuration
 
-A scenario config is a single JSON file describing every region NEMSweep will dispatch: its demand
-and weather inputs, its generating and storage fleets, the interconnectors linking it to other
-regions, the cost basis the run is priced against, and the bounds the storage-sizing search may use
-to grow a region's Battery capacity. `--run-scenario` reads one of these, dispatches it hour by
-hour across the modelled year, and writes the results.
+A scenario config is the `NEMSweep.CLI` input format. It is a single JSON file describing every
+region a run will dispatch: its demand and weather inputs, its generating and storage fleets, the
+interconnectors linking it to other regions, the cost basis the run is priced against, and the
+bounds the storage-sizing search may use to grow a region's Battery capacity. `--run-scenario` reads
+one of these, dispatches it over the period its demand series cover, and writes the results.
+
+The five-region rule below is the CLI's, enforced because the demand and weather artifacts it
+ingests are National Electricity Market data. The framework itself takes region identifiers as
+free-form strings.
 
 The authoritative machine-readable form of everything on this page is the published JSON Schema:
 
@@ -186,5 +190,5 @@ demand and weather under its own offset instead.
 - [Scenario parameters](../assumptions/scenario-parameters.md): what these values mean in the
   model and how to think about choosing them. They are assumptions you supply, not constants the
   model derives.
-- [Sweeps](sweeps.md): varying one scenario field across a series of runs instead of hand-editing
-  copies of this file.
+- [Sweeps](sweeps.md): applying override patches to this file across a series of runs on one
+  labelled axis, instead of hand-editing copies of it.

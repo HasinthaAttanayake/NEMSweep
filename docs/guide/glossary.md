@@ -1,26 +1,31 @@
 # Glossary
 
 Terms NEMSweep uses without explaining them elsewhere. Where a word has a general meaning and a
-narrower one here, the narrower one is what the model means.
+narrower one here, the narrower one is what the model means. Terms are marked as framework, CLI or
+published-example concepts where the distinction matters.
 
 ## Dispatch
 
-**Dispatch.** Deciding, for each hour, which generators run and how much they produce. NEMSweep
-dispatches by merit order and does not model bidding, prices or settlement.
+**Dispatch.** Deciding, for each interval, which generators run and how much they produce. A
+framework concept. NEMSweep dispatches by merit order and does not model bidding, prices or
+settlement.
 
-**Merit order.** The order generators are called on in, cheapest short-run marginal cost first.
-Wind and solar come first because their marginal cost is zero, then hydro against its energy budget,
-then thermal plant by fuel cost times heat rate.
+**Merit order.** The order generators are called on in, lowest short-run marginal cost first, ties
+broken by technology. Wind, solar and hydro all have zero short-run marginal cost and so tie at the
+front; hydro is additionally rationed against a monthly energy budget by a causal pacer, so it does
+not spend that budget on whichever intervals come first. Thermal plant follows, ordered by fuel
+price times heat rate.
 
 **Curtailment.** Generation that was available but neither delivered to demand nor stored, so it was
-spilled. High curtailment usually means the system has more variable generation than it can use at
-that hour.
+spilled. High curtailment usually means the system has more variable generation than it can use in
+that interval.
 
 **Unserved energy.** Demand not met by generation, storage discharge or imports. Reported both as
-MWh and as a percentage of demand, which is what the reliability standard is expressed against.
+MWh and as a percentage of demand energy, which is what the reliability standard is expressed
+against.
 
-**Interval.** One hour. Every series in a result is one value per interval, and interval values are
-average MW rather than instantaneous.
+**Interval.** One hour. The framework's grid model runs on a fixed one-hour timestep. Every series
+in a result is one value per interval, as average MW rather than instantaneous.
 
 ## Storage
 
@@ -49,11 +54,16 @@ needed storage, or outside it because the search was capped, and those are diffe
 
 ## Economics
 
-**SLCOE.** System levelised cost of energy, in AUD per MWh **served**. Annuitised capital plus fixed
-and variable operating cost, divided by energy served. It is the cost of building and running the
-system, not a retail bill and not a market price.
+**SLCoE.** System levelised cost of electricity, in AUD per MWh served. Annuitised capital plus
+fixed and variable operating cost, divided by energy served. It is the cost of building and running
+the system, not a retail bill and not a market price.
 
-**SLCOT.** The transmission equivalent, levelised cost of transmission per MWh served.
+**SLCoT.** The transmission equivalent, levelised cost of transmission per MWh served.
+
+**Energy served.** Demand minus unserved energy: the energy the system actually met. The
+denominator of every levelised cost, published as `energyServedMwh`. Not the same as **delivered
+generation** (`deliveredGenerationMwh`), which is the generation that reached load, after
+curtailment and storage charging.
 
 **Cost basis.** The year costs are expressed in, and the real discount rate used to annuitise
 capital. Both are scenario inputs, so two runs are only comparable if they share them.
@@ -63,12 +73,13 @@ rate, so a one-off build cost can be compared against annual operating cost.
 
 ## Studies
 
-**Scenario.** One system described in one file: regions, their demand and weather artifacts, their
-generating and storage fleets, and the interconnectors between them. One scenario produces one
-result.
+**Scenario.** One system described in one CLI config file: regions, their demand and weather
+artifacts, their generating and storage fleets, and the interconnectors between them. One scenario
+produces one result.
 
-**Sweep.** A series of runs that differ in one controlled way. Each point is the baseline scenario
-with a small set of overrides applied, so everything except the varied input is held constant.
+**Sweep.** A baseline scenario config plus a set of points, run and published together. Each point
+is a free-form override patch on the baseline, and the points sit along one labelled axis. A point
+may change any number of inputs.
 
 **Point.** One run within a sweep, identified by a `pointId` and positioned on the sweep's axis by
 its `axisValue`.

@@ -94,8 +94,9 @@ Adapt this. The structure matters more than the wording: role, contract, task, c
 format.
 
 ```text
-You are helping design a sweep for NEMSweep, a deterministic hourly grid dispatch model
-for Australia's National Electricity Market.
+You are helping design a sweep for NEMSweep, a deterministic hourly grid dispatch,
+reliability and storage-sizing model. This sweep runs it against Australian National
+Electricity Market data: five regions (NSW1, QLD1, SA1, TAS1, VIC1) at hourly resolution.
 
 CONTRACT
 Sweep definition JSON Schema:

@@ -1,21 +1,22 @@
 # Input bundles
 
-An input bundle is a directory of raw upstream source files (AEMO demand archives, an AEMO
-generation workbook and EnergyPlus weather files) plus a manifest describing what the bundle claims
-to cover. It exists so that everything a run depends on can be validated as a unit, in one place,
-before anything derived from it is written. Bundle ingestion is all-or-nothing: `--ingest` loads
-the whole bundle, checks the shape and content of every file in it, and only then produces the
-per-region JSON that scenarios actually reference.
+An input bundle is the raw material `NEMSweep.CLI` turns into the per-region artifacts a scenario
+reads. It is a directory of upstream source files (AEMO demand archives, an AEMO generation
+workbook and EnergyPlus weather files) plus a manifest describing what the bundle claims to cover.
+It exists so that everything a run depends on can be validated as a unit, in one place, before
+anything derived from it is written. Bundle ingestion is all-or-nothing: `--ingest` loads the whole
+bundle, checks the shape and content of every file in it, and only then produces the per-region
+JSON that scenarios reference.
 
 The single-source commands (`--import-demand`, `--generation-information` and `--epw-report`) read
-one kind of source at a time and are there for iterating on a single input. They bypass the
+one kind of source at a time and are there for iterating on one of them. They bypass the
 whole-bundle check, so a bundle you intend to publish from should still go through
 `--validate-inputs` and `--ingest`.
 
-The live bundle lives at `NEMSweep.CLI/data/nemsweep-inputs/` and is gitignored, because it is large and
-is derived from third-party sources you fetch yourself rather than something the repository
-carries. What follows describes its required shape rather than assuming you have a copy of it
-open.
+The bundle path is the `inputBundleRoot` setting, resolved against your working directory, and
+`data/nemsweep-inputs/` in the committed example settings. It is gitignored, because it is large and
+is fetched from third-party sources rather than carried in the repository. This page describes the
+shape `InputBundle.Load` requires, so you do not need a copy open to follow it.
 
 ## Directory layout
 
@@ -80,11 +81,10 @@ independently and for different reasons, the solar site for the quality of its s
 the wind site for the quality of its wind resource, so they are frequently different physical
 locations within the region.
 
-This matters beyond generation shape. The **solar** site's coordinates are the model's *only*
-source of that region's location, published on every dispatch result as that region's endpoint
-coordinates for map display (see [Scenario configuration](scenarios.md#interconnectors)). Transmission
-cost does not depend on it: an interconnector's route length is a scenario value you declare
-directly, not derived from a region's weather file.
+This matters beyond generation shape. The **solar** site's coordinates are the model's only source
+of that region's location: they drive the region's solar-geometry calculation and are published as
+its coordinates on each result and in `dim_region`. Two things do not use them: transmission cost
+takes a declared `routeLengthKm`, and the network map draws each region at its coastline centroid.
 
 No file in the repository records why a given site was chosen for a given role. That context is
 currently held only by the person who built the bundle. Document your own reasoning somewhere
@@ -92,7 +92,7 @@ durable if you change an assignment.
 
 ### The FY2026 bundle's current assignment
 
-Checked directly against `NEMSweep.CLI/data/nemsweep-inputs/manifest.json` and the `weather/` subdirectory
+Checked directly against `data/nemsweep-inputs/manifest.json` and the `weather/` subdirectory
 contents. The bundle currently covers all five NEM regions:
 
 | Region | Solar site | Wind site |
@@ -147,6 +147,6 @@ as a warning at validation time, not silently absorbed.
 
 - [Scenario configuration](scenarios.md): how `demandFile` and `weatherFile` are referenced once a
   bundle has been ingested.
-- [Limitations](../assumptions/limitations.md): the consequences of the solar-site-as-location
-  assumption above.
+- [Limitations](../assumptions/limitations.md): where the typical-year weather and the
+  solar-site-as-region-location choices affect a result.
 - [CLI reference](cli.md): the full set of commands, including `--validate-inputs` and `--ingest`.

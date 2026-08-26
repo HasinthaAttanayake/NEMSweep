@@ -230,7 +230,7 @@ public enum SweepFailureStage
 /// is a copy of a figure in the point's own detail artifact; the display label and unit for each
 /// come from <see cref="SweepScalarCatalog"/>.
 /// </summary>
-/// <param name="SlcoeAudPerMwh">System levelised cost of energy, in AUD per MWh served.</param>
+/// <param name="SlcoeAudPerMwh">System levelised cost of electricity, in AUD per MWh served.</param>
 /// <param name="GenerationSlcoeAudPerMwh">Generation component of levelised cost, in AUD per MWh served.</param>
 /// <param name="StorageSlcoeAudPerMwh">Storage component of levelised cost, in AUD per MWh served.</param>
 /// <param name="DemandMwh">Total demand energy over the dispatch period, in MWh.</param>

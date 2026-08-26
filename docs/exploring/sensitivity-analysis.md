@@ -67,7 +67,8 @@ compare them with the compliant points.
 | p7 | 3,500 MW | 7,784 | 46,023 |
 | **p8** | **4,000 MW** | **7,849** | **85,212** |
 | p9 | 4,500 MW | 9,325 | 97,641 |
-| p10+ | 5,000 MW and above | 12,234 | 108,870 |
+| p10 | 5,000 MW | 12,234 | 97,138 |
+| p11–p24 | 5,400 MW and above | 12,234 | 108,870 |
 
 Two things to notice.
 
@@ -76,8 +77,11 @@ The step from p7 to p8, which is 500 MW of load, adds 39 GWh and nearly doubles 
 requirement is not proportional to load; it is driven by how the new load interacts with the
 existing generation shape, and there is a point where the existing shape stops covering it.
 
-**Capacity plateaus once sizing stops succeeding.** From p10 onward, 12,234 MW / 108,870 MWh is
-where the search stopped, not what the system needs. Reading it as a requirement would be wrong.
+**Capacity plateaus once sizing stops succeeding.** From p11 onward the search settles on the same
+12,234 MW / 108,870 MWh at every point, because the outcome is `storageNoLongerImprovesReliability`:
+larger batteries stopped materially reducing unserved energy, so the search reports the last size
+that helped. That figure is where the search gave up, not what the system needs. Reading it as a
+requirement would be wrong.
 
 ## Step 4: decompose the cost before reading the total
 
@@ -135,7 +139,7 @@ as curtailment falls, more of the existing renewable fleet reaches load, so it r
 
 Both are correct. They answer different questions. Quoting one without saying which basis it uses
 is exactly the error described in
-[Limitations §2](../assumptions/limitations.md#2-the-82-renewable-target-is-not-the-same-target-on-a-grid-scale-basis).
+[Limitations §2](../assumptions/limitations.md#2-renewable-share-is-measured-on-operational-demand-not-a-rooftop-inclusive-basis).
 
 ## What this sweep supports, and what it does not
 
