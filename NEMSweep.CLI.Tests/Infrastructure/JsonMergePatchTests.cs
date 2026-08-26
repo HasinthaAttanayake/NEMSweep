@@ -55,6 +55,48 @@ public sealed class JsonMergePatchTests
     }
 
     [Fact]
+    public void Apply_MergesInterconnectorsByEndpointPairAndAppendsNewLinks()
+    {
+        JsonNode result = JsonMergePatch.Apply(
+            Parse("""{ "interconnectors": [{ "fromRegionId": "NSW1", "toRegionId": "QLD1", "capacityMw": 957 }, { "fromRegionId": "QLD1", "toRegionId": "NSW1", "capacityMw": 1610 }] }"""),
+            Parse("""{ "interconnectors": [{ "fromRegionId": "NSW1", "toRegionId": "QLD1", "capacityMw": 2000 }, { "fromRegionId": "VIC1", "toRegionId": "NSW1", "capacityMw": 1700, "routeLengthKm": 300 }] }"""));
+
+        result.ToJsonString().Should().Be("{\"interconnectors\":[{\"fromRegionId\":\"NSW1\",\"toRegionId\":\"QLD1\",\"capacityMw\":2000},{\"fromRegionId\":\"QLD1\",\"toRegionId\":\"NSW1\",\"capacityMw\":1610},{\"fromRegionId\":\"VIC1\",\"toRegionId\":\"NSW1\",\"capacityMw\":1700,\"routeLengthKm\":300}]}");
+    }
+
+    [Fact]
+    public void Apply_RemovesAnInterconnectorByEndpointPairWithoutTouchingItsReverse()
+    {
+        JsonNode result = JsonMergePatch.Apply(
+            Parse("""{ "interconnectors": [{ "fromRegionId": "TAS1", "toRegionId": "VIC1", "capacityMw": 594 }, { "fromRegionId": "VIC1", "toRegionId": "TAS1", "capacityMw": 478 }] }"""),
+            Parse("""{ "interconnectors": [{ "fromRegionId": "TAS1", "toRegionId": "VIC1", "$remove": true }] }"""));
+
+        result.ToJsonString().Should().Be("{\"interconnectors\":[{\"fromRegionId\":\"VIC1\",\"toRegionId\":\"TAS1\",\"capacityMw\":478}]}");
+    }
+
+    [Fact]
+    public void Apply_RejectsInterconnectorRemoveItemCarryingAnExtraField()
+    {
+        var act = () => JsonMergePatch.Apply(
+            Parse("""{ "interconnectors": [] }"""),
+            Parse("""{ "interconnectors": [{ "fromRegionId": "TAS1", "toRegionId": "VIC1", "capacityMw": 594, "$remove": true }] }"""));
+
+        act.Should().Throw<FormatException>()
+            .WithMessage("*interconnectors*remove item 0*'fromRegionId', 'toRegionId'*$remove*");
+    }
+
+    [Fact]
+    public void Apply_RejectsInterconnectorPatchItemMissingAnEndpoint()
+    {
+        var act = () => JsonMergePatch.Apply(
+            Parse("""{ "interconnectors": [] }"""),
+            Parse("""{ "interconnectors": [{ "fromRegionId": "NSW1", "capacityMw": 957 }] }"""));
+
+        act.Should().Throw<FormatException>()
+            .WithMessage("*interconnectors*item 0*toRegionId*");
+    }
+
+    [Fact]
     public void Apply_RejectsMalformedKeyedPatchItems()
     {
         var act = () => JsonMergePatch.Apply(

@@ -149,6 +149,31 @@ public sealed class SweepFanOutTests
         fleets[1]!["nameplateCapacityMw"]!.GetValue<double>().Should().Be(100);
     }
 
+    [Fact]
+    public void Run_InterconnectorOverride_EditsOneLinkAndRemovesAnotherWithoutRestatingTheRest()
+    {
+        using var fixture = new SweepFixture();
+        fixture.WriteInterconnectedBaseline();
+        fixture.WriteDefinition("""
+            [{ "pointId": "p1", "axisValue": 2500, "label": "NSW-QLD to 2500 MW, drop the reverse", "overrides": {
+                "interconnectors": [
+                    { "fromRegionId": "NSW1", "toRegionId": "QLD1", "capacityMw": 2500 },
+                    { "fromRegionId": "QLD1", "toRegionId": "NSW1", "$remove": true }
+                ]
+            } }]
+            """);
+
+        SweepFanOutCommand.Run(new CliContext(fixture.Paths, fixture.Settings, TextWriter.Null), "sweeps/test-sweep.json");
+
+        string path = Path.Combine(fixture.RootPath, "sweeps", "test-sweep", "configs", "p1.json");
+        JsonArray links = JsonNode.Parse(File.ReadAllText(path))!["interconnectors"]!.AsArray();
+        links.Select(link => $"{link!["fromRegionId"]!.GetValue<string>()}->{link["toRegionId"]!.GetValue<string>()}")
+            .Should().Equal("NSW1->QLD1", "VIC1->NSW1");
+        links[0]!["capacityMw"]!.GetValue<double>().Should().Be(2500);
+        links[0]!["routeLengthKm"]!.GetValue<double>().Should().Be(500);
+        ScenarioConfig.Load(path).Interconnectors!.Should().HaveCount(2);
+    }
+
     private sealed class SweepFixture : IDisposable
     {
         public SweepFixture()
@@ -172,6 +197,39 @@ public sealed class SweepFanOutTests
             }
             """);
             Paths = WorkspacePaths.FromRoots(RootPath, RootPath, Path.Combine(RootPath, "out"));
+        }
+
+        /// <summary>
+        /// Replaces the baseline with a three-region config carrying reciprocal interconnectors, so a
+        /// point can be shown editing one link and removing another without restating the array.
+        /// </summary>
+        public void WriteInterconnectedBaseline()
+        {
+            const string region = """
+                { "regionId": "$ID", "demandFile": "demand.json", "weatherFile": "weather.json",
+                  "generatingFleets": [{ "technology": "Gas", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 } }],
+                  "storageFleets": [{ "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0, "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 }, "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 } }] }
+                """;
+            const string link = """
+                { "fromRegionId": "$FROM", "toRegionId": "$TO", "capacityMw": $CAP, "routeLengthKm": $LEN, "capitalCostAudPerKmPerMw": 3860, "fixedOperatingCostAudPerKmPerMwYear": 38.6, "technicalLifeYears": 50 }
+                """;
+            string regions = string.Join(", ", new[] { "NSW1", "QLD1", "VIC1" }
+                .Select(id => region.Replace("$ID", id)));
+            string interconnectors = string.Join(", ", new[]
+            {
+                link.Replace("$FROM", "NSW1").Replace("$TO", "QLD1").Replace("$CAP", "957").Replace("$LEN", "500"),
+                link.Replace("$FROM", "QLD1").Replace("$TO", "NSW1").Replace("$CAP", "1610").Replace("$LEN", "500"),
+                link.Replace("$FROM", "VIC1").Replace("$TO", "NSW1").Replace("$CAP", "1700").Replace("$LEN", "300"),
+            });
+            File.WriteAllText(Path.Combine(RootPath, "scenarios", "baseline.json"), $$"""
+            {
+              "schemaVersion": 5, "id": "baseline", "name": "Baseline",
+              "costBasis": { "year": 2026, "realDiscountRate": 0.07 },
+              "storageSizing": { "maximumPowerMw": 100, "maximumEnergyMwh": 400 },
+              "regions": [{{regions}}],
+              "interconnectors": [{{interconnectors}}]
+            }
+            """);
         }
 
         public string RootPath { get; }
