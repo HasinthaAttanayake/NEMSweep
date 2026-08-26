@@ -32,7 +32,9 @@ nemsweep --run-scenario scenarios/my-scenario.json --output ./study
 nemsweep --output ./study --run-scenario scenarios/my-scenario.json
 ```
 
-One more option rides alongside them. `--csv` asks a run to also write its results as a star schema
+Two more options ride alongside them. `--format json` makes a command report its result as one
+JSON object rather than prose, for a caller that acts on the answer instead of reading it. And
+`--csv` asks a run to also write its results as a star schema
 of CSV tables, which is what you want if the result is going anywhere other than back into NEMSweep:
 
 ```bash
@@ -105,6 +107,34 @@ artifacts in place rather than a half-written set.
 
 If the reliability target is not met, the command still exits `0` and prints a `WARNING` line
 naming the achieved and target unserved-energy percentages.
+
+### `--validate-scenario`
+
+```bash
+dotnet run --project NEMSweep.CLI -- --validate-scenario scenarios/my-scenario.json
+```
+
+```bash
+dotnet run --project NEMSweep.CLI -- --validate-scenario scenarios/my-scenario.json --format json
+```
+
+| Argument | Optional | Default |
+|---|---|---|
+| scenario config path | yes | `defaultScenarioPath` from the loaded CLI settings |
+
+Loads a scenario configuration, reports whether it is valid, and **writes nothing**. Exit code `0`
+if it loaded, `1` if it did not. Use it before `--run-scenario` while you are editing a config: an
+invented field name then costs a parse rather than a full dispatch.
+
+With `--format json` the answer is a single object, which is what a caller correcting a generated
+config wants:
+
+```json
+{"valid":false,"path":"scenarios/mine.json","error":{"stage":"Input","code":"invalidConfig","message":"The JSON property 'invented' could not be mapped ..."}}
+```
+
+The message names the offending property, because deserialisation rejects unknown fields rather
+than ignoring them. That strictness is what makes a mistake loud, and it is why the schema matters.
 
 ### `--fan-out-sweep`
 

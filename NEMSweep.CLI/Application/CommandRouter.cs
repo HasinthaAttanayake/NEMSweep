@@ -79,6 +79,9 @@ internal sealed class CommandRouter
             // rejected without reading settings it was never going to use.
             Func<CliContext, int>? handler = commandArgs switch
             {
+                ["--validate-scenario"] => ValidateScenarioCommand.Run,
+                ["--validate-scenario", var validatePath] =>
+                    context => ValidateScenarioCommand.Run(context, validatePath),
                 ["--run-scenario"] => ScenarioCommand.Run,
                 ["--run-scenario", var scenarioConfigPath] =>
                     context => ScenarioCommand.Run(context, scenarioConfigPath),
@@ -126,7 +129,7 @@ internal sealed class CommandRouter
             _workingRoot,
             options.DataRoot,
             options.OutputRoot);
-        return new CliContext(paths, settings, _output, _error, options.Csv);
+        return new CliContext(paths, settings, _output, _error, options.Csv, options.Format);
     }
 
     /// <summary>
@@ -162,8 +165,10 @@ internal sealed class CommandRouter
         writer.WriteLine("  --data-root <dir>   where inputs are read from  (env NEMSWEEP_DATA_ROOT)");
         writer.WriteLine("  --output <dir>      where results are written   (env NEMSWEEP_OUTPUT)");
         writer.WriteLine("  --csv               also write the star schema CSV tables");
+        writer.WriteLine("  --format <text|json>  report as JSON (--validate-scenario)");
         writer.WriteLine();
         writer.WriteLine("  Scenario and sweep runs:");
+        writer.WriteLine("  nemsweep --validate-scenario [scenario-config.json]");
         writer.WriteLine("  nemsweep --run-scenario [scenario-config.json]");
         writer.WriteLine("  nemsweep --fan-out-sweep <sweep-definition.json>");
         writer.WriteLine("  nemsweep --run-sweep <sweep-definition.json>");
@@ -183,6 +188,7 @@ internal sealed class CommandRouter
 
     private static string OperationName(string[] args) => args.FirstOrDefault() switch
     {
+        "--validate-scenario" => "Scenario validation",
         "--run-scenario" => "Scenario run",
         "--fan-out-sweep" => "Sweep fan-out",
         "--run-sweep" => "Sweep run",

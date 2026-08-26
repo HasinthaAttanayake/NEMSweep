@@ -26,9 +26,7 @@ internal static class ScenarioConfig
             throw new JsonException("Scenario input fields must be defined on each region.");
         }
 
-        ScenarioSettings scenario = JsonSerializer.Deserialize<ScenarioSettings>(
-            contents,
-            JsonFile.StrictReadOptions)
+        ScenarioSettings scenario = JsonFile.ReadConfig<ScenarioSettings>(contents)
             ?? throw new FormatException("Scenario config is empty.");
         Validate(scenario);
         return scenario;
