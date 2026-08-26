@@ -30,15 +30,29 @@ internal static class ScenarioCommand
     /// <param name="resultsPath">Where this point's result is written.</param>
     /// <param name="regionFileNamePrefix">Prefix that keeps point region files distinct.</param>
     /// <param name="provenance">Model build captured once for the sweep.</param>
+    /// <param name="csvDirectory">Where this point's star schema tables go, when asked for.</param>
+    /// <param name="pointId">Identifier stamped on every CSV fact row for this point.</param>
+    /// <param name="dimensionDirectory">Where the study's shared dimensions go, on the point that writes them.</param>
     public static int Run(
         CliContext context,
         string scenarioConfigPath,
         string resultsPath,
         string regionFileNamePrefix,
-        DispatchModelProvenanceDTO? provenance = null)
+        DispatchModelProvenanceDTO? provenance = null,
+        string? csvDirectory = null,
+        string? pointId = null,
+        string? dimensionDirectory = null)
     {
         string path = context.Paths.ResolveConfiguredPath(scenarioConfigPath);
-        return RunPublication(context, LoadScenario(path), resultsPath, regionFileNamePrefix, provenance);
+        return RunPublication(
+            context,
+            LoadScenario(path),
+            resultsPath,
+            regionFileNamePrefix,
+            provenance,
+            csvDirectory,
+            pointId,
+            dimensionDirectory);
     }
 
     /// <summary>Reads the model build this run was made from, reporting absence rather than
@@ -83,7 +97,10 @@ internal static class ScenarioCommand
         ScenarioSettings settings,
         string? resultsPath = null,
         string? regionFileNamePrefix = null,
-        DispatchModelProvenanceDTO? provenance = null)
+        DispatchModelProvenanceDTO? provenance = null,
+        string? csvDirectory = null,
+        string? pointId = null,
+        string? dimensionDirectory = null)
     {
         ScenarioDispatchResult dispatch = ScenarioRunner.RunDispatch(settings, context.Paths);
         string finalResultsPath = resultsPath ?? context.Paths.DispatchResultsPath;
@@ -106,6 +123,22 @@ internal static class ScenarioCommand
                 "resultsUnwritable",
                 exception.Message,
                 exception);
+        }
+
+        if (context.Csv)
+        {
+            // A sweep names its own fact directory and writes the shared dimensions itself, once for
+            // the study. A standalone run has no such parent, so it writes both side by side.
+            string factDirectory = csvDirectory ?? context.Paths.OutputPath("csv");
+            StarSchemaExport.WriteFacts(publication, factDirectory, pointId ?? settings.Id);
+            if (csvDirectory is null)
+            {
+                StarSchemaExport.WriteDimensions(publication, dispatch.PowerSystem, factDirectory);
+            }
+            else if (dimensionDirectory is not null)
+            {
+                StarSchemaExport.WriteDimensions(publication, dispatch.PowerSystem, dimensionDirectory);
+            }
         }
 
         if (resultsPath is null)

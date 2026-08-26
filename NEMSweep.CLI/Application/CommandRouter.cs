@@ -130,7 +130,7 @@ internal sealed class CommandRouter
             _workingRoot,
             options.DataRoot,
             options.OutputRoot);
-        return new CliContext(paths, settings, _output, _error);
+        return new CliContext(paths, settings, _output, _error, options.Csv);
     }
 
     /// <summary>
@@ -165,6 +165,7 @@ internal sealed class CommandRouter
         writer.WriteLine("  Workspace overrides, accepted alongside any command below:");
         writer.WriteLine("  --data-root <dir>   where inputs are read from  (env NEMSWEEP_DATA_ROOT)");
         writer.WriteLine("  --output <dir>      where results are written   (env NEMSWEEP_OUTPUT)");
+        writer.WriteLine("  --csv               also write the star schema CSV tables");
         writer.WriteLine();
         writer.WriteLine("  Scenario and sweep runs:");
         writer.WriteLine("  nemsweep --run-scenario [scenario-config.json]");

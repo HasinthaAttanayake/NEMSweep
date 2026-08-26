@@ -32,6 +32,15 @@ nemsweep --run-scenario scenarios/my-scenario.json --output ./study
 nemsweep --output ./study --run-scenario scenarios/my-scenario.json
 ```
 
+One more option rides alongside them. `--csv` asks a run to also write its results as a star schema
+of CSV tables, which is what you want if the result is going anywhere other than back into NEMSweep:
+
+```bash
+nemsweep --run-scenario scenarios/my-scenario.json --output ./study --csv
+```
+
+The JSON is written exactly as before either way. See [CSV tables](csv-tables.md).
+
 `--help`, `--version` and `--describe-schema` answer without a workspace at all, so they work before
 you have written any settings file.
 
