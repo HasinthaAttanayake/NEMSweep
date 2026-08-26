@@ -33,3 +33,46 @@ jobs:
     # cannot ship a dead link. Cloudflare Pages runs docs/build.sh, which invokes the same command.
     - name: Build documentation site
       run: dotnet docfx docs/docfx.json --warningsAsErrors
+
+  # The image is described entirely by NEMSweep.CLI.csproj, so there is no Dockerfile to drift and
+  # no daemon in the build. On a pull request it is built and thrown away, which is enough to catch
+  # a broken image without publishing one; only main pushes a tag anyone could pull.
+  container:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Build image
+      if: github.ref != 'refs/heads/main'
+      run: >
+        dotnet publish NEMSweep.CLI/NEMSweep.CLI.csproj -c Release --os linux --arch x64
+        -t:PublishContainer
+        -p:ContainerArchiveOutputPath=${{ runner.temp }}/nemsweep.tar.gz
+
+    - name: Log in to GitHub Container Registry
+      if: github.ref == 'refs/heads/main'
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    # Multi-architecture needs a registry: the SDK can write a single-architecture image to a local
+    # archive, but composing the image index requires somewhere to push the manifests.
+    - name: Publish image
+      if: github.ref == 'refs/heads/main'
+      run: >
+        dotnet publish NEMSweep.CLI/NEMSweep.CLI.csproj -c Release
+        -t:PublishContainer
+        -p:ContainerRegistry=ghcr.io
+        -p:ContainerRepository=${{ github.repository_owner }}/nemsweep
+        -p:ContainerImageTags='"latest;${{ github.sha }}"'

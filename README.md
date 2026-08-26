@@ -72,7 +72,7 @@ Follow progress on the
 | --- | --- |
 | `Application` | Argument routing, usage, exit codes, and shared command context |
 | `Configuration` | Strongly typed local/example settings and validation |
-| `Infrastructure` | Repository paths and the shared JSON policy |
+| `Infrastructure` | Workspace roots and the shared JSON policy |
 | `Demand` | Operational-demand import, validation, and export |
 | `Weather` | EPW parsing, provenance analysis, diagnostics, and weather export |
 | `Generation` | Generation-information workbook import and export |
@@ -83,6 +83,10 @@ Follow progress on the
 domain-service boundaries are tracked in the [domain model](docs/domain-model.md).
 
 ## Local development
+
+There are two ways to run NEMSweep: clone and run it with the .NET SDK, or run the container image
+(`ghcr.io/hasinthaattanayake/nemsweep`), which needs no toolchain and works under Docker or Podman.
+See [Running the container](docs/guide/container.md).
 
 NEMSweep targets .NET 10.
 
