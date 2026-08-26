@@ -16,6 +16,18 @@ jobs:
     - name: Test
       run: dotnet test --configuration Release
 
+    # The schemas are generated from the same constants the validator enforces, so a committed copy
+    # can fall behind them silently. Regenerating and diffing is what keeps the published contract
+    # honest now that editors and language models are pointed at the file rather than the command.
+    - name: Check committed schemas match the validator
+      run: |
+        set -euo pipefail
+        fail() { echo "::error::schema/$1 is stale; regenerate it with --describe-schema $2"; exit 1; }
+        dotnet run --project NEMSweep.CLI -c Release -- --describe-schema scenario > scenario.actual.json
+        dotnet run --project NEMSweep.CLI -c Release -- --describe-schema sweep > sweep.actual.json
+        diff -u schema/scenario-v5.json scenario.actual.json || fail scenario-v5.json scenario
+        diff -u schema/sweep-v1.json sweep.actual.json || fail sweep-v1.json sweep
+
   docs:
     runs-on: ubuntu-latest
     steps:

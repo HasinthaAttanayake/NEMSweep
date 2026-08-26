@@ -26,6 +26,10 @@ public sealed class SweepFanOutTests
     [InlineData("[]", "at least one point is required")]
     [InlineData("[{ \"pointId\": \"unsafe_id\", \"axisValue\": 0, \"label\": \"Base\", \"overrides\": {} }]", "point 'unsafe_id' must have a filename-safe id")]
     [InlineData("[{ \"pointId\": \"p0\", \"axisValue\": 0, \"label\": \" \", \"overrides\": {} }]", "point 'p0': label is required")]
+    // Nothing reads axisValue, so a wrong one mislabels a chart rather than failing a run. Two points
+    // claiming one position is the shape a copy-pasted point takes, and the only axis mistake that
+    // can be caught without knowing what the overrides mean.
+    [InlineData("[{ \"pointId\": \"p0\", \"axisValue\": 500, \"label\": \"A\", \"overrides\": {} }, { \"pointId\": \"p1\", \"axisValue\": 500, \"label\": \"B\", \"overrides\": {} }]", "share axis value 500")]
     public void Load_RejectsInvalidPoints(string points, string expectedMessage)
     {
         using var fixture = new SweepFixture();
@@ -34,6 +38,19 @@ public sealed class SweepFanOutTests
         Action act = () => SweepDefinition.Load("sweeps/test-sweep.json", fixture.Paths);
 
         act.Should().Throw<FormatException>().WithMessage($"*{expectedMessage}*");
+    }
+
+    [Fact]
+    public void Load_AcceptsASchemaHintSoAnEditorCanValidateTheDefinition()
+    {
+        using var fixture = new SweepFixture();
+        fixture.WriteDefinition(
+            """[{ "pointId": "p0", "axisValue": 0, "label": "Base", "overrides": {} }]""",
+            schemaHint: "\"$schema\": \"https://example.invalid/sweep.json\", ");
+
+        SweepDefinition definition = SweepDefinition.Load("sweeps/test-sweep.json", fixture.Paths);
+
+        definition.SweepId.Should().Be("test-sweep");
     }
 
     [Fact]
@@ -166,9 +183,10 @@ public sealed class SweepFanOutTests
         public void WriteDefinition(
             string points,
             string baselineConfigPath = "scenarios/baseline.json",
-            string name = "Test sweep") =>
+            string name = "Test sweep",
+            string schemaHint = "") =>
             File.WriteAllText(Path.Combine(RootPath, "sweeps", "test-sweep.json"), $$"""
-            { "schemaVersion": 1, "sweepId": "test-sweep", "name": "{{name}}", "axis": { "label": "Capacity", "unit": "MW" }, "baselineConfigPath": "{{baselineConfigPath}}", "points": {{points}} }
+            { {{schemaHint}}"schemaVersion": 1, "sweepId": "test-sweep", "name": "{{name}}", "axis": { "label": "Capacity", "unit": "MW" }, "baselineConfigPath": "{{baselineConfigPath}}", "points": {{points}} }
             """);
 
         public void Dispose() => Directory.Delete(RootPath, recursive: true);

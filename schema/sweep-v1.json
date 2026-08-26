@@ -1,0 +1,443 @@
+{
+  "$defs": {
+    "costBasisOverride": {
+      "additionalProperties": false,
+      "properties": {
+        "realDiscountRate": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "year": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "generatingFleetOverride": {
+      "additionalProperties": false,
+      "properties": {
+        "$remove": {
+          "const": true
+        },
+        "costParameters": {
+          "$ref": "#/$defs/generationCostsOverride"
+        },
+        "monthlyCapacityFactors": {
+          "items": {
+            "$ref": "#/$defs/monthlyCapacityFactorOverride"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "nameplateCapacityMw": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "technology": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "technologyProfile": {
+          "$ref": "#/$defs/generationProfileOverride"
+        }
+      },
+      "required": [
+        "technology"
+      ],
+      "type": "object"
+    },
+    "generationCostsOverride": {
+      "additionalProperties": false,
+      "properties": {
+        "capitalCostAudPerMw": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "fixedOperatingCostAudPerMwYear": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "fuelPriceAudPerGj": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "variableOperatingCostAudPerMwh": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "generationProfileOverride": {
+      "additionalProperties": false,
+      "properties": {
+        "heatRateGjPerMwh": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "technicalLifeYears": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "monthlyCapacityFactorOverride": {
+      "additionalProperties": false,
+      "properties": {
+        "$remove": {
+          "const": true
+        },
+        "capacityFactor": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "month": {
+          "format": "date",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "month"
+      ],
+      "type": "object"
+    },
+    "regionOverride": {
+      "additionalProperties": false,
+      "properties": {
+        "$remove": {
+          "const": true
+        },
+        "dataCentreNameplateMw": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "demandFile": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "generatingFleets": {
+          "items": {
+            "$ref": "#/$defs/generatingFleetOverride"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "regionId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "storageFleets": {
+          "items": {
+            "$ref": "#/$defs/storageFleetOverride"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "weatherFile": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "regionId"
+      ],
+      "type": "object"
+    },
+    "scenarioOverrides": {
+      "additionalProperties": false,
+      "properties": {
+        "costBasis": {
+          "$ref": "#/$defs/costBasisOverride"
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provenance": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "regions": {
+          "items": {
+            "$ref": "#/$defs/regionOverride"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "schemaVersion": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "storageSizing": {
+          "$ref": "#/$defs/storageSizingOverride"
+        }
+      },
+      "type": "object"
+    },
+    "storageCostsOverride": {
+      "additionalProperties": false,
+      "properties": {
+        "energyCapitalCostAudPerMwh": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "fixedOperatingCostAudPerMwYear": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "powerCapitalCostAudPerMw": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "storageFleetOverride": {
+      "additionalProperties": false,
+      "properties": {
+        "$remove": {
+          "const": true
+        },
+        "costParameters": {
+          "$ref": "#/$defs/storageCostsOverride"
+        },
+        "initialEnergyCapacityMwh": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "initialPowerCapacityMw": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "technology": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "technologyProfile": {
+          "$ref": "#/$defs/storageProfileOverride"
+        }
+      },
+      "required": [
+        "technology"
+      ],
+      "type": "object"
+    },
+    "storageProfileOverride": {
+      "additionalProperties": false,
+      "properties": {
+        "roundTripEfficiency": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "technicalLifeYears": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "storageSizingOverride": {
+      "additionalProperties": false,
+      "properties": {
+        "maximumEnergyMwh": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "maximumPasses": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "maximumPowerMw": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "reliabilityStandardName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "targetUsePercentage": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  },
+  "$id": "https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/sweep-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "axis": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "unit": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "unit"
+      ],
+      "type": "object"
+    },
+    "baselineConfigPath": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "name": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "points": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "axisValue": {
+            "type": "number"
+          },
+          "label": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "overrides": {
+            "$ref": "#/$defs/scenarioOverrides"
+          },
+          "pointId": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pointId",
+          "axisValue",
+          "label",
+          "overrides"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "sweepId": {
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "sweepId",
+    "name",
+    "axis",
+    "baselineConfigPath",
+    "points"
+  ],
+  "title": "NEMSweep sweep definition",
+  "type": "object"
+}

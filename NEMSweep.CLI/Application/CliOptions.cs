@@ -8,11 +8,17 @@ namespace NEMSweep.CLI.Application;
 /// <param name="DataRoot">Value of <c>--data-root</c>, or <see langword="null"/> when absent.</param>
 /// <param name="OutputRoot">Value of <c>--output</c>, or <see langword="null"/> when absent.</param>
 /// <param name="Csv">Whether <c>--csv</c> was given, asking for the star schema alongside the JSON.</param>
-internal sealed record CliOptions(string? DataRoot, string? OutputRoot, bool Csv = false)
+/// <param name="Format">How a command reports its result.</param>
+internal sealed record CliOptions(
+    string? DataRoot,
+    string? OutputRoot,
+    bool Csv = false,
+    OutputFormat Format = OutputFormat.Text)
 {
     private const string DataRootFlag = "--data-root";
     private const string OutputFlag = "--output";
     private const string CsvFlag = "--csv";
+    private const string FormatFlag = "--format";
 
     /// <summary>Splits a command line into workspace overrides and the command's own arguments.</summary>
     /// <param name="args">The raw command line.</param>
@@ -22,6 +28,7 @@ internal sealed record CliOptions(string? DataRoot, string? OutputRoot, bool Csv
         string? dataRoot = null;
         string? outputRoot = null;
         bool csv = false;
+        OutputFormat format = OutputFormat.Text;
         var rest = new List<string>(args.Length);
 
         for (int index = 0; index < args.Length; index++)
@@ -33,7 +40,7 @@ internal sealed record CliOptions(string? DataRoot, string? OutputRoot, bool Csv
                 continue;
             }
 
-            if (argument is not (DataRootFlag or OutputFlag))
+            if (argument is not (DataRootFlag or OutputFlag or FormatFlag))
             {
                 rest.Add(argument);
                 continue;
@@ -41,20 +48,33 @@ internal sealed record CliOptions(string? DataRoot, string? OutputRoot, bool Csv
 
             if (index + 1 >= args.Length)
             {
-                throw new UsageException($"{argument} requires a directory.");
+                throw new UsageException(
+                    argument is FormatFlag
+                        ? $"{argument} requires 'text' or 'json'."
+                        : $"{argument} requires a directory.");
             }
 
+            string value = args[++index];
             if (argument is DataRootFlag)
             {
-                dataRoot = args[++index];
+                dataRoot = value;
+            }
+            else if (argument is OutputFlag)
+            {
+                outputRoot = value;
             }
             else
             {
-                outputRoot = args[++index];
+                format = value switch
+                {
+                    "json" => OutputFormat.Json,
+                    "text" => OutputFormat.Text,
+                    _ => throw new UsageException($"{FormatFlag} must be 'text' or 'json'."),
+                };
             }
         }
 
         remaining = [.. rest];
-        return new CliOptions(dataRoot, outputRoot, csv);
+        return new CliOptions(dataRoot, outputRoot, csv, format);
     }
 }

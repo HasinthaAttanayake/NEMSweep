@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -25,9 +26,7 @@ internal sealed record SweepDefinition(
             throw new FileNotFoundException($"Sweep definition was not found: {path}.", fullPath);
         }
 
-        SweepDefinition definition = JsonSerializer.Deserialize<SweepDefinition>(
-            File.ReadAllBytes(fullPath),
-            JsonFile.StrictReadOptions)
+        SweepDefinition definition = JsonFile.ReadConfig<SweepDefinition>(File.ReadAllBytes(fullPath))
             ?? throw new FormatException($"Sweep definition '{path}' is empty.");
         definition.Validate(paths);
         return definition;
@@ -71,6 +70,7 @@ internal sealed record SweepDefinition(
         }
 
         var pointIds = new HashSet<string>(StringComparer.Ordinal);
+        var axisValues = new Dictionary<double, string>();
         foreach (SweepPoint? point in Points)
         {
             if (point is null || string.IsNullOrWhiteSpace(point.PointId) || !SafeId.IsMatch(point.PointId))
@@ -91,6 +91,18 @@ internal sealed record SweepDefinition(
             if (point.Overrides is null)
             {
                 throw new FormatException($"Sweep '{SweepId}', point '{point.PointId}': overrides are required.");
+            }
+
+            // Nothing in the model reads axisValue: it labels the x-axis and no more, so a wrong one
+            // is a silently mislabelled chart rather than a failed run. Two points claiming the same
+            // position cannot both be right, and it is the shape a copy-pasted point takes, so it is
+            // the one axis mistake that can be caught without knowing what the overrides mean.
+            if (!axisValues.TryAdd(point.AxisValue, point.PointId))
+            {
+                throw new FormatException(
+                    $"Sweep '{SweepId}': points '{axisValues[point.AxisValue]}' and '{point.PointId}' "
+                    + $"share axis value {point.AxisValue.ToString(CultureInfo.InvariantCulture)}. "
+                    + "Each point must sit at its own position on the axis.");
             }
         }
     }

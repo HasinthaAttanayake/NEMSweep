@@ -1,4 +1,5 @@
 {
+  "$schema": "https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/scenario-v5.json",
   "schemaVersion": 5,
   "id": "starter-nsw1",
   "name": "Starter: NSW1 alone",
