@@ -142,18 +142,18 @@ public static class PowerSystemCostCalculator
                 scenarioRegion.RegionId,
                 annualisedGenerationCost,
                 annualisedStorageCost,
-                outcome.DeliveredToLoad.Integrate(),
+                outcome.EnergyServed.Integrate(),
                 outcome.Imports.Integrate() - outcome.Exports.Integrate(),
                 generationCostContributions));
         }
 
         Money totalAnnualisedStorageCost = Money.Zero;
-        Energy totalDeliveredEnergy = Energy.Zero;
+        Energy totalEnergyServed = Energy.Zero;
         var systemGenerationCosts = new Dictionary<GenerationTechnology, Money>();
         foreach (RegionCostBreakdown region in regionBreakdowns)
         {
             totalAnnualisedStorageCost += region.AnnualisedStorageCost;
-            totalDeliveredEnergy += region.DeliveredEnergy;
+            totalEnergyServed += region.EnergyServed;
             foreach (GenerationCostContribution contribution in region.GenerationCostContributions)
             {
                 systemGenerationCosts[contribution.Technology] =
@@ -172,7 +172,7 @@ public static class PowerSystemCostCalculator
             totalAnnualisedGenerationCost,
             totalAnnualisedStorageCost,
             AnnualisedTransmissionCost(scenario),
-            totalDeliveredEnergy,
+            totalEnergyServed,
             regionBreakdowns,
             systemGenerationCosts
                 .OrderBy(entry => entry.Key)
@@ -184,7 +184,7 @@ public static class PowerSystemCostCalculator
     /// <summary>
     /// Interconnector capital and fixed operating cost, charged against its declared route length
     /// and its directed capacity. There is no variable term: transmission has no marginal fuel cost
-    /// here, and losses already raise cost implicitly by requiring more generation per MWh delivered.
+    /// here, and losses already raise cost implicitly by requiring more generation per MWh served.
     /// </summary>
     private static Money AnnualisedTransmissionCost(Scenario scenario)
     {

@@ -10,7 +10,7 @@ public sealed record GenerationCostContribution(
 
 /// <summary>
 /// Annual generation and storage cost contributions for one region, using that
-/// region's electricity served to load as the denominator for each levelised cost.
+/// region's energy served as the denominator for each levelised cost.
 /// </summary>
 public sealed record RegionCostBreakdown
 {
@@ -18,7 +18,7 @@ public sealed record RegionCostBreakdown
         string regionId,
         Money annualisedGenerationCost,
         Money annualisedStorageCost,
-        Energy deliveredEnergy,
+        Energy energyServed,
         Energy netImportedEnergy,
         IReadOnlyList<GenerationCostContribution> generationCostContributions)
     {
@@ -26,7 +26,7 @@ public sealed record RegionCostBreakdown
         AnnualisedGenerationCost = annualisedGenerationCost;
         AnnualisedStorageCost = annualisedStorageCost;
         TotalAnnualisedCost = annualisedGenerationCost + annualisedStorageCost;
-        DeliveredEnergy = deliveredEnergy;
+        EnergyServed = energyServed;
         NetImportedEnergy = netImportedEnergy;
         GenerationCostContributions = generationCostContributions.ToArray();
         decimal contributionTotalAud = GenerationCostContributions.Sum(
@@ -37,17 +37,17 @@ public sealed record RegionCostBreakdown
                 "Generation cost contributions must sum to annualised generation cost.",
                 nameof(generationCostContributions));
         }
-        if (!double.IsFinite(deliveredEnergy.MegawattHours) || deliveredEnergy.MegawattHours <= 0)
+        if (!double.IsFinite(energyServed.MegawattHours) || energyServed.MegawattHours <= 0)
         {
             throw new ArgumentOutOfRangeException(
-                nameof(deliveredEnergy),
-                "Delivered energy must be positive when deriving levelised costs for region "
+                nameof(energyServed),
+                "Energy served must be positive when deriving levelised costs for region "
                 + $"'{regionId}'.");
         }
 
-        LevelisedCostOfGeneration = annualisedGenerationCost.Per(deliveredEnergy);
-        LevelisedCostOfStorage = annualisedStorageCost.Per(deliveredEnergy);
-        LevelisedCostOfElectricity = TotalAnnualisedCost.Per(deliveredEnergy);
+        LevelisedCostOfGeneration = annualisedGenerationCost.Per(energyServed);
+        LevelisedCostOfStorage = annualisedStorageCost.Per(energyServed);
+        LevelisedCostOfElectricity = TotalAnnualisedCost.Per(energyServed);
     }
 
     /// <summary>Region identifier corresponding to the scenario and dispatch outcome.</summary>
@@ -60,8 +60,8 @@ public sealed record RegionCostBreakdown
     public Money AnnualisedStorageCost { get; }
     /// <summary>Annualised generation and storage cost, in AUD.</summary>
     public Money TotalAnnualisedCost { get; }
-    /// <summary>Annual electricity served to load in this region, in MWh.</summary>
-    public Energy DeliveredEnergy { get; }
+    /// <summary>Annual energy served in this region, in MWh. The levelised-cost denominator.</summary>
+    public Energy EnergyServed { get; }
 
     /// <summary>
     /// Imports less exports over the year, in MWh. Disclosed because the levelised costs
@@ -75,17 +75,17 @@ public sealed record RegionCostBreakdown
     /// rather than silent.
     /// </remarks>
     public Energy NetImportedEnergy { get; }
-    /// <summary>Annualised generation cost per regional MWh served to load, in AUD/MWh.</summary>
+    /// <summary>Annualised generation cost per regional MWh served, in AUD/MWh.</summary>
     public EnergyPrice LevelisedCostOfGeneration { get; }
-    /// <summary>Annualised storage cost per regional MWh served to load, in AUD/MWh.</summary>
+    /// <summary>Annualised storage cost per regional MWh served, in AUD/MWh.</summary>
     public EnergyPrice LevelisedCostOfStorage { get; }
-    /// <summary>Annualised generation and storage cost per regional MWh served to load, in AUD/MWh.</summary>
+    /// <summary>Annualised generation and storage cost per regional MWh served, in AUD/MWh.</summary>
     public EnergyPrice LevelisedCostOfElectricity { get; }
 }
 
 /// <summary>
-/// Annual generation, storage and transmission cost contributions using electricity
-/// served to load as their common denominator.
+/// Annual generation, storage and transmission cost contributions using energy
+/// served as their common denominator.
 /// </summary>
 /// <remarks>
 /// Transmission is held at system level and is not attributed to any region. An
@@ -100,7 +100,7 @@ public sealed record PowerSystemCostBreakdown
         Money totalAnnualisedGenerationCost,
         Money totalAnnualisedStorageCost,
         Money totalAnnualisedTransmissionCost,
-        Energy deliveredEnergy,
+        Energy energyServed,
         IReadOnlyList<RegionCostBreakdown> regions,
         IReadOnlyList<GenerationCostContribution> generationCostContributions,
         bool transmissionCostModelled)
@@ -115,10 +115,10 @@ public sealed record PowerSystemCostBreakdown
                 "Generation cost contributions must sum to total annualised generation cost.",
                 nameof(generationCostContributions));
         }
-        SystemLevelisedCostOfGeneration = totalAnnualisedGenerationCost.Per(deliveredEnergy);
-        SystemLevelisedCostOfStorage = totalAnnualisedStorageCost.Per(deliveredEnergy);
+        SystemLevelisedCostOfGeneration = totalAnnualisedGenerationCost.Per(energyServed);
+        SystemLevelisedCostOfStorage = totalAnnualisedStorageCost.Per(energyServed);
         SystemLevelisedCostOfTransmission =
-            totalAnnualisedTransmissionCost.Per(deliveredEnergy);
+            totalAnnualisedTransmissionCost.Per(energyServed);
         TotalAnnualisedGenerationCost = totalAnnualisedGenerationCost;
         TotalAnnualisedStorageCost = totalAnnualisedStorageCost;
         TotalAnnualisedTransmissionCost = totalAnnualisedTransmissionCost;
@@ -126,21 +126,21 @@ public sealed record PowerSystemCostBreakdown
         TotalAnnualisedCost = totalAnnualisedGenerationCost
             + totalAnnualisedStorageCost
             + totalAnnualisedTransmissionCost;
-        SystemLevelisedCostOfElectricity = TotalAnnualisedCost.Per(deliveredEnergy);
-        DeliveredEnergy = deliveredEnergy;
+        SystemLevelisedCostOfElectricity = TotalAnnualisedCost.Per(energyServed);
+        EnergyServed = energyServed;
     }
 
     /// <summary>
-    /// Total annualised system cost per MWh served to load, in AUD/MWh. The cost of building and
+    /// Total annualised system cost per MWh served, in AUD/MWh. The cost of building and
     /// running the system, not a retail price.
     /// </summary>
     public EnergyPrice SystemLevelisedCostOfElectricity { get; }
 
-    /// <summary>Annualised generation cost per MWh served to load, in AUD/MWh.</summary>
+    /// <summary>Annualised generation cost per MWh served, in AUD/MWh.</summary>
     public EnergyPrice SystemLevelisedCostOfGeneration { get; }
 
     /// <summary>
-    /// Annualised storage asset cost per MWh served to load, in AUD/MWh. Not a standalone levelised
+    /// Annualised storage asset cost per MWh served, in AUD/MWh. Not a standalone levelised
     /// cost of storage: the denominator is system energy served, and charging energy is already
     /// priced through gross-generation variable and fuel cost.
     /// </summary>
@@ -153,8 +153,8 @@ public sealed record PowerSystemCostBreakdown
     public EnergyPrice SystemLevelisedCostOfTransmission { get; }
 
     /// <summary>
-    /// Regional annualised costs and levelised costs, each using regional electricity
-    /// served to load as its denominator. These exclude transmission.
+    /// Regional annualised costs and levelised costs, each using regional energy
+    /// served as its denominator. These exclude transmission.
     /// </summary>
     public IReadOnlyList<RegionCostBreakdown> Regions { get; }
     /// <summary>System annualised generation cost aggregated by technology, in AUD.</summary>
@@ -180,6 +180,6 @@ public sealed record PowerSystemCostBreakdown
     /// <summary>Annualised generation, storage and transmission cost, in AUD.</summary>
     public Money TotalAnnualisedCost { get; }
 
-    /// <summary>Total annual electricity served to load, in MWh.</summary>
-    public Energy DeliveredEnergy { get; }
+    /// <summary>Total annual energy served, in MWh. The levelised-cost denominator.</summary>
+    public Energy EnergyServed { get; }
 }

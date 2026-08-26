@@ -61,7 +61,7 @@ overstate it.
 
 The levelised figures NEMSweep publishes are **system build-and-run costs per MWh served**:
 annuitised capital plus one year of operating cost for the generation, storage and transmission
-assets in the scenario, divided by the energy actually delivered to load.
+assets in the scenario, divided by the energy actually served.
 
 A retail electricity bill is a different thing entirely. It also contains distribution network
 charges below the transmission level, retail operating costs and margin, market and settlement

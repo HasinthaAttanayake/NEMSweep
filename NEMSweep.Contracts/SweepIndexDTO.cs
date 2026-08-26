@@ -232,7 +232,7 @@ public enum SweepFailureStage
 /// <param name="StorageSlcoeAudPerMwh">Storage component of levelised cost, in AUD per MWh served.</param>
 /// <param name="DemandMwh">Total demand energy over the dispatch period, in MWh.</param>
 /// <param name="EnergyServedMwh">Demand energy actually served, in MWh (demand less unserved energy).</param>
-/// <param name="DeliveredGenerationMwh">Generation energy delivered to load, in MWh.</param>
+/// <param name="DeliveredGenerationMwh">Generation energy net of curtailment and storage charging, in MWh. Not the same as energy served.</param>
 /// <param name="AchievedRenewableShareGridScale">
 /// Renewable share of delivered generation counting only grid-scale generation, as a fraction in
 /// [0, 1]; null when it could not be computed.

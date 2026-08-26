@@ -13,7 +13,7 @@ public sealed class SystemDispatchOutcomeTests
         new(2026, 7, 1, 0, 0, 0, TimeSpan.FromHours(10));
 
     [Fact]
-    public void Create_SumsSystemFlowsAndRecomputesDeliveredLoadAndReliability()
+    public void Create_SumsSystemFlowsAndRecomputesEnergyServedAndReliability()
     {
         PowerSystem system = System("NSW1", "VIC1");
         SystemDispatchOutcome outcome = SystemDispatchOutcome.Create(system,
@@ -24,7 +24,7 @@ public sealed class SystemDispatchOutcomeTests
 
         AssertFlow(outcome.Demand, 150, 150);
         AssertFlow(outcome.Unserved, 5, 10);
-        AssertFlow(outcome.DeliveredToLoad, 145, 140);
+        AssertFlow(outcome.EnergyServed, 145, 140);
         AssertFlow(outcome.PerFleetGeneration[GenerationTechnology.Coal], 100, 90);
         AssertFlow(outcome.PerFleetGeneration[GenerationTechnology.Gas], 45, 50);
         outcome.Reliability.UnservedEnergy.Should().Be(Energy.FromMegawattHours(15));

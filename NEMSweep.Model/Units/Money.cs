@@ -42,22 +42,22 @@ public readonly record struct Money : IComparable<Money>
     public static Money operator *(decimal factor, Money money) => money * factor;
 
     /// <summary>
-    /// Price per unit of delivered energy: AUD/MWh delivered = AUD ÷ MWh
-    /// delivered. Delivered energy must be positive and finite.
+    /// Price per unit of energy served: AUD/MWh served = AUD ÷ MWh
+    /// served. Energy served must be positive and finite.
     /// </summary>
-    public EnergyPrice Per(Energy deliveredEnergy)
+    public EnergyPrice Per(Energy energyServed)
     {
         decimal megawattHours = DecimalPhysicalBoundary.RequireNonNegativeFinite(
-            deliveredEnergy.MegawattHours,
-            nameof(deliveredEnergy));
+            energyServed.MegawattHours,
+            nameof(energyServed));
         if (megawattHours <= 0)
         {
             throw new ArgumentOutOfRangeException(
-                nameof(deliveredEnergy),
-                "Delivered energy must be positive when deriving an energy price.");
+                nameof(energyServed),
+                "Energy served must be positive when deriving an energy price.");
         }
 
-        return EnergyPrice.FromAudPerMwhDelivered(Aud / megawattHours);
+        return EnergyPrice.FromAudPerMwhServed(Aud / megawattHours);
     }
 
     /// <summary>Orders this monetary amount against another by AUD.</summary>

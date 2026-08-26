@@ -57,17 +57,17 @@ energy was generated, and a battery's round-trip loss is already folded into tha
 figure because more had to be generated than was later delivered. Charging storage again for its
 energy throughput would double-count it. For the same reason, the storage figure published here is
 **not** a standalone levelised cost of storage (LCoS). It prices only the storage asset itself,
-against the same served-energy denominator as everything else, rather than the delivered cost of
+against the same energy-served denominator as everything else, rather than the delivered cost of
 energy that passed through storage.
 
 ## The denominator
 
 Every levelised figure, for generation, storage, transmission and the total alike, divides by
-`DeliveredToLoad`: demand minus unserved energy. It never divides by generation. A regional levelised
-cost uses only that region's own delivered energy; the system figure uses the system total. Dividing
-by delivered energy rather than generation is what makes the figures comparable to a genuine cost of
+`EnergyServed`: demand minus unserved energy. It never divides by generation. A regional levelised
+cost uses only that region's own energy served; the system figure uses the system total. Dividing
+by energy served rather than generation is what makes the figures comparable to a genuine cost of
 supply: energy generated but curtailed, or lost to storage round-trip inefficiency, was never
-delivered to anyone and so does not appear in the denominator that spreads the system's cost.
+served to anyone and so does not appear in the denominator that spreads the system's cost.
 
 ## Why regional costs do not sum to the system total
 
@@ -95,10 +95,10 @@ assumptions any more accurate.
 | Type | Unit | Prices |
 |---|---|---|
 | `Money` | AUD | A monetary amount: a cost, credit, or net adjustment. |
-| `EnergyPrice` | AUD/MWh delivered to load | The output unit of every levelised cost figure (SLCoE and its regional equivalents). |
+| `EnergyPrice` | AUD/MWh served | The output unit of every levelised cost figure (SLCoE and its regional equivalents). |
 | `GenerationEnergyCost` | AUD/MWh generated | Variable operating cost and fuel-derived cost on gross generation; also short-run marginal cost. |
 | `PowerCapacityCost` | AUD/MW | One-off generation or storage power capital cost. |
-| `EnergyCapacityCost` | AUD/MWh of storage capacity (one-off) | Storage energy capital cost. Not AUD/MWh generated or delivered. |
+| `EnergyCapacityCost` | AUD/MWh of storage capacity (one-off) | Storage energy capital cost. Not AUD/MWh generated or served. |
 | `AnnualPowerCapacityCost` | AUD/MW/year | Recurring fixed operating cost against installed power capacity. |
 | `FuelPrice` | AUD/GJ (thermal) | Fuel price; combined with `HeatRate` to derive the fuel component of `GenerationEnergyCost`. |
 | `HeatRate` | GJ/MWh | Thermal energy required per MWh generated. |

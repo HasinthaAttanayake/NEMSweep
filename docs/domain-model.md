@@ -304,7 +304,7 @@ classDiagram
   including capacity introduced by sizing, and rejects storage without matching
   scenario assumptions. It produces one `RegionCostBreakdown` per region with
   annualised generation, storage, and total costs and each of their levelised
-  costs divided by that region's `DispatchOutcome.DeliveredToLoad`. It derives
+  costs divided by that region's `DispatchOutcome.EnergyServed`. It derives
   system annual costs and served energy from those regional values. System generation
   cost is deterministically re-aggregated by technology so the published technology
   contributions exactly reconcile to the published generation total, then the system
@@ -363,9 +363,9 @@ and fuel-derived costs on gross generation. `FuelPrice` multiplied by heat rate
 produces a `GenerationEnergyCost`. `EnergyCapacityCost` is one-time AUD/MWh of
 storage capacity and produces `Money` only when multiplied by storage `Energy`.
 
-`PowerSystemCostBreakdown` retains delivered energy separately from annual
+`PowerSystemCostBreakdown` retains energy served separately from annual
 generation and storage costs. Its denominator is total
-`DispatchOutcome.DeliveredToLoad`, not per-fleet generation allocation. Storage
+`DispatchOutcome.EnergyServed`, not per-fleet generation allocation. Storage
 asset cost does not add charging energy: gross generation VOM and fuel already
 price generation used for charging and therefore include storage losses. The
 storage component is annualised storage asset cost divided by the same served
@@ -373,12 +373,12 @@ energy denominator; it is not a standalone LCoS. These costs are modelled
 estimates, not audited figures; `decimal` prevents base-10 accumulation
 artefacts from appearing as model defects.
 
-Each `RegionCostBreakdown` retains the equivalent annual costs and delivered
-energy for one region. Its three levelised costs use only that region's
-`DispatchOutcome.DeliveredToLoad`; they are not divided by total system served
-energy. `PowerSystemCostBreakdown.Regions` carries these regional values while
+Each `RegionCostBreakdown` retains the equivalent annual costs and energy
+served for one region. Its three levelised costs use only that region's
+`DispatchOutcome.EnergyServed`; they are not divided by total system energy
+served. `PowerSystemCostBreakdown.Regions` carries these regional values while
 its existing system totals remain the exact sums of the regional annual costs
-and delivered energy.
+and energy served.
 
 Flow series are interval-average MW and integrate to MWh through
 `FlowSeries.Integrate()`. The dispatch invariant is:
@@ -402,7 +402,7 @@ cross-checked every interval against the loss the transfer solver reports
 directly. Nothing enters or leaves the system as a whole: every export is
 another region's import plus the loss incurred on the way.
 
-`DispatchOutcome.DeliveredToLoad` is `demand - unserved`; it is the regional
+`DispatchOutcome.EnergyServed` is `demand - unserved`; it is the regional
 load served by generation, storage discharge, and imports, and is the SLCoE
 denominator. Storage charging is recorded only as total `charge`; dispatch
 evidence does not retain a surplus-versus-incremental-generation source split.
@@ -437,7 +437,7 @@ denominator is zero or no relevant renewable fleet exists. Sweep scalars copy
 these definitions from the canonical delivered-generation and base-demand
 artifact series before base demand is externalized.
 
-Generator-supplied load sums to `deliveredToLoad - discharge - imports +
+Generator-supplied load sums to `energyServed - discharge - imports +
 exports`, while allocated fleet charge sums to regional `charge`. This
 distinction is necessary because storage discharge and imports serve load but
 are not current-interval generation by any generating fleet.

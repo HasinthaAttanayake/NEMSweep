@@ -77,7 +77,7 @@ A small set of terms carries most of the meaning. They are used precisely throug
 | **Residual** | Demand less generation, within an interval. Positive is a deficit; negative is a surplus. |
 | **Unserved energy (USE)** | Demand that could not be met. The binding reliability measure, as a percentage of demand energy. |
 | **Curtailment** | Available generation that could not be used and was not stored. |
-| **Delivered to load** | Demand minus unserved. The denominator of every levelised cost. |
+| **Energy served** | Demand minus unserved energy. The denominator of every levelised cost. |
 | **Sizing** | Growing Battery capacity until the reliability target is met, or reporting that it cannot be. |
 | **Sweep** | A series of runs varying one input, with everything else held constant. |
 

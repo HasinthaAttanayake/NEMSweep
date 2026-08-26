@@ -35,8 +35,11 @@ public sealed record DispatchOutcome
     public FlowSeries Demand { get; }
     /// <summary>Demand before additive components, used as the native-demand denominator.</summary>
     public FlowSeries NativeDemand { get; }
-    /// <summary>Demand served by generation, storage discharge, and imports.</summary>
-    public FlowSeries DeliveredToLoad { get; }
+    /// <summary>
+    /// Energy served: demand met by generation, storage discharge, and imports, being demand
+    /// less unserved demand. Integrated over the run, the denominator of every levelised cost.
+    /// </summary>
+    public FlowSeries EnergyServed { get; }
     /// <summary>Total power drawn from the grid to charge storage, in MW.</summary>
     public FlowSeries Charge { get; }
     /// <summary>Power discharged from storage to serve demand, in MW.</summary>
@@ -160,7 +163,7 @@ public sealed record DispatchOutcome
         Demand = demand;
         NativeDemand = demandProfile?.BaseDemand ?? demand;
         Unserved = unserved;
-        DeliveredToLoad = Demand.Subtract(Unserved);
+        EnergyServed = Demand.Subtract(Unserved);
         Charge = charge;
         Discharge = discharge;
         Imports = imports;
@@ -278,7 +281,7 @@ public sealed record DispatchOutcome
                     + $"({Demand.InstantAt(index):o}).");
             }
 
-            if (Math.Abs(composedDemand - (DeliveredToLoad[index].Megawatts + unserved)) > tolerance)
+            if (Math.Abs(composedDemand - (EnergyServed[index].Megawatts + unserved)) > tolerance)
             {
                 throw new InvalidOperationException(
                     $"Demand composition balance failed at index {index} "

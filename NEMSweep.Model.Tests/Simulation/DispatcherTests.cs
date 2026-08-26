@@ -212,14 +212,14 @@ namespace NEMSweep.Model.Tests.Simulation
                     .Sum(flow => flow[hour].Megawatts);
                 double allocatedCharge = outcome.PerFleetCharge.Values
                     .Sum(flow => flow[hour].Megawatts);
-                double generatorDelivered = outcome.DeliveredToLoad[hour].Megawatts
+                double generatorDelivered = outcome.EnergyServed[hour].Megawatts
                     - outcome.Discharge[hour].Megawatts
                     - outcome.Imports[hour].Megawatts
                     + outcome.Exports[hour].Megawatts;
 
                 allocatedDelivered.Should().BeApproximately(generatorDelivered, 1e-9);
                 allocatedCharge.Should().BeApproximately(outcome.Charge[hour].Megawatts, 1e-9);
-                outcome.DeliveredToLoad[hour].Megawatts.Should().BeApproximately(
+                outcome.EnergyServed[hour].Megawatts.Should().BeApproximately(
                     outcome.Demand[hour].Megawatts - outcome.Unserved[hour].Megawatts,
                     1e-9);
             }
@@ -447,7 +447,7 @@ namespace NEMSweep.Model.Tests.Simulation
             AssertSeries(outcome.Charge, 20, 0);
             AssertSeries(outcome.PerFleetCharge[GenerationTechnology.Solar], 20, 0);
             AssertSeries(outcome.PerFleetDelivered[GenerationTechnology.Solar], 0, 20);
-            AssertSeries(outcome.DeliveredToLoad, 0, 30);
+            AssertSeries(outcome.EnergyServed, 0, 30);
             AssertSeries(outcome.Discharge, 0, 10);
             AssertSeries(outcome.Curtailment, 0, 0);
             AssertSeries(outcome.Unserved, 0, 0);
@@ -1106,7 +1106,7 @@ namespace NEMSweep.Model.Tests.Simulation
         }
 
         [Fact]
-        public void DispatchOutcome_DerivesDeliveredToLoadAndAcceptsConsistentPerFleetFlows()
+        public void DispatchOutcome_DerivesEnergyServedAndAcceptsConsistentPerFleetFlows()
         {
             FlowSeries zero = HourlyFlow(0);
             var outcome = new DispatchOutcome(
@@ -1135,7 +1135,7 @@ namespace NEMSweep.Model.Tests.Simulation
                 zero);
 
             AssertSeries(outcome.Charge, 3);
-            AssertSeries(outcome.DeliveredToLoad, 7);
+            AssertSeries(outcome.EnergyServed, 7);
             AssertSeries(outcome.PerFleetCharge[GenerationTechnology.Coal], 3);
             AssertSeries(outcome.PerFleetDelivered[GenerationTechnology.Coal], 7);
         }

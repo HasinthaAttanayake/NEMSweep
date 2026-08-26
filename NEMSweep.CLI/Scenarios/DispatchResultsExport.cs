@@ -435,17 +435,17 @@ internal static class DispatchResultsExport
     {
         DispatchGenerationCostContributionDTO[] contributions = CreateGenerationCostContributions(
             cost.GenerationCostContributions,
-            cost.DeliveredEnergy.MegawattHours);
+            cost.EnergyServed.MegawattHours);
         return new(
             "calculated",
             contributions.Sum(contribution => contribution.AnnualisedCostAud),
             cost.TotalAnnualisedStorageCost.Aud,
             cost.TotalAnnualisedCost.Aud,
-            cost.SystemLevelisedCostOfGeneration.AudPerMwhDelivered,
-            cost.SystemLevelisedCostOfStorage.AudPerMwhDelivered,
-            cost.SystemLevelisedCostOfElectricity.AudPerMwhDelivered,
+            cost.SystemLevelisedCostOfGeneration.AudPerMwhServed,
+            cost.SystemLevelisedCostOfStorage.AudPerMwhServed,
+            cost.SystemLevelisedCostOfElectricity.AudPerMwhServed,
             cost.TotalAnnualisedTransmissionCost.Aud,
-            cost.SystemLevelisedCostOfTransmission.AudPerMwhDelivered,
+            cost.SystemLevelisedCostOfTransmission.AudPerMwhServed,
             cost.TransmissionCostModelled
                 ? TransmissionCostStatus.Calculated
                 : TransmissionCostStatus.NotModelled,
@@ -457,15 +457,15 @@ internal static class DispatchResultsExport
     {
         DispatchGenerationCostContributionDTO[] contributions = CreateGenerationCostContributions(
             cost.GenerationCostContributions,
-            cost.DeliveredEnergy.MegawattHours);
+            cost.EnergyServed.MegawattHours);
         return new(
             "calculated",
             contributions.Sum(contribution => contribution.AnnualisedCostAud),
             cost.AnnualisedStorageCost.Aud,
             cost.TotalAnnualisedCost.Aud,
-            cost.LevelisedCostOfGeneration.AudPerMwhDelivered,
-            cost.LevelisedCostOfStorage.AudPerMwhDelivered,
-            cost.LevelisedCostOfElectricity.AudPerMwhDelivered,
+            cost.LevelisedCostOfGeneration.AudPerMwhServed,
+            cost.LevelisedCostOfStorage.AudPerMwhServed,
+            cost.LevelisedCostOfElectricity.AudPerMwhServed,
             0,
             0,
             TransmissionCostStatus.NotModelled,
@@ -475,14 +475,14 @@ internal static class DispatchResultsExport
 
     private static DispatchGenerationCostContributionDTO[] CreateGenerationCostContributions(
         IEnumerable<GenerationCostContribution> contributions,
-        double deliveredEnergyMwh) =>
+        double energyServedMwh) =>
         contributions
             .OrderBy(contribution => contribution.Technology)
             .Select(contribution => new DispatchGenerationCostContributionDTO(
                 contribution.Technology.ToString(),
                 Math.Round(contribution.AnnualisedCost.Aud, 2, MidpointRounding.AwayFromZero),
                 Math.Round(
-                    contribution.AnnualisedCost.Aud / (decimal)deliveredEnergyMwh,
+                    contribution.AnnualisedCost.Aud / (decimal)energyServedMwh,
                     2,
                     MidpointRounding.AwayFromZero)))
             .ToArray();
