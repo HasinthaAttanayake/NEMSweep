@@ -91,6 +91,9 @@ dotnet run --project NEMSweep.CLI -- --run-scenario --output ./my-study
 That is also how the results the site displays are refreshed: point `--output` at the web project
 when you intend to update what it shows, and nowhere near it the rest of the time.
 
+Add `--csv` and the run also writes its results as [CSV tables](csv-tables.md), which is what you
+want if the numbers are going anywhere other than back into NEMSweep.
+
 A single scenario run dispatches a modelled year in one pass per storage-sizing iteration, so it
 finishes quickly enough to iterate on locally rather than being something you queue and walk away
 from. You will know it succeeded because the process prints the number of hourly intervals
@@ -119,8 +122,44 @@ for the exact commands:
 - A synthetic 8,760-hour full-year storage-sizing acceptance test, run in Release mode, which
   prints solver wall-clock time, dispatch-pass count and the selected Battery capacity.
 
+## Making it yours
+
+The published scenario is a worked example of a real system, and it is 746 lines because a real
+system is. Two shorter routes in, and the second is easier than it looks:
+
+**Start from a small scenario.** `scenarios/starter-nsw1.json` is the same NSW1 assets on their own,
+about a fifth the length, and it runs the same way:
+
+```bash
+dotnet run --project NEMSweep.CLI -- --run-scenario scenarios/starter-nsw1.json
+```
+
+Change one number in it, run it again, and watch one number move in the result. That loop is the
+whole skill. For a blank starting point instead, `--new-scenario` prints the smallest configuration
+that runs:
+
+```bash
+dotnet run --project NEMSweep.CLI -- --new-scenario > scenarios/mine.json
+```
+
+**Or write a sweep, which is less work than a scenario.** This is the counterintuitive one. A sweep
+point is not a scenario: it is a handful of overrides applied to one you already have, plus a value
+saying where it sits on the axis. Copy `sweeps/datacentre-nameplate-fy2026.json`, change the numbers,
+and you have a study without having authored a system at all.
+
+It is also the question most people arrive with. "What happens as I vary this" is a sweep; "here is
+a system I designed" is a scenario. Reach for [Sweeps](sweeps.md) before
+[Scenario configuration](scenarios.md) unless you know you need the latter.
+
+Validate before you spend time dispatching:
+
+```bash
+dotnet run --project NEMSweep.CLI -- --fan-out-sweep sweeps/my-sweep.json
+```
+
 ## Where next
 
+- [Glossary](glossary.md): the vocabulary, if a term above went past you.
 - [Concepts](../concepts/index.md): what the model actually does.
 - [Limitations](../assumptions/limitations.md): what it assumes, and where it will mislead you.
 - [Exploring](../exploring/index.md): designing a study, including sweeps and driving the model
