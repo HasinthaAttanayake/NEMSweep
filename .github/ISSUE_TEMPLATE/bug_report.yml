@@ -1,0 +1,41 @@
+name: Bug report
+description: A result, command or artifact that is wrong or fails
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you ran, and what it did.
+      placeholder: |
+        nemsweep --run-scenario scenarios/mine.json --output ./study
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Commit or image digest
+      description: >-
+        A result records this for you. `provenance.gitCommitSha` in results.json,
+        or the image digest if you ran the container.
+    validations:
+      required: true
+  - type: textarea
+    id: provenance
+    attributes:
+      label: Input provenance
+      description: >-
+        Optional but decisive for anything numerical. The `dataSourcesByRegion`
+        block from the result identifies the exact input bytes the run consumed.
+      render: json
+  - type: input
+    id: how-run
+    attributes:
+      label: How you ran it
+      placeholder: "dotnet run from a clone, or ghcr.io/hasinthaattanayake/nemsweep"

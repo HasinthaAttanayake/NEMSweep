@@ -1,0 +1,31 @@
+<Project>
+
+  <!--
+    Identity and licensing for every project in the solution, stated once. Everything here lands on
+    the built assembly: Copyright and Company become assembly attributes on their own, and the
+    licence and URLs are added as assembly metadata below, so a DLL on its own says what it is and
+    what may be done with it rather than relying on whoever holds it also holding the clone.
+  -->
+  <PropertyGroup>
+    <Product>NEMSweep</Product>
+    <Authors>Hasintha Attanayake</Authors>
+    <Company>Hasintha Attanayake</Company>
+    <Copyright>Copyright (c) 2026 Hasintha Attanayake</Copyright>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>License</_Parameter1>
+      <_Parameter2>BSD-3-Clause</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>ProjectUrl</_Parameter1>
+      <_Parameter2>https://www.nemsweep.com/</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>RepositoryUrl</_Parameter1>
+      <_Parameter2>https://github.com/HasinthaAttanayake/NEMSweep</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+</Project>
