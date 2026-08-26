@@ -576,13 +576,6 @@
     line-height: 1.55;
 }
 
-.schema-line {
-    margin: 1.5rem 0 0;
-    color: var(--color-muted);
-    font-size: 0.79rem;
-    line-height: 1.6;
-}
-
 /* Caveats and documentation -------------------------------------------------- */
 
 .claims-band {
