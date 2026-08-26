@@ -29,9 +29,6 @@
     <EnableSdkContainerSupport>true</EnableSdkContainerSupport>
     <ContainerFamily>noble-chiseled</ContainerFamily>
     <ContainerRepository>hasinthaattanayake/nemsweep</ContainerRepository>
-    <!-- Trailing separator matters: without it the SDK composes an entrypoint of
-         /worknemsweep.dll and the image will not start. -->
-    <ContainerWorkingDirectory>/work/</ContainerWorkingDirectory>
     <RuntimeIdentifiers>linux-x64;linux-arm64</RuntimeIdentifiers>
     <ContainerRuntimeIdentifiers>linux-x64;linux-arm64</ContainerRuntimeIdentifiers>
   </PropertyGroup>

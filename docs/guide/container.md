@@ -33,12 +33,16 @@ The data mount is read-only because nothing in a scenario run writes to it. Resu
 `./study` on your own machine, owned by you: the image runs as a non-root user, so bind-mounted
 output does not come back owned by root.
 
-To keep a project directory alongside them, mount it at `/work`, which is the image's working
-directory. Relative paths on the command line resolve against it:
+To bring your own scenarios and sweeps, mount the directory holding them and name them by absolute
+path:
 
 ```bash
-podman run --rm -v .:/work -v ./reference:/data:ro -v ./study:/out ghcr.io/hasinthaattanayake/nemsweep:latest --run-scenario scenarios/my-scenario.json
+podman run --rm -v ./my-study:/work:ro -v ./reference:/data:ro -v ./study:/out ghcr.io/hasinthaattanayake/nemsweep:latest --run-scenario /work/my-scenario.json
 ```
+
+Use an absolute path inside the container rather than a relative one. Relative paths resolve against
+the container's working directory, which is where the application itself lives, and that is not
+where your files are. `/work` above is just a name; mount wherever you like and point at it.
 
 `--data-root` and `--output` override the defaults per run, exactly as they do outside a container.
 See [the workspace](cli.md#the-workspace).
@@ -69,6 +73,16 @@ smaller image is not worth a feature that fails only in front of a user.
 
 There is no Dockerfile. The image is described by `NEMSweep.CLI.csproj` and built by the SDK, so
 there is no second description of the application to keep in step with the first.
+
+## It is the same model
+
+A container run and a host run of the same scenario against the same inputs produce **identical
+results**. Verified leaf by leaf across a Windows host and the Linux image: every modelled value
+matches, and only `runId` differs, plus the `provenance` block, which is absent in the container
+because there is no git working tree inside it.
+
+That is worth knowing before you trust a figure produced one way and compared against a figure
+produced the other.
 
 ## Reproducibility
 
