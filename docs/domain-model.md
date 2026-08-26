@@ -1,8 +1,12 @@
 # Domain model
 
-This document tracks the domain types currently implemented in `NEMSweep.Model`.
-It describes code that exists now; future concepts belong here only when their
-domain types and invariants are implemented.
+This document tracks the domain types in `NEMSweep.Model`, the framework. It
+describes the code as it is. The framework does not hardcode the National
+Electricity Market's region list or couple to AEMO: region identifiers are
+free-form strings. Its grid model runs on a fixed one-hour timestep. The
+market-time offset is a run parameter, taken from the scenario period bounds
+(`Scenario.MarketTimeOffset`, validated by `MarketTime`) and defaulting to the
+NEM's UTC+10; every series in a run shares it.
 
 ```mermaid
 classDiagram
@@ -224,9 +228,9 @@ classDiagram
   solved by bisection each interval so that, applied over a trailing 336-interval
   window of past residual-demand observations, it would have spent exactly the
   budget affordable per interval over the intervals left in the month. This
-  self-calibrates to whatever the demand distribution looks like (a sort-based
-  "dispatch last" rule tried first and stranded ~93% of the budget instead of
-  rationing it - see NEM-076). The remaining 10% (the "reserve" pool) is held
+  self-calibrates to whatever the demand distribution looks like. A sort-based
+  "dispatch last" rule tried first stranded roughly 93% of the budget instead of
+  rationing it (NEM-076). The remaining 10% (the "reserve" pool) is held
   back entirely from normal merit-order dispatch and spent only by
   `RegionalDispatchRun.DispatchHydroFallback`, a true last-resort backstop that
   runs after that region's own storage, against whatever local deficit storage
@@ -243,9 +247,9 @@ classDiagram
   region the inner loop**, so every region is at the same hour at the same time
   and surplus in one can serve a deficit in another. Order within an interval is
   generation (including Hydro's paced share, in normal merit-order position),
-  then inter-regional transfer, then storage - and, immediately after that
-  region's own storage, that region's own Hydro reserve fallback, which is
-  strictly local and never visible to transfer. Each region's own sequence of
+  then inter-regional transfer, then storage. Immediately after that region's own
+  storage comes that region's own Hydro reserve fallback, which is strictly local
+  and never visible to transfer. Each region's own sequence of
   operations is otherwise unchanged by the inversion, so a system with no
   interconnectors produces results identical to dispatching each region alone.
 - `InterRegionalTransfer` is the only place the domain meets the graph. It maps
@@ -256,7 +260,7 @@ classDiagram
   never inside the search, which is what keeps it a standard max-flow problem.
   Exports draw on curtailment first and then start dispatchable plant in merit
   order; pumped hydro is excluded because storage is decided after transfer.
-  Conventional Hydro is not excluded - its incremental headroom for an export is
+  Conventional Hydro is not excluded. Its incremental headroom for an export is
   capped to the same per-interval pace as local dispatch (see
   `RegionalDispatchRun.IncrementalHeadroom`), so an export can substitute for
   local demand this interval but never draws on budget paced for a future local
@@ -359,7 +363,7 @@ and a `+00:00` generated timestamp in the same result is intentional.
 Money and cost-rate quantities use `decimal`; measured physical quantities use
 `double`. They meet only inside typed conversion methods, where finite,
 non-negative physical values are explicitly converted to `decimal`. `Money`
-divided by energy served to load produces `EnergyPrice` in AUD/MWh served.
+divided by energy served produces `EnergyPrice` in AUD/MWh served.
 `GenerationEnergyCost` is AUD/MWh generated and is used for variable operating
 and fuel-derived costs on gross generation. `FuelPrice` multiplied by heat rate
 produces a `GenerationEnergyCost`. `EnergyCapacityCost` is one-time AUD/MWh of
@@ -367,16 +371,16 @@ storage capacity and produces `Money` only when multiplied by storage `Energy`.
 
 `PowerSystemCostBreakdown` retains energy served separately from annual
 generation and storage costs. Its denominator is total
-`DispatchOutcome.EnergyServed`, not per-fleet generation allocation. Storage
-asset cost does not add charging energy: gross generation VOM and fuel already
-price generation used for charging and therefore include storage losses. The
-storage component is annualised storage asset cost divided by the same served
-energy denominator; it is not a standalone LCoS. These costs are modelled
-estimates, not audited figures; `decimal` prevents base-10 accumulation
-artefacts from appearing as model defects.
+`DispatchOutcome.EnergyServed` (demand minus unserved energy), not per-fleet
+generation allocation. Storage asset cost does not add charging energy: gross
+generation VOM and fuel already price generation used for charging and therefore
+include storage losses. The storage component is annualised storage asset cost
+divided by the same energy-served denominator; it is not a standalone LCoS. These
+costs are modelled estimates, not audited figures; `decimal` prevents base-10
+accumulation artefacts from appearing as model defects.
 
-Each `RegionCostBreakdown` retains the equivalent annual costs and energy
-served for one region. Its three levelised costs use only that region's
+Each `RegionCostBreakdown` retains the equivalent annual costs and energy served
+for one region. Its three levelised costs use only that region's
 `DispatchOutcome.EnergyServed`; they are not divided by total system energy
 served. `PowerSystemCostBreakdown.Regions` carries these regional values while
 its existing system totals remain the exact sums of the regional annual costs

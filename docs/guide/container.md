@@ -1,8 +1,12 @@
 # Running the container
 
-There are two ways to run NEMSweep: clone the repository and run it with the .NET SDK, or run the
+There are two ways to run NEMSweep: clone the repository and build it with the .NET SDK, or run the
 container image. The image is the one to reach for if you would rather not install a toolchain, or
-if your organisation would rather you did not.
+if your organisation would rather you did not. Either way you are running `NEMSweep.CLI`; the image
+is that tool and a .NET runtime, and nothing else.
+
+Throughout this page, replace `<owner>` with the GitHub repository owner. The image is published to
+the GitHub Container Registry under `<owner>/nemsweep`.
 
 ## What you need
 
@@ -10,11 +14,11 @@ Any [OCI](https://opencontainers.org/) runtime. Docker and Podman are both first
 image is an ordinary OCI image, so anything that reads the spec will run it.
 
 ```bash
-podman pull ghcr.io/hasinthaattanayake/nemsweep:latest
+podman pull ghcr.io/<owner>/nemsweep:latest
 ```
 
 ```bash
-docker pull ghcr.io/hasinthaattanayake/nemsweep:latest
+docker pull ghcr.io/<owner>/nemsweep:latest
 ```
 
 Images are published for `linux/amd64` and `linux/arm64`, so Apple Silicon is covered without
@@ -26,7 +30,7 @@ A run reads inputs from one directory and writes results to another, and the ima
 `/data` and `/out`. Mount yours over those and there is nothing else to configure:
 
 ```bash
-podman run --rm -v ./reference:/data:ro -v ./study:/out ghcr.io/hasinthaattanayake/nemsweep:latest --run-scenario /data/my-scenario.json
+podman run --rm -v ./reference:/data:ro -v ./study:/out ghcr.io/<owner>/nemsweep:latest --run-scenario /data/my-scenario.json
 ```
 
 The data mount is read-only because nothing in a scenario run writes to it. Results appear in
@@ -37,7 +41,7 @@ To bring your own scenarios and sweeps, mount the directory holding them and nam
 path:
 
 ```bash
-podman run --rm -v ./my-study:/work:ro -v ./reference:/data:ro -v ./study:/out ghcr.io/hasinthaattanayake/nemsweep:latest --run-scenario /work/my-scenario.json
+podman run --rm -v ./my-study:/work:ro -v ./reference:/data:ro -v ./study:/out ghcr.io/<owner>/nemsweep:latest --run-scenario /work/my-scenario.json
 ```
 
 Use an absolute path inside the container rather than a relative one. Relative paths resolve against
@@ -93,7 +97,7 @@ the one part a loose build leaves open. Pull by digest rather than by tag when a
 reproducible later:
 
 ```bash
-podman run --rm -v ./reference:/data:ro -v ./study:/out ghcr.io/hasinthaattanayake/nemsweep@sha256:... --run-scenario /data/my-scenario.json
+podman run --rm -v ./reference:/data:ro -v ./study:/out ghcr.io/<owner>/nemsweep@sha256:... --run-scenario /data/my-scenario.json
 ```
 
 ## See also

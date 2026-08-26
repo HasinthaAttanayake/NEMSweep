@@ -1,9 +1,13 @@
 # Dispatch
 
-Dispatch is the hour-by-hour simulation that turns a realised power system into generation,
-storage, transfer and reliability figures. This page explains the mechanism well enough to predict
-what a change to a scenario will do to it. For the full ownership and invariant detail, see the
-[domain model](../domain-model.md).
+Dispatch is the framework's hour-by-hour simulation that turns a realised power system into
+generation, storage, transfer and reliability figures. It is part of `NEMSweep.Model`, has no
+hardcoded region list, and takes region identifiers as free-form strings. The grid model runs on a
+fixed one-hour timestep, so sub-hourly demand input is resampled to it before dispatch sees it. The
+published example runs a financial year because that is the period of the ingested data.
+
+This page explains the mechanism well enough to predict what a change to a scenario will do to it.
+For the full ownership and invariant detail, see the [domain model](../domain-model.md).
 
 ## From scenario to power system
 
@@ -25,8 +29,8 @@ that produced it.
 
 ## Interval outer, region inner
 
-`SystemDispatchRun.Execute` drives the whole system through the modelled year with the **interval as
-the outer loop and the region as the inner loop**:
+`SystemDispatchRun.Execute` drives the whole system through the modelled period with the **interval
+as the outer loop and the region as the inner loop**:
 
 ```text
 for each interval:
@@ -35,10 +39,10 @@ for each interval:
     for each region: run storage, then Hydro's reserve fallback
 ```
 
-The reason for the inversion is that every region needs to sit at the same hour at the same time for
-transfer to mean anything. A surplus in one region can only serve a deficit in another *within that
-hour* if both regions have already reached that hour before either one moves on. Running each region
-to completion before starting the next, which is the more obvious loop order, would never put two
+The reason for the inversion is that every region needs to sit at the same interval at the same time
+for transfer to mean anything. A surplus in one region can only serve a deficit in another within
+that interval if both regions have already reached it before either one moves on. Running each
+region to completion before starting the next, the more obvious loop order, would never put two
 regions at the same interval simultaneously, and transfer would have nothing to connect.
 
 A direct consequence: a system with **no interconnectors** produces results identical to dispatching

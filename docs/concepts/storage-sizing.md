@@ -1,8 +1,10 @@
 # Storage sizing
 
-Storage sizing answers one question: given a fleet that misses its reliability target, how much
-Battery does it take to meet it, and is the target reachable at all within the bounds the scenario
-allows? This page explains the search that answers it. For the full invariant detail, see
+Storage sizing is the framework step that, given a realised system that misses its reliability
+target, searches for the Battery capacity that meets it, or reports why the bounded search could
+not. It is `StorageSizingService` in `NEMSweep.Model` and, like dispatch, is region-agnostic.
+
+This page explains that search. For the full invariant detail, see
 [Storage sizing](../domain-model.md#storage-sizing) and [Storage](../domain-model.md#storage) in the
 domain model.
 
@@ -27,8 +29,8 @@ what keeps the search honest about inter-regional transfer: growing one region's
 what it needs to import or can afford to export, which can move another region's outcome too.
 
 Only **Battery** is sizeable. Pumped hydro is fixed at whatever the scenario declared, because a new
-pumped-hydro scheme is a specific site and reservoir, not a quantity purchasable in arbitrary
-increments the way batteries are, to a first approximation.
+pumped-hydro scheme is a specific site and reservoir, not a quantity that scales in arbitrary
+increments the way a battery fleet does.
 
 ## The floor
 
@@ -70,8 +72,8 @@ artifact carries; the .NET name is what you see in the API reference and in sour
 | JSON name | .NET name | What it means | What to do next |
 |---|---|---|---|
 | `notRequired` | `NotRequired` | The installed fleet already met the target, unchanged. | Nothing. The scenario as declared is already reliable. |
-| `resized` | `Resized` | The search grew Battery capacity and the target was met. | Read the final MW/MWh as the near-frontier point. It is not a cost-optimal answer (see below). |
-| `energyLimited` | `EnergyLimited` | Total available generation energy across the whole system is below total demand energy. | Add generation, not storage. See `EnergyLimitedAssessment` below. No Battery size will fix this. |
+| `resized` | `Resized` | The search grew Battery capacity and the target was met. | Read the final MW/MWh as the near-frontier point, not a cost-optimal answer. See [what a sizing result is, and is not](#what-a-sizing-result-is-and-is-not). |
+| `energyLimited` | `EnergyLimited` | Total available generation energy across the whole system is under total demand energy. | Add generation, not storage. No Battery size will fix this. See [when storage cannot be the answer](#when-storage-cannot-be-the-answer). |
 | `storageNoLongerImprovesReliability` | `StorageNoLongerImprovesReliability` | Every feasible larger candidate failed to materially reduce unserved energy before hitting the configured capacity limits. | Investigate whether the shortfall is a generation-timing problem or a storage-policy limitation (see [Limitations §4](../assumptions/limitations.md#4-greedy-storage-dispatch-is-wrong-in-both-directions)) rather than assuming more Battery would help. |
 | `batteryCapacityLimitReached` | `BatteryCapacityLimitReached` | The configured per-region MW or MWh ceiling was hit before the target was met. | Raise the ceiling if it was set conservatively, or accept the residual shortfall. |
 | `passLimitReached` | `PassLimitReached` | The dispatch-pass budget was exhausted before the target was met. | Raise `maximumPasses`, or treat the run as inconclusive rather than a verdict on feasibility. |
@@ -79,7 +81,7 @@ artifact carries; the .NET name is what you see in the API reference and in sour
 Only `energyLimited` is a proof that no Battery could have met the target. The other three failure
 outcomes each report a bound the search ran into, so none of them establishes infeasibility.
 
-## `EnergyLimitedAssessment`: when storage cannot be the answer
+## When storage cannot be the answer
 
 Whenever a dispatch fails its target, the model separately checks whether the failure could ever be
 fixed by storage at all. `EnergyLimitedAssessment` sums generator availability and demand across
@@ -109,15 +111,15 @@ tested, and would stop measuring what installed capacity alone achieves, which i
 actually being searched over. See [Model assumptions](../assumptions/index.md) for the seed
 fractions themselves.
 
-## What the result is, and is not
+## What a sizing result is, and is not
 
-The result of a sizing run is a **deterministic coordinate-wise near-frontier point**. It is not a
-global minimum, and it is emphatically not cost-optimal: nothing anywhere in the search prices the
-capacity it adds, so the search cannot trade off, say, more Battery energy against less Battery power
-against a different technology entirely. A different search order, meaning a different growth or
-refinement strategy, could land on a different but equally compliant point. Two sizing results from
-the same procedure are comparable to each other because the procedure is deterministic; neither one
-is "the answer" in any stronger sense. See
+A sizing result is a **deterministic coordinate-wise near-frontier point**. It is not a global
+minimum, and it is not cost-optimal: nothing in the search prices the capacity it adds, so the
+search cannot trade off, say, more Battery energy against less Battery power, or against a different
+technology entirely. A different search order, meaning a different growth or refinement strategy,
+could land on a different but equally compliant point. Two sizing results from the same procedure
+are comparable to each other because the procedure is deterministic; neither one is "the answer" in
+any stronger sense. See
 [Limitations §5](../assumptions/limitations.md#5-sizing-finds-a-near-frontier-point-not-an-optimum)
 for what that means for how you should read a sizing result.
 

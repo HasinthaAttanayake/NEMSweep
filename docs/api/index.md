@@ -4,9 +4,12 @@ Generated from the XML documentation comments in the source. Two assemblies are 
 
 ## NEMSweep.Model
 
-The domain model: scenarios, the realised power system, dispatch, storage sizing, economics, and the
+The framework: scenarios, the realised power system, dispatch, storage sizing, economics, and the
 typed quantities everything is expressed in. This is the library you would reference to run the
-model from your own code.
+model from your own code, with no command line. Region identifiers are free-form strings and the
+grid model runs on a fixed one-hour timestep. The market-time offset is a run parameter, read from
+the `Scenario` period bounds (`Scenario.MarketTimeOffset`, validated by `MarketTime`) and defaulting
+to the National Electricity Market's UTC+10.
 
 **How to reference it.** By project reference from a clone, or by referencing the built assembly.
 The licence is what grants the right:

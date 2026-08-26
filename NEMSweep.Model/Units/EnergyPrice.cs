@@ -3,7 +3,7 @@ namespace NEMSweep.Model.Units;
 /// <summary>
 /// Money per unit of energy served, in AUD/MWh served.
 /// <para>
-/// This is the output unit of system levelised cost of energy (SLCoE). It is
+/// This is the output unit of system levelised cost of electricity (SLCoE). It is
 /// deliberately distinct from <see cref="GenerationEnergyCost"/>, which prices
 /// gross generator output rather than energy served.
 /// </para>

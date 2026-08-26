@@ -2,9 +2,14 @@
 
 Read this before you quote a number from NEMSweep.
 
-These are not disclaimers. Each one changes how a result should be read, and in most cases we can
-say which direction the error runs. They are stated first, ahead of the assumptions register,
-because a reader who takes only one page from this site should take this one.
+These are not disclaimers. Each one changes how a result should be read, and in most cases the
+direction of the error is known. They are stated ahead of the assumptions register, because a
+reader who takes only one page from this site should take this one.
+
+Some limitations are the framework's (greedy storage dispatch, no unit commitment, a near-frontier
+sizing search). Others belong to the published example (a single typical weather year, operational
+demand rather than total demand). Both kinds are here, because both change how a published figure
+should be read.
 
 ## The four that matter most
 
@@ -14,7 +19,7 @@ through.
 | Limitation | What it does to a result |
 |---|---|
 | [1. A deterministic run cannot honour an expectation-based standard](#1-a-deterministic-run-cannot-honour-an-expected-unserved-energy-standard) | **Storage is understated.** The standard is an expectation across many weather outcomes; one typical year is a realisation, and it excludes the tail events that drive reliability. Treat a sizing result as a lower bound. |
-| [2. The 82% renewable target is measured on a different basis](#2-the-82-renewable-target-is-not-the-same-target-on-a-grid-scale-basis) | **Not directly comparable.** Operational demand nets out rooftop PV before the model sees it, and no rooftop fleet is dispatched. Two shares are published, on grid-scale and native bases; neither is "the" number. |
+| [2. Renewable share is measured on operational demand](#2-renewable-share-is-measured-on-operational-demand-not-a-rooftop-inclusive-basis) | **Not comparable to a rooftop-inclusive target.** Operational demand nets out rooftop PV before the model sees it, and no rooftop fleet is dispatched. Two shares are published, on grid-scale and native bases; neither is "the" number. |
 | [3. This is the cost of building the system, not a power bill](#3-this-is-the-cost-of-building-the-system-not-a-power-bill) | **Not a price.** The figures are annuitised build-and-run cost per MWh served. No distribution, retail, market, environmental scheme or tax costs are modelled. |
 | [4. Greedy storage dispatch is wrong in both directions](#4-greedy-storage-dispatch-is-wrong-in-both-directions) | **Biased both ways.** With no foresight, storage undersizes against a multi-day wind drought and oversizes against a system able to arbitrage. Which dominates depends on the scenario. |
 
@@ -38,15 +43,15 @@ result as a lower bound on required capacity, not an estimate of it.
 Doing this properly means running many weather years, or synthetic years drawn from a fitted
 distribution, and taking the expectation across them. NEMSweep does not do that today.
 
-## 2. The 82% renewable target is not the same target on a grid-scale basis
+## 2. Renewable share is measured on operational demand, not a rooftop-inclusive basis
 
-Australia's 82% renewable generation target is commonly quoted against a basis that includes
-rooftop solar. NEMSweep dispatches **operational demand**, which is demand as seen by the grid *after*
-rooftop PV has already served part of it. Rooftop generation is netted out of the demand series
-before the model ever sees it, and no rooftop fleet is dispatched.
+Renewable-generation targets are commonly quoted against total demand, including the part rooftop
+solar serves. The published example dispatches **operational demand**, which is demand as seen by
+the grid *after* rooftop PV has served part of it. Rooftop generation is netted out of the demand
+series before the model sees it, and no rooftop fleet is dispatched.
 
-So a renewable share measured on what NEMSweep dispatches is not directly comparable to the headline
-target. NEMSweep therefore reports **two** shares, and neither is presented as "the" number:
+So a renewable share measured on what NEMSweep dispatches is not directly comparable to a
+rooftop-inclusive target. NEMSweep reports **two** shares, and neither is presented as "the" number:
 
 | Measure | Numerator | Denominator |
 |---|---|---|
@@ -59,9 +64,9 @@ overstate it.
 
 ## 3. This is the cost of building the system, not a power bill
 
-The levelised figures NEMSweep publishes are **system build-and-run costs per MWh served**:
-annuitised capital plus one year of operating cost for the generation, storage and transmission
-assets in the scenario, divided by the energy actually served.
+The levelised figures NEMSweep publishes are **system build-and-run costs per MWh of energy
+served**: annuitised capital plus one year of operating cost for the generation, storage and
+transmission assets in the scenario, divided by energy served (demand minus unserved energy).
 
 A retail electricity bill is a different thing entirely. It also contains distribution network
 charges below the transmission level, retail operating costs and margin, market and settlement
@@ -105,8 +110,8 @@ neither is "the answer".
 A sizing run that does not meet the target reports which bound stopped it. Only the
 `energyLimited` outcome, where total available generation energy across the system is below total
 demand energy, proves that no Battery could have met the target. A capacity ceiling, a pass budget,
-or probes that stopped helping each report a limit of the search rather than a limit of the
-system.
+or storage that has stopped reducing unserved energy each report a limit of the search rather than
+a limit of the system.
 
 The same applies to inter-regional transfer, which serves regions in priority order by successive
 max-flow solves. That guarantees a higher-priority region is never starved by a lower-priority one,
@@ -152,8 +157,8 @@ Stated so their absence is not mistaken for a zero:
 - **No intra-regional network.** A region is a single node. Distribution and sub-transmission
   constraints do not exist.
 - **No frequency control, inertia, or system strength.** Reliability here is an energy measure only.
-- **One year, one weather year, hourly.** No multi-year build path, no retirement schedule, no
-  capacity expansion over time.
+- **No capacity expansion over time.** No multi-year build path and no retirement schedule. The
+  cost engine prices exactly one year, and storage sizing solves for a single end state.
 - **No demand response or price elasticity.** Demand is exogenous and inelastic.
 
 ## Reading a result honestly

@@ -26,7 +26,7 @@ public sealed record ReliabilityBasisDTO(
 /// they are summed across the regions, and <see cref="MaximumEnergyMwh"/> and
 /// <see cref="MaximumPowerMw"/> are summed with them. The limit the loop actually enforces is a
 /// per-region one, so a system artifact that passed it through unsummed reported a total against a
-/// ceiling a fifth of its size — a fleet inside its limit read as one past it.
+/// ceiling a fifth of its size, and a fleet inside its limit read as one past it.
 /// </remarks>
 public sealed record StorageSizingOutcomeDTO(
     StorageSizingOutcome Outcome,

@@ -84,7 +84,7 @@ needs, and price it at these economics". That is the normal way to use the sizin
 | `targetUsePercentage` | % of demand energy | The reliability standard this scenario is sized against. Defaults to the NER standard if omitted. |
 | `maximumPowerMw` | MW | Largest Battery power the search may consider, **per region**. |
 | `maximumEnergyMwh` | MWh | Largest Battery energy the search may consider, **per region**. Must support four hours at the power maximum. |
-| `maximumPasses` | count | Cap on whole-system dispatch passes. Each pass re-dispatches every region for the full year, so this bounds run time. |
+| `maximumPasses` | count | Cap on whole-system dispatch passes. Each pass re-dispatches every region for the full period, so this bounds run time. |
 | `reliabilityStandardName` | text | A label carried through to published results. |
 
 The maxima are commercial limits you assert, not physical ones. Reaching one is a reportable
@@ -113,7 +113,7 @@ change, not a code change.
 | Parameter | Unit | What it means |
 |---|---|---|
 | `demandFile` | path | The operational-demand artifact for this region. Per region, not top-level. |
-| `weatherFile` | path | The weather artifact for this region. Also supplies the region's location. |
+| `weatherFile` | path | The weather artifact for this region. Its solar site also supplies the region's published coordinates and drives the solar-geometry calculation. |
 | `dataCentreNameplateMw` | MW | An additive demand component at full load factor, on top of base demand. |
 
 `dataCentreNameplateMw` is named for the study it was built for, but nothing about it is
@@ -133,6 +133,6 @@ should be replacing with your own and sweeping.
 ## Next
 
 - [Scenario configuration](../guide/scenarios.md): the schema and validation rules.
-- [Sweeps](../guide/sweeps.md): varying one of these across a series of runs.
+- [Sweeps](../guide/sweeps.md): applying override patches to these values across a series of runs.
 - [Sensitivity analysis](../exploring/sensitivity-analysis.md): reading what the variation tells
   you.

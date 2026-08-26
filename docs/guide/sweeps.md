@@ -1,9 +1,13 @@
 # Sweeps
 
-A sweep varies one input across a series of runs while holding everything else constant, so that
-the shape of the system's response to that input can be read off a chart rather than reconstructed
-run-by-run from a pile of scenario files. Each run in a sweep is called a **point**. Every point
-starts from the same baseline scenario config and applies a small patch on top of it.
+A sweep is a baseline scenario config plus a set of points, run together and published together.
+Each point is a free-form override patch applied to that baseline, and the points are lined up along
+one labelled axis so the shape of the system's response can be read off a chart rather than
+reconstructed run by run from a pile of scenario files. Each run is called a **point**.
+
+A point may change any number of inputs at once. The axis is the chart's x-dimension, not a
+constraint on what a point varies: a point can move a data-centre load, a discount rate and a
+storage limit together, and still sit at a single position on one axis.
 
 The full published JSON Schema for the sweep definition format is available from the CLI:
 
@@ -196,18 +200,14 @@ at hourly resolution. A scenario of a different size will not match these:
 | The whole 25-point sweep | about 8 minutes |
 
 So a single scenario is something you iterate on, and a sweep is something you start and come back
-to. A slow point is usually sitting on a transition where the search has to work rather than
-misbehaving. If you are still shaping a definition, `--fan-out-sweep` validates every point in
-seconds without dispatching any of them, which is the loop to stay in until the definition is
-right.
-
-A point that takes much longer than its neighbours is usually telling you something: the sizing
-search is working hard near a transition, and that is often the interesting part of the axis rather
-than a problem.
+to. A point that takes much longer than its neighbours is usually the sizing search working hard
+near a transition, which is often the interesting part of the axis rather than a problem. While you
+are still shaping a definition, `--fan-out-sweep` validates every point in seconds without
+dispatching any of them, which is the loop to stay in until the definition is right.
 
 ## A complete minimal worked example
 
-A two-point sweep varying storage capital cost, run against the committed FY2026 example scenario.
+A two-point sweep of storage capital cost, run against the committed FY2026 example scenario.
 
 ```json
 {

@@ -1,8 +1,9 @@
 # CSV tables
 
-JSON is the contract every artifact is defined by, but it is not something you can open. Add
-`--csv` to any run and it also writes a **star schema**: narrow fact tables at the hour grain,
-joined to small dimension tables.
+CSV tables are a `NEMSweep.CLI` output format, projected from the JSON artifacts. JSON is the
+contract every artifact is defined by, but it is not something you can open. Add `--csv` to any run
+and it also writes a **star schema**: narrow fact tables at the hour grain, joined to small
+dimension tables.
 
 ```bash
 nemsweep --run-scenario scenarios/my-scenario.json --output ./study --csv

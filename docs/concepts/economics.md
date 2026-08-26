@@ -1,16 +1,19 @@
 # Economics
 
-The figures on this page are the cost of **building and running** the modelled system for one year,
-not a retail electricity bill. There is no bidding, no settlement, no market price anywhere in
-NEMSweep, and nothing here should be read as what anyone would pay. See
+This page is about the framework's cost engine (`PowerSystemCostCalculator` and
+`LevelisedCostCalculator` in `NEMSweep.Model`). The figures it produces are the cost of
+**building and running** the modelled system for one year, not a retail electricity bill. There is
+no bidding, no settlement, and no market price anywhere in NEMSweep, and nothing here should be read
+as what anyone would pay. See
 [Limitations §3](../assumptions/limitations.md#3-this-is-the-cost-of-building-the-system-not-a-power-bill)
 before quoting a dollar figure from a NEMSweep result.
 
 ## Annuitisation
 
-A scenario models a single year, but the assets in it last decades: a coal plant, a battery, an
-interconnector. `LevelisedCostCalculator` spreads a one-off capital cost across an asset's technical
-life using the standard capital recovery factor:
+The cost engine prices exactly one year, and rejects a scenario whose period is not exactly one
+year. The assets in that year last decades, though: a coal plant, a battery, an interconnector.
+`LevelisedCostCalculator` spreads a one-off capital cost across an asset's technical life using the
+standard capital recovery factor:
 
 ```text
 r(1 + r)^n / ((1 + r)^n − 1)
@@ -23,7 +26,7 @@ twenty.
 
 The rate is **real, not nominal**: every cost figure in the model is stated in the scenario's
 real-dollar year, so applying a nominal rate on top would double-count inflation. At a zero discount
-rate the annuity formula above is undefined (division by zero), so the calculator falls back to
+rate the capital recovery factor is undefined (division by zero), so the calculator falls back to
 straight-line recovery, `1/n`, as the degenerate case.
 
 ## What is charged for generation
@@ -63,11 +66,12 @@ energy that passed through storage.
 ## The denominator
 
 Every levelised figure, for generation, storage, transmission and the total alike, divides by
-`EnergyServed`: demand minus unserved energy. It never divides by generation. A regional levelised
-cost uses only that region's own energy served; the system figure uses the system total. Dividing
-by energy served rather than generation is what makes the figures comparable to a genuine cost of
-supply: energy generated but curtailed, or lost to storage round-trip inefficiency, was never
-served to anyone and so does not appear in the denominator that spreads the system's cost.
+**energy served**: demand minus unserved energy (`DispatchOutcome.EnergyServed` in code). No
+levelised figure divides by generation. A regional levelised cost uses only that region's own energy
+served; the system figure uses the system total. Dividing by energy served rather than generation is
+what makes the figures comparable to a genuine cost of supply: energy generated but curtailed, or
+lost to storage round-trip inefficiency, was never served to anyone and so does not appear in the
+denominator that spreads the system's cost.
 
 ## Why regional costs do not sum to the system total
 

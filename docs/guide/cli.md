@@ -1,5 +1,10 @@
 # CLI reference
 
+`NEMSweep.CLI` is the command-line tool that runs the framework against National Electricity Market
+data. This page is about that tool only: the framework (`NEMSweep.Model`, `NEMSweep.Contracts`) has
+no command line. The five-region rule the CLI enforces is the CLI's; the one-hour timestep is the
+framework's, and the CLI resamples half-hourly demand to it.
+
 `NEMSweep.CLI` is a single executable with no options parser: each command is a flag literal followed
 by zero to three positional arguments, matched by a pattern in
 `NEMSweep.CLI/Application/CommandRouter.cs`. This page documents every command it routes.
@@ -329,6 +334,7 @@ dotnet run --project NEMSweep.CLI -- --epw-report NSW1 path/to/solar.epw path/to
 The region argument is validated against the five NEM regions (`NSW1`, `QLD1`, `SA1`, `TAS1`,
 `VIC1`); anything else is rejected before any file is read, and before settings are loaded. The EPW
 paths are relative to your current working directory unless they are absolute. Writes
-`weather-{region}.json` under the data root, and prints the provenance report, including the
-daylight DNI source shares, along with a count of each series constructed.
+`weather-{region}.json` (the region is lower-cased in the file name) under the data root, and prints
+the provenance report, the daylight DNI source shares and their total, and a count of each series
+constructed.
 

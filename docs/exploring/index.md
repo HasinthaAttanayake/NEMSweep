@@ -1,12 +1,13 @@
 # Designing a study
 
-NEMSweep's published work so far asks one question: what does adding a large new load to the grid do
-to storage requirements, reliability and system cost. That is a narrow use of a general instrument.
+This section is for anyone using NEMSweep to answer a question rather than to reproduce the
+published example. The published example asks one thing, what a large new load does to storage,
+reliability and system cost, and that is a narrow use of a general instrument.
 
-The model is deterministic, every assumption is either a documented constant or a scenario input,
-and a run takes minutes rather than hours. Those three properties together mean the natural unit of
-work is not a run but a **study**: a set of runs that differ in one controlled way, published
-together with their provenance.
+The framework is deterministic, every assumption is either a documented constant or a scenario
+input, and a run takes minutes rather than hours. Those three properties together mean the natural
+unit of work is not a run but a **study**: a baseline scenario plus a set of runs that vary it in a
+controlled way, published together with their provenance.
 
 This section is about designing those.
 
@@ -19,9 +20,9 @@ on each one, which identifies the run rather than describing it. Imported input 
 sweep index also carry timestamps and durations, which
 [Outputs and provenance](../guide/outputs.md) sets out.
 
-That is why a sweep is meaningful. When you vary one input across twenty points and the storage
-requirement moves, the input moved it. There is no run-to-run noise for the effect to hide in, and
-nothing to average.
+That is why a sweep is meaningful. When one controlled thing changes along the axis across twenty
+points and the storage requirement moves, that change moved it. There is no run-to-run noise for the
+effect to hide in, and nothing to average.
 
 It also means a result is checkable. A sweep records the commit the model was built at, whether the
 working tree was dirty when it ran, and the SHA-256 of every input file it consumed. Anyone with the
@@ -36,9 +37,9 @@ distribution to sample and gives no confidence intervals. See
 The single most useful habit when working with NEMSweep: **read differences, not levels**.
 
 The model's biases are systematic. Reciprocal interconnectors are each costed at the corridor's
-full length, roughly doubling reported transmission cost. Greedy storage dispatch is wrong in a
-known direction. A typical meteorological year understates tail events. Every one of those sits on
-*both* runs when you compare two, and largely cancels.
+full length, which lifts reported transmission cost by roughly 1.8×. Greedy storage dispatch is
+wrong in a known direction. A typical meteorological year understates tail events. Every one of
+those sits on *both* runs when you compare two, and largely cancels.
 
 So a claim of the form "storage requirement roughly triples between +2 GW and +6 GW of new load" is
 far better supported than "the system needs 14 GWh of storage". Frame findings the first way.
@@ -100,8 +101,10 @@ before drawing a cost conclusion from it.
 
 ## Designing a good sweep
 
-**One axis.** If two things change between points you cannot attribute the difference. That is what
-a sweep is *for*.
+**Vary one thing along the axis.** A point's override patch can change anything, and often changes
+several fields at once to express one idea (the published sweep raises `dataCentreNameplateMw` in
+several regions per point to add one total load). But if two *independent* things change between
+adjacent points, you cannot attribute the difference to either.
 
 **Points where the interesting thing happens.** A linear ladder wastes runs on the flat stretches.
 Run a coarse sweep first, find the region where behaviour changes, then sweep finely through it.

@@ -312,3 +312,6 @@ dist/
 docs/_site/
 docs/api/*.yml
 docs/api/.manifest
+
+# Crash dumps from MSYS2 tools (e.g. Git Bash grep.exe) segfaulting on a pipe.
+*.stackdump

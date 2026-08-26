@@ -1,8 +1,12 @@
 # Transmission
 
-Transmission is how a surplus in one region reaches a deficit in another within the same interval.
-This page explains the layering that makes that possible, the algorithm underneath it, and the two
-approximations in its cost model. For the full invariant detail, see the
+Transmission is the framework mechanism by which a surplus in one region reaches a deficit in
+another within the same interval, over the directed interconnectors a scenario declares. It is
+`InterRegionalTransfer` and `NEMSweep.Model/Algorithms` in `NEMSweep.Model`, and it is
+region-agnostic: "region" is a node label and nothing more.
+
+This page explains the layering that makes transfer possible, the algorithm underneath it, and the
+two approximations in its cost model. For the full invariant detail, see the
 [domain model](../domain-model.md).
 
 ## Interconnectors are directed and owned by the system
@@ -23,13 +27,13 @@ responsibility is the interesting part:
 
 - **The transfer layer** (`InterRegionalTransfer`) knows about regions, power, and losses. It maps
   each region's post-generation surplus or deficit onto a node in a capacity graph, delegates to the
-  pure algorithms below to find out what can move, and books the outcome back onto the regions as
-  imports and exports.
-- **The algorithm layer** (`NEMSweep.Model/Algorithms`) knows none of that. `EdmondsKarp` finds maximum
-  flow on an abstract capacity graph; `FlowPathDecomposition` turns an edge-flow solution into
-  discrete source-to-sink routes; `PrioritisedTransferSolver` sequences sinks and calls both. None of
-  it has ever heard of a region, a megawatt, or a transmission loss. Those are the transfer layer's
-  concern entirely.
+  algorithm layer to find out what can move, and books the outcome back onto the regions as imports
+  and exports.
+- **The algorithm layer** (`NEMSweep.Model/Algorithms`) knows none of that. `EdmondsKarp` finds
+  maximum flow on an abstract capacity graph; `FlowPathDecomposition` turns an edge-flow solution
+  into discrete source-to-sink routes; `PrioritisedTransferSolver` sequences sinks and calls both.
+  None of it has ever heard of a region, a megawatt, or a transmission loss. Those are the transfer
+  layer's concern entirely.
 
 That separation is what keeps the max-flow solver a genuinely standard one: it never has to reason
 about losses, priority, or anything domain-specific, and the transfer layer never has to reimplement
