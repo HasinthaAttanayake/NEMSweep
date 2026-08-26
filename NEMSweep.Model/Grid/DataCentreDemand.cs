@@ -24,7 +24,7 @@ public static class DataCentreDemand
 
     /// <summary>Expands a data-centre nameplate into a flat demand component series.</summary>
     /// <param name="nameplate">Data-centre nameplate power in MW. Must not be negative.</param>
-    /// <param name="start">Series start, in NEM market time (UTC+10).</param>
+    /// <param name="start">Series start, carrying the run's market-time offset.</param>
     /// <param name="resolution">Interval length of the returned series.</param>
     /// <param name="intervalCount">Number of intervals to generate. Must be positive.</param>
     /// <returns>
@@ -48,7 +48,7 @@ public static class DataCentreDemand
                 "Data-centre nameplate cannot be negative.");
         }
 
-        NemTime.Require(start, nameof(start));
+        MarketTime.Require(start, nameof(start));
         if (intervalCount <= 0)
         {
             throw new ArgumentOutOfRangeException(

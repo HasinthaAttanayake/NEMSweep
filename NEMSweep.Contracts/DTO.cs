@@ -74,9 +74,12 @@ namespace NEMSweep.Contracts
         public string Id { get; set; } = id;
         /// <summary>The NEM region this demand series belongs to.</summary>
         public string Region { get; set; } = region;
-        /// <summary>Start of the covered period, in NEM market time (UTC+10).</summary>
+        /// <summary>
+        /// Start of the covered period. Its UTC offset is the market-time offset every series in
+        /// the artifact is normalised to (the NEM's is UTC+10).
+        /// </summary>
         public DateTimeOffset PeriodStart { get; set; } = periodStart;
-        /// <summary>End of the covered period, in NEM market time (UTC+10).</summary>
+        /// <summary>End of the covered period, carrying the same market-time offset as <see cref="PeriodStart"/>.</summary>
         public DateTimeOffset PeriodEnd { get; set; } = periodEnd;
         /// <summary>Interval length of <see cref="Series.DemandMw"/>.</summary>
         public TimeSpan Resolution { get; set; } = resolution;

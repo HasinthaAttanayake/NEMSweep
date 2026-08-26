@@ -54,6 +54,7 @@ internal static class ValidateInputsCommand
         string root = context.Paths.ResolveConfiguredPath(
             string.IsNullOrWhiteSpace(bundlePath) ? settings.InputBundleRoot : bundlePath);
         InputBundle bundle = InputBundle.Load(root);
+        double marketOffsetHours = bundle.Manifest.Period.Start.Offset.TotalHours;
         IReadOnlyDictionary<string, OperationalDemandData> demandByRegion = OperationalDemandParser.Read(
             bundle.DemandArchivePaths,
             bundle.Manifest.Regions,
@@ -66,9 +67,9 @@ internal static class ValidateInputsCommand
         foreach ((string region, RegionWeatherSources sources) in bundle.WeatherByRegion)
         {
             (EpwFile solarFile, RegionalResourceProfile solarSeries) = ReadWeather(
-                sources.SolarEpwPath, weatherByPath);
+                sources.SolarEpwPath, weatherByPath, marketOffsetHours);
             (EpwFile windFile, RegionalResourceProfile windSeries) = ReadWeather(
-                sources.WindEpwPath, weatherByPath);
+                sources.WindEpwPath, weatherByPath, marketOffsetHours);
             weatherByRegion.Add(region, EpwWeatherExport.Create(
                 region,
                 solarFile.Header,
@@ -89,15 +90,16 @@ internal static class ValidateInputsCommand
 
     private static (EpwFile File, RegionalResourceProfile Series) ReadWeather(
         string path,
-        IDictionary<string, (EpwFile File, RegionalResourceProfile Series)> cache)
+        IDictionary<string, (EpwFile File, RegionalResourceProfile Series)> cache,
+        double marketOffsetHours)
     {
         if (cache.TryGetValue(path, out (EpwFile File, RegionalResourceProfile Series) result))
         {
             return result;
         }
 
-        EpwFile file = EpwParser.ReadValidated(path);
-        result = (file, EpwParser.ReadTimeSeries(file));
+        EpwFile file = EpwParser.ReadValidated(path, marketOffsetHours);
+        result = (file, EpwParser.ReadTimeSeries(file, marketOffsetHours));
         cache.Add(path, result);
         return result;
     }

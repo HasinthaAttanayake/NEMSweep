@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using NEMSweep.Model.Grid;
+using NEMSweep.Model.Series;
 using NEMSweep.Model.Units;
 
 namespace NEMSweep.Model.Scenarios;
@@ -42,8 +43,11 @@ public sealed class Scenario
     /// <summary>Validates and creates a scenario.</summary>
     /// <param name="id">Stable identity cited by every result derived from this scenario.</param>
     /// <param name="name">Human-readable name. Must not be blank.</param>
-    /// <param name="periodStart">Inclusive period start in NEM market time (UTC+10).</param>
-    /// <param name="periodEnd">Exclusive period end in NEM market time (UTC+10).</param>
+    /// <param name="periodStart">
+    /// Inclusive period start. Its UTC offset is the run's market-time offset (the NEM's is
+    /// UTC+10) and every demand, weather and dispatch series in the run shares it.
+    /// </param>
+    /// <param name="periodEnd">Exclusive period end. Must carry the same offset as <paramref name="periodStart"/>.</param>
     /// <param name="regions">
     /// At least one regional plan, with distinct region IDs compared case-insensitively.
     /// </param>
@@ -53,8 +57,9 @@ public sealed class Scenario
     /// regions of this scenario. Null or empty models the regions as unlinked.
     /// </param>
     /// <exception cref="ArgumentException">
-    /// A period bound is not in UTC+10, the regions are empty or contain duplicates, or an
-    /// interconnector names an unknown endpoint or repeats a direction.
+    /// A period bound carries an offset that is not a usable market-time offset or the two bounds
+    /// disagree, the regions are empty or contain duplicates, or an interconnector names an unknown
+    /// endpoint or repeats a direction.
     /// </exception>
     public Scenario(
         ScenarioId id,
@@ -69,10 +74,13 @@ public sealed class Scenario
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(regions);
         ArgumentNullException.ThrowIfNull(costBasis);
-        if (periodStart.Offset != TimeSpan.FromHours(10)
-            || periodEnd.Offset != TimeSpan.FromHours(10))
+        MarketTime.Require(periodStart, nameof(periodStart));
+        MarketTime.Require(periodEnd, nameof(periodEnd));
+        if (periodStart.Offset != periodEnd.Offset)
         {
-            throw new ArgumentException("Scenario periods must use NEM market time (UTC+10).");
+            throw new ArgumentException(
+                "Scenario period start and end must carry the same market-time offset; "
+                + $"got {periodStart.Offset} and {periodEnd.Offset}.");
         }
 
         if (periodEnd <= periodStart)
@@ -116,11 +124,17 @@ public sealed class Scenario
     /// <summary>Human-readable scenario name.</summary>
     public string Name { get; }
 
-    /// <summary>Inclusive period start, in NEM market time (UTC+10).</summary>
+    /// <summary>Inclusive period start, carrying the run's market-time offset.</summary>
     public DateTimeOffset PeriodStart { get; }
 
-    /// <summary>Exclusive period end, in NEM market time (UTC+10).</summary>
+    /// <summary>Exclusive period end, carrying the run's market-time offset.</summary>
     public DateTimeOffset PeriodEnd { get; }
+
+    /// <summary>
+    /// The run's market-time offset, taken from the period bounds: the single fixed UTC offset
+    /// every demand, weather and dispatch series in the run is normalised to. The NEM's is UTC+10.
+    /// </summary>
+    public TimeSpan MarketTimeOffset => PeriodStart.Offset;
 
     /// <summary>One fleet plan per region, with distinct region IDs.</summary>
     public IReadOnlyList<ScenarioRegion> Regions { get; }

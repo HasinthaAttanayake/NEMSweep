@@ -47,7 +47,7 @@ public sealed class SolarZenithSeries : TimeSeries
         double latitude,
         double longitude)
     {
-        NemTime.Require(start, nameof(start));
+        MarketTime.Require(start, nameof(start));
 
         if (resolution <= TimeSpan.Zero)
         {

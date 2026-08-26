@@ -35,7 +35,7 @@ public abstract class TimeSeries
 
     private protected TimeSeries(DateTimeOffset start, TimeSpan resolution, double[] values)
     {
-        NemTime.Require(start, nameof(start));
+        MarketTime.Require(start, nameof(start));
 
         if (resolution <= TimeSpan.Zero)
         {
@@ -68,7 +68,7 @@ public abstract class TimeSeries
         _values = (double[])values.Clone();
     }
 
-    /// <summary>First instant of the series, in NEM market time (UTC+10).</summary>
+    /// <summary>First instant of the series, carrying the run's market-time offset.</summary>
     public DateTimeOffset Start { get; }
 
     /// <summary>Interval between successive values.</summary>
@@ -106,6 +106,15 @@ public abstract class TimeSeries
         {
             throw new ArgumentException(
                 $"Series are misaligned on start: {Start:o} vs {other.Start:o}.",
+                nameof(other));
+        }
+
+        // Same instant, different offset means the two series were built against
+        // different market times; a run must settle on one.
+        if (Start.Offset != other.Start.Offset)
+        {
+            throw new ArgumentException(
+                $"Series are misaligned on market-time offset: {Start.Offset} vs {other.Start.Offset}.",
                 nameof(other));
         }
 

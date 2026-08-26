@@ -238,7 +238,7 @@ public sealed class SystemDispatchOutcome
     /// <summary>Identity of the power system this evidence describes.</summary>
     public PowerSystemId PowerSystemId { get; }
 
-    /// <summary>First interval instant, in NEM market time (UTC+10).</summary>
+    /// <summary>First interval instant, carrying the run's market-time offset.</summary>
     public DateTimeOffset Start { get; }
 
     /// <summary>Interval length. System outcomes are hourly.</summary>

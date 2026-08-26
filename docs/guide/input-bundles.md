@@ -59,7 +59,7 @@ archives NEMSweep actually reads without them being picked up twice.
 | `schemaVersion` | integer | yes | Must equal the version the CLI supports (currently `1`). |
 | `bundleId` | string | yes | Identifier for the bundle. Expected to match the name of the folder it lives in; a mismatch is a warning, not a rejection. |
 | `name` | string | yes | Human-readable name. |
-| `period` | object | yes | `start` and `end`, both timestamps; `end` must be after `start`. The calendar period the bundle's inputs are intended to cover. |
+| `period` | object | yes | `start` and `end`, both timestamps; `end` must be after `start`, and both must carry the same UTC offset. That offset is the market-time offset the ingested demand and weather are normalised to (UTC+10 for AEMO NEM data). The calendar period the bundle's inputs are intended to cover. |
 | `regions` | array of string | yes, at least one | NEM region identifiers (`NSW1`, `QLD1`, `SA1`, `TAS1`, `VIC1`) the bundle supplies weather for. Every entry must be a recognised region, and duplicates are rejected. |
 
 ## Where the source data comes from
