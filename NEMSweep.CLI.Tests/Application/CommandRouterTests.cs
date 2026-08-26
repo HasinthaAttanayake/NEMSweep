@@ -10,18 +10,50 @@ namespace NEMSweep.CLI.Tests.Application;
 public sealed class CommandRouterTests
 {
     [Fact]
-    public void RepositoryPaths_SeparatesOutputsAndResolvesInputsFromSolutionRoot()
+    public void WorkspacePaths_ReadInputsFromDataRootAndWriteResultsToOutputRoot()
     {
         using var fixture = new CliFixture();
-        RepositoryPaths paths = fixture.Paths;
+        WorkspacePaths paths = fixture.Paths;
 
-        paths.WeatherDataPath("NSW1").Should().EndWith(
-            Path.Combine("NEMSweep.Web", "wwwroot", "data", "weather-nsw1.json"));
-        paths.DispatchResultsPath.Should().EndWith(
-            Path.Combine("NEMSweep.Web", "wwwroot", "data", "results.json"));
-        paths.WeatherDataPath("NSW1").Should().NotBe(paths.DispatchResultsPath);
-        paths.ResolveConfiguredPath(Path.Combine("NEMSweep.CLI", "data", "demand-zips")).Should().Be(
-            Path.Combine(fixture.RootPath, "NEMSweep.CLI", "data", "demand-zips"));
+        paths.WeatherDataPath("NSW1").Should().Be(
+            Path.Combine(fixture.RootPath, "data", "weather-nsw1.json"));
+        paths.DispatchResultsPath.Should().Be(
+            Path.Combine(fixture.RootPath, "out", "results.json"));
+        paths.ResolveConfiguredPath(Path.Combine("scenarios", "one.json")).Should().Be(
+            Path.Combine(fixture.RootPath, "scenarios", "one.json"));
+    }
+
+    [Fact]
+    public void WorkspacePaths_PreferCommandLineOverrideOverConfiguredRoot()
+    {
+        using var fixture = new CliFixture();
+
+        WorkspacePaths paths = WorkspacePaths.Create(
+            fixture.Settings,
+            fixture.RootPath,
+            dataRootOverride: "elsewhere",
+            outputRootOverride: null);
+
+        paths.DataRoot.Should().Be(Path.Combine(fixture.RootPath, "elsewhere"));
+        paths.OutputRoot.Should().Be(Path.Combine(fixture.RootPath, "out"));
+    }
+
+    [Theory]
+    [InlineData("--data-root")]
+    [InlineData("--output")]
+    public void Run_RejectsAnOverrideMissingItsValueAsInvalidUsage(string flag)
+    {
+        using var fixture = new CliFixture();
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var application = new CommandRouter(fixture.RootPath, fixture.RootPath, output, error);
+
+        int exitCode = application.Run(["--run-scenario", flag]);
+
+        exitCode.Should().Be(2);
+        error.ToString().Should().Contain($"{flag} requires a directory.");
+        error.ToString().Should().Contain("Usage:");
+        output.ToString().Should().BeEmpty();
     }
 
     [Fact]
@@ -30,7 +62,7 @@ public sealed class CommandRouterTests
         using var fixture = new CliFixture();
         using var output = new StringWriter();
         using var error = new StringWriter();
-        var application = new CommandRouter(fixture.Paths, fixture.RootPath, output, error);
+        var application = new CommandRouter(fixture.RootPath, fixture.RootPath, output, error);
 
         int exitCode = application.Run(["--unknown"]);
 
@@ -47,7 +79,7 @@ public sealed class CommandRouterTests
         using var fixture = new CliFixture();
         using var output = new StringWriter();
         using var error = new StringWriter();
-        var application = new CommandRouter(fixture.Paths, fixture.RootPath, output, error);
+        var application = new CommandRouter(fixture.RootPath, fixture.RootPath, output, error);
 
         int exitCode = application.Run([flag]);
 
@@ -61,7 +93,7 @@ public sealed class CommandRouterTests
     {
         using var fixture = new CliFixture();
         using var output = new StringWriter();
-        var application = new CommandRouter(fixture.Paths, fixture.RootPath, output, TextWriter.Null);
+        var application = new CommandRouter(fixture.RootPath, fixture.RootPath, output, TextWriter.Null);
 
         application.Run(["--help"]).Should().Be(0);
 
@@ -84,7 +116,7 @@ public sealed class CommandRouterTests
         using var fixture = new CliFixture();
         using var output = new StringWriter();
         using var error = new StringWriter();
-        var application = new CommandRouter(fixture.Paths, fixture.RootPath, output, error);
+        var application = new CommandRouter(fixture.RootPath, fixture.RootPath, output, error);
 
         application.Run(["--version"]).Should().Be(0);
 
@@ -98,7 +130,7 @@ public sealed class CommandRouterTests
         using var fixture = new CliFixture();
         using var output = new StringWriter();
         using var error = new StringWriter();
-        var application = new CommandRouter(fixture.Paths, fixture.RootPath, output, error);
+        var application = new CommandRouter(fixture.RootPath, fixture.RootPath, output, error);
 
         int exitCode = application.Run(["scenarios/nem-fy2026-all-regions.json"]);
 
@@ -113,7 +145,7 @@ public sealed class CommandRouterTests
         using var fixture = new CliFixture();
         using var output = new StringWriter();
         using var error = new StringWriter();
-        var application = new CommandRouter(fixture.Paths, fixture.RootPath, output, error);
+        var application = new CommandRouter(fixture.RootPath, fixture.RootPath, output, error);
 
         int exitCode = application.Run(["--epw-report", "NSW", "solar.epw"]);
 
@@ -130,7 +162,7 @@ public sealed class CommandRouterTests
     {
         using var fixture = new CliFixture();
         using var output = new StringWriter();
-        var application = new CommandRouter(fixture.Paths, fixture.RootPath, output, TextWriter.Null);
+        var application = new CommandRouter(fixture.RootPath, fixture.RootPath, output, TextWriter.Null);
 
         application.Run(["--describe-schema", format]).Should().Be(0);
 
@@ -149,7 +181,7 @@ public sealed class CommandRouterTests
         using var fixture = new CliFixture();
         using var output = new StringWriter();
         using var error = new StringWriter();
-        var application = new CommandRouter(fixture.Paths, fixture.RootPath, output, error);
+        var application = new CommandRouter(fixture.RootPath, fixture.RootPath, output, error);
 
         int exitCode = application.Run(["--epw-report", "NSW1", "missing.epw"]);
 
@@ -168,8 +200,8 @@ public sealed class CommandRouterTests
         using var firstOutput = new StringWriter();
         using var firstError = new StringWriter();
         using var secondOutput = new StringWriter();
-        var first = new CommandRouter(fixture.Paths, fixture.RootPath, firstOutput, firstError);
-        var second = new CommandRouter(fixture.Paths, fixture.RootPath, secondOutput, TextWriter.Null);
+        var first = new CommandRouter(fixture.RootPath, fixture.RootPath, firstOutput, firstError);
+        var second = new CommandRouter(fixture.RootPath, fixture.RootPath, secondOutput, TextWriter.Null);
 
         first.Run(["--describe-schema", format]).Should().Be(0);
         second.Run(["--describe-schema", format]).Should().Be(0);
@@ -190,7 +222,7 @@ public sealed class CommandRouterTests
         using var fixture = new CliFixture();
         using var output = new StringWriter();
         using var error = new StringWriter();
-        var application = new CommandRouter(fixture.Paths, fixture.RootPath, output, error);
+        var application = new CommandRouter(fixture.RootPath, fixture.RootPath, output, error);
 
         application.Run(["--describe-schema"]).Should().Be(2);
         application.Run(["--describe-schema", "contract"]).Should().Be(2);
@@ -207,13 +239,14 @@ public sealed class CommandRouterTests
 
         CliSettings settings = CliSettings.Load(fixture.RootPath);
 
-        settings.InputBundleRoot.Should().Be("NEMSweep.CLI/data/nemsweep-inputs");
-        settings.OutputRoot.Should().Be("NEMSweep.Web/wwwroot/data");
+        settings.InputBundleRoot.Should().Be("data/nemsweep-inputs");
+        settings.DataRoot.Should().Be("data");
+        settings.OutputRoot.Should().Be("out");
         settings.DefaultScenarioPath.Should().Be("scenarios/Local scenario.json");
     }
 
     [Fact]
-    public void RunScenario_WithoutPath_ResolvesConfiguredDefaultFromSolutionRoot()
+    public void RunScenario_WithoutPath_ResolvesConfiguredDefaultFromWorkingRoot()
     {
         using var fixture = new CliFixture();
         fixture.WriteSettings("appsettings.local.json", "Local scenario");
@@ -249,12 +282,13 @@ public sealed class CommandRouterTests
                         """);
         using var output = new StringWriter();
         using var error = new StringWriter();
-        var application = new CommandRouter(fixture.Paths, fixture.RootPath, output, error);
+        var application = new CommandRouter(fixture.RootPath, fixture.RootPath, output, error);
 
         int exitCode = application.Run(["--run-scenario"]);
 
         exitCode.Should().Be(1);
-        error.ToString().Should().Contain(Path.Combine(fixture.RootPath, "missing-demand.json"));
+        error.ToString().Should().Contain(
+            Path.Combine(fixture.RootPath, "data", "missing-demand.json"));
     }
 
     private sealed class CliFixture : IDisposable
@@ -262,21 +296,24 @@ public sealed class CommandRouterTests
         public CliFixture()
         {
             RootPath = Path.Combine(Path.GetTempPath(), $"nemsweep-cli-{Guid.NewGuid():N}");
-            string nestedPath = Path.Combine(RootPath, "NEMSweep.CLI", "bin", "Debug", "net10.0");
-            Directory.CreateDirectory(nestedPath);
-            File.WriteAllText(Path.Combine(RootPath, "NEMSweep.slnx"), string.Empty);
-            Paths = RepositoryPaths.Discover(nestedPath);
+            Directory.CreateDirectory(RootPath);
         }
 
         public string RootPath { get; }
-        public RepositoryPaths Paths { get; }
+
+        public CliSettings Settings { get; } =
+            new("data/nemsweep-inputs", "data", "out", "scenarios/unused.json");
+
+        public WorkspacePaths Paths =>
+            WorkspacePaths.Create(Settings, RootPath, null, null);
 
         public void WriteSettings(string fileName, string scenarioName)
         {
             var settings = new
             {
-                inputBundleRoot = "NEMSweep.CLI/data/nemsweep-inputs",
-                outputRoot = "NEMSweep.Web/wwwroot/data",
+                inputBundleRoot = "data/nemsweep-inputs",
+                dataRoot = "data",
+                outputRoot = "out",
                 defaultScenarioPath = $"scenarios/{scenarioName}.json",
             };
             File.WriteAllText(

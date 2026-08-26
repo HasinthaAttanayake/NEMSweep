@@ -369,12 +369,14 @@ public sealed class SweepRunTests
     }
 
     [Fact]
-    public void CreateProvenance_UsesConfiguredOutputRootForScenarioInputs()
+    public void CreateProvenance_ResolvesScenarioInputsFromTheDataRoot()
     {
         using var fixture = new SweepRunFixture();
-        fixture.MoveInputsToConfiguredOutputRoot();
+        fixture.MoveInputsToDataRoot();
         fixture.WriteDefinition("""[{ "pointId": "p0", "axisValue": 0, "label": "Base", "overrides": {} }]""");
-        CliContext context = fixture.CreateContext(TextWriter.Null);
+        CliContext context = fixture.CreateContext(
+            TextWriter.Null,
+            dataRoot: SweepRunFixture.MovedInputDirectory);
         SweepDefinition definition = SweepFanOutCommand.WriteConfigs(
             context,
             "sweeps/test-sweep.json",
@@ -394,9 +396,9 @@ public sealed class SweepRunTests
             new SweepRunMetadata("test", false));
 
         provenance.InputFiles.Should().Contain(
-            input => input.Purpose == "demand-data" && input.Path == "published-inputs/demand.json");
+            input => input.Purpose == "demand-data" && input.Path == "demand.json");
         provenance.InputFiles.Should().Contain(
-            input => input.Purpose == "weather-data" && input.Path == "published-inputs/weather.json");
+            input => input.Purpose == "weather-data" && input.Path == "weather.json");
     }
 
     [Fact]
@@ -597,14 +599,26 @@ public sealed class SweepRunTests
             File.WriteAllText(Path.Combine(RootPath, "scenarios", "baseline.json"), """
             { "schemaVersion": 5, "id": "baseline", "name": "Baseline", "costBasis": { "year": 2026, "realDiscountRate": 0.07 }, "storageSizing": { "maximumPowerMw": 100, "maximumEnergyMwh": 400 }, "regions": [{ "regionId": "NSW1", "demandFile": "demand.json", "weatherFile": "weather.json", "generatingFleets": [{ "technology": "Gas", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 } }], "storageFleets": [{ "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0, "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 }, "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 } }] }] }
             """);
-            Paths = RepositoryPaths.Discover(RootPath);
+            Paths = WorkspacePaths.FromRoots(RootPath, RootPath, Path.Combine(RootPath, "out"));
         }
 
         public string RootPath { get; }
-        public RepositoryPaths Paths { get; }
+        public WorkspacePaths Paths { get; }
 
-        public CliContext CreateContext(TextWriter output, TextWriter? error = null) =>
-            new(Paths, RootPath, output, error);
+        public CliSettings Settings { get; } =
+            new("bundle", "data", "out", "scenarios/baseline.json");
+
+        public CliContext CreateContext(
+            TextWriter output,
+            TextWriter? error = null,
+            string? dataRoot = null) =>
+            new(
+                dataRoot is null
+                    ? Paths
+                    : WorkspacePaths.FromRoots(RootPath, Path.Combine(RootPath, dataRoot), Path.Combine(RootPath, "out")),
+                Settings,
+                output,
+                error);
 
         public string PointResultPath(string pointId) => Path.Combine(
             SweepDataPath, "points", $"{pointId}.json");
@@ -616,12 +630,12 @@ public sealed class SweepRunTests
             SweepDataPath, "points", $"{pointId}.status.json");
 
         public string SweepDataPath => Path.Combine(
-            RootPath, "NEMSweep.Web", "wwwroot", "data", "sweeps", "test-sweep");
+            RootPath, "out", "sweeps", "test-sweep");
 
         public string IndexPath => Path.Combine(SweepDataPath, "index.json");
 
         public string ManifestPath => Path.Combine(
-            RootPath, "NEMSweep.Web", "wwwroot", "data", "sweeps", "index.json");
+            RootPath, "out", "sweeps", "index.json");
 
         public string DefinitionPath => Path.Combine(RootPath, "sweeps", "test-sweep.json");
 
@@ -649,22 +663,19 @@ public sealed class SweepRunTests
             """);
         }
 
-        public void MoveInputsToConfiguredOutputRoot()
+        public const string MovedInputDirectory = "published-inputs";
+
+        /// <summary>Moves the scenario inputs somewhere only a data-root override reaches.</summary>
+        public void MoveInputsToDataRoot()
         {
-            const string outputDirectory = "published-inputs";
-            string fullOutputDirectory = Path.Combine(RootPath, outputDirectory);
-            Directory.CreateDirectory(fullOutputDirectory);
+            string fullDirectory = Path.Combine(RootPath, MovedInputDirectory);
+            Directory.CreateDirectory(fullDirectory);
             File.Move(
                 Path.Combine(RootPath, "demand.json"),
-                Path.Combine(fullOutputDirectory, "demand.json"));
+                Path.Combine(fullDirectory, "demand.json"));
             File.Move(
                 Path.Combine(RootPath, "weather.json"),
-                Path.Combine(fullOutputDirectory, "weather.json"));
-            string settingsDirectory = Path.Combine(RootPath, "NEMSweep.CLI");
-            Directory.CreateDirectory(settingsDirectory);
-            File.WriteAllText(
-                Path.Combine(settingsDirectory, "appsettings.local.json"),
-                """{ "inputBundleRoot": "unused", "outputRoot": "published-inputs", "defaultScenarioPath": "unused" }""");
+                Path.Combine(fullDirectory, "weather.json"));
         }
 
         public void Dispose() => Directory.Delete(RootPath, recursive: true);

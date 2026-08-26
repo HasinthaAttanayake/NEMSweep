@@ -13,6 +13,32 @@
     <WarningsAsErrors>$(WarningsAsErrors);CS1572;CS1573;CS1574;CS1591</WarningsAsErrors>
   </PropertyGroup>
 
+  <!--
+    The commit is stamped in here rather than read from git at run time. An installed binary can be
+    run from anywhere, and git asked at run time answers for whatever repository the process happens
+    to be standing in, which is a different model from the one that did the work.
+  -->
+  <Target Name="StampBuildCommit"
+          BeforeTargets="GetAssemblyAttributes"
+          Condition="Exists('$(MSBuildProjectDirectory)\..\.git')">
+    <Exec Command="git rev-parse HEAD"
+          WorkingDirectory="$(MSBuildProjectDirectory)"
+          ConsoleToMSBuild="true"
+          StandardOutputImportance="low"
+          StandardErrorImportance="low"
+          ContinueOnError="true"
+          IgnoreExitCode="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="BuildCommitSha" />
+      <Output TaskParameter="ExitCode" PropertyName="BuildCommitExitCode" />
+    </Exec>
+    <ItemGroup Condition="'$(BuildCommitExitCode)' == '0' And '$(BuildCommitSha)' != ''">
+      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+        <_Parameter1>BuildCommitSha</_Parameter1>
+        <_Parameter2>$(BuildCommitSha)</_Parameter2>
+      </AssemblyAttribute>
+    </ItemGroup>
+  </Target>
+
   <ItemGroup>
     <PackageReference Include="ClosedXML" Version="0.105.1" />
     <PackageReference Include="CsvHelper" Version="33.1.0" />

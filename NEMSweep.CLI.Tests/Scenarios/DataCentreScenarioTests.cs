@@ -1,6 +1,7 @@
 using System.Text.Json;
 using AwesomeAssertions;
 using NEMSweep.CLI.Application;
+using NEMSweep.CLI.Configuration;
 using NEMSweep.CLI.Scenarios;
 using NEMSweep.Contracts;
 
@@ -45,7 +46,6 @@ public sealed class DataCentreScenarioTests
         {
             RootPath = Path.Combine(Path.GetTempPath(), $"nemsweep-data-centre-{Guid.NewGuid():N}");
             Directory.CreateDirectory(Path.Combine(RootPath, "scenarios"));
-            File.WriteAllText(Path.Combine(RootPath, "NEMSweep.slnx"), string.Empty);
             DateTimeOffset start = new(2026, 1, 1, 0, 0, 0, TimeSpan.FromHours(10));
             double[] zeroes = new double[HoursPerYear];
             File.WriteAllText(Path.Combine(RootPath, "demand.json"), JsonSerializer.Serialize(
@@ -84,9 +84,15 @@ public sealed class DataCentreScenarioTests
 
         public SystemDispatchResultsDTO Run(string scenarioFile)
         {
-            NEMSweep.CLI.Infrastructure.RepositoryPaths paths =
-                NEMSweep.CLI.Infrastructure.RepositoryPaths.Discover(RootPath);
-            var context = new CliContext(paths, RootPath, TextWriter.Null);
+            NEMSweep.CLI.Infrastructure.WorkspacePaths paths =
+                NEMSweep.CLI.Infrastructure.WorkspacePaths.FromRoots(
+                    RootPath,
+                    RootPath,
+                    Path.Combine(RootPath, "out"));
+            var context = new CliContext(
+                paths,
+                new CliSettings("bundle", ".", "out", "unused.json"),
+                TextWriter.Null);
 
             ScenarioCommand.Run(context, $"scenarios/{scenarioFile}").Should().Be(0);
             return JsonSerializer.Deserialize<SystemDispatchResultsDTO>(

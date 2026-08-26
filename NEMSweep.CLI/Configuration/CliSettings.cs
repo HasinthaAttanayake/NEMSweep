@@ -5,6 +5,7 @@ namespace NEMSweep.CLI.Configuration;
 
 internal sealed record CliSettings(
     string InputBundleRoot,
+    string DataRoot,
     string OutputRoot,
     string DefaultScenarioPath)
 {
@@ -25,6 +26,7 @@ internal sealed record CliSettings(
     private void Validate()
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(InputBundleRoot);
+        ArgumentException.ThrowIfNullOrWhiteSpace(DataRoot);
         ArgumentException.ThrowIfNullOrWhiteSpace(OutputRoot);
         ArgumentException.ThrowIfNullOrWhiteSpace(DefaultScenarioPath);
     }

@@ -1,4 +1,5 @@
 using System.Reflection;
+using NEMSweep.CLI.Configuration;
 using NEMSweep.CLI.Demand;
 using NEMSweep.CLI.Generation;
 using NEMSweep.CLI.Infrastructure;
@@ -12,27 +13,37 @@ namespace NEMSweep.CLI.Application;
 /// <summary>
 /// Maps a command line onto one command handler. Every command is a flag literal followed by zero
 /// to three positional arguments; there is no options parser, because the surface is small enough
-/// that a pattern match over the argument array is easier to read than a framework.
+/// that a pattern match over the argument array is easier to read than a framework. The workspace
+/// overrides are stripped by <see cref="CliOptions"/> before that match, so they can appear anywhere
+/// on the line without every command pattern having to account for them.
 /// </summary>
 /// <remarks>
 /// Exit codes are the contract callers script against: <c>0</c> success, <c>1</c> a command that
-/// ran and failed, <c>2</c> a command line this router could not route. Requesting help is a
+/// ran and failed, <c>2</c> a command line this router could not read. Requesting help is a
 /// success, so <c>--help</c> writes usage to standard output and returns <c>0</c>, while an
-/// unrecognised command line writes the same usage to standard error and returns <c>2</c>.
+/// unrecognised command line, or an override missing its value, writes the same usage to standard
+/// error and returns <c>2</c>.
 /// </remarks>
 internal sealed class CommandRouter
 {
-    private readonly CliContext _context;
+    private readonly string _settingsDirectory;
+    private readonly string _workingRoot;
     private readonly TextWriter _output;
     private readonly TextWriter _error;
 
+    /// <summary>Creates a router for one process.</summary>
+    /// <param name="settingsDirectory">Directory the settings file is loaded from.</param>
+    /// <param name="workingRoot">Base for relative paths, normally the current directory.</param>
+    /// <param name="output">Standard output.</param>
+    /// <param name="error">Standard error.</param>
     public CommandRouter(
-        RepositoryPaths paths,
         string settingsDirectory,
+        string workingRoot,
         TextWriter output,
         TextWriter error)
     {
-        _context = new CliContext(paths, settingsDirectory, output, error);
+        _settingsDirectory = settingsDirectory;
+        _workingRoot = workingRoot;
         _output = output;
         _error = error;
     }
@@ -42,38 +53,84 @@ internal sealed class CommandRouter
     {
         try
         {
-            return args switch
+            CliOptions options = CliOptions.Parse(args, out string[] commandArgs);
+
+            // Answered without a workspace, so asking how to use the tool, or for a schema, never
+            // fails on a settings file the caller has not written yet.
+            switch (commandArgs)
             {
-                ["--help"] or ["-h"] or ["--usage"] => PrintUsage(_output, 0),
-                ["--version"] => PrintVersion(),
-                ["--run-scenario"] => ScenarioCommand.Run(_context),
-                ["--run-scenario", var scenarioConfigPath] => ScenarioCommand.Run(_context, scenarioConfigPath),
-                ["--fan-out-sweep", var definitionPath] => SweepFanOutCommand.Run(_context, definitionPath),
-                ["--run-sweep", var definitionPath] => SweepRunCommand.Run(_context, definitionPath),
-                ["--describe-schema", var format] when format is "scenario" or "sweep" =>
-                    SchemaDescriptionCommand.Run(_context, format),
-                ["--validate-inputs"] => ValidateInputsCommand.Run(_context),
-                ["--validate-inputs", var bundlePath] => ValidateInputsCommand.Run(_context, bundlePath),
-                ["--ingest"] => IngestCommand.Run(_context),
-                ["--ingest", var bundlePath] => IngestCommand.Run(_context, bundlePath),
+                case ["--help"] or ["-h"] or ["--usage"]:
+                    return PrintUsage(_output, 0);
+                case ["--version"]:
+                    return PrintVersion();
+                case ["--describe-schema", var schemaFormat] when schemaFormat is "scenario" or "sweep":
+                    return SchemaDescriptionCommand.Run(_output, schemaFormat);
+            }
+
+            // Checked here rather than inside the handler so a typo is rejected without first
+            // reading settings the run was never going to reach.
+            if (commandArgs is ["--epw-report", var epwRegionId, ..])
+            {
+                RequireKnownRegion(epwRegionId);
+            }
+
+            // Matched to a handler before the workspace is built, so an unroutable command line is
+            // rejected without reading settings it was never going to use.
+            Func<CliContext, int>? handler = commandArgs switch
+            {
+                ["--run-scenario"] => ScenarioCommand.Run,
+                ["--run-scenario", var scenarioConfigPath] =>
+                    context => ScenarioCommand.Run(context, scenarioConfigPath),
+                ["--fan-out-sweep", var definitionPath] =>
+                    context => SweepFanOutCommand.Run(context, definitionPath),
+                ["--run-sweep", var definitionPath] =>
+                    context => SweepRunCommand.Run(context, definitionPath),
+                ["--validate-inputs"] => context => ValidateInputsCommand.Run(context),
+                ["--validate-inputs", var bundlePath] =>
+                    context => ValidateInputsCommand.Run(context, bundlePath),
+                ["--ingest"] => context => IngestCommand.Run(context),
+                ["--ingest", var bundlePath] => context => IngestCommand.Run(context, bundlePath),
                 ["--import-demand"] =>
-                    OperationalDemandCommand.Run(_context, string.Empty),
+                    context => OperationalDemandCommand.Run(context, string.Empty),
                 ["--import-demand", var outputDirectory] =>
-                    OperationalDemandCommand.Run(_context, outputDirectory),
+                    context => OperationalDemandCommand.Run(context, outputDirectory),
                 ["--generation-information", var path] =>
-                    GenerationInformationCommand.Run(_context, path),
+                    context => GenerationInformationCommand.Run(context, path),
                 ["--epw-report", var regionId, var solarPath] =>
-                    EpwCommands.WriteReport(_context, RequireKnownRegion(regionId), solarPath),
+                    context => EpwCommands.WriteReport(context, RequireKnownRegion(regionId), solarPath),
                 ["--epw-report", var regionId, var solarPath, var windPath] =>
-                    EpwCommands.WriteReport(_context, RequireKnownRegion(regionId), solarPath, windPath),
-                _ => PrintUsage(_error, 2),
+                    context => EpwCommands.WriteReport(
+                        context,
+                        RequireKnownRegion(regionId),
+                        solarPath,
+                        windPath),
+                _ => null,
             };
+
+            return handler is null ? PrintUsage(_error, 2) : handler(CreateContext(options));
+        }
+        catch (UsageException exception)
+        {
+            _error.WriteLine(exception.Message);
+            return PrintUsage(_error, 2);
         }
         catch (Exception exception)
         {
             _error.WriteLine($"{OperationName(args)} failed: {exception.Message}");
             return 1;
         }
+    }
+
+    /// <summary>Loads settings and resolves the workspace the command will read and write through.</summary>
+    private CliContext CreateContext(CliOptions options)
+    {
+        CliSettings settings = CliSettings.Load(_settingsDirectory);
+        WorkspacePaths paths = WorkspacePaths.Create(
+            settings,
+            _workingRoot,
+            options.DataRoot,
+            options.OutputRoot);
+        return new CliContext(paths, settings, _output, _error);
     }
 
     /// <summary>
@@ -102,23 +159,27 @@ internal sealed class CommandRouter
     private static int PrintUsage(TextWriter writer, int exitCode)
     {
         writer.WriteLine("Usage:");
-        writer.WriteLine("  NEMSweep.CLI --help");
-        writer.WriteLine("  NEMSweep.CLI --version");
+        writer.WriteLine("  nemsweep --help");
+        writer.WriteLine("  nemsweep --version");
+        writer.WriteLine();
+        writer.WriteLine("  Workspace overrides, accepted alongside any command below:");
+        writer.WriteLine("  --data-root <dir>   where inputs are read from  (env NEMSWEEP_DATA_ROOT)");
+        writer.WriteLine("  --output <dir>      where results are written   (env NEMSWEEP_OUTPUT)");
         writer.WriteLine();
         writer.WriteLine("  Scenario and sweep runs:");
-        writer.WriteLine("  NEMSweep.CLI --run-scenario [scenario-config.json]");
-        writer.WriteLine("  NEMSweep.CLI --fan-out-sweep <sweep-definition.json>");
-        writer.WriteLine("  NEMSweep.CLI --run-sweep <sweep-definition.json>");
-        writer.WriteLine("  NEMSweep.CLI --describe-schema <scenario|sweep>");
+        writer.WriteLine("  nemsweep --run-scenario [scenario-config.json]");
+        writer.WriteLine("  nemsweep --fan-out-sweep <sweep-definition.json>");
+        writer.WriteLine("  nemsweep --run-sweep <sweep-definition.json>");
+        writer.WriteLine("  nemsweep --describe-schema <scenario|sweep>");
         writer.WriteLine();
         writer.WriteLine("  Input bundles:");
-        writer.WriteLine("  NEMSweep.CLI --validate-inputs [input-bundle]");
-        writer.WriteLine("  NEMSweep.CLI --ingest [input-bundle]");
+        writer.WriteLine("  nemsweep --validate-inputs [input-bundle]");
+        writer.WriteLine("  nemsweep --ingest [input-bundle]");
         writer.WriteLine();
         writer.WriteLine("  Single-source imports (all covered by --ingest):");
-        writer.WriteLine("  NEMSweep.CLI --import-demand [output-directory]");
-        writer.WriteLine("  NEMSweep.CLI --generation-information <workbook.xlsx>");
-        writer.WriteLine("  NEMSweep.CLI --epw-report <region> <solar.epw> [wind.epw]");
+        writer.WriteLine("  nemsweep --import-demand [output-directory]");
+        writer.WriteLine("  nemsweep --generation-information <workbook.xlsx>");
+        writer.WriteLine("  nemsweep --epw-report <region> <solar.epw> [wind.epw]");
         return exitCode;
     }
 

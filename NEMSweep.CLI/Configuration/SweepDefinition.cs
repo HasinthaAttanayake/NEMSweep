@@ -16,7 +16,7 @@ internal sealed record SweepDefinition(
 {
     private static readonly Regex SafeId = new("^[a-z0-9][a-z0-9-]*$", RegexOptions.CultureInvariant);
 
-    public static SweepDefinition Load(string path, RepositoryPaths paths)
+    public static SweepDefinition Load(string path, WorkspacePaths paths)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         string fullPath = paths.ResolveConfiguredPath(path);
@@ -33,10 +33,10 @@ internal sealed record SweepDefinition(
         return definition;
     }
 
-    public string BaselineConfigFullPath(RepositoryPaths paths) =>
+    public string BaselineConfigFullPath(WorkspacePaths paths) =>
         paths.ResolveConfiguredPath(BaselineConfigPath);
 
-    private void Validate(RepositoryPaths paths)
+    private void Validate(WorkspacePaths paths)
     {
         if (SchemaVersion != ArtifactSchemaVersions.SweepDefinition)
         {
