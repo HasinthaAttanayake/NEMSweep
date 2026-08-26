@@ -14,13 +14,15 @@
 <div class="home-page">
     <header class="hero">
         <div class="shell">
-            <p class="eyebrow">Open source &middot; grid adequacy and investment cases</p>
-            <h1>Ask the grid a question. Get the whole year back.</h1>
+            <p class="eyebrow">Open source &middot; techno-economic grid analysis &middot; policy and investment cases</p>
+            <h1>Define your energy assets. Stress-test them. Understand the impacts.</h1>
             <p class="lead">
-                NEMSweep runs a full year of hourly dispatch across all five NEM regions, sizes the
-                storage each scenario needs to hold the reliability standard, and prices what that
-                costs. Built for the people who have to defend a grid plan or an investment case
-                under load growth.
+                NEMSweep is an open-source dispatch framework that lets policy and investment
+                professionals run low-fidelity models of the grid with regional generation,
+                transmission and storage assets. Those assets can be stress-tested against
+                user-defined loads, giving fast feedback on the challenges faced as the world
+                transitions to renewables and demand for power grows. Understand firming
+                shortfalls, reliability challenges, and economics at your desktop.
             </p>
 
             @* The headline finding, read live from the published sweep rather than written down,
@@ -28,14 +30,14 @@
             @if (BreakingPoint is { } breaking)
             {
                 <p class="hero-claim">
-                    <span>In the published sweep</span>
+                    <span>In a published sweep</span>
                     @breaking
                 </p>
             }
 
             <div class="hero-actions">
                 <a class="button-primary" href="@(PrimarySweepRoute ?? "regions")">
-                    @(PrimarySweepRoute is null ? "Open the baseline run" : "Open the sweep")
+                    See the possibilities
                     <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" />
                 </a>
                 <a class="button-secondary"
@@ -43,14 +45,14 @@
                    target="_blank"
                    rel="noopener noreferrer">
                     <MudIcon Icon="@Icons.Material.Filled.PlayArrow" Size="Size.Small" />
-                    Run your own scenario
+                    Get started
                 </a>
             </div>
 
             @if (_analysis is not null)
             {
                 <div class="hero-metrics">
-                    <p class="figure-label">The baseline run &middot; @ScopeShort</p>
+                    <p class="figure-label">The Australian National Electricity Market (NEM) baseline run &middot; @ScopeShort</p>
                     <MetricStrip Items="@HeadlineMetrics"
                                  AriaLabel="Baseline run headline figures"
                                  Style="--metric-value-size: 1.45rem;" />
@@ -65,24 +67,26 @@
                 <p class="section-number">01</p>
                 <div>
                     <p class="section-label">Why this exists</p>
-                    <h2 id="problem-heading">Most modelling of the transition asks you to trust it</h2>
+                    <h2 id="problem-heading">Most modelling of the transition is inaccessible and demands your trust</h2>
                 </div>
             </div>
 
             <div class="ruled-list">
+                <article>
+                    <h3>Open source code, closed ecosystem</h3>
+                    <p>
+                        Even when higher-fidelity models are made publicly available to conduct
+                        techno-economic analysis of energy markets, they may require proprietary
+                        licences to run and a university-level understanding of concepts such as
+                        linear programming.
+                    </p>
+                </article>
                 <article>
                     <h3>A headline number that improves as the system fails</h3>
                     <p>
                         Cost per megawatt-hour is measured against the energy actually served, so
                         demand the grid never met simply leaves the denominator. Quote that figure
                         alone and a system in shortfall reads as one getting cheaper.
-                    </p>
-                </article>
-                <article>
-                    <h3>One national average, five different grids</h3>
-                    <p>
-                        NSW, QLD, VIC, SA and TAS carry different resource mixes, demand shapes and
-                        transmission constraints. A blended national figure hides all of it.
                     </p>
                 </article>
                 <article>
@@ -95,9 +99,12 @@
             </div>
 
             <p class="pull">
-                NEMSweep answers each of these directly: cost is always reported beside the unserved
-                energy behind it, and dispatch is simulated per region and reported per region rather
-                than blended into a national figure.
+                NEMSweep answers each of these directly. Its core model is open-source, open to
+                scrutiny and well documented, and it hands control back to the policy and investment
+                professional: the asset, resource and economic inputs, and the assumptions they
+                carry. Cost is always reported beside the unserved energy behind it. Dispatch is
+                simulated per region and reported per region rather than blended into a national
+                figure.
             </p>
         </div>
     </section>
@@ -110,13 +117,14 @@
             <div class="section-heading">
                 <p class="section-number">02</p>
                 <div>
-                    <p class="section-label">What a sweep is for</p>
+                    <p class="section-label">Sweep the scenario space</p>
                     <h2 id="why-sweep-heading">One run tells you what happened. A sweep tells you when it breaks.</h2>
                 </div>
                 <p>
-                    A single scenario answers one question at one value. Holding everything else
-                    constant and moving one input answers a more useful question: how far can this
-                    go before the grid stops holding, and what does each step cost?
+                    A single scenario answers one question at one value. Hold everything else
+                    constant, move one input, and you answer a more useful one. Raise the penetration
+                    of intermittent renewables, increase demand, add an interconnector or more
+                    storage: can the grid still meet demand, and what does each step cost?
                 </p>
             </div>
 
@@ -132,7 +140,7 @@
                         @if (question.Answer is { } answer)
                         {
                             <p class="question-answer">
-                                <span>In the published sweep</span>
+                                <span>In a published sweep</span>
                                 @answer
                             </p>
                         }
@@ -174,7 +182,7 @@
                     <p class="section-number">03</p>
                     <div>
                         <p class="section-label">Published sweeps</p>
-                        <h2 id="sweeps-heading">Every scenario here is openable as a full year</h2>
+                        <h2 id="sweeps-heading">Explore the types of questions you can ask with NEMSweep</h2>
                     </div>
                     <p>
                         A sweep is not a chart of summary figures. Each point is a complete dispatch
@@ -250,10 +258,11 @@
 
                 <div class="sweep-invitation">
                     <div>
-                        <h3>Sweep something else</h3>
+                        <h3>Design your own study</h3>
                         <p>
-                            A sweep is a JSON definition against a published contract. Pick an input,
-                            give it a range, and the runner fans out the year at every point.
+                            Define a baseline scenario and a set of points that vary from it. The
+                            runner fans out the full year at every point and lines them up along one
+                            axis.
                         </p>
                     </div>
                     <a class="button-invert"
@@ -276,7 +285,7 @@
                     <p class="section-number">04</p>
                     <div>
                         <p class="section-label">The baseline scenario</p>
-                        <h2 id="headline-heading">The fleet as it stands, dispatched for a year</h2>
+                        <h2 id="headline-heading">Australia's National Electricity Market, dispatched for a year</h2>
                     </div>
                     <p>@ScopeSentence</p>
                 </div>
@@ -304,7 +313,7 @@
 
         <div class="shell">
             <FindingCards Findings="@_analysis.Findings"
-                          Eyebrow="Read this first"
+                          Eyebrow="Baseline insights"
                           Heading="What the baseline run found"
                           Description="Generated from the run's own figures each time this page loads, not written by hand. The most significant are shown here; the comparison page carries them all with the tables behind them."
                           Limit="3"
@@ -323,7 +332,7 @@
                     <p class="section-number">04</p>
                     <div>
                         <p class="section-label">The baseline scenario</p>
-                        <h2 id="headline-heading">The fleet as it stands, dispatched for a year</h2>
+                        <h2 id="headline-heading">Australia's National Electricity Market, dispatched for a year</h2>
                     </div>
                 </div>
                 <ArtifactLoadStateView State="_systemState"><span /></ArtifactLoadStateView>
@@ -345,7 +354,10 @@
                     </div>
                     <p>
                         Every line below is read from the artifacts the latest run produced, not
-                        written by hand, so it describes what ran rather than what might.
+                        written by hand, so it reflects what the model actually did. The NEM is
+                        modelled as its five regional grids at hourly resolution; which regions a
+                        scenario includes, and the demand, fleet, storage and interconnectors in
+                        each, are yours to define.
                     </p>
                 </div>
 
@@ -362,11 +374,6 @@
                         </li>
                     }
                 </ul>
-
-                <p class="schema-line">
-                    Artifact schemas in this build:
-                    @string.Join(" · ", _modelState.SchemaVersions.Select(entry => $"{entry.Key} v{entry.Value}"))
-                </p>
             </div>
         </section>
     }
@@ -450,8 +457,9 @@
                 </p>
                 <p class="claim">
                     <strong>Not a bill.</strong>
-                    These are build-and-run costs. Retail, network and scheme costs are not in here,
-                    so nothing on this site is a price anyone pays.
+                    These are build-and-run costs. Retail, network and scheme costs are not included.
+                    The levelised cost figure (SLCoE, system levelised cost of electricity) is not a
+                    retail price anyone pays.
                 </p>
                 <p class="claim">
                     <strong>Not unexamined.</strong>
@@ -573,7 +581,7 @@
                         : $"the standard holds up to {PlotFormat.Compact(breach.AxisValue)} {unit}, and is missed from there on."),
                 new(
                     "If it does not, how much storage has to be built?",
-                    "Installed storage energy before and after sizing, for every scenario in the sweep.",
+                    "When a scenario as configured misses the reliability standard, the model grows storage to try to hold it. Installed storage energy before and after sizing, for every scenario in the sweep.",
                     first is not null && last is not null && StorageBuild(first, last) is { } build
                         ? $"storage grows {build} across the axis."
                         : null),
