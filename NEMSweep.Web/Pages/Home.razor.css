@@ -1,6 +1,7 @@
 /* An analytical report, not a product page. Structure comes from rules, numbered sections and a
-   measured column, so nothing floats: no cards, no drop shadows, no rounded panels. The one
-   inversion is the sweep band, which is the page's argument. */
+   measured column, so nothing floats: no cards, no drop shadows, no rounded panels. Two bands
+   invert: the banner that opens it, which is the subject, and the sweep band, which is the
+   argument. Everything between them is set on the page. */
 
 .home-page {
     --accent: var(--color-brand);
@@ -146,20 +147,102 @@
     border-color: #f0b264;
 }
 
-/* Hero ---------------------------------------------------------------------- */
+/* Hero banner ----------------------------------------------------------------
+   A photograph, mapped to the page's own two colours. A duotone is a decision
+   about subject rather than a filter: the shadows are the brand navy and the
+   highlights the brand amber, so the towers and the sky are drawn in the same
+   ink as the charts further down instead of importing a second palette. */
 
 .hero {
-    padding: 4.5rem 0 3.5rem;
+    position: relative;
+    padding: 5.5rem 0 4.25rem;
+    color: #fff;
+    background: var(--color-ink-surface);
+}
+
+.hero-banner {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    /* The highlight end of the duotone. The image multiplies down onto it, so this is the colour
+       the sky ends up in. */
+    background: #eec489;
+    /* Contains the blending, so the layers below the banner are never mixed into it. */
+    isolation: isolate;
+}
+
+.hero-banner img {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 38%;
+    /* Flipped, so the open sky falls under the headline and the tower line recedes away from it
+       rather than through it. */
+    transform: scaleX(-1);
+    filter: grayscale(1) contrast(1.06);
+    mix-blend-mode: multiply;
+}
+
+/* The shadow end: anything darker than the navy is lifted to it, which is what turns a grey
+   photograph into two colours rather than a tinted one. */
+.hero-banner::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: var(--color-ink-surface);
+    mix-blend-mode: lighten;
+}
+
+/* Type legibility, not mood: the copy column needs a contrast ratio, the right-hand third of the
+   frame does not, so the wash clears off the picture as it crosses. */
+.hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background:
+        linear-gradient(100deg, rgba(20, 27, 45, 0.9) 0%, rgba(20, 27, 45, 0.81) 34%, rgba(20, 27, 45, 0.52) 68%, rgba(20, 27, 45, 0.26) 100%),
+        linear-gradient(to bottom, rgba(20, 27, 45, 0.3) 0%, rgba(20, 27, 45, 0) 30%);
+}
+
+/* Narrow enough and the copy runs the full width of the frame, so the wash has to hold contrast
+   all the way across rather than clearing off the right of the picture. */
+@media (max-width: 900px) {
+    .hero::after {
+        background:
+            linear-gradient(160deg, rgba(20, 27, 45, 0.95) 0%, rgba(20, 27, 45, 0.86) 55%, rgba(20, 27, 45, 0.72) 100%);
+    }
+}
+
+.hero > .shell {
+    position: relative;
+    z-index: 2;
+}
+
+@supports not (mix-blend-mode: multiply) {
+    .hero-banner img {
+        opacity: 0.55;
+    }
+}
+
+.hero .eyebrow {
+    color: var(--color-on-ink-accent);
 }
 
 .hero h1 {
     max-width: 20ch;
     margin: 0;
     font-family: var(--font-display);
-    font-size: clamp(2.5rem, 5.6vw, 4.1rem);
+    font-size: clamp(2.5rem, 5.4vw, 3.9rem);
     font-weight: 700;
     letter-spacing: -0.028em;
-    line-height: 1.03;
+    line-height: 1.04;
+    text-wrap: balance;
 }
 
 .lead {
@@ -170,15 +253,44 @@
     line-height: 1.62;
 }
 
-/* The single most arresting figure the model produces, and the only place on the page where the
-   amber is used on a light ground: it is a finding, not a brand flourish. */
+.hero .lead {
+    max-width: 58ch;
+    color: rgba(255, 255, 255, 0.86);
+}
+
+/* Amber on ink rather than ink on white: on the banner the primary action is the one warm thing
+   on a navy field, which is the same weight it carried as a filled ink button on the light page. */
+.hero .button-primary {
+    border-color: var(--color-on-ink-accent);
+    background: var(--color-on-ink-accent);
+    color: var(--color-ink-surface);
+}
+
+.hero .button-primary:hover {
+    border-color: #f0b264;
+    background: #f0b264;
+}
+
+.hero .button-secondary {
+    border-color: rgba(255, 255, 255, 0.55);
+    color: #fff;
+}
+
+.hero .button-secondary:hover {
+    border-color: #fff;
+    background: rgba(255, 255, 255, 0.12);
+}
+
+/* The single most arresting figure the model produces. Set as a panel on the banner rather than
+   as a tinted block, so it reads as a result quoted out of a run and not as a caption on the
+   photograph. */
 .hero-claim {
-    max-width: 62ch;
+    max-width: 58ch;
     margin: 1.75rem 0 0;
     padding: 0.9rem 0 0.9rem 1.1rem;
     border-left: 3px solid var(--color-on-ink-accent);
-    background: var(--color-brand-accent-soft);
-    color: var(--color-ink);
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
     font-size: 1.02rem;
     line-height: 1.6;
 }
@@ -186,7 +298,7 @@
 .hero-claim span {
     display: block;
     margin-bottom: 0.25rem;
-    color: var(--color-brand-accent);
+    color: var(--color-on-ink-accent);
     font-size: 0.66rem;
     font-weight: 700;
     letter-spacing: 0.12em;
