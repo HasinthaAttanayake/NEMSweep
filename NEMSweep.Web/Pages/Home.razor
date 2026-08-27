@@ -12,7 +12,19 @@
 <PageTitle>NEMSweep</PageTitle>
 
 <div class="home-page">
+    @* The banner is the one photograph on the site. It is what the model is about - generation
+       out in the weather and the transmission that has to carry it - and it is rendered as a
+       duotone in the site's own two colours rather than as stock photography, so it reads as part
+       of the page instead of as decoration laid on top of it. *@
     <header class="hero">
+        <div class="hero-banner">
+            <img src="img/hero-transmission-wind.jpg"
+                 width="1800"
+                 height="950"
+                 fetchpriority="high"
+                 alt="A line of transmission towers receding across farmland, with wind turbines standing behind them." />
+        </div>
+
         <div class="shell">
             <p class="eyebrow">Open source &middot; techno-economic grid analysis &middot; policy and investment cases</p>
             <h1>Define your energy assets. Stress-test them. Understand the impacts.</h1>
@@ -48,18 +60,22 @@
                     Get started
                 </a>
             </div>
-
-            @if (_analysis is not null)
-            {
-                <div class="hero-metrics">
-                    <p class="figure-label">The Australian National Electricity Market (NEM) baseline run &middot; @ScopeShort</p>
-                    <MetricStrip Items="@HeadlineMetrics"
-                                 AriaLabel="Baseline run headline figures"
-                                 Style="--metric-value-size: 1.45rem;" />
-                </div>
-            }
         </div>
     </header>
+
+    @* Read on the light page rather than over the banner: these are the run's own figures and they
+       are read as a table, which a photograph behind them would work against. *@
+    @if (_analysis is not null)
+    {
+        <div class="shell">
+            <div class="hero-metrics">
+                <p class="figure-label">The Australian National Electricity Market (NEM) baseline run &middot; @ScopeShort</p>
+                <MetricStrip Items="@HeadlineMetrics"
+                             AriaLabel="Baseline run headline figures"
+                             Style="--metric-value-size: 1.45rem;" />
+            </div>
+        </div>
+    }
 
     <section id="problem" class="section" aria-labelledby="problem-heading">
         <div class="shell">
