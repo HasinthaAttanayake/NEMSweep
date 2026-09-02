@@ -18,6 +18,10 @@ report it. Do not try to work around it.
 You will see things that look wrong or untidy. Leave them alone. "No other changes" is a hard
 requirement from the person who asked for this work.
 
+There is **exactly one** file edit permitted in this whole runbook, and it is spelled out for you in
+Step 4.6: removing one line from `NEMSweep.Web/NEMSweep.Web.csproj` **in the new repository only**.
+Nothing else. If you find yourself editing any other file, you have gone wrong.
+
 ### Rule 2: Never use `git push --force` or `git push -f`.
 
 Not once. Not anywhere. If you think you need it, you have made a mistake earlier. STOP and report.
@@ -54,33 +58,54 @@ You must understand this before you start or you will produce a repository that 
 
 ```
 NEMSweep.Web.Tests  ──references──>  NEMSweep.Web
-NEMSweep.Web        ──references──>  NEMSweep.Contracts
-NEMSweep.Web        ──references──>  NEMSweep.Model
+NEMSweep.Web        ──references──>  NEMSweep.Contracts     <-- really used
+NEMSweep.Web        ──references──>  NEMSweep.Model         <-- declared but NEVER used
 NEMSweep.Contracts  ──references──>  (nothing)
-NEMSweep.Model      ──references──>  (nothing)
 ```
 
 This means:
 
-1. **`NEMSweep.Web` cannot compile on its own.** It needs `NEMSweep.Contracts` and `NEMSweep.Model`
-   sitting next to it. So the new repository gets **four** project folders, not one.
+1. **`NEMSweep.Web` cannot compile on its own.** It needs `NEMSweep.Contracts` sitting next to it.
+   So the new repository gets **three** project folders, not one.
 2. **`NEMSweep.Web.Tests` must move too.** If you leave it behind it will point at a project that no
    longer exists and the old repository will stop building.
-3. `NEMSweep.Contracts` and `NEMSweep.Model` are **copied**, not moved. They stay in the old
-   repository as well, because `NEMSweep.CLI` needs them there.
+3. `NEMSweep.Contracts` is **copied**, not moved. It stays in the old repository as well, because
+   `NEMSweep.CLI` needs it there.
+4. **`NEMSweep.Model` does NOT come with you.** See the next section.
 
-> Yes, this duplicates two projects across two repositories. That is a known, accepted consequence
-> of this task. Do not try to solve it with a git submodule, a NuGet package, or a symbolic link.
-> Copy the folders.
+> Yes, this duplicates `NEMSweep.Contracts` across two repositories. That is a known, accepted,
+> temporary consequence — it will be replaced by a NuGet package later. Do not try to solve it now
+> with a git submodule, a NuGet package, or a symbolic link. Copy the folder.
 
-### The four folders that go into the new repository
+### The three folders that go into the new repository
 
 | Folder | Why |
 |---|---|
 | `NEMSweep.Web/` | The thing being moved. **103 MB** — most of it published data files. |
 | `NEMSweep.Web.Tests/` | Tests it. Breaks the old repo if left behind. |
 | `NEMSweep.Contracts/` | Copied. `NEMSweep.Web` will not compile without it. |
-| `NEMSweep.Model/` | Copied. `NEMSweep.Web.csproj` declares a reference to it. |
+
+**`NEMSweep.Model` is NOT in that list.** Do not copy it.
+
+### Why `NEMSweep.Model` is left behind
+
+`NEMSweep.Web/NEMSweep.Web.csproj` contains this line:
+
+```xml
+<ProjectReference Include="..\NEMSweep.Model\NEMSweep.Model.csproj" />
+```
+
+That reference is dead. Nothing in `NEMSweep.Web` or `NEMSweep.Web.Tests` uses a single type from
+`NEMSweep.Model`. This was checked: the only place the text `NEMSweep.Model` appears anywhere in
+either project is that one line in the `.csproj`. Every type the web project consumes — every DTO,
+every enum — is defined in `NEMSweep.Contracts`, and `NEMSweep.Contracts` itself references nothing
+at all.
+
+So in the new repository you **delete that one line** (Step 4.6) and do not copy the folder. This is
+the single permitted edit mentioned in Rule 1.
+
+**You do not touch that line in the old repository.** The old `NEMSweep.Web` folder is being deleted
+wholesale, so there is nothing there to edit.
 
 ### The five loose files that go into the new repository
 
@@ -126,7 +151,7 @@ Read these. You will use them throughout.
 ```
 NEW_REPO_NAME   = nemsweep-web
 NEW_REPO_DIR    = /git/nemsweep-web
-OLD_REPO_DIR    = /git/NEMSweep          (see Step 2.3 if it is somewhere else)
+OLD_REPO_DIR    = /git/NEMSweep          (see Step 3.3 if it is somewhere else)
 GITHUB_OWNER    = HasinthaAttanayake
 SOURCE_COMMIT   = d881c5f542bc
 ```
@@ -240,15 +265,15 @@ mkdir -p /git/nemsweep-web
 cd /git/nemsweep-web
 ```
 
-### Step 4.2 — Copy the four project folders
+### Step 4.2 — Copy the three project folders
 
-Run these one at a time. The trailing slashes matter.
+Run these one at a time. There are **three** commands here, not four. Do **not** copy
+`NEMSweep.Model`.
 
 ```bash
 cp -R /git/NEMSweep/NEMSweep.Web /git/nemsweep-web/NEMSweep.Web
 cp -R /git/NEMSweep/NEMSweep.Web.Tests /git/nemsweep-web/NEMSweep.Web.Tests
 cp -R /git/NEMSweep/NEMSweep.Contracts /git/nemsweep-web/NEMSweep.Contracts
-cp -R /git/NEMSweep/NEMSweep.Model /git/nemsweep-web/NEMSweep.Model
 ```
 
 ### Step 4.3 — Copy the five loose files
@@ -278,12 +303,15 @@ cd /git/nemsweep-web
 ls
 ```
 
-**Expect exactly these nine entries** (order may differ):
+**Expect exactly these six entries** (order may differ):
 
 ```
 DATA-LICENSE.md   Directory.Build.props   LICENSE.md
-NEMSweep.Contracts   NEMSweep.Model   NEMSweep.Web   NEMSweep.Web.Tests
+NEMSweep.Contracts   NEMSweep.Web   NEMSweep.Web.Tests
 ```
+
+**If you see `NEMSweep.Model` in that list:** you copied it by mistake. Remove it:
+`rm -rf /git/nemsweep-web/NEMSweep.Model`
 
 plus the two hidden files. Check them:
 
@@ -304,9 +332,45 @@ du -sh NEMSweep.Web/wwwroot/data
 
 **If the count is 0 or very small:** STOP. The copy failed.
 
-### Step 4.6 — Create the solution file
+### Step 4.6 — THE ONE PERMITTED EDIT: drop the dead `NEMSweep.Model` reference
 
-The old `NEMSweep.slnx` lists seven projects. The new repository has four. You are writing a new
+This is in the **new** repository only: `/git/nemsweep-web/NEMSweep.Web/NEMSweep.Web.csproj`.
+
+Open it. Find this line and **delete the whole line**:
+
+```xml
+    <ProjectReference Include="..\NEMSweep.Model\NEMSweep.Model.csproj" />
+```
+
+Leave the `NEMSweep.Contracts` line directly above it alone. After the edit that `<ItemGroup>` must
+read exactly:
+
+```xml
+  <ItemGroup>
+    <ProjectReference Include="..\NEMSweep.Contracts\NEMSweep.Contracts.csproj" />
+  </ItemGroup>
+```
+
+Verify:
+
+```bash
+cd /git/nemsweep-web
+cat NEMSweep.Web/NEMSweep.Web.csproj
+grep -c "NEMSweep.Model" NEMSweep.Web/NEMSweep.Web.csproj
+```
+
+**Expect:** the `grep -c` prints `0`, and the file still contains its three `PackageReference` lines
+(`Microsoft.AspNetCore.Components.WebAssembly`, `...WebAssembly.DevServer`, `MudBlazor`) and the
+`NEMSweep.Contracts` project reference.
+
+**If `grep -c` prints anything other than 0:** you have not removed the line. Try again.
+
+**If you accidentally deleted the `NEMSweep.Contracts` line instead:** put it back. The `ItemGroup`
+must contain exactly one `ProjectReference`, and it must be the Contracts one.
+
+### Step 4.7 — Create the solution file
+
+The old `NEMSweep.slnx` lists seven projects. The new repository has three. You are writing a new
 file, not copying the old one.
 
 ```bash
@@ -314,7 +378,6 @@ cd /git/nemsweep-web
 cat > NEMSweep.Web.slnx <<'EOF'
 <Solution>
   <Project Path="NEMSweep.Contracts/NEMSweep.Contracts.csproj" />
-  <Project Path="NEMSweep.Model/NEMSweep.Model.csproj" />
   <Project Path="NEMSweep.Web/NEMSweep.Web.csproj" />
   <Project Path="NEMSweep.Web.Tests/NEMSweep.Web.Tests.csproj" />
 </Solution>
@@ -322,9 +385,9 @@ EOF
 cat NEMSweep.Web.slnx
 ```
 
-**Expect:** the file prints back with four `<Project` lines.
+**Expect:** the file prints back with three `<Project` lines.
 
-### Step 4.7 — ⚠️ CRITICAL: prove the new repository compiles
+### Step 4.8 — ⚠️ CRITICAL: prove the new repository compiles
 
 Do not skip this. Do not continue until it passes.
 
@@ -336,10 +399,22 @@ dotnet build NEMSweep.Web.slnx
 
 **Expect:** `Build succeeded` with `0 Error(s)`.
 
-**If the build fails:** STOP and report the exact error. Do not start editing `.csproj` files to make
-it pass. The most likely cause is a folder that did not copy in Step 4.2.
+**If the build fails with errors mentioning `NEMSweep.Model` or a missing type** — for example
+`CS0246: The type or namespace name '...' could not be found` — then the reference you removed in
+Step 4.6 was not dead after all. Recover like this:
 
-### Step 4.8 — Prove the tests pass
+1. Put the line back into `/git/nemsweep-web/NEMSweep.Web/NEMSweep.Web.csproj`:
+   `<ProjectReference Include="..\NEMSweep.Model\NEMSweep.Model.csproj" />`
+2. Copy the folder in after all: `cp -R /git/NEMSweep/NEMSweep.Model /git/nemsweep-web/NEMSweep.Model`
+3. Add it to `NEMSweep.Web.slnx` as a fourth line:
+   `<Project Path="NEMSweep.Model/NEMSweep.Model.csproj" />`
+4. Build again. Then **STOP** and report that the reference turned out to be live, quoting the exact
+   error you saw. The human needs to know the runbook was wrong about this.
+
+**If the build fails for any other reason:** STOP and report the exact error. Do not start editing
+`.csproj` files to make it pass. The most likely cause is a folder that did not copy in Step 4.2.
+
+### Step 4.9 — Prove the tests pass
 
 ```bash
 cd /git/nemsweep-web
@@ -350,7 +425,7 @@ dotnet test NEMSweep.Web.slnx
 
 **If any test fails:** STOP and report which one.
 
-### Step 4.9 — Prove the website actually runs
+### Step 4.10 — Prove the website actually runs
 
 ```bash
 cd /git/nemsweep-web
@@ -362,7 +437,7 @@ dotnet build NEMSweep.Web/NEMSweep.Web.csproj
 Optionally, if you can run a background process and open a URL: `dotnet run --project NEMSweep.Web`
 should serve on `http://localhost:5021`. If you cannot do that, the build succeeding is enough.
 
-### Step 4.10 — Clean up build output again before committing
+### Step 4.11 — Clean up build output again before committing
 
 ```bash
 cd /git/nemsweep-web
@@ -456,22 +531,25 @@ cd /git/nemsweep-web
 git commit -F - <<'EOF'
 Import NEMSweep.Web from the NEMSweep repository
 
-Copied verbatim from HasinthaAttanayake/NEMSweep at commit d881c5f542bc.
-No file contents were changed.
+Copied from HasinthaAttanayake/NEMSweep at commit d881c5f542bc.
 
-Four projects are present. NEMSweep.Web cannot compile without them:
+Three projects are present:
 
 - NEMSweep.Web            the Blazor WebAssembly results site
 - NEMSweep.Web.Tests      its tests
 - NEMSweep.Contracts      referenced by NEMSweep.Web
-- NEMSweep.Model          referenced by NEMSweep.Web.csproj
 
-NEMSweep.Contracts and NEMSweep.Model are copies. They remain in the
-NEMSweep repository as well, because NEMSweep.CLI depends on them there.
-Keeping the two copies in step is follow-up work, not part of this import.
+One line was removed from NEMSweep.Web.csproj: a ProjectReference to
+NEMSweep.Model that nothing used. Neither NEMSweep.Web nor
+NEMSweep.Web.Tests referenced a single type from it, so the project is
+not carried over. Every other file is byte-for-byte as it was.
+
+NEMSweep.Contracts is a copy. It remains in the NEMSweep repository as
+well, because NEMSweep.CLI depends on it there. The duplicate is
+temporary and will be replaced by a NuGet package.
 
 NEMSweep.Web.slnx is new: the original solution listed seven projects and
-this repository has four.
+this repository has three.
 
 Git history was not preserved.
 EOF
@@ -497,7 +575,7 @@ gh pr create --repo HasinthaAttanayake/nemsweep-web \
   --base main --head import/nemsweep-web \
   --title "Import NEMSweep.Web from the NEMSweep repository" \
   --body "$(cat <<'EOF'
-Copied verbatim from `HasinthaAttanayake/NEMSweep` at commit `d881c5f542bc`. No file contents were changed.
+Copied from `HasinthaAttanayake/NEMSweep` at commit `d881c5f542bc`.
 
 ## What is here
 
@@ -506,24 +584,37 @@ Copied verbatim from `HasinthaAttanayake/NEMSweep` at commit `d881c5f542bc`. No 
 | `NEMSweep.Web` | The project being moved. |
 | `NEMSweep.Web.Tests` | Tests `NEMSweep.Web`. Would break the old repository if left behind. |
 | `NEMSweep.Contracts` | `NEMSweep.Web` references it. Copy. |
-| `NEMSweep.Model` | `NEMSweep.Web.csproj` declares a reference to it. Copy. |
 
-`NEMSweep.Web.slnx` is new — the original solution listed seven projects and this one has four.
+`NEMSweep.Web.slnx` is new — the original solution listed seven projects and this one has three.
+
+## The only content change
+
+One line removed from `NEMSweep.Web/NEMSweep.Web.csproj`:
+
+```xml
+<ProjectReference Include="..\NEMSweep.Model\NEMSweep.Model.csproj" />
+```
+
+That reference was dead — neither `NEMSweep.Web` nor `NEMSweep.Web.Tests` used a single type from `NEMSweep.Model`, and every DTO and enum the site consumes is defined in `NEMSweep.Contracts`. Dropping it keeps `NEMSweep.Model` out of this repository entirely.
+
+Every other file is byte-for-byte as it was in the source commit.
 
 ## Verified before raising this
 
-- `dotnet build NEMSweep.Web.slnx` succeeds.
+- `dotnet build NEMSweep.Web.slnx` succeeds with the reference removed.
 - `dotnet test NEMSweep.Web.slnx` passes.
 - The ~300 published data files under `NEMSweep.Web/wwwroot/data` are committed.
 
 ## Known consequences, for a human to decide on later
 
-- `NEMSweep.Contracts` and `NEMSweep.Model` now exist in two repositories and can drift apart.
+- `NEMSweep.Contracts` now exists in two repositories and can drift apart. This is temporary — the plan is to replace the copy with a NuGet package.
 - Git history was not preserved; this is a fresh import.
 - `Directory.Build.props` still records `RepositoryUrl` as the NEMSweep repository.
 - There is no CI workflow in this repository yet.
 
 Paired with a pull request on `HasinthaAttanayake/NEMSweep` that removes `NEMSweep.Web` and `NEMSweep.Web.Tests`. **Do not merge that one before this one.**
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
 )"
 ```
@@ -550,7 +641,8 @@ git status
 
 ### Step 6.2 — Delete the two folders
 
-Only these two. `NEMSweep.Contracts` and `NEMSweep.Model` **stay** — `NEMSweep.CLI` needs them.
+Only these two. `NEMSweep.Contracts` and `NEMSweep.Model` **stay** — `NEMSweep.CLI` needs them
+both. `NEMSweep.Model` was never copied to the new repository, so it exists in this one only.
 
 ```bash
 cd /git/NEMSweep
@@ -693,7 +785,9 @@ The Blazor results site now lives in its own private repository. Both
 project folders are deleted here and their two entries are removed from
 NEMSweep.slnx.
 
-NEMSweep.Contracts and NEMSweep.Model stay: NEMSweep.CLI depends on them.
+NEMSweep.Contracts and NEMSweep.Model stay: NEMSweep.CLI depends on
+them. NEMSweep.Model is not duplicated in the new repository at all --
+NEMSweep.Web declared a reference to it but never used it.
 
 Nothing else is changed. Prose references to NEMSweep.Web in README.md,
 CITATION.cff, DATA-LICENSE.md and docs/ are left as they are, as is the
@@ -733,6 +827,8 @@ Paired with <NEW_REPO_PR_URL>. **Merge that one first.**
 
 Nothing else. `NEMSweep.Contracts` and `NEMSweep.Model` stay, because `NEMSweep.CLI` depends on them.
 
+`NEMSweep.Model` is not duplicated in the new repository. `NEMSweep.Web.csproj` declared a reference to it but no code used it, so the new repository drops the reference and takes only `NEMSweep.Contracts`.
+
 ## Verified before raising this
 
 - `dotnet build NEMSweep.slnx` succeeds.
@@ -754,6 +850,8 @@ These still mention `NEMSweep.Web` in prose and were not edited:
 `README.md`, `CITATION.cff`, `DATA-LICENSE.md`, `docs/index.md`, `docs/guide/index.md`, `docs/guide/outputs.md`, `docs/exploring/sensitivity-analysis.md`, `.gitignore`, `.gitattributes`
 
 `NEMSweep.CLI.Tests/Scenarios/RunMetadataTests.cs` contains the string `"NEMSweep.Web"` in synthetic test paths. It does not touch the filesystem and still passes.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
 )"
 ```
@@ -786,7 +884,7 @@ cd /git/NEMSweep && git log origin/main --oneline -1
 
 ### Checklist — every line must be YES
 
-- [ ] `/git/nemsweep-web` exists and contains four project folders
+- [ ] `/git/nemsweep-web` exists and contains **three** project folders, and no `NEMSweep.Model`
 - [ ] The new GitHub repository is **PRIVATE**
 - [ ] About 300 data files under `NEMSweep.Web/wwwroot/data` are committed in the new repo
 - [ ] New repo: `dotnet build` succeeds, `dotnet test` passes
@@ -796,6 +894,7 @@ cd /git/NEMSweep && git log origin/main --oneline -1
 - [ ] `git push --force` was never used
 - [ ] `NEMSweep.Contracts` and `NEMSweep.Model` still exist in the **old** repo
 - [ ] No file outside `NEMSweep.slnx` was edited in the old repo
+- [ ] In the **new** repo, the only edited file is `NEMSweep.Web/NEMSweep.Web.csproj` (one line removed)
 - [ ] The Step 6.8 warning was reported to the human
 
 ### Report back with
