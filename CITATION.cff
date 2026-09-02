@@ -28,8 +28,8 @@ keywords:
 license: BSD-3-Clause
 # There is no DOI, and that is a decision rather than an omission. Minting one
 # means archiving a snapshot of this repository permanently and publicly, and the
-# snapshot would include the demand, generation and weather artifacts under
-# NEMSweep.Web/wwwroot/data. Those derive from AEMO and EnergyPlus Weather
-# sources whose redistribution terms are still open; see DATA-LICENSE.md. An
+# snapshot would include the demand, generation and weather artifacts published
+# with the results site. Those derive from AEMO and EnergyPlus Weather sources
+# whose redistribution terms are still open; see DATA-LICENSE.md. An
 # archive is deliberately hard to withdraw, so it is the wrong place to resolve
 # that question after the fact.

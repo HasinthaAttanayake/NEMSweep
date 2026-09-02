@@ -152,9 +152,9 @@ Every file described here is generated. Do not hand-edit one. Regenerate it by r
 command that produced it (`--ingest` for the input artifacts, `--run-scenario` or `--run-sweep` for
 results), so what is on disk stays traceable to the inputs and commit behind it.
 
-The set committed under `NEMSweep.Web/wwwroot/data` is what the results site displays. Publishing to
-it is a deliberate act: point `--output` there when you intend to update the site, and let ordinary
-runs land in your own directory the rest of the time.
+The published artifact set is what the results site displays. Publishing to it is a deliberate act:
+use the site's publication workflow when you intend to update it, and let ordinary runs land in your
+own directory the rest of the time.
 
 **That set is an illustrative example, not a dataset.** It is one FY2026 run and one sweep, retained
 so the site has something to show and so a clone runs without first sourcing upstream data. The
