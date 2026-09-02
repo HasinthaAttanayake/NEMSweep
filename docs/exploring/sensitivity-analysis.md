@@ -3,8 +3,8 @@
 A worked reading of the sweep committed to this repository, `datacentre-nameplate-fy2026`. The
 point is not the result but the method: what to look at, in what order, and where the traps are.
 
-Figures below come from `NEMSweep.Web/wwwroot/data/sweeps/datacentre-nameplate-fy2026/index.json` as
-published. Rerunning the sweep at a different commit will move them.
+Figures below come from the published `datacentre-nameplate-fy2026` sweep. Rerunning the sweep at a
+different commit will move them.
 
 ## The sweep
 

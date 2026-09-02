@@ -20,7 +20,7 @@ one of these three layers, and mistaking one for another is the most common way 
 |---|---|---|
 | Framework | The dispatch, reliability, storage-sizing and cost engine. No hardcoded region list and no AEMO coupling: region identifiers are free-form strings. Fixed one-hour timestep. The market-time offset is a run parameter, read from the scenario period and defaulting to UTC+10. Deterministic, no package dependencies, embeddable. | `NEMSweep.Model`, `NEMSweep.Contracts` |
 | NEM scoping | The command-line tool that binds the framework to Australia. It ingests AEMO operational demand, EnergyPlus Weather data and AEMO generation data, and validates scenarios against the five National Electricity Market regions (NSW1, QLD1, SA1, TAS1, VIC1). | `NEMSweep.CLI` |
-| Published example | One scenario: the National Electricity Market configured for the 2026 financial year, plus a sweep that adds data-centre load across the regions. Everything on the [results site](https://www.nemsweep.com/) is this one example. | the repository artifacts, `NEMSweep.Web` |
+| Published example | One scenario: the National Electricity Market configured for the 2026 financial year, plus a sweep that adds data-centre load across the regions. Everything on the [results site](https://www.nemsweep.com/) is this one example. | the repository artifacts |
 
 The five NEM regions are the CLI's constraint, enforced because the data it ingests is National
 Electricity Market data. The one-hour timestep is the framework's, fixed in `NEMSweep.Model`; the
@@ -108,5 +108,5 @@ forecast:
   data-centre nameplate load across the regions, one run per step.
 
 The example demonstrates what the framework does. It is not the limit of what the framework does.
-Its artifacts, under `NEMSweep.Web/wwwroot/data`, derive from AEMO and EnergyPlus Weather sources
-under their own terms. Run your own scenario before quoting a figure from it.
+Its artifacts derive from AEMO and EnergyPlus Weather sources under their own terms. Run your own
+scenario before quoting a figure from it.

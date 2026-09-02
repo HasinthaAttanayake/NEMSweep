@@ -1,8 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" role="img" aria-label="NEMSweep">
   <title>NEMSweep</title>
-  <!-- The documentation site's own copy of the mark. Deliberately duplicated rather than shared
-       with NEMSweep.Web, because the two sites deploy separately and the web project is expected
-       to move out of this repository. Keep the geometry in step with NEMSweep.Web/wwwroot/brand.
+  <!-- The documentation site's own copy of the mark. It deploys separately from the results site.
 
        docfx renders this through an <img>, so the mark cannot inherit a colour from the page and
        cannot see docfx's own data-bs-theme. It carries its own media query instead, which matches

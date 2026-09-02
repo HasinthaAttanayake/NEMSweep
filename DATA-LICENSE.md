@@ -7,7 +7,7 @@ covered by that licence**, and this page exists so nobody has to guess where the
 
 | What | Licence |
 |---|---|
-| Everything under `NEMSweep.Model`, `NEMSweep.Contracts`, `NEMSweep.CLI`, `NEMSweep.Web` | BSD-3-Clause |
+| Everything under `NEMSweep.Model`, `NEMSweep.Contracts` and `NEMSweep.CLI` | BSD-3-Clause |
 | The published JSON schemas under `schema/` | BSD-3-Clause |
 | Scenario and sweep configurations under `scenarios/` and `sweeps/` | BSD-3-Clause |
 | Demand, weather and generation artifacts, and anything derived from them | **See below. Upstream terms apply.** |
@@ -44,10 +44,9 @@ prohibit redistribution. Check the terms attached to the specific files you use.
 
 ## What this repository redistributes
 
-The artifacts committed under `NEMSweep.Web/wwwroot/data` are ingested derivatives of the above,
-retained so the results site has something to display and so a clone can run without first sourcing
-upstream data. **They are an illustrative example, not a dataset**, and they are not offered under
-the code licence.
+The published artifacts are ingested derivatives of the above, retained so the results site has
+something to display and so a clone can run without first sourcing upstream data. **They are an
+illustrative example, not a dataset**, and they are not offered under the code licence.
 
 Raw source files are not committed. The input bundle they are ingested from is gitignored, because
 it is large and because it is third-party material you fetch yourself.

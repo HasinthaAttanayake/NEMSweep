@@ -27,7 +27,7 @@ engine.
 |---|---|---|
 | Framework | The dispatch, reliability, storage-sizing and cost engine described above. No hardcoded region list and no AEMO coupling. Fixed one-hour timestep; the market-time offset is a run parameter that defaults to UTC+10. Deterministic, no package dependencies, embeddable. | `NEMSweep.Model`, `NEMSweep.Contracts` |
 | NEM scoping | The command-line tool that binds the framework to Australia. It ingests AEMO operational demand, EnergyPlus Weather data and AEMO generation data, and validates scenarios against the five National Electricity Market regions (NSW1, QLD1, SA1, TAS1, VIC1). | `NEMSweep.CLI` |
-| Published example | One scenario: the National Electricity Market configured for the 2026 financial year, plus a sweep that adds data-centre load across the regions. Everything on nemsweep.com is this one example. | the repository artifacts, `NEMSweep.Web`, the live site |
+| Published example | One scenario: the National Electricity Market configured for the 2026 financial year, plus a sweep that adds data-centre load across the regions. Everything on nemsweep.com is this one example. | the repository artifacts, the live site |
 
 The five NEM regions are the CLI's constraint, enforced because the data it ingests is National
 Electricity Market data. The one-hour timestep is the framework's, fixed in `NEMSweep.Model`. The
@@ -101,9 +101,9 @@ The example demonstrates what the framework does. It is not the limit of what th
 Generation mix, economics, the reliability standard and transmission capacity are all scenario
 inputs, and each can be swept the same way. [Designing a study](docs/exploring/index.md) covers how.
 
-The example's artifacts live under `NEMSweep.Web/wwwroot/data`. They are an illustrative example,
-not a dataset, and they derive from AEMO and EnergyPlus Weather sources under their own terms. Run
-your own scenario before quoting a figure.
+The example's artifacts are published with the results site. They are an illustrative example, not
+a dataset, and they derive from AEMO and EnergyPlus Weather sources under their own terms. Run your
+own scenario before quoting a figure.
 
 ## Repository
 
@@ -112,8 +112,7 @@ your own scenario before quoting a figure.
 | `NEMSweep.Model` | The framework: domain models, units, time series, generation models, dispatch, storage sizing, economics. No package dependencies. |
 | `NEMSweep.Contracts` | The exported data contracts. No package dependencies. |
 | `NEMSweep.CLI` | The National Electricity Market scoping: source-data validation and ingestion, and the commands that produce the published datasets. |
-| `NEMSweep.Web` | The Blazor WebAssembly results site. |
-| `NEMSweep.Model.Tests`, `NEMSweep.CLI.Tests`, `NEMSweep.Web.Tests` | Cover model, ingestion and web behaviour. |
+| `NEMSweep.Model.Tests`, `NEMSweep.CLI.Tests` | Cover model and ingestion behaviour. |
 | `docs` | The docfx documentation site. |
 
 `NEMSweep.CLI` is organised by workflow, with application mechanics kept separate:
@@ -178,10 +177,6 @@ dotnet test NEMSweep.slnx
 
 ```bash
 dotnet run --project NEMSweep.CLI -- --help
-```
-
-```bash
-dotnet run --project NEMSweep.Web
 ```
 
 Copy `NEMSweep.CLI/appsettings.example.json` to `NEMSweep.CLI/appsettings.local.json` for

@@ -32,7 +32,7 @@ dotnet test NEMSweep.slnx
 ```
 
 The solution file is `NEMSweep.slnx` at the repository root. `dotnet test` runs
-`NEMSweep.Model.Tests`, `NEMSweep.CLI.Tests` and `NEMSweep.Web.Tests`.
+`NEMSweep.Model.Tests` and `NEMSweep.CLI.Tests`.
 
 ## Configure the workspace
 
@@ -65,10 +65,9 @@ point outside the repository. `dataRoot` and `outputRoot` can also be overridden
 `--data-root` and `--output`, or with `NEMSWEEP_DATA_ROOT` and `NEMSWEEP_OUTPUT`; the
 [CLI reference](cli.md#the-workspace) covers the precedence.
 
-The committed `appsettings.example.json` points `dataRoot` at `NEMSweep.Web/wwwroot/data`, where
-this repository keeps the example artifacts, and `outputRoot` at a gitignored `out/`. A fresh clone
-therefore runs without configuration, and your results land where they do not disturb the committed
-ones.
+The committed `appsettings.example.json` points `dataRoot` at the published example artifacts, and
+`outputRoot` at a gitignored `out/`. A fresh clone therefore runs without configuration, and your
+results land where they do not disturb the published ones.
 
 ## Run your first scenario
 
@@ -93,8 +92,8 @@ To send a run elsewhere, name the output directory:
 dotnet run --project NEMSweep.CLI -- --run-scenario --output ./my-study
 ```
 
-That is also how the results the site displays are refreshed: point `--output` at
-`NEMSweep.Web/wwwroot/data` when you intend to update what it shows, and nowhere near it otherwise.
+That is also how the results displayed by the separate results site are refreshed: publish the
+output when you intend to update what it shows, and keep ordinary study output in your own directory.
 
 Add `--csv` and the run also writes its results as [CSV tables](csv-tables.md), which is what you
 want if the numbers are going anywhere other than back into NEMSweep.
@@ -107,16 +106,6 @@ exits with status 0.
 If the reliability standard was not met it also prints a `WARNING` line naming the achieved and
 target unserved-energy percentages. That is a result worth reading closely, not a failure, and the
 exit code is still 0.
-
-## View the results
-
-```bash
-dotnet run --project NEMSweep.Web
-```
-
-`NEMSweep.Web` is a Blazor WebAssembly site that reads the JSON artifacts committed under
-`NEMSweep.Web/wwwroot/data`. A default run writes to `out/` and so does not change what the site
-shows. Rerun with `--output NEMSweep.Web/wwwroot/data` when you mean to publish a result to it.
 
 ## Start from a smaller scenario
 

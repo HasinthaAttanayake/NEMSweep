@@ -20,7 +20,7 @@ applyTo: ["NEMSweep.CLI/**", "NEMSweep.CLI.Tests/**"]
   from the command boundary.
 - Test parsers with small synthetic fixtures and temporary files. Add contract
   tests when an exporter or generated JSON shape changes.
-- Regenerate the committed web data with
-  `dotnet run --project .\NEMSweep.CLI\NEMSweep.CLI.csproj -- --run-scenario --output .\NEMSweep.Web\wwwroot\data`
+- Regenerate the published artifacts with
+  `dotnet run --project .\NEMSweep.CLI\NEMSweep.CLI.csproj -- --run-scenario --output .\published-data`
   after changing its producer or committed inputs. Without `--output` a run writes to
-  `out/` and leaves the committed artifacts untouched.
+  `out/` and leaves the published artifacts untouched.
