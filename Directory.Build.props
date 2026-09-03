@@ -28,4 +28,42 @@
     </AssemblyAttribute>
   </ItemGroup>
 
+  <!--
+    Package identity, stated once for the same reason the assembly identity above is. The version is
+    a single prefix here and is overridden on the command line by the publish workflow, which packs
+    the version named by the git tag it was triggered by: the tag is the release, so nothing in the
+    tree has to be edited to cut one, and a local `dotnet pack` still produces a coherent package.
+
+    Test projects set IsPackable=false themselves, so nothing here needs to exclude them.
+  -->
+  <PropertyGroup>
+    <VersionPrefix>0.1.0</VersionPrefix>
+    <PackageLicenseExpression>BSD-3-Clause</PackageLicenseExpression>
+    <PackageProjectUrl>https://www.nemsweep.com/</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/HasinthaAttanayake/NEMSweep</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>electricity;energy;power-system;dispatch;nem;australia;simulation</PackageTags>
+  </PropertyGroup>
+
+  <!--
+    Source Link and symbols, so a consumer stepping into one of these packages lands on the exact
+    source the binary was built from rather than on decompiled output. EmbedUntrackedSources covers
+    generated files, which are not in the repository for Source Link to resolve against, and
+    ContinuousIntegrationBuild makes the build deterministic where CI sets $(CI) - it normalises
+    paths, which is only correct when the build is not the one being debugged locally.
+  -->
+  <PropertyGroup>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsPackable)' != 'false'">
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+
 </Project>

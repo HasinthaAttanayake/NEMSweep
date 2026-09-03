@@ -9,6 +9,15 @@ framework's, and the CLI resamples half-hourly demand to it.
 by zero to three positional arguments, matched by a pattern in
 `NEMSweep.CLI/Application/CommandRouter.cs`. This page documents every command it routes.
 
+Install it as a .NET tool, which puts `nemsweep` on your path:
+
+```bash
+dotnet tool install --global NEMSweep.CLI
+```
+
+From a clone, the equivalent of every `nemsweep` invocation below is
+`dotnet run --project NEMSweep.CLI -- ...`.
+
 Paths you pass on the command line are resolved relative to your **current working directory**
 (`WorkspacePaths.ResolveConfiguredPath`). An absolute path is used as given. Nothing searches for a
 repository, so the executable runs from wherever you put it.

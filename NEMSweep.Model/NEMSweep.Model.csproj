@@ -1,10 +1,12 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageId>NEMSweep.Model</PackageId>
+    <Description>The NEMSweep modelling framework: hourly dispatch, reliability, storage sizing, cost and emissions accounting for an electricity system, with typed physical units throughout. Deterministic and free of any market or bidding behaviour.</Description>
     <!-- The published docs site is generated from these comments, so a gap is a build break:
          CS1591 a missing comment, CS1572/CS1573 param tags out of step with the signature,
          CS1574 a cross-reference that will not resolve. -->
