@@ -146,6 +146,7 @@ internal static class DispatchResultsExport
                 request.ReliabilityStandardName),
             CreateSystemStorageSizingOutcome(request, dispatch.SizingResult),
             CreateCost(dispatch.CostBreakdown),
+            CreateEmissions(dispatch.EmissionsSummary),
             new DispatchTopologyDTO(
                 regionIds,
                 dispatch.PowerSystem.Interconnectors.Select(link => new DispatchTopologyLinkDTO(
@@ -207,6 +208,7 @@ internal static class DispatchResultsExport
             system.Reliability,
             system.StorageSizing,
             system.Cost,
+            system.Emissions,
             system.Topology);
 
     /// <summary>One region's slice of a publication: the two artifacts and the two index entries.</summary>
@@ -253,6 +255,12 @@ internal static class DispatchResultsExport
             regionId,
             IncomingTransmissionLossesMw(systemOutcome, regionId)));
         DispatchCostDTO cost = CreateCost(regionalCost);
+        RegionEmissionsSummary regionalEmissions = dispatch.EmissionsSummary.Regions.Single(
+            emissions => string.Equals(
+                emissions.RegionId,
+                regionId,
+                StringComparison.OrdinalIgnoreCase));
+        DispatchEmissionsDTO emissions = CreateEmissions(regionalEmissions);
         RegionDispatchResultsDTO detail = new(
             ArtifactSchemaVersions.RegionDispatchResults,
             runId,
@@ -266,7 +274,8 @@ internal static class DispatchResultsExport
             evidence.Metrics,
             evidence.Reliability,
             evidence.StorageSizing,
-            cost);
+            cost,
+            emissions);
         string detailPath = $"{request.RegionFileNamePrefix ?? "results-"}{regionId.ToLowerInvariant()}.json";
         Dictionary<string, double> deliveredGenerationByTechnologyMwh =
             evidence.DataSeries.DeliveredGenerationByTechnologyMw.ToDictionary(
@@ -287,6 +296,7 @@ internal static class DispatchResultsExport
             evidence.Reliability,
             evidence.StorageSizing,
             cost,
+            emissions,
             deliveredGenerationByTechnologyMwh,
             evidence.DataSeries.TransmissionLossesMw.Sum() * evidence.Scenario.Resolution.TotalHours);
 
@@ -301,6 +311,7 @@ internal static class DispatchResultsExport
                 evidence.Reliability,
                 evidence.StorageSizing,
                 cost,
+                emissions,
                 deliveredGenerationByTechnologyMwh,
                 detailPath,
                 overviewPath));
@@ -473,6 +484,66 @@ internal static class DispatchResultsExport
             contributions);
     }
 
+    private static DispatchEmissionsDTO CreateEmissions(EmissionsSummary emissions) =>
+        CreateEmissions(
+            emissions.EnergyServed,
+            emissions.GenerationEmissionsContributions);
+
+    private static DispatchEmissionsDTO CreateEmissions(RegionEmissionsSummary emissions) =>
+        CreateEmissions(
+            emissions.EnergyServed,
+            emissions.GenerationEmissionsContributions);
+
+    /// <summary>
+    /// Publishes emissions with the totals derived from the contributions <em>after</em> each has
+    /// been rounded to the precision it is published at, so the artifact reconciles as its contract
+    /// promises. Rounding the total independently would not: two 0.0006 t contributions publish as
+    /// 0.001 each while their 0.0012 t total publishes as 0.001. The domain figures are unrounded,
+    /// and the accounted total is the sum of the same contributions, so taking the residual here
+    /// costs no more than the publication precision already does.
+    /// </summary>
+    private static DispatchEmissionsDTO CreateEmissions(
+        Energy energyServed,
+        IEnumerable<GenerationEmissionsContribution> contributions)
+    {
+        int tonnePlaces = JsonFile.DecimalPlaces(
+            nameof(DispatchGenerationEmissionsContributionDTO.EmissionsTonnesCO2e));
+        int intensityPlaces = JsonFile.DecimalPlaces(
+            nameof(DispatchGenerationEmissionsContributionDTO.IntensityContributionTonnesCO2ePerMwh));
+
+        DispatchGenerationEmissionsContributionDTO[] published = contributions
+            .OrderBy(contribution => contribution.Technology)
+            .Select(contribution =>
+            {
+                double tonnes = Math.Round(
+                    contribution.Emissions.TonnesCO2e,
+                    tonnePlaces,
+                    MidpointRounding.AwayFromZero);
+                return new DispatchGenerationEmissionsContributionDTO(
+                    contribution.Technology.ToString(),
+                    tonnes,
+                    Math.Round(
+                        tonnes / energyServed.MegawattHours,
+                        intensityPlaces,
+                        MidpointRounding.AwayFromZero));
+            })
+            .ToArray();
+
+        // Rounded again after summing: adding decimal-rounded doubles need not land on a value
+        // representable at that precision, and the artifact should carry the decimal sum of the
+        // figures it publishes rather than that sum's binary residue.
+        return new DispatchEmissionsDTO(
+            Math.Round(
+                published.Sum(contribution => contribution.EmissionsTonnesCO2e),
+                tonnePlaces,
+                MidpointRounding.AwayFromZero),
+            Math.Round(
+                published.Sum(contribution => contribution.IntensityContributionTonnesCO2ePerMwh),
+                intensityPlaces,
+                MidpointRounding.AwayFromZero),
+            published);
+    }
+
     private static DispatchGenerationCostContributionDTO[] CreateGenerationCostContributions(
         IEnumerable<GenerationCostContribution> contributions,
         double energyServedMwh) =>
@@ -608,7 +679,9 @@ internal static class DispatchResultsExport
                         costed.CostParameters.VariableOperatingCost.AudPerMwhGenerated,
                         costed.CostParameters.FuelPrice.AudPerGjThermal,
                         costed.TechnologyProfile.HeatRate.GigajoulesPerMegawattHour,
-                        costed.TechnologyProfile.TechnicalLifeYears);
+                        costed.TechnologyProfile.TechnicalLifeYears,
+                        costed.TechnologyProfile.EmissionsIntensity
+                            .TonnesCO2ePerMwhGenerated);
                 }).ToArray(),
                 region.StorageFleets.Select(fleet =>
                 {

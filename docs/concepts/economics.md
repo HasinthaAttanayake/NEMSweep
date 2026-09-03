@@ -73,6 +73,38 @@ what makes the figures comparable to a genuine cost of supply: energy generated 
 lost to storage round-trip inefficiency, was never served to anyone and so does not appear in the
 denominator that spreads the system's cost.
 
+## Emissions
+
+`EmissionsCalculator` accounts operational carbon dioxide over the same modelled year, from the same
+dispatch evidence, and publishes an `EmissionsSummary` beside the cost breakdown. For each
+generating fleet:
+
+```text
+emissions = emissions intensity (t CO2-e/MWh) x gross generated energy
+```
+
+Gross, deliberately: this is the fuel term's basis, so energy a fleet generated to charge storage
+carries the emissions of generating it, and a battery's round-trip loss shows up as emissions
+rather than disappearing. Emissions are aggregated by region and by technology, and the
+per-technology contributions reconcile exactly to the system total, in the published artifact as
+well as in the model.
+
+The series read is available generation, before curtailment. That is exact for the fleets that
+emit, because dispatch only constrains off Solar and Wind and records no curtailment for a
+dispatchable fleet; it is also why a scenario should leave those intensities at zero, since a
+non-zero one would be charged for output that was constrained off.
+
+The published intensity divides system emissions by the same **energy served** denominator every
+levelised cost uses, so an emissions intensity and an SLCoE for the same run are comparable figures
+about the same year. A regional intensity charges the emissions a region's own plant released
+against the load that region served, so a net importer's figure understates the emissions behind its
+supply and a net exporter's overstates them; the system figure is free of that distortion.
+
+The scope is combustion during generation. Fuel extraction and delivery, plant construction and
+decommissioning are all outside it, as is anything attributable to storage or transmission assets,
+which burn no fuel of their own here. This is an operational figure, not a life-cycle one, and like
+every cost figure it is only as good as the scenario's own assumptions.
+
 ## Why regional costs do not sum to the system total
 
 Transmission is annuitised once, at system level, from each directed interconnector's own capital and
@@ -106,6 +138,9 @@ assumptions any more accurate.
 | `AnnualPowerCapacityCost` | AUD/MW/year | Recurring fixed operating cost against installed power capacity. |
 | `FuelPrice` | AUD/GJ (thermal) | Fuel price; combined with `HeatRate` to derive the fuel component of `GenerationEnergyCost`. |
 | `HeatRate` | GJ/MWh | Thermal energy required per MWh generated. |
+| `Emissions` | t CO2-e | A quantity of greenhouse gas released. Unsigned. |
+| `GenerationEmissionsIntensity` | t CO2-e/MWh generated | A technology's emissions per MWh generated. The input assumption. |
+| `ServedEmissionsIntensity` | t CO2-e/MWh served | Emissions per MWh served. The published outcome, and never an input. |
 | `DistancePowerCost` | AUD/km/MW (one-off) | Interconnector capital cost, scaled by route length and directed capacity. |
 | `AnnualDistancePowerCost` | AUD/km/MW/year | Interconnector fixed operating cost, scaled the same way. |
 

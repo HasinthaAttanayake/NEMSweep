@@ -160,6 +160,10 @@ internal static class JsonFile
     internal static int DecimalPlaces(string propertyName) =>
         propertyName.Equals("TransmissionSlcotAudPerMwh", StringComparison.OrdinalIgnoreCase) ? 4
         : propertyName.Contains("Aud", StringComparison.OrdinalIgnoreCase) ? 2
+        // Emissions intensities are fractions of a tonne per MWh, so the megawatt-hour rule below
+        // would round a whole coal fleet's intensity to one decimal place and lose the figure.
+        : propertyName.Contains("TonnesCO2ePerMwh", StringComparison.OrdinalIgnoreCase) ? 6
+        : propertyName.EndsWith("TonnesCO2e", StringComparison.OrdinalIgnoreCase) ? 3
         : propertyName.EndsWith("Mw", StringComparison.OrdinalIgnoreCase)
             || propertyName.EndsWith("Mwh", StringComparison.OrdinalIgnoreCase) ? 1
         : propertyName.Contains("share", StringComparison.OrdinalIgnoreCase) ? 4

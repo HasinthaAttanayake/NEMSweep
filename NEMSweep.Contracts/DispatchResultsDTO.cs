@@ -21,6 +21,7 @@ namespace NEMSweep.Contracts;
 /// <param name="Reliability">The reliability target this run was sized against and the outcome.</param>
 /// <param name="StorageSizing">What, if anything, the storage sizing loop did to meet the target.</param>
 /// <param name="Cost">Annualised and levelised cost evidence for the run.</param>
+/// <param name="Emissions">Annual operational emissions evidence for the run.</param>
 public sealed record DispatchResultsDTO(
     int SchemaVersion,
     DispatchScenarioDTO Scenario,
@@ -31,7 +32,8 @@ public sealed record DispatchResultsDTO(
     DispatchMetricsDTO Metrics,
     ReliabilityBasisDTO Reliability,
     StorageSizingOutcomeDTO StorageSizing,
-    DispatchCostDTO Cost);
+    DispatchCostDTO Cost,
+    [property: JsonRequired] DispatchEmissionsDTO Emissions);
 
 /// <summary>The scenario identity and dispatched period for a single-scenario dispatch result.</summary>
 /// <param name="Id">Scenario identifier.</param>
@@ -105,6 +107,7 @@ public sealed record DispatchPowerSystemDTO(
 /// <param name="FuelPriceAudPerGj">Fuel price per GJ thermal, multiplied by heat rate to cost fuel.</param>
 /// <param name="HeatRateGjPerMwh">Thermal energy consumed per MWh of electricity generated.</param>
 /// <param name="TechnicalLifeYears">Operating life used to annuitise capital cost.</param>
+/// <param name="EmissionsIntensityTonnesCO2ePerMwh">Operational emissions per MWh generated, in t CO2-e/MWh.</param>
 public sealed record DispatchFleetDTO(
     string Technology,
     double NameplateCapacityMw,
@@ -113,7 +116,8 @@ public sealed record DispatchFleetDTO(
     decimal VariableOperatingCostAudPerMwh = 0,
     decimal FuelPriceAudPerGj = 0,
     double HeatRateGjPerMwh = 0,
-    uint TechnicalLifeYears = 0);
+    uint TechnicalLifeYears = 0,
+    [property: JsonRequired] double EmissionsIntensityTonnesCO2ePerMwh = 0);
 
 /// <summary>
 /// One storage fleet's identity, installed capacity, and the scenario cost assumptions it was
@@ -312,3 +316,35 @@ public sealed record DispatchGenerationCostContributionDTO(
     [property: JsonRequired] string Technology,
     [property: JsonRequired] decimal AnnualisedCostAud,
     [property: JsonRequired] decimal LevelisedContributionAudPerMwh);
+
+/// <summary>
+/// Annual operational emissions from generation. Combustion only: this excludes fuel extraction and
+/// delivery, plant construction and decommissioning, so it is not a life-cycle figure. Emissions are
+/// charged on gross generation, the same basis as fuel cost, so energy that was curtailed or spent
+/// charging storage carries the emissions of generating it.
+/// </summary>
+/// <param name="TotalEmissionsTonnesCO2e">Annual emissions in tonnes of carbon dioxide equivalent.</param>
+/// <param name="EmissionsIntensityTonnesCO2ePerMwh">
+/// Annual emissions per MWh served. A region's figure counts the emissions its own plant released
+/// against the load it served, so a net importer's understates the emissions behind its supply.
+/// </param>
+/// <param name="GenerationEmissionsContributions">
+/// Emissions attributed to each generating technology. Both totals above are the sum of these
+/// values as published, so the figures in this artifact reconcile exactly rather than to within
+/// the precision each was rounded to.
+/// </param>
+public sealed record DispatchEmissionsDTO(
+    [property: JsonRequired] double TotalEmissionsTonnesCO2e,
+    [property: JsonRequired] double EmissionsIntensityTonnesCO2ePerMwh,
+    [property: JsonRequired] DispatchGenerationEmissionsContributionDTO[] GenerationEmissionsContributions);
+
+/// <summary>Annual emissions attributable to one generation technology.</summary>
+/// <param name="Technology">The generation technology, e.g. <c>Coal</c>, <c>Gas</c>.</param>
+/// <param name="EmissionsTonnesCO2e">Annual emissions from this technology, in tonnes CO2-e.</param>
+/// <param name="IntensityContributionTonnesCO2ePerMwh">
+/// This technology's share of the emissions intensity, in t CO2-e per MWh served.
+/// </param>
+public sealed record DispatchGenerationEmissionsContributionDTO(
+    [property: JsonRequired] string Technology,
+    [property: JsonRequired] double EmissionsTonnesCO2e,
+    [property: JsonRequired] double IntensityContributionTonnesCO2ePerMwh);

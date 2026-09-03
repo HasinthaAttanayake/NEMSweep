@@ -26,6 +26,11 @@ internal static class ScenarioConfig
             throw new JsonException("Scenario input fields must be defined on each region.");
         }
 
+        // The schema version is read before deserialising, not after. A file written for an older
+        // schema is missing whatever the newer one requires, so deserialising first would report a
+        // missing property where the honest answer is that the whole file predates this version.
+        RequireCurrentSchemaVersion(document.RootElement);
+
         ScenarioSettings scenario = JsonFile.ReadConfig<ScenarioSettings>(contents)
             ?? throw new FormatException("Scenario config is empty.");
         Validate(scenario);
@@ -47,15 +52,38 @@ internal static class ScenarioConfig
             sizing.MaximumPasses);
     }
 
+    /// <summary>
+    /// Reports a schema-version mismatch from the raw document, before deserialisation can fail on
+    /// a property the file's own schema version never had.
+    /// </summary>
+    private static void RequireCurrentSchemaVersion(JsonElement root)
+    {
+        if (!root.TryGetProperty("schemaVersion", out JsonElement version)
+            || version.ValueKind != JsonValueKind.Number
+            || !version.TryGetInt32(out int declared))
+        {
+            // Absent or malformed: leave it to deserialisation and Validate, which report the
+            // property itself rather than guessing at a version.
+            return;
+        }
+
+        RequireCurrentSchemaVersion(declared);
+    }
+
+    private static void RequireCurrentSchemaVersion(int declared)
+    {
+        if (declared != ArtifactSchemaVersions.ScenarioConfig)
+        {
+            throw new FormatException(
+                $"Scenario config schema version found {declared}; "
+                + $"expected {ArtifactSchemaVersions.ScenarioConfig}.");
+        }
+    }
+
     private static void Validate(ScenarioSettings scenario)
     {
         ArgumentNullException.ThrowIfNull(scenario);
-        if (scenario.SchemaVersion != ArtifactSchemaVersions.ScenarioConfig)
-        {
-            throw new FormatException(
-                $"Scenario config schema version found {scenario.SchemaVersion}; "
-                + $"expected {ArtifactSchemaVersions.ScenarioConfig}.");
-        }
+        RequireCurrentSchemaVersion(scenario.SchemaVersion);
 
         ArgumentException.ThrowIfNullOrWhiteSpace(scenario.Id);
         ArgumentException.ThrowIfNullOrWhiteSpace(scenario.Name);
@@ -147,6 +175,7 @@ internal static class ScenarioConfig
 
             ValidateNonNegative(fleet.NameplateCapacityMw, region.RegionId, fleet.Technology, "nameplateCapacityMw");
             ValidateNonNegative(fleet.TechnologyProfile.HeatRateGjPerMwh, region.RegionId, fleet.Technology, "heatRateGjPerMwh");
+            ValidateNonNegative(fleet.TechnologyProfile.EmissionsIntensityTonnesPerMwh, region.RegionId, fleet.Technology, "emissionsIntensityTonnesPerMwh");
             ValidateCosts(region.RegionId, fleet.Technology, fleet.CostParameters);
             if (fleet.MonthlyCapacityFactors is not null)
             {
@@ -345,7 +374,10 @@ internal sealed record GeneratingFleetSettings(
     GenerationTechnologyProfileSettings TechnologyProfile,
     MonthlyCapacityFactorSettings[]? MonthlyCapacityFactors = null);
 
-internal sealed record GenerationTechnologyProfileSettings(double HeatRateGjPerMwh, uint TechnicalLifeYears);
+internal sealed record GenerationTechnologyProfileSettings(
+    [property: JsonRequired] double HeatRateGjPerMwh,
+    [property: JsonRequired] uint TechnicalLifeYears,
+    [property: JsonRequired] double EmissionsIntensityTonnesPerMwh);
 
 internal sealed record CostParametersSettings(
     decimal CapitalCostAudPerMw,

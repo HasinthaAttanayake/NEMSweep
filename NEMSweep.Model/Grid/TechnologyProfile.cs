@@ -67,7 +67,15 @@ public sealed record GenerationTechnologyProfile
     /// <param name="technicalLifeYears">
     /// Operating life used to annuitise capital cost. Must be positive.
     /// </param>
-    public GenerationTechnologyProfile(HeatRate heatRate, uint technicalLifeYears)
+    /// <param name="emissionsIntensity">
+    /// Greenhouse gas released per MWh of electricity generated. Like fuel, this is charged on
+    /// gross generation, not on the energy that reaches load. Zero for a fleet that emits nothing
+    /// when it runs; there is no technology-name default, so a scenario states it either way.
+    /// </param>
+    public GenerationTechnologyProfile(
+        HeatRate heatRate,
+        uint technicalLifeYears,
+        GenerationEmissionsIntensity emissionsIntensity)
     {
         if (technicalLifeYears == 0)
         {
@@ -76,6 +84,7 @@ public sealed record GenerationTechnologyProfile
 
         HeatRate = heatRate;
         TechnicalLifeYears = technicalLifeYears;
+        EmissionsIntensity = emissionsIntensity;
     }
 
     /// <summary>Thermal energy consumed per MWh of electricity generated.</summary>
@@ -83,6 +92,13 @@ public sealed record GenerationTechnologyProfile
 
     /// <summary>Expected operating life of the generating asset in years.</summary>
     public uint TechnicalLifeYears { get; }
+
+    /// <summary>
+    /// Operational greenhouse gas released per MWh of electricity generated, in t CO2-e/MWh. This
+    /// is combustion only: it excludes fuel extraction, construction and decommissioning, so it is
+    /// not a life-cycle figure.
+    /// </summary>
+    public GenerationEmissionsIntensity EmissionsIntensity { get; }
 }
 
 /// <summary>

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "id": "nem-fy2026-all-regions",
   "name": "NEM FY2026 all regions",
   "costBasis": {
@@ -152,7 +152,8 @@
           },
           "technologyProfile": {
             "heatRateGjPerMwh": 0,
-            "technicalLifeYears": 30
+            "technicalLifeYears": 30,
+            "emissionsIntensityTonnesPerMwh": 0
           }
         },
         {
@@ -166,7 +167,8 @@
           },
           "technologyProfile": {
             "heatRateGjPerMwh": 0,
-            "technicalLifeYears": 25
+            "technicalLifeYears": 25,
+            "emissionsIntensityTonnesPerMwh": 0
           }
         },
         {
@@ -180,7 +182,8 @@
           },
           "technologyProfile": {
             "heatRateGjPerMwh": 0,
-            "technicalLifeYears": 80
+            "technicalLifeYears": 80,
+            "emissionsIntensityTonnesPerMwh": 0
           },
           "monthlyCapacityFactors": [
             {
@@ -244,7 +247,8 @@
           },
           "technologyProfile": {
             "heatRateGjPerMwh": 8.547,
-            "technicalLifeYears": 30
+            "technicalLifeYears": 30,
+            "emissionsIntensityTonnesPerMwh": 0.771
           }
         },
         {
@@ -258,7 +262,8 @@
           },
           "technologyProfile": {
             "heatRateGjPerMwh": 7.073,
-            "technicalLifeYears": 25
+            "technicalLifeYears": 25,
+            "emissionsIntensityTonnesPerMwh": 0.364
           }
         }
       ]
@@ -309,7 +314,8 @@
           },
           "technologyProfile": {
             "heatRateGjPerMwh": 8.547,
-            "technicalLifeYears": 30
+            "technicalLifeYears": 30,
+            "emissionsIntensityTonnesPerMwh": 0.771
           }
         },
         {
@@ -323,7 +329,8 @@
           },
           "technologyProfile": {
             "heatRateGjPerMwh": 7.073,
-            "technicalLifeYears": 25
+            "technicalLifeYears": 25,
+            "emissionsIntensityTonnesPerMwh": 0.364
           }
         },
         {
@@ -337,7 +344,8 @@
           },
           "technologyProfile": {
             "heatRateGjPerMwh": 0,
-            "technicalLifeYears": 30
+            "technicalLifeYears": 30,
+            "emissionsIntensityTonnesPerMwh": 0
           }
         },
         {
@@ -351,7 +359,8 @@
           },
           "technologyProfile": {
             "heatRateGjPerMwh": 0,
-            "technicalLifeYears": 25
+            "technicalLifeYears": 25,
+            "emissionsIntensityTonnesPerMwh": 0
           }
         },
         {
@@ -365,7 +374,8 @@
           },
           "technologyProfile": {
             "heatRateGjPerMwh": 0,
-            "technicalLifeYears": 80
+            "technicalLifeYears": 80,
+            "emissionsIntensityTonnesPerMwh": 0
           },
           "monthlyCapacityFactors": [
             {
@@ -452,7 +462,8 @@
           },
           "technologyProfile": {
             "heatRateGjPerMwh": 0,
-            "technicalLifeYears": 25
+            "technicalLifeYears": 25,
+            "emissionsIntensityTonnesPerMwh": 0
           }
         },
         {
@@ -466,7 +477,8 @@
           },
           "technologyProfile": {
             "heatRateGjPerMwh": 7.073,
-            "technicalLifeYears": 25
+            "technicalLifeYears": 25,
+            "emissionsIntensityTonnesPerMwh": 0.364
           }
         },
         {
@@ -480,7 +492,8 @@
           },
           "technologyProfile": {
             "heatRateGjPerMwh": 0,
-            "technicalLifeYears": 30
+            "technicalLifeYears": 30,
+            "emissionsIntensityTonnesPerMwh": 0
           }
         }
       ]
@@ -517,7 +530,8 @@
           },
           "technologyProfile": {
             "heatRateGjPerMwh": 0,
-            "technicalLifeYears": 80
+            "technicalLifeYears": 80,
+            "emissionsIntensityTonnesPerMwh": 0
           },
           "monthlyCapacityFactors": [
             {
@@ -581,7 +595,8 @@
           },
           "technologyProfile": {
             "heatRateGjPerMwh": 0,
-            "technicalLifeYears": 25
+            "technicalLifeYears": 25,
+            "emissionsIntensityTonnesPerMwh": 0
           }
         },
         {
@@ -595,7 +610,8 @@
           },
           "technologyProfile": {
             "heatRateGjPerMwh": 7.073,
-            "technicalLifeYears": 25
+            "technicalLifeYears": 25,
+            "emissionsIntensityTonnesPerMwh": 0.364
           }
         }
       ]
@@ -632,7 +648,8 @@
           },
           "technologyProfile": {
             "heatRateGjPerMwh": 0,
-            "technicalLifeYears": 25
+            "technicalLifeYears": 25,
+            "emissionsIntensityTonnesPerMwh": 0
           }
         },
         {
@@ -646,7 +663,8 @@
           },
           "technologyProfile": {
             "heatRateGjPerMwh": 11.337,
-            "technicalLifeYears": 30
+            "technicalLifeYears": 30,
+            "emissionsIntensityTonnesPerMwh": 1.054
           }
         },
         {
@@ -660,7 +678,8 @@
           },
           "technologyProfile": {
             "heatRateGjPerMwh": 7.073,
-            "technicalLifeYears": 25
+            "technicalLifeYears": 25,
+            "emissionsIntensityTonnesPerMwh": 0.364
           }
         },
         {
@@ -674,7 +693,8 @@
           },
           "technologyProfile": {
             "heatRateGjPerMwh": 0,
-            "technicalLifeYears": 80
+            "technicalLifeYears": 80,
+            "emissionsIntensityTonnesPerMwh": 0
           },
           "monthlyCapacityFactors": [
             {
@@ -738,7 +758,8 @@
           },
           "technologyProfile": {
             "heatRateGjPerMwh": 0,
-            "technicalLifeYears": 30
+            "technicalLifeYears": 30,
+            "emissionsIntensityTonnesPerMwh": 0
           }
         }
       ]

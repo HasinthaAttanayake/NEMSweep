@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace NEMSweep.Contracts;
 
 /// <summary>
@@ -20,4 +22,5 @@ public sealed record RegionDispatchResultsDTO(
     DispatchMetricsDTO Metrics,
     ReliabilityBasisDTO Reliability,
     StorageSizingOutcomeDTO StorageSizing,
-    DispatchCostDTO Cost);
+    DispatchCostDTO Cost,
+    [property: JsonRequired] DispatchEmissionsDTO Emissions);

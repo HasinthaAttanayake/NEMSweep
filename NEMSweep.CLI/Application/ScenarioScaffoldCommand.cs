@@ -75,7 +75,8 @@ internal static class ScenarioScaffoldCommand
                   },
                   "technologyProfile": {
                     "heatRateGjPerMwh": 7.1,
-                    "technicalLifeYears": 30
+                    "technicalLifeYears": 30,
+                    "emissionsIntensityTonnesPerMwh": 0.4
                   }
                 }
               ],

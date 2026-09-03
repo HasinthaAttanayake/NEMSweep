@@ -54,6 +54,7 @@ classDiagram
     class GenerationTechnologyProfile {
       HeatRate heatRate
       uint technicalLifeYears
+      GenerationEmissionsIntensity emissionsIntensity
     }
     class ScenarioStorageFleet {
       StorageTechnology storageTechnology
@@ -169,7 +170,11 @@ classDiagram
   Each `ScenarioGeneratingFleet` owns its `GenerationCostParameters` and a
   `GenerationTechnologyProfile`. Generation cost parameters contain only power
   capital cost, annual fixed OPEX, variable operating cost in AUD/MWh generated,
-  and fuel price. They do not contain storage energy capital cost.
+  and fuel price. They do not contain storage energy capital cost. The technology
+  profile holds the fleet's physical per-MWh-generated assumptions: heat rate,
+  technical life, and emissions intensity in t CO2-e/MWh generated. There is no
+  technology-name default for any of them, so a non-emitting fleet declares a zero
+  intensity rather than inheriting one.
 - Each `ScenarioStorageFleet` owns initial MW and MWh plus
   `StorageCostParameters`: power capex in AUD/MW, energy capex in AUD/MWh of
   storage capacity, and fixed OPEX in AUD/MW/year. It also owns a
@@ -298,6 +303,21 @@ classDiagram
   It also requires exactly one aligned `InterconnectorFlow` for every final link,
   matching endpoint order case-insensitively, directed capacity, and non-negative
   flow/loss values.
+- `EmissionsCalculator` calculates an `EmissionsSummary` from the same scenario,
+  realised system and dispatch evidence, after the same correspondence validation:
+  `RealisedSystemCorrespondence` is shared by both accounting services, so a
+  cost figure and an emissions figure can never be published against differently
+  validated inputs. For each generation fleet it multiplies that fleet's
+  `GenerationEmissionsIntensity` by its gross generated energy, exactly the basis
+  the fuel term uses. It produces one `RegionEmissionsSummary` per region with
+  total emissions and an intensity divided by that region's
+  `DispatchOutcome.EnergyServed`, then re-aggregates system emissions by
+  technology so the published contributions reconcile to the published total,
+  independent of region iteration order. Scope is combustion during generation:
+  storage and transmission assets have no emissions of their own, because the
+  generation that charged a battery is already counted where it was generated.
+  `EmissionsSummary` and `RegionEmissionsSummary` are value-only results, not
+  calculation services.
 - `PowerSystemCostCalculator` calculates a `PowerSystemCostBreakdown` after
   validating scenario, realised system, and dispatch correspondence. It requires
   exactly one scenario year. For each generation fleet it adds annualised power
@@ -368,6 +388,16 @@ divided by energy served produces `EnergyPrice` in AUD/MWh served.
 and fuel-derived costs on gross generation. `FuelPrice` multiplied by heat rate
 produces a `GenerationEnergyCost`. `EnergyCapacityCost` is one-time AUD/MWh of
 storage capacity and produces `Money` only when multiplied by storage `Energy`.
+
+Emissions follow the same generated-versus-served rule, and for the same reason:
+`GenerationEmissionsIntensity` is t CO2-e/MWh generated and is a technology
+assumption, while `ServedEmissionsIntensity` is t CO2-e/MWh served and is only
+ever a result. They are separate types so the two bases cannot be assigned to one
+another, exactly as `GenerationEnergyCost` and `EnergyPrice` are. A
+`GenerationEmissionsIntensity` applied to generated `Energy` produces `Emissions`,
+and `Emissions.Per(Energy)` over energy served produces a
+`ServedEmissionsIntensity`. `Emissions` is unsigned: there is no modelled
+sequestration, so a negative quantity is not constructible.
 
 `PowerSystemCostBreakdown` retains energy served separately from annual
 generation and storage costs. Its denominator is total

@@ -40,6 +40,8 @@ public static class SweepScalarCatalog
         new("hoursServedFraction", "Hours served", "fraction"),
         new("peakUnservedPowerMw", "Peak unserved power", "MW"),
         new("curtailedEnergyMwh", "Curtailed energy", "MWh"),
+        new("emissionsTonnesCO2e", "Emissions", "t CO2-e"),
+        new("emissionsIntensityTonnesCO2ePerMwh", "Emissions intensity", "t CO2-e/MWh served"),
         new("transmissionSlcotAudPerMwh", "Transmission levelised cost", "AUD/MWh served", "AUD"),
         new("transmissionCostStatus", "Transmission cost status", "status", Chartable: false),
         new("netImportedEnergyMwh", "Net imported energy", "MWh"),

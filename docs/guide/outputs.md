@@ -59,6 +59,8 @@ under, its label, and its unit.
 | `hoursServedFraction` | Hours served | fraction |
 | `peakUnservedPowerMw` | Peak unserved power | MW |
 | `curtailedEnergyMwh` | Curtailed energy | MWh |
+| `emissionsTonnesCO2e` | Emissions | t CO2-e |
+| `emissionsIntensityTonnesCO2ePerMwh` | Emissions intensity | t CO2-e/MWh served |
 | `transmissionSlcotAudPerMwh` | Transmission levelised cost | AUD/MWh served |
 | `transmissionCostStatus` | Transmission cost status | status |
 | `netImportedEnergyMwh` | Net imported energy | MWh |

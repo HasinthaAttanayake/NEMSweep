@@ -25,7 +25,7 @@ jobs:
         fail() { echo "::error::schema/$1 is stale; regenerate it with --describe-schema $2"; exit 1; }
         dotnet run --project NEMSweep.CLI -c Release -- --describe-schema scenario > scenario.actual.json
         dotnet run --project NEMSweep.CLI -c Release -- --describe-schema sweep > sweep.actual.json
-        diff -u schema/scenario-v5.json scenario.actual.json || fail scenario-v5.json scenario
+        diff -u schema/scenario-v6.json scenario.actual.json || fail scenario-v6.json scenario
         diff -u schema/sweep-v1.json sweep.actual.json || fail sweep-v1.json sweep
 
   docs:

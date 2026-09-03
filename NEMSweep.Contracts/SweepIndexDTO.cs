@@ -216,6 +216,10 @@ public enum SweepFailureStage
     [JsonStringEnumMemberName("costing")]
     Costing,
 
+    /// <summary>System emissions could not be accounted.</summary>
+    [JsonStringEnumMemberName("emissions")]
+    Emissions,
+
     /// <summary>The point ran but its artifacts could not be written.</summary>
     [JsonStringEnumMemberName("export")]
     Export,
@@ -252,6 +256,8 @@ public enum SweepFailureStage
 /// <param name="HoursServedFraction">Fraction of intervals with no unserved energy, in [0, 1].</param>
 /// <param name="PeakUnservedPowerMw">Largest unserved power in any single interval, in MW.</param>
 /// <param name="CurtailedEnergyMwh">Generation energy curtailed rather than delivered, in MWh.</param>
+/// <param name="EmissionsTonnesCO2e">Annual operational emissions from generation, in tonnes CO2-e.</param>
+/// <param name="EmissionsIntensityTonnesCO2ePerMwh">Operational emissions per MWh served, in t CO2-e per MWh.</param>
 /// <param name="TransmissionSlcotAudPerMwh">Transmission component of levelised cost, in AUD per MWh served.</param>
 /// <param name="TransmissionCostStatus">Whether the transmission cost figure could be calculated for this point.</param>
 /// <param name="NetImportedEnergyMwh">
@@ -276,6 +282,8 @@ public sealed record SweepPointScalarResultsDTO(
     double HoursServedFraction,
     double PeakUnservedPowerMw,
     double CurtailedEnergyMwh,
+    [property: JsonRequired] double EmissionsTonnesCO2e,
+    [property: JsonRequired] double EmissionsIntensityTonnesCO2ePerMwh,
     [property: JsonRequired] decimal TransmissionSlcotAudPerMwh,
     [property: JsonRequired] TransmissionCostStatus TransmissionCostStatus,
     [property: JsonRequired] double NetImportedEnergyMwh);

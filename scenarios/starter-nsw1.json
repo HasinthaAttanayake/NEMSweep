@@ -1,6 +1,6 @@
 {
-  "$schema": "https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/scenario-v5.json",
-  "schemaVersion": 5,
+  "$schema": "https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/scenario-v6.json",
+  "schemaVersion": 6,
   "id": "starter-nsw1",
   "name": "Starter: NSW1 alone",
   "costBasis": {
@@ -61,7 +61,8 @@
           },
           "technologyProfile": {
             "heatRateGjPerMwh": 0,
-            "technicalLifeYears": 30
+            "technicalLifeYears": 30,
+            "emissionsIntensityTonnesPerMwh": 0
           }
         },
         {
@@ -75,7 +76,8 @@
           },
           "technologyProfile": {
             "heatRateGjPerMwh": 0,
-            "technicalLifeYears": 25
+            "technicalLifeYears": 25,
+            "emissionsIntensityTonnesPerMwh": 0
           }
         },
         {
@@ -89,7 +91,8 @@
           },
           "technologyProfile": {
             "heatRateGjPerMwh": 0,
-            "technicalLifeYears": 80
+            "technicalLifeYears": 80,
+            "emissionsIntensityTonnesPerMwh": 0
           },
           "monthlyCapacityFactors": [
             {
@@ -153,7 +156,8 @@
           },
           "technologyProfile": {
             "heatRateGjPerMwh": 8.547,
-            "technicalLifeYears": 30
+            "technicalLifeYears": 30,
+            "emissionsIntensityTonnesPerMwh": 0.771
           }
         },
         {
@@ -167,7 +171,8 @@
           },
           "technologyProfile": {
             "heatRateGjPerMwh": 7.073,
-            "technicalLifeYears": 25
+            "technicalLifeYears": 25,
+            "emissionsIntensityTonnesPerMwh": 0.364
           }
         }
       ]

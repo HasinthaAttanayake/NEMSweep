@@ -44,7 +44,7 @@ paraphrase is where field names get invented.
 
 They are also committed, so a model that can fetch a URL does not need you to paste anything:
 
-- `https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/scenario-v5.json`
+- `https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/scenario-v6.json`
 - `https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/sweep-v1.json`
 
 CI regenerates both and fails if they have drifted from the validator, so the published file cannot

@@ -14,8 +14,8 @@ Add `$schema` to the top of your file:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/scenario-v5.json",
-  "schemaVersion": 5,
+  "$schema": "https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/scenario-v6.json",
+  "schemaVersion": 6,
   "id": "my-scenario"
 }
 ```
@@ -27,14 +27,21 @@ The repository is the host. The raw endpoint serves with a permissive cross-orig
 editors do not mind that it returns `text/plain`, so putting the file anywhere else would be
 presentation rather than capability.
 
-| File | Schema |
-|---|---|
-| Scenario config | `schema/scenario-v5.json` |
-| Sweep definition | `schema/sweep-v1.json` |
+| File | Schema | Status |
+|---|---|---|
+| Scenario config | `schema/scenario-v6.json` | Current; what the CLI accepts. |
+| Scenario config | `schema/scenario-v5.json` | Superseded, and kept. |
+| Sweep definition | `schema/sweep-v1.json` | Current. |
 
 File names carry the version, so bumping a schema does not invalidate files pinned to the old one.
 Each schema's `$id` is that same versioned URL, which is what keeps a later version from colliding
 with this one in a tool that caches schemas by identity.
+
+Superseded files stay in the repository, frozen, for exactly that reason: a file pinned to
+`scenario-v5.json` keeps validating in an editor rather than resolving to a 404. It will not load,
+because the CLI accepts only the current version and says so by number, but a reader is then
+looking at a version mismatch rather than at a broken editor. Only the current schema is
+regenerated and diffed by CI.
 
 `--describe-schema scenario` and `--describe-schema sweep` still print the same documents to
 standard output, which is the route to take when you want the schema without a network round trip,
@@ -57,7 +64,7 @@ fall behind them silently. CI regenerates both and diffs them against what is co
 the build if they differ. Regenerate after changing a constant:
 
 ```bash
-dotnet run --project NEMSweep.CLI -- --describe-schema scenario > schema/scenario-v5.json
+dotnet run --project NEMSweep.CLI -- --describe-schema scenario > schema/scenario-v6.json
 ```
 
 ## What a schema cannot check
