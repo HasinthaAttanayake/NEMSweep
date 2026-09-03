@@ -18,7 +18,8 @@ public sealed class ScenarioDerivationTests
         FuelPrice.FromAudPerGjThermal(5));
     private static readonly GenerationTechnologyProfile TechnologyProfile = new(
         HeatRate.FromGigajoulesPerMegawattHour(8),
-        technicalLifeYears: 40u);
+        technicalLifeYears: 40u,
+        GenerationEmissionsIntensity.FromTonnesCO2ePerMwhGenerated(0.4));
 
     [Fact]
     public void Derive_RealisesScenarioGeneratingFleetsAndKeepsScenarioIdentity()

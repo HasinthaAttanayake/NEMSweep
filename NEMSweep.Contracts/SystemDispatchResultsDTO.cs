@@ -22,6 +22,7 @@ public sealed record SystemDispatchResultsDTO(
     ReliabilityBasisDTO Reliability,
     StorageSizingOutcomeDTO StorageSizing,
     DispatchCostDTO Cost,
+    [property: JsonRequired] DispatchEmissionsDTO Emissions,
     [property: JsonRequired] DispatchTopologyDTO Topology,
     [property: JsonRequired] DispatchInterconnectorDTO[] Interconnectors,
     DispatchCostBasisDTO? CostBasis = null,
@@ -61,6 +62,7 @@ public sealed record RegionDispatchSummaryDTO(
     ReliabilityBasisDTO Reliability,
     StorageSizingOutcomeDTO StorageSizing,
     DispatchCostDTO Cost,
+    [property: JsonRequired] DispatchEmissionsDTO Emissions,
     [property: JsonRequired] Dictionary<string, double> DeliveredGenerationByTechnologyMwh,
     [property: JsonRequired] string DetailPath,
     [property: JsonRequired] string OverviewPath);

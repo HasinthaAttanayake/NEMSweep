@@ -17,22 +17,22 @@ public static class ArtifactSchemaVersions
     public const int GenerationInformation = 1;
 
     /// <summary>Dispatch results (<c>results.json</c> and each sweep point detail).</summary>
-    public const int DispatchResults = 13;
+    public const int DispatchResults = 14;
 
     /// <summary>Whole-system dispatch results artifact.</summary>
-    public const int SystemDispatchResults = 14;
+    public const int SystemDispatchResults = 15;
 
     /// <summary>Compact whole-system dispatch overview (<c>results-overview.json</c>).</summary>
-    public const int SystemDispatchOverview = 3;
+    public const int SystemDispatchOverview = 4;
 
     /// <summary>Per-region dispatch results detail artifact.</summary>
-    public const int RegionDispatchResults = 9;
+    public const int RegionDispatchResults = 10;
 
     /// <summary>Compact per-region dispatch overview (<c>results-{regionId}-overview.json</c>).</summary>
-    public const int RegionDispatchOverview = 2;
+    public const int RegionDispatchOverview = 3;
 
     /// <summary>Sweep index (<c>sweeps/{sweepId}/index.json</c>).</summary>
-    public const int SweepIndex = 10;
+    public const int SweepIndex = 11;
 
     /// <summary>Sweep manifest (<c>sweeps/index.json</c>).</summary>
     public const int SweepManifest = 1;
@@ -41,7 +41,7 @@ public static class ArtifactSchemaVersions
     public const int SweepDefinition = 1;
 
     /// <summary>Scenario configuration, the CLI-side input a scenario run is resolved from.</summary>
-    public const int ScenarioConfig = 5;
+    public const int ScenarioConfig = 6;
 
     /// <summary>Externalised regular series (<c>sweeps/{sweepId}/series/*.json</c>).</summary>
     public const int RegularSeries = 1;

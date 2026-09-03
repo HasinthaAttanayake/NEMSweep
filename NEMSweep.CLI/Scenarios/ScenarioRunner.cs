@@ -106,6 +106,7 @@ internal static class ScenarioRunner
             powerSystem,
             sizingResult,
             Cost(scenario, sizingResult),
+            Emissions(scenario, sizingResult),
             demandInputs,
             weatherInputs);
     }
@@ -161,6 +162,24 @@ internal static class ScenarioRunner
             throw new ScenarioRunException(
                 SweepFailureStage.Costing,
                 "costingFailed",
+                exception.Message,
+                exception);
+        }
+    }
+
+    private static EmissionsSummary Emissions(
+        DomainScenario scenario,
+        StorageSizingRunResult sizingResult)
+    {
+        try
+        {
+            return EmissionsCalculator.Calculate(scenario, sizingResult);
+        }
+        catch (Exception exception) when (exception is not ScenarioRunException)
+        {
+            throw new ScenarioRunException(
+                SweepFailureStage.Emissions,
+                "emissionsFailed",
                 exception.Message,
                 exception);
         }
@@ -335,7 +354,9 @@ internal static class ScenarioRunner
             new GenerationTechnologyProfile(
                 HeatRate.FromGigajoulesPerMegawattHour(
                     generatingFleetSettings.TechnologyProfile.HeatRateGjPerMwh),
-                generatingFleetSettings.TechnologyProfile.TechnicalLifeYears),
+                generatingFleetSettings.TechnologyProfile.TechnicalLifeYears,
+                GenerationEmissionsIntensity.FromTonnesCO2ePerMwhGenerated(
+                    generatingFleetSettings.TechnologyProfile.EmissionsIntensityTonnesPerMwh)),
             monthlyCapacityFactors);
     }
 
@@ -470,5 +491,6 @@ internal sealed record ScenarioDispatchResult(
     PowerSystem PowerSystem,
     StorageSizingRunResult SizingResult,
     PowerSystemCostBreakdown CostBreakdown,
+    EmissionsSummary EmissionsSummary,
     IReadOnlyDictionary<string, LoadedInput<OperationalDemandData>> DemandInputs,
     IReadOnlyDictionary<string, LoadedInput<WeatherDataDTO>> WeatherInputs);

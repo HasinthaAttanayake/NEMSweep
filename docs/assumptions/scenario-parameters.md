@@ -46,6 +46,7 @@ the technology.
 | `costParameters.fuelPriceAudPerGj` | AUD/GJ | Multiplied by heat rate to give a fuel cost per MWh generated. |
 | `technologyProfile.heatRateGjPerMwh` | GJ/MWh | Thermal energy consumed per MWh **generated**, on the same gross basis as variable operating cost. With fuel price this sets the fleet's short-run marginal cost, which is what decides merit order. |
 | `technologyProfile.technicalLifeYears` | years | Annuitisation period for capital cost. |
+| `technologyProfile.emissionsIntensityTonnesPerMwh` | t CO2-e/MWh | Operational carbon dioxide equivalent released per MWh **generated**, on the same gross basis as fuel. Combustion only: it excludes fuel extraction, construction and decommissioning, so it is not a life-cycle figure. Zero for a fleet that emits nothing when it runs; there is no technology-name default, so a non-emitting fleet still states it. The shipped NEM scenario derives each value as heat rate multiplied by a fuel combustion factor (about 90.2 kg CO2-e/GJ for black coal, 93.0 for Victorian brown coal, 51.4 for natural gas), giving 0.771 for black coal, 1.054 for brown coal and 0.364 for gas. Substitute your own sourced figures rather than treating these as authoritative. |
 | `monthlyCapacityFactors` | fraction per month | An energy budget rather than a capacity limit. Used by Hydro, whose output is limited by inflow. |
 
 **Sensitivity: fuel price and heat rate change dispatch, not just cost.** Together they set

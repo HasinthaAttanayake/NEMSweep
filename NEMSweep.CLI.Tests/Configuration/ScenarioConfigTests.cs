@@ -13,7 +13,7 @@ public sealed class ScenarioConfigTests
         var act = () => Load(config => config["schemaVersion"] = 1);
 
         act.Should().Throw<FormatException>()
-            .WithMessage("*found 1*expected 5*");
+            .WithMessage("*found 1*expected 6*");
     }
 
     [Fact]
@@ -252,6 +252,43 @@ public sealed class ScenarioConfigTests
     }
 
     [Fact]
+    public void Load_RejectsNegativeEmissionsIntensity()
+    {
+        var act = () => Load(config =>
+            GeneratingProfile(config)["emissionsIntensityTonnesPerMwh"] = -0.1);
+
+        act.Should().Throw<FormatException>()
+            .WithMessage("*NSW1*Coal*emissionsIntensityTonnesPerMwh*");
+    }
+
+    /// <summary>
+    /// A real file written for the previous schema is missing what this one requires, so the
+    /// version has to be checked before deserialisation or the reader is told about a property
+    /// rather than about the version their whole file predates.
+    /// </summary>
+    [Fact]
+    public void Load_ReportsTheVersionForAPreviousSchemaFileMissingANewlyRequiredField()
+    {
+        var act = () => Load(config =>
+        {
+            config["schemaVersion"] = 5;
+            GeneratingProfile(config).Remove("emissionsIntensityTonnesPerMwh");
+        });
+
+        act.Should().Throw<FormatException>()
+            .WithMessage("*found 5*expected 6*");
+    }
+
+    [Fact]
+    public void Load_RejectsAGeneratingProfileWithoutAnEmissionsIntensity()
+    {
+        var act = () => Load(config =>
+            GeneratingProfile(config).Remove("emissionsIntensityTonnesPerMwh"));
+
+        act.Should().Throw<JsonException>();
+    }
+
+    [Fact]
     public void Load_RejectsImplausibleCostBasisYear()
     {
         var act = () => Load(config => config["costBasis"]!["year"] = 1900);
@@ -263,7 +300,7 @@ public sealed class ScenarioConfigTests
     {
         JsonObject config = JsonNode.Parse("""
         {
-                    "schemaVersion": 5,
+                    "schemaVersion": 6,
           "id": "test",
           "name": "Test",
           "costBasis": { "year": 2026, "realDiscountRate": 0.07 },
@@ -275,7 +312,7 @@ public sealed class ScenarioConfigTests
             "generatingFleets": [{
               "technology": "Coal", "nameplateCapacityMw": 100,
               "costParameters": { "capitalCostAudPerMw": 1, "fixedOperatingCostAudPerMwYear": 1, "variableOperatingCostAudPerMwh": 1, "fuelPriceAudPerGj": 1 },
-              "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 }
+              "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30, "emissionsIntensityTonnesPerMwh": 0.4 }
             }],
             "storageFleets": [{
               "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0,

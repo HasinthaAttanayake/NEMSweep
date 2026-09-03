@@ -93,6 +93,12 @@
     "generationProfileOverride": {
       "additionalProperties": false,
       "properties": {
+        "emissionsIntensityTonnesPerMwh": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "heatRateGjPerMwh": {
           "type": [
             "number",

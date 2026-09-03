@@ -103,10 +103,11 @@ internal static class SchemaDescriptionCommand
             },
             "generationProfile": {
               "type": "object", "additionalProperties": false,
-              "required": ["heatRateGjPerMwh", "technicalLifeYears"],
+              "required": ["heatRateGjPerMwh", "technicalLifeYears", "emissionsIntensityTonnesPerMwh"],
               "properties": {
                 "heatRateGjPerMwh": { "type": "number", "minimum": 0 },
-                "technicalLifeYears": { "type": "integer", "minimum": 0 }
+                "technicalLifeYears": { "type": "integer", "minimum": 0 },
+                "emissionsIntensityTonnesPerMwh": { "type": "number", "minimum": 0 }
               }
             },
             "monthlyCapacityFactor": {
@@ -265,7 +266,10 @@ internal static class SchemaDescriptionCommand
             },
             "generationProfileOverride": {
               "type": ["object", "null"], "additionalProperties": false,
-              "properties": { "heatRateGjPerMwh": { "type": ["number", "null"] }, "technicalLifeYears": { "type": ["integer", "null"] } }
+              "properties": {
+                "heatRateGjPerMwh": { "type": ["number", "null"] }, "technicalLifeYears": { "type": ["integer", "null"] },
+                "emissionsIntensityTonnesPerMwh": { "type": ["number", "null"] }
+              }
             },
             "storageCostsOverride": {
               "type": ["object", "null"], "additionalProperties": false,

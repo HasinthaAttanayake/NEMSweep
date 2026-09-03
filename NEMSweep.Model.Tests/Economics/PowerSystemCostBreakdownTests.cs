@@ -52,7 +52,8 @@ public sealed class PowerSystemCostBreakdownTests
                         FuelPrice.FromAudPerGjThermal(fuelPricePerGj)),
                     new GenerationTechnologyProfile(
                         HeatRate.FromGigajoulesPerMegawattHour(heatRateGjPerMwh),
-                        technicalLifeYears: 10))])],
+                        technicalLifeYears: 10,
+                        GenerationEmissionsIntensity.Zero))])],
             new CostBasis(2026, realDiscountRate: 0));
 
         PowerSystemCostBreakdown breakdown = PowerSystemCostCalculator.Calculate(
@@ -616,7 +617,8 @@ public sealed class PowerSystemCostBreakdownTests
                         FuelPrice.FromAudPerGjThermal(0m)),
                     new GenerationTechnologyProfile(
                         HeatRate.FromGigajoulesPerMegawattHour(0),
-                        technicalLifeYears: 10u))],
+                        technicalLifeYears: 10u,
+                        GenerationEmissionsIntensity.Zero))],
                 storageFleets)],
             new CostBasis(2026, realDiscountRate: 0m));
 
@@ -647,7 +649,8 @@ public sealed class PowerSystemCostBreakdownTests
                     FuelPrice.FromAudPerGjThermal(0m)),
                 new GenerationTechnologyProfile(
                     HeatRate.FromGigajoulesPerMegawattHour(0),
-                    technicalLifeYears: 10u))]);
+                    technicalLifeYears: 10u,
+                    GenerationEmissionsIntensity.Zero))]);
 
     private static Region RegionFor(string regionId, FlowSeries demand) =>
         new(

@@ -111,7 +111,7 @@ public sealed class ValidateScenarioCommandTests
                 $$"""
                 {
                   {{schemaHint}}
-                  "schemaVersion": 5,
+                  "schemaVersion": 6,
                   "id": "validate-fixture",
                   "name": "Validate fixture",
                   "costBasis": { "year": 2026, "realDiscountRate": 0.07 },
@@ -125,7 +125,7 @@ public sealed class ValidateScenarioCommandTests
                       "technology": "Gas",
                       "nameplateCapacityMw": 100,
                       "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 },
-                      "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 }
+                      "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30, "emissionsIntensityTonnesPerMwh": 0.4 }
                     }],
                     "storageFleets": [{
                       "technology": "Battery",

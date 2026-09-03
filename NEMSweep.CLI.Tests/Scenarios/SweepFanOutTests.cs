@@ -184,13 +184,13 @@ public sealed class SweepFanOutTests
             File.WriteAllText(Path.Combine(RootPath, "NEMSweep.slnx"), string.Empty);
             File.WriteAllText(Path.Combine(RootPath, "scenarios", "baseline.json"), """
             {
-              "schemaVersion": 5, "id": "baseline", "name": "Baseline",
+              "schemaVersion": 6, "id": "baseline", "name": "Baseline",
               "costBasis": { "year": 2026, "realDiscountRate": 0.07 },
               "storageSizing": { "maximumPowerMw": 100, "maximumEnergyMwh": 400 },
               "regions": [{
                                 "regionId": "NSW1", "demandFile": "demand.json", "weatherFile": "weather.json", "generatingFleets": [
-                                    { "technology": "Coal", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 4.175 }, "technologyProfile": { "heatRateGjPerMwh": 8.547, "technicalLifeYears": 30 } },
-                                    { "technology": "Gas", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 15.313 }, "technologyProfile": { "heatRateGjPerMwh": 7.073, "technicalLifeYears": 30 } }
+                                    { "technology": "Coal", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 4.175 }, "technologyProfile": { "heatRateGjPerMwh": 8.547, "technicalLifeYears": 30, "emissionsIntensityTonnesPerMwh": 0.4 } },
+                                    { "technology": "Gas", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 15.313 }, "technologyProfile": { "heatRateGjPerMwh": 7.073, "technicalLifeYears": 30, "emissionsIntensityTonnesPerMwh": 0.4 } }
                                 ],
                 "storageFleets": [{ "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0, "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 }, "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 } }]
               }]
@@ -207,7 +207,7 @@ public sealed class SweepFanOutTests
         {
             const string region = """
                 { "regionId": "$ID", "demandFile": "demand.json", "weatherFile": "weather.json",
-                  "generatingFleets": [{ "technology": "Gas", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30 } }],
+                  "generatingFleets": [{ "technology": "Gas", "nameplateCapacityMw": 100, "costParameters": { "capitalCostAudPerMw": 0, "fixedOperatingCostAudPerMwYear": 0, "variableOperatingCostAudPerMwh": 0, "fuelPriceAudPerGj": 0 }, "technologyProfile": { "heatRateGjPerMwh": 7, "technicalLifeYears": 30, "emissionsIntensityTonnesPerMwh": 0.4 } }],
                   "storageFleets": [{ "technology": "Battery", "initialEnergyCapacityMwh": 0, "initialPowerCapacityMw": 0, "costParameters": { "powerCapitalCostAudPerMw": 0, "energyCapitalCostAudPerMwh": 0, "fixedOperatingCostAudPerMwYear": 0 }, "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.87 } }] }
                 """;
             const string link = """
@@ -223,7 +223,7 @@ public sealed class SweepFanOutTests
             });
             File.WriteAllText(Path.Combine(RootPath, "scenarios", "baseline.json"), $$"""
             {
-              "schemaVersion": 5, "id": "baseline", "name": "Baseline",
+              "schemaVersion": 6, "id": "baseline", "name": "Baseline",
               "costBasis": { "year": 2026, "realDiscountRate": 0.07 },
               "storageSizing": { "maximumPowerMw": 100, "maximumEnergyMwh": 400 },
               "regions": [{{regions}}],

@@ -19,4 +19,5 @@ public sealed record SystemDispatchOverviewDTO(
     ReliabilityBasisDTO Reliability,
     StorageSizingOutcomeDTO StorageSizing,
     DispatchCostDTO Cost,
+    [property: JsonRequired] DispatchEmissionsDTO Emissions,
     [property: JsonRequired] DispatchTopologyDTO Topology);

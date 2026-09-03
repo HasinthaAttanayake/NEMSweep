@@ -17,6 +17,9 @@ namespace NEMSweep.CLI.Tests.Scenarios;
 
 public sealed class DispatchResultsContractTests
 {
+    private const double CoalEmissionsIntensity = 0.771;
+    private const double GasEmissionsIntensity = 0.364;
+
     [Fact]
     public void StorageSizingOutcome_StorageNoLongerImprovesReliability_RoundTripsAsAString()
     {
@@ -110,12 +113,12 @@ public sealed class DispatchResultsContractTests
                         GenerationTechnology.Coal,
                         Power.FromMegawatts(140),
                         CreateCostParameters(),
-                        CreateTechnologyProfile()),
+                        CreateTechnologyProfile(CoalEmissionsIntensity)),
                     new ScenarioGeneratingFleet(
                         GenerationTechnology.Gas,
                         Power.FromMegawatts(60),
                         CreateCostParameters(),
-                        CreateTechnologyProfile()),
+                        CreateTechnologyProfile(GasEmissionsIntensity)),
                 ],
                 includesStorage
                     ? [new ScenarioStorageFleet(
@@ -196,6 +199,7 @@ public sealed class DispatchResultsContractTests
             powerSystem,
             sizingResult,
             PowerSystemCostCalculator.Calculate(scenario, powerSystem, [outcome]),
+            EmissionsCalculator.Calculate(scenario, powerSystem, [outcome]),
             new Dictionary<string, LoadedInput<OperationalDemandData>>(StringComparer.OrdinalIgnoreCase)
             {
                 ["NSW1"] = new LoadedInput<OperationalDemandData>(
@@ -227,6 +231,35 @@ public sealed class DispatchResultsContractTests
                 NEMSweep.CLI.Infrastructure.JsonFile.ReadOptions)!;
 
             result.SchemaVersion.Should().Be(ArtifactSchemaVersions.RegionDispatchResults);
+            result.PowerSystem.Fleets.Single(fleet => fleet.Technology == "Coal")
+                .EmissionsIntensityTonnesCO2ePerMwh.Should().Be(CoalEmissionsIntensity);
+            result.Emissions.GenerationEmissionsContributions
+                .Select(contribution => contribution.Technology)
+                .Should().Equal("Coal", "Gas");
+            // Reconciles at the precision the artifact is published to, which is the strongest
+            // claim a double can carry: the totals are derived from these contributions, so no
+            // rounding residual is left for a reader to trip over, but summing decimal-rounded
+            // doubles still need not land exactly on the published decimal.
+            Publish(
+                result.Emissions.GenerationEmissionsContributions
+                    .Sum(contribution => contribution.EmissionsTonnesCO2e),
+                nameof(DispatchGenerationEmissionsContributionDTO.EmissionsTonnesCO2e))
+                .Should().Be(result.Emissions.TotalEmissionsTonnesCO2e);
+            Publish(
+                result.Emissions.GenerationEmissionsContributions
+                    .Sum(contribution => contribution.IntensityContributionTonnesCO2ePerMwh),
+                nameof(DispatchGenerationEmissionsContributionDTO
+                    .IntensityContributionTonnesCO2ePerMwh))
+                .Should().Be(result.Emissions.EmissionsIntensityTonnesCO2ePerMwh);
+            // Gross generation, not delivered: the emissions of the energy booked to charging
+            // storage stay on the fleet that generated it.
+            result.Emissions.GenerationEmissionsContributions
+                .Single(contribution => contribution.Technology == "Coal")
+                .EmissionsTonnesCO2e
+                .Should().BeApproximately(
+                    outcome.PerFleetGeneration[GenerationTechnology.Coal]
+                        .Integrate().MegawattHours * CoalEmissionsIntensity,
+                    0.01);
             result.DataSeries.DeliveredGenerationByTechnologyMw["Coal"].Take(2)
                 .Should().Equal(120 - generationSourcedChargeMwh, 50);
             result.DataSeries.DeliveredGenerationByTechnologyMw["Gas"].Take(2)
@@ -310,13 +343,22 @@ public sealed class DispatchResultsContractTests
         return values;
     }
 
+    /// <summary>Rounds as publication does, so a test reads the artifact's own precision.</summary>
+    private static double Publish(double value, string propertyName) => Math.Round(
+        value,
+        NEMSweep.CLI.Infrastructure.JsonFile.DecimalPlaces(propertyName),
+        MidpointRounding.AwayFromZero);
+
     private static GenerationCostParameters CreateCostParameters() => new(
         PowerCapacityCost.FromAudPerMwCapacity(0),
         AnnualPowerCapacityCost.FromAudPerMwYear(0),
         GenerationEnergyCost.FromAudPerMwhGenerated(0),
         FuelPrice.FromAudPerGjThermal(0));
 
-    private static GenerationTechnologyProfile CreateTechnologyProfile() => new(
+    private static GenerationTechnologyProfile CreateTechnologyProfile(
+        double emissionsIntensityTonnesPerMwh) => new(
         HeatRate.FromGigajoulesPerMegawattHour(0),
-        technicalLifeYears: 30u);
+        technicalLifeYears: 30u,
+        GenerationEmissionsIntensity.FromTonnesCO2ePerMwhGenerated(
+            emissionsIntensityTonnesPerMwh));
 }

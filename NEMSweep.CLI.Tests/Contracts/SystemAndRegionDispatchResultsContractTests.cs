@@ -134,6 +134,7 @@ public sealed class SystemAndRegionDispatchResultsContractTests
             new ReliabilityBasisDTO(0.002, 0, true, "NEM reliability standard"),
             CreateSizing(),
             CreateCost(),
+            CreateEmissions(),
             new Dictionary<string, double> { ["Solar"] = 165 },
             1.5);
 
@@ -173,6 +174,7 @@ public sealed class SystemAndRegionDispatchResultsContractTests
             new ReliabilityBasisDTO(0.002, 0, true, "NEM reliability standard"),
             CreateSizing(),
             CreateCost(),
+            CreateEmissions(),
             new Dictionary<string, double> { ["Solar"] = 165 },
             "results-nsw1.json",
             "results-nsw1-overview.json");
@@ -199,6 +201,7 @@ public sealed class SystemAndRegionDispatchResultsContractTests
             new ReliabilityBasisDTO(0.002, 0, true, "NEM reliability standard"),
             CreateSizing(),
             CreateCost(),
+            CreateEmissions(),
             new DispatchTopologyDTO(
                 ["NSW1", "VIC1"],
                 [new DispatchTopologyLinkDTO("NSW1->VIC1", "NSW1", "VIC1", 100)]),
@@ -235,7 +238,8 @@ public sealed class SystemAndRegionDispatchResultsContractTests
             CreateMetrics(),
             new ReliabilityBasisDTO(0.002, 0, true, "NEM reliability standard"),
             CreateSizing(),
-            CreateCost());
+            CreateCost(),
+            CreateEmissions());
 
     private static DispatchSourcesDTO CreateSources(string demandFile) =>
         new(
@@ -276,6 +280,34 @@ public sealed class SystemAndRegionDispatchResultsContractTests
             3,
             new EnergyLimitedEvidenceDTO(10, 12, 2, [4, 7]),
             [new StorageSizingPassDTO(1, 100, 25, 5, 2)]);
+
+    [Fact]
+    public void DispatchFleet_RequiresItsEmissionsIntensity()
+    {
+        string json = JsonSerializer.Serialize(
+            new DispatchFleetDTO("Coal", 100, EmissionsIntensityTonnesCO2ePerMwh: 0.771),
+            CamelCaseOptions);
+        string withoutIntensity = json.Replace(
+            ",\"emissionsIntensityTonnesCO2ePerMwh\":0.771",
+            string.Empty,
+            StringComparison.Ordinal);
+
+        var act = () => JsonSerializer.Deserialize<DispatchFleetDTO>(
+            withoutIntensity,
+            CaseInsensitiveOptions);
+
+        withoutIntensity.Should().NotContain("emissionsIntensity");
+        act.Should().Throw<JsonException>();
+    }
+
+    private static DispatchEmissionsDTO CreateEmissions() =>
+        new(
+            420,
+            0.42,
+            [
+                new DispatchGenerationEmissionsContributionDTO("Solar", 0, 0),
+                new DispatchGenerationEmissionsContributionDTO("Coal", 420, 0.42),
+            ]);
 
     private static DispatchCostDTO CreateCost() =>
         new(

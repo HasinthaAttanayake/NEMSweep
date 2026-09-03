@@ -195,7 +195,8 @@ internal static class SweepArtifactExport
             result.DataSeries,
             result.PowerSystem.StorageFleets.Sum(fleet => fleet.PowerCapacityMw),
             result.PowerSystem.StorageFleets.Sum(fleet => fleet.EnergyCapacityMwh),
-            result.Cost);
+            result.Cost,
+            result.Emissions);
     }
 
     public static SweepPointScalarResultsDTO CreateScalars(
@@ -207,7 +208,8 @@ internal static class SweepArtifactExport
             result.DataSeries,
             result.StorageSizing.FinalPowerMw,
             result.StorageSizing.FinalEnergyMwh,
-            result.Cost);
+            result.Cost,
+            result.Emissions);
     }
 
     public static SweepPointScalarResultsDTO CreateScalars(RegionDispatchResultsDTO result)
@@ -218,7 +220,8 @@ internal static class SweepArtifactExport
             result.DataSeries,
             result.PowerSystem.StorageFleets.Sum(fleet => fleet.PowerCapacityMw),
             result.PowerSystem.StorageFleets.Sum(fleet => fleet.EnergyCapacityMwh),
-            result.Cost);
+            result.Cost,
+            result.Emissions);
     }
 
     private static SweepPointScalarResultsDTO CreateScalars(
@@ -226,7 +229,8 @@ internal static class SweepArtifactExport
         DispatchSeriesDTO dataSeries,
         double storagePowerMw,
         double storageEnergyMwh,
-        DispatchCostDTO cost)
+        DispatchCostDTO cost,
+        DispatchEmissionsDTO emissions)
     {
         RenewableShareMetrics renewableShare = RenewableShareMetrics.FromDeliveredEnergy(
             dataSeries.DeliveredGenerationByTechnologyMw.ToDictionary(
@@ -252,6 +256,8 @@ internal static class SweepArtifactExport
             metrics.HoursServedFraction,
             metrics.PeakUnservedPowerMw,
             metrics.CurtailedEnergyMwh,
+            emissions.TotalEmissionsTonnesCO2e,
+            emissions.EmissionsIntensityTonnesCO2ePerMwh,
             cost.TransmissionSlcotAudPerMwh,
             cost.TransmissionCostStatus,
             cost.NetImportedEnergyMwh);

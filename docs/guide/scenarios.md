@@ -92,6 +92,7 @@ An interconnector endpoint must name a region that appears in `regions` (see
 |---|---|---|---|---|
 | `heatRateGjPerMwh` | number | yes | GJ per MWh generated | Fuel consumed per MWh generated. Zero for fuel-free technologies. Combined with `fuelPriceAudPerGj` and `variableOperatingCostAudPerMwh` to derive short-run marginal cost, which sets merit order. |
 | `technicalLifeYears` | integer | yes | years | Technical life used to annuitise capital cost. |
+| `emissionsIntensityTonnesPerMwh` | number | yes | t CO2-e per MWh generated | Operational emissions per MWh generated, on the same gross basis as fuel. Combustion only, not life-cycle. Zero for non-emitting technologies, stated rather than defaulted. |
 
 ### `monthlyCapacityFactors[]`
 
