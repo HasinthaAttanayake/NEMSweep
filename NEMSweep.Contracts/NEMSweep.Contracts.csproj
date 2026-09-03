@@ -1,10 +1,12 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageId>NEMSweep.Contracts</PackageId>
+    <Description>The published artifact contracts for NEMSweep: the DTOs, schema versions and scalar catalogue every NEMSweep result is emitted under, so a consumer reads a run's output against the same definitions that wrote it.</Description>
     <!-- The published docs site is generated from these comments, so a gap is a build break:
          CS1591 a missing comment, CS1572/CS1573 param tags out of step with the signature,
          CS1574 a cross-reference that will not resolve. -->

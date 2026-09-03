@@ -17,6 +17,20 @@ To run without a toolchain, use the container image instead. The rest of this pa
 same commands, same workspace, mounts in place of directories. See
 [Running the container](container.md).
 
+## Install without cloning
+
+If you only want to run NEMSweep, install the published .NET tool rather than building from source:
+
+```bash
+dotnet tool install --global NEMSweep.CLI
+```
+
+Everything below is then `nemsweep <command>` in place of
+`dotnet run --project NEMSweep.CLI -- <command>`, and the workspace is configured with `--data-root`
+and `--output` or their environment variables rather than with a settings file next to a build. To
+build against the framework instead of running it, add the `NEMSweep.Model` and `NEMSweep.Contracts`
+packages to your own project.
+
 ## Clone, build, test
 
 ```bash

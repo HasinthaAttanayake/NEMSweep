@@ -146,10 +146,33 @@ not a dataset.
 Using NEMSweep in published work? [CITATION.cff](CITATION.cff) has the citation metadata.
 Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## Install
+
+The CLI is published to NuGet as a .NET tool, so a machine with the .NET 10 SDK needs neither a
+clone nor a container to run it:
+
+```bash
+dotnet tool install --global NEMSweep.CLI
+```
+
+That installs the `nemsweep` command. The framework and its published artifact contracts are
+packages of their own, for building something else on top of the model rather than running it:
+
+```bash
+dotnet add package NEMSweep.Model
+```
+
+```bash
+dotnet add package NEMSweep.Contracts
+```
+
+Releases are cut by pushing a `v*` tag, which is the version the packages are published at.
+
 ## Local development
 
-There are two ways to run NEMSweep: clone it and build it with the .NET SDK, or run the published
-container image, which needs no toolchain and works under Docker or Podman.
+There are three ways to run NEMSweep: install the tool as above, clone it and build it with the
+.NET SDK, or run the published container image, which needs no toolchain and works under Docker or
+Podman.
 
 The image is published to the GitHub Container Registry as `ghcr.io/<owner>/nemsweep`, where
 `<owner>` is the repository owner. It contains the tool and nothing else: demand, weather and

@@ -28,6 +28,11 @@ jobs:
         diff -u schema/scenario-v6.json scenario.actual.json || fail scenario-v6.json scenario
         diff -u schema/sweep-v1.json sweep.actual.json || fail sweep-v1.json sweep
 
+    # Packing on every change, and throwing the packages away, is what stops a packaging break
+    # being discovered only when a release tag is pushed. Nothing is published from here.
+    - name: Pack
+      run: dotnet pack --configuration Release --output ${{ runner.temp }}/packages
+
   docs:
     runs-on: ubuntu-latest
     steps:
@@ -104,3 +109,48 @@ jobs:
         -p:ContainerRegistry=ghcr.io
         -p:ContainerRepository=${{ github.repository_owner }}/nemsweep
         -p:ContainerImageTags='"latest;${{ github.sha }}"'
+
+  # A release is a `v*` tag, and the tag names the version: nothing in the tree records it, so
+  # cutting a release is a tag push and no commit.
+  #
+  # A tag is not a trusted-code boundary on its own. Anyone who can push a tag can tag any commit,
+  # reviewed or not, and the workflow definition that then runs is the tagged one. Two things stand
+  # between that and the API key. `needs` holds publication behind the same tests, schema diff and
+  # docs build every other change passes, so an unreviewed tag cannot publish by skipping them. And
+  # the key lives in the `nuget` environment rather than in repository secrets, so it is only
+  # readable by a run that a reviewer has approved: configure that environment with required
+  # reviewers and a deployment branch rule limiting it to release tags. A run from a tagged commit
+  # is then visible and approvable rather than automatic.
+  #
+  # Requires a NUGET_API_KEY secret on that environment, scoped to push these package IDs.
+  publish-nuget:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-and-test, docs]
+    runs-on: ubuntu-latest
+    environment: nuget
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Pack at the tagged version
+      env:
+        CI: 'true'
+      run: |
+        set -euo pipefail
+        version="${GITHUB_REF_NAME#v}"
+        dotnet pack --configuration Release -p:Version="$version" --output "${{ runner.temp }}/packages"
+
+    # --skip-duplicate so re-running the job after a partial failure pushes only what is missing
+    # rather than failing on the packages that already landed.
+    - name: Push to nuget.org
+      run: >
+        dotnet nuget push "${{ runner.temp }}/packages/*.nupkg"
+        --source https://api.nuget.org/v3/index.json
+        --api-key ${{ secrets.NUGET_API_KEY }}
+        --skip-duplicate

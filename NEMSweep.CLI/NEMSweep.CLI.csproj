@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -7,6 +7,14 @@
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AssemblyName>nemsweep</AssemblyName>
+    <PackageId>NEMSweep.CLI</PackageId>
+    <Description>The NEMSweep command-line tool: ingest inputs, run a scenario or a sweep, and publish dispatch, cost and emissions artifacts. Installs the `nemsweep` command.</Description>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>nemsweep</ToolCommandName>
+    <!-- A tool package carries an application, not a reference assembly a consumer steps into, and
+         the RID-specific tool packages the container's RuntimeIdentifiers produce have no
+         RID-agnostic symbol payload to pack at all. Symbols stay on the two libraries. -->
+    <IncludeSymbols>false</IncludeSymbols>
     <!-- The published docs site is generated from these comments, so a gap is a build break:
          CS1591 a missing comment, CS1572/CS1573 param tags out of step with the signature,
          CS1574 a cross-reference that will not resolve. -->
@@ -55,7 +63,11 @@
     <EnableSdkContainerSupport>true</EnableSdkContainerSupport>
     <ContainerFamily>noble-chiseled</ContainerFamily>
     <ContainerRepository>hasinthaattanayake/nemsweep</ContainerRepository>
-    <RuntimeIdentifiers>linux-x64;linux-arm64</RuntimeIdentifiers>
+    <!-- Not while packing. The tool package is framework-dependent and runs anywhere the .NET
+         runtime does, but a project that declares runtime identifiers packs a tool that resolves
+         only to those identifiers, which would leave `dotnet tool install` with nothing to run on
+         Windows or macOS. The container publish below still restores the RIDs it needs. -->
+    <RuntimeIdentifiers Condition="'$(_IsPacking)' != 'true'">linux-x64;linux-arm64</RuntimeIdentifiers>
     <ContainerRuntimeIdentifiers>linux-x64;linux-arm64</ContainerRuntimeIdentifiers>
   </PropertyGroup>
 
