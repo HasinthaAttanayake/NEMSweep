@@ -28,6 +28,12 @@ public enum GenerationTechnology
     /// </summary>
     Hydro,
 
+    /// <summary>
+    /// Nuclear thermal generation. Priced by fuel price multiplied by heat rate like the other
+    /// thermal technologies, and not counted as renewable.
+    /// </summary>
+    Nuclear,
+
     /// <summary>Coal-fired thermal generation. Priced by fuel price multiplied by heat rate.</summary>
     Coal,
 
