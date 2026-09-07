@@ -38,7 +38,7 @@ habit from carrying over into a multi-region config.
 | Field | Type | Required | Unit | Meaning |
 |---|---|---|---|---|
 | `schemaVersion` | integer | yes | n/a | Must equal the version reported by `--describe-schema scenario`. |
-| `id` | string | yes | n/a | Scenario identifier. Recorded in each result's provenance. It does not appear in any published path: an ordinary run writes fixed `results*.json` names, and sweep paths are keyed by sweep and point ID. |
+| `id` | string | yes | n/a | Scenario identifier. Reported by `--validate-scenario` and carried on sweep-generated point configs, but **not** written into a dispatch result: neither `results.json` nor `results-{region}.json` records it. It does not appear in any published path either, because an ordinary run writes fixed `results*.json` names and sweep paths are keyed by sweep and point ID. Keep your own note of which config produced a result. |
 | `name` | string | yes | n/a | Human-readable name. |
 | `costBasis` | object | yes | n/a | See [`costBasis`](#costbasis). |
 | `regions` | array of [region](#regions) | yes, at least one | n/a | One entry per NEM region the scenario dispatches. |
@@ -92,7 +92,14 @@ An interconnector endpoint must name a region that appears in `regions` (see
 |---|---|---|---|---|
 | `heatRateGjPerMwh` | number | yes | GJ per MWh generated | Fuel consumed per MWh generated. Zero for fuel-free technologies. Combined with `fuelPriceAudPerGj` and `variableOperatingCostAudPerMwh` to derive short-run marginal cost, which sets merit order. |
 | `technicalLifeYears` | integer | yes | years | Technical life used to annuitise capital cost. |
-| `emissionsIntensityTonnesPerMwh` | number | yes | t CO2-e per MWh generated | Operational emissions per MWh generated, on the same gross basis as fuel. Combustion only, not life-cycle. Zero for non-emitting technologies, stated rather than defaulted. |
+| `emissionsIntensityTonnesPerMwh` | number | yes | t CO2-e per MWh generated | Operational emissions per MWh generated, on the same gross basis as fuel. Combustion only, so not a life-cycle figure. Zero for non-emitting technologies, stated rather than defaulted. This field is an input assumption; the emissions intensity a run publishes is a different quantity, t CO2-e per MWh **served**. |
+
+**Leave `emissionsIntensityTonnesPerMwh` at zero for Solar and Wind.** Emissions are charged on
+available generation, before curtailment, which is exact for the fleets that emit because dispatch
+constrains off only Solar and Wind. A non-zero intensity on either of those two therefore charges
+the scenario for output that was constrained off and never released anything. Nothing in validation
+stops you: the field is yours to set, and this is the one value where a plausible-looking number is
+wrong. [Emissions](../concepts/economics.md#emissions) covers the basis.
 
 ### `monthlyCapacityFactors[]`
 

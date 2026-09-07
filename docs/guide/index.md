@@ -79,9 +79,30 @@ point outside the repository. `dataRoot` and `outputRoot` can also be overridden
 `--data-root` and `--output`, or with `NEMSWEEP_DATA_ROOT` and `NEMSWEEP_OUTPUT`; the
 [CLI reference](cli.md#the-workspace) covers the precedence.
 
-The committed `appsettings.example.json` points `dataRoot` at the published example artifacts, and
-`outputRoot` at a gitignored `out/`. A fresh clone therefore runs without configuration, and your
-results land where they do not disturb the published ones.
+`outputRoot` in the committed `appsettings.example.json` is a gitignored `out/`, so your results
+land where they do not disturb published ones. `dataRoot` is the setting you have to supply:
+the example still points it at `NEMSweep.Web/wwwroot/data`, a path the repository no longer
+contains, and the demand and weather artifacts are not carried here in any case. Set it to wherever
+you ingest them, or pass `--data-root` per run.
+
+## Ingest the input artifacts
+
+A scenario reads a `demand-{region}.json` and a `weather-{region}.json` per region, plus
+`generation-information.json`. Those are produced, not committed: you assemble an
+[input bundle](input-bundles.md) of upstream AEMO demand archives, an AEMO Generation Information
+workbook and EnergyPlus Weather files, then run
+
+```bash
+dotnet run --project NEMSweep.CLI -- --validate-inputs
+```
+
+```bash
+dotnet run --project NEMSweep.CLI -- --ingest
+```
+
+`--validate-inputs` writes nothing and reports what it found. `--ingest` runs the same checks and
+then writes the artifacts into the data root. [Input bundles](input-bundles.md) covers the bundle
+shape, the manifest, and which upstream file supplies what.
 
 ## Run your first scenario
 

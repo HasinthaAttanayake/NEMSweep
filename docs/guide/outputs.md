@@ -93,6 +93,26 @@ records the same for the sweep as a whole. Digests pin the bytes a run consumed,
 result is a manual step, so without the commit a file copied somewhere else could not say which
 version of the model read them.
 
+### Citing a run
+
+Cite the run, not just the tool. "Modelled with NEMSweep" cannot be checked by anyone; a version, a
+commit and a scenario can be. The paste-ready form:
+
+```text
+Modelled with NEMSweep <version> at commit <commit>, scenario <scenario config>, run <runId>.
+https://github.com/HasinthaAttanayake/NEMSweep
+```
+
+`nemsweep --version` reports the version, and `provenance.gitCommitSha` and `runId` on the result
+supply the commit and the run. The scenario config is the one field you have to carry yourself: a
+dispatch result records no scenario identifier, so note which file you ran at the time you run it.
+A sweep is better placed, because its index provenance lists the baseline scenario config by path
+and SHA-256 under the `baseline-scenario-config` purpose.
+[CITATION.cff](https://github.com/HasinthaAttanayake/NEMSweep/blob/main/CITATION.cff) carries the
+citation metadata for the software itself.
+
+### Which commit is recorded
+
 The commit is the one the binary was built at, stamped in by its build, not whatever commit the
 directory you ran from happens to be standing on. That distinction matters once the CLI is installed
 or run as a container, where the two are unrelated. The dirty flag is only ever true when the run
@@ -159,7 +179,8 @@ use the site's publication workflow when you intend to update it, and let ordina
 own directory the rest of the time.
 
 **That set is an illustrative example, not a dataset.** It is one FY2026 run and one sweep, retained
-so the site has something to show and so a clone runs without first sourcing upstream data. The
+so the site has something to show. It is not carried in this repository, so a clone sources its own
+upstream data and runs `--ingest` before it can reproduce a run. The
 provenance block on it is real, which is exactly why it is worth saying plainly: a demo carrying
 input digests and a commit can read as more authoritative than it is. Run your own scenario before
 quoting a figure, and see [DATA-LICENSE.md](https://github.com/HasinthaAttanayake/NEMSweep/blob/main/DATA-LICENSE.md)

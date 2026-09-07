@@ -1,11 +1,22 @@
 # NEMSweep
 
-NEMSweep is a deterministic engine for grid dispatch, reliability assessment, storage sizing and
-system cost. You describe a set of regions, each with its demand, generation and storage, and a
-reliability standard. The engine dispatches them in merit order for every hour of the modelled
-period, grows battery storage in the regions that miss the standard, and reports the technical and
-economic result. It is written for analysts building or scrutinising an energy-system policy or
-investment case, who will quote its numbers in their own work.
+NEMSweep is a free, open-source tool that checks whether a proposed electricity grid could have met
+a full year of real demand hour by hour, works out how much storage it would take if it couldn't,
+and tells you what that costs.
+
+Repository: <https://github.com/HasinthaAttanayake/NEMSweep>. Licence: [BSD-3-Clause](LICENSE.md).
+
+NEMSweep ships with no numbers of its own. Every cost, every carbon intensity, every demand trace
+and every weather year is supplied by whoever runs it. The model does the accounting. The
+assumptions belong to the person who supplies them.
+
+Underneath that sentence is a deterministic engine for grid dispatch, reliability assessment,
+storage sizing, system cost and emissions accounting. You describe a set of regions, each with its
+demand, generation and storage, and a reliability standard. The engine dispatches them in merit
+order for every hour of the modelled period, grows battery storage in the regions that miss the
+standard, and reports the technical and economic result. It is written for analysts building or
+scrutinising an energy-system policy or investment case, who will quote its numbers in their own
+work.
 
 The engine does not hardcode a region list or couple to AEMO: region identifiers are free-form
 strings. Its grid model runs on a fixed one-hour timestep, and sub-hourly input is resampled to it.
@@ -45,7 +56,12 @@ Given a realised system and a reliability standard, the framework:
   limit;
 - costs the build and operation of the resulting system and divides annualised cost by energy
   served (demand minus unserved energy) to give a system levelised cost of electricity (SLCoE), in
-  AUD per MWh.
+  AUD per MWh;
+- accounts operational combustion emissions from that same dispatch, on gross generated energy, and
+  divides them by the same energy-served denominator to give an emissions intensity in t CO2-e per
+  MWh served. The per-technology intensity a scenario supplies is an input assumption in t CO2-e per
+  MWh generated; the published intensity is an output per MWh served. Combustion only, so not a
+  life-cycle figure.
 
 Only battery capacity is sized. Pumped hydro is fixed at whatever the scenario declares.
 
@@ -140,10 +156,24 @@ takes to embed them.
 
 The data is not covered by that licence. The demand, generation and weather artifacts derive from
 AEMO and EnergyPlus Weather sources with their own terms. Read [DATA-LICENSE.md](DATA-LICENSE.md)
-before redistributing any of it. The artifacts this repository carries are an illustrative example,
-not a dataset.
+before redistributing any of it. This repository carries none of them: the artifacts published
+alongside the results site are an illustrative example, not a dataset.
 
-Using NEMSweep in published work? [CITATION.cff](CITATION.cff) has the citation metadata.
+Using NEMSweep in published work? [CITATION.cff](CITATION.cff) carries the citation metadata. Cite
+the run rather than the tool, because a result is reproducible only against a specific version,
+commit and scenario:
+
+```text
+Modelled with NEMSweep <version> at commit <commit>, scenario <scenario config>, run <runId>.
+https://github.com/HasinthaAttanayake/NEMSweep
+```
+
+`nemsweep --version` reports the version, and every result carries `provenance.gitCommitSha`, the
+commit the binary was built from, and `runId`. The scenario config is yours to record: a dispatch
+result does not name the file it was configured from.
+[Outputs and provenance](docs/guide/outputs.md#provenance-and-reproducibility) covers the block
+those fields sit in.
+
 Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Install
@@ -204,11 +234,15 @@ dotnet run --project NEMSweep.CLI -- --help
 
 Copy `NEMSweep.CLI/appsettings.example.json` to `NEMSweep.CLI/appsettings.local.json` for
 machine-local input and output paths. The local file is ignored by Git, and the example is the
-fallback when it is absent, so a fresh clone runs without configuring anything.
+fallback when it is absent. Set `dataRoot` in your local file to wherever `--ingest` wrote its
+artifacts: the committed example still points at a path the repository no longer contains, so a
+fresh clone will not run a scenario until you supply a data root.
 
-A run reads its inputs from a data root and writes results to an output root. The committed example
-reads the artifacts this repository already carries and writes to a gitignored `out/`, so an
-ordinary run never disturbs the published results. Override either per run:
+A run reads its inputs from a data root and writes results to an output root. The demand, weather
+and generation artifacts a scenario reads are not carried in this repository: assemble an
+[input bundle](docs/guide/input-bundles.md) from upstream sources and run `--ingest` to produce
+them, then point the data root at where they landed. The output root defaults to a gitignored
+`out/`, so an ordinary run never disturbs published results. Override either per run:
 
 ```bash
 dotnet run --project NEMSweep.CLI -- --run-scenario --output ./my-study

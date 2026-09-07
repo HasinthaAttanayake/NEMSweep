@@ -1,8 +1,13 @@
 cff-version: 1.2.0
 title: NEMSweep
 message: >-
-  If you use NEMSweep in work you publish, please cite it. Citation is how a
-  method gets scrutinised rather than just used.
+  If you use NEMSweep in work you publish, please cite the run rather than the
+  tool: "Modelled with NEMSweep <version> at commit <commit>, scenario <scenario
+  config>, run <runId>." A result is reproducible only against a specific
+  version, commit and scenario. `nemsweep --version` reports the version and the
+  result carries `provenance.gitCommitSha` and `runId`, but no dispatch result
+  records which scenario config produced it, so name that file yourself.
+  Citation is how a method gets scrutinised rather than just used.
 type: software
 authors:
   - given-names: Hasintha
@@ -10,13 +15,16 @@ authors:
 repository-code: 'https://github.com/HasinthaAttanayake/NEMSweep'
 url: 'https://www.nemsweep.com/'
 abstract: >-
-  An hourly grid dispatch model for Australia's National Electricity Market.
-  Regions are described with their demand, generation assets and storage, then
-  dispatched hour by hour across a modelled year; where a declared reliability
-  standard is not met, storage is grown until it is met or the search reports
-  what stopped it. Deterministic: the same inputs at the same commit reproduce
-  every modelled value, and every result records the SHA-256 of the input bytes
-  it was built from.
+  An hourly grid dispatch, storage sizing, cost and emissions model for
+  electricity systems. Region identifiers are free-form, and the published
+  example is Australia's National Electricity Market. Regions are described with
+  their demand, generation assets and storage, then dispatched hour by hour
+  across a modelled year; where a declared reliability standard is not met,
+  storage is grown until it is met or the search reports what stopped it. The
+  model holds no cost, demand, weather or carbon figures of its own: every one
+  of them is supplied by whoever runs it. Deterministic: the same inputs at the
+  same commit reproduce every modelled value, and every result records the
+  SHA-256 of the input bytes it was built from.
 keywords:
   - electricity
   - National Electricity Market
@@ -24,6 +32,7 @@ keywords:
   - energy systems
   - renewable energy
   - storage sizing
+  - emissions
   - Australia
 license: BSD-3-Clause
 # There is no DOI, and that is a decision rather than an omission. Minting one
