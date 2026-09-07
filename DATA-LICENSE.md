@@ -20,7 +20,8 @@ If you are redistributing NEMSweep, the code is straightforward. If you are redi
 ### Operational demand
 
 Derived from AEMO's actual operational demand half-hourly archives, published on AEMO's NEMWeb.
-Ingested by `--ingest` into `demand-{region}.json`.
+Ingested by `--ingest` into `demand-{region}.json`. The bundle behind the published example uses the
+weekly archives covering 1 July 2025 to 30 June 2026, the 2026 Australian financial year.
 
 AEMO publishes this data under its own terms of use. Those terms govern reuse and redistribution,
 and they are not compatible-by-default with an open-source code licence. Read AEMO's current
@@ -29,14 +30,17 @@ copyright and data-use statements before redistributing the archives or artifact
 ### Generation information
 
 Derived from AEMO's Generation Information workbook, which lists existing and committed generating
-unit capacity, technology and status. Ingested into `generation-information.json`.
+unit capacity, technology and status. Ingested into `generation-information.json`. The bundle behind
+the published example uses the April 2026 edition of the workbook.
 
 Same position as demand: AEMO's terms apply to the workbook and to what is derived from it.
 
 ### Weather
 
 Derived from EnergyPlus Weather (EPW) files, the standard hourly weather format used by building and
-energy simulation tools. Ingested into `weather-{region}.json`.
+energy simulation tools. Ingested into `weather-{region}.json`. The bundle behind the published
+example uses TMYx typical-year files assembled over the 2011 to 2025 period of record, one site per
+role per region.
 
 EPW files are assembled from national meteorological sources and are distributed under the terms of
 whoever compiled and published the particular file. Those terms vary by source and by site, and some
@@ -44,12 +48,14 @@ prohibit redistribution. Check the terms attached to the specific files you use.
 
 ## What this repository redistributes
 
-The published artifacts are ingested derivatives of the above, retained so the results site has
-something to display and so a clone can run without first sourcing upstream data. **They are an
-illustrative example, not a dataset**, and they are not offered under the code licence.
+Nothing. Neither the raw source files nor the ingested artifacts derived from them are committed
+here. The input bundle is gitignored, because it is large and because it is third-party material you
+fetch yourself, and the ingested demand, weather and generation artifacts are produced by `--ingest`
+into a data root you choose.
 
-Raw source files are not committed. The input bundle they are ingested from is gitignored, because
-it is large and because it is third-party material you fetch yourself.
+The artifacts published alongside the results site are ingested derivatives of the above, retained
+so the site has something to display. **They are an illustrative example, not a dataset**, and they
+are not offered under the code licence.
 
 ## If you are building your own
 

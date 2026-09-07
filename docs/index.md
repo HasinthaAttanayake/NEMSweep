@@ -9,7 +9,14 @@ system cost. You describe a set of regions, each with its demand, generation and
 reliability standard. The engine dispatches them in merit order for every hour of the modelled
 period, grows battery storage in the regions that miss the standard, and reports the technical and
 economic result: what was generated, what was curtailed, what was left unserved, how much battery
-capacity the system needed, and the system levelised cost of electricity (SLCoE) in AUD per MWh.
+capacity the system needed, the system levelised cost of electricity (SLCoE) in AUD per MWh, and the
+operational emissions intensity in t CO2-e per MWh served.
+
+NEMSweep ships with no numbers of its own. Every cost, every carbon intensity, every demand trace
+and every weather year is supplied by whoever runs it. The model does the accounting. The
+assumptions belong to the person who supplies them, which is why
+[Scenario parameters](assumptions/scenario-parameters.md) treats the committed example's economics
+as one person's claims rather than a reference case.
 
 ## The three layers
 
