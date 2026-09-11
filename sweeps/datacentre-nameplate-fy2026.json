@@ -417,7 +417,7 @@
     {
       "pointId": "p15",
       "axisValue": 7500,
-      "label": "+7,500 MW (committed pipeline)",
+      "label": "+7,500 MW",
       "overrides": {
         "regions": [
           {

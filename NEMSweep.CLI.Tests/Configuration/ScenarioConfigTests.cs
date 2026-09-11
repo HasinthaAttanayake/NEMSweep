@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using AwesomeAssertions;
 using NEMSweep.CLI.Configuration;
+using NEMSweep.Contracts;
 
 namespace NEMSweep.CLI.Tests.Configuration;
 
@@ -261,22 +262,18 @@ public sealed class ScenarioConfigTests
             .WithMessage("*NSW1*Coal*emissionsIntensityTonnesPerMwh*");
     }
 
-    /// <summary>
-    /// A real file written for the previous schema is missing what this one requires, so the
-    /// version has to be checked before deserialisation or the reader is told about a property
-    /// rather than about the version their whole file predates.
-    /// </summary>
     [Fact]
-    public void Load_ReportsTheVersionForAPreviousSchemaFileMissingANewlyRequiredField()
+    public void Load_UpgradesVersion5ByAddingTheLegacyZeroEmissionsIntensity()
     {
-        var act = () => Load(config =>
+        ScenarioSettings scenario = Load(config =>
         {
             config["schemaVersion"] = 5;
             GeneratingProfile(config).Remove("emissionsIntensityTonnesPerMwh");
         });
 
-        act.Should().Throw<FormatException>()
-            .WithMessage("*found 5*expected 6*");
+        scenario.SchemaVersion.Should().Be(ArtifactSchemaVersions.ScenarioConfig);
+        scenario.Regions.Single().GeneratingFleets.Single().TechnologyProfile
+            .EmissionsIntensityTonnesPerMwh.Should().Be(0);
     }
 
     [Fact]

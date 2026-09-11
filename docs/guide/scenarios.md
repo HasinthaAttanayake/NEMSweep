@@ -20,6 +20,11 @@ Run that to see the exact `schemaVersion` the installed CLI accepts, and to vali
 before you run it. This page does not repeat that number, because it changes independently of the
 documentation.
 
+The CLI also upgrades the immediately preceding scenario schema where its omitted field has a
+defined legacy meaning. The current compatibility upgrade adds a zero operational-emissions
+intensity to generation profiles from the pre-emissions schema, preserving that version's
+behavior. Other older schemas are rejected rather than guessed at.
+
 ## How the file is read
 
 Deserialisation is strict: `additionalProperties` is `false` throughout the schema, and the CLI
