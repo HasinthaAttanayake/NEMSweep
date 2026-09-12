@@ -38,10 +38,10 @@ Each schema's `$id` is that same versioned URL, which is what keeps a later vers
 with this one in a tool that caches schemas by identity.
 
 Superseded files stay in the repository, frozen, for exactly that reason: a file pinned to
-`scenario-v5.json` keeps validating in an editor rather than resolving to a 404. It will not load,
-because the CLI accepts only the current version and says so by number, but a reader is then
-looking at a version mismatch rather than at a broken editor. Only the current schema is
-regenerated and diffed by CI.
+`scenario-v5.json` keeps validating in an editor rather than resolving to a 404. The CLI upgrades
+schema 5 to the current format by adding the explicit zero emissions intensity that preserves its
+pre-emissions behavior. Older schemas still fail by version number rather than looking like a
+broken editor. Only the current schema is regenerated and diffed by CI.
 
 `--describe-schema scenario` and `--describe-schema sweep` still print the same documents to
 standard output, which is the route to take when you want the schema without a network round trip,

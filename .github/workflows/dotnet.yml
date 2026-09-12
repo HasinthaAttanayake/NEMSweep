@@ -113,16 +113,10 @@ jobs:
   # A release is a `v*` tag, and the tag names the version: nothing in the tree records it, so
   # cutting a release is a tag push and no commit.
   #
-  # A tag is not a trusted-code boundary on its own. Anyone who can push a tag can tag any commit,
-  # reviewed or not, and the workflow definition that then runs is the tagged one. Two things stand
-  # between that and the API key. `needs` holds publication behind the same tests, schema diff and
-  # docs build every other change passes, so an unreviewed tag cannot publish by skipping them. And
-  # the key lives in the `nuget` environment rather than in repository secrets, so it is only
-  # readable by a run that a reviewer has approved: configure that environment with required
-  # reviewers and a deployment branch rule limiting it to release tags. A run from a tagged commit
-  # is then visible and approvable rather than automatic.
-  #
-  # Requires a NUGET_API_KEY secret on that environment, scoped to push these package IDs.
+  # NuGet trusted publishing exchanges this job's short-lived GitHub OIDC token for a temporary
+  # one-hour NuGet API key. Register a NuGet trusted-publishing policy for this repository and
+  # workflow file (`dotnet.yml`), restricted to the `nuget` environment. The environment retains
+  # required reviewers and a deployment branch rule for release tags, so a tag alone cannot publish.
   publish-nuget:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [build-and-test, docs]
@@ -130,6 +124,7 @@ jobs:
     environment: nuget
     permissions:
       contents: read
+      id-token: write
     steps:
     - uses: actions/checkout@v4
 
@@ -146,11 +141,18 @@ jobs:
         version="${GITHUB_REF_NAME#v}"
         dotnet pack --configuration Release -p:Version="$version" --output "${{ runner.temp }}/packages"
 
+    - name: Log in to NuGet with trusted publishing
+      uses: NuGet/login@v1
+      id: nuget-login
+      with:
+        # This is the NuGet.org profile name, not an email address or API key.
+        user: ${{ secrets.NUGET_USER }}
+
     # --skip-duplicate so re-running the job after a partial failure pushes only what is missing
     # rather than failing on the packages that already landed.
     - name: Push to nuget.org
       run: >
         dotnet nuget push "${{ runner.temp }}/packages/*.nupkg"
         --source https://api.nuget.org/v3/index.json
-        --api-key ${{ secrets.NUGET_API_KEY }}
+        --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
         --skip-duplicate

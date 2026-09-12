@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -26,12 +27,9 @@ internal static class ScenarioConfig
             throw new JsonException("Scenario input fields must be defined on each region.");
         }
 
-        // The schema version is read before deserialising, not after. A file written for an older
-        // schema is missing whatever the newer one requires, so deserialising first would report a
-        // missing property where the honest answer is that the whole file predates this version.
-        RequireCurrentSchemaVersion(document.RootElement);
+        byte[] currentSchemaContents = UpgradeVersion5(contents, document.RootElement);
 
-        ScenarioSettings scenario = JsonFile.ReadConfig<ScenarioSettings>(contents)
+        ScenarioSettings scenario = JsonFile.ReadConfig<ScenarioSettings>(currentSchemaContents)
             ?? throw new FormatException("Scenario config is empty.");
         Validate(scenario);
         return scenario;
@@ -52,22 +50,124 @@ internal static class ScenarioConfig
             sizing.MaximumPasses);
     }
 
-    /// <summary>
-    /// Reports a schema-version mismatch from the raw document, before deserialisation can fail on
-    /// a property the file's own schema version never had.
-    /// </summary>
-    private static void RequireCurrentSchemaVersion(JsonElement root)
+    /// <summary>Upgrades the one supported legacy scenario format to the current format.</summary>
+    private static byte[] UpgradeVersion5(byte[] contents, JsonElement root)
     {
-        if (!root.TryGetProperty("schemaVersion", out JsonElement version)
+        if (!TryGetPropertyIgnoreCase(root, "schemaVersion", out JsonElement version)
             || version.ValueKind != JsonValueKind.Number
             || !version.TryGetInt32(out int declared))
         {
-            // Absent or malformed: leave it to deserialisation and Validate, which report the
-            // property itself rather than guessing at a version.
-            return;
+            return contents;
         }
 
-        RequireCurrentSchemaVersion(declared);
+        if (declared == ArtifactSchemaVersions.ScenarioConfig)
+        {
+            return contents;
+        }
+
+        if (declared != 5)
+        {
+            throw new FormatException(
+                $"Scenario config schema version found {declared}; "
+                + $"expected {ArtifactSchemaVersions.ScenarioConfig}.");
+        }
+
+        JsonObject scenario = JsonNode.Parse(contents)?.AsObject()
+            ?? throw new FormatException("Scenario config is empty.");
+        if (TryGetPropertyIgnoreCase(scenario, "regions", out JsonNode? regionsNode)
+            && regionsNode is JsonArray regions)
+        {
+            foreach (JsonNode? regionNode in regions)
+            {
+                if (regionNode is not JsonObject region
+                    || !TryGetPropertyIgnoreCase(region, "generatingFleets", out JsonNode? fleetsNode)
+                    || fleetsNode is not JsonArray fleets)
+                {
+                    continue;
+                }
+
+                foreach (JsonNode? fleetNode in fleets)
+                {
+                    if (fleetNode is JsonObject fleet
+                        && TryGetPropertyIgnoreCase(
+                            fleet,
+                            "technologyProfile",
+                            out JsonNode? profileNode)
+                        && profileNode is JsonObject profile)
+                    {
+                        if (TryGetPropertyIgnoreCase(
+                            profile,
+                            "emissionsIntensityTonnesPerMwh",
+                            out _))
+                        {
+                            throw new FormatException(
+                                "Scenario config schema version 5 must not define "
+                                + "'emissionsIntensityTonnesPerMwh'.");
+                        }
+
+                        // Schema 5 predated operational-emissions accounting, so zero is the
+                        // legacy model's exact behavior rather than a guessed emissions value.
+                        profile["emissionsIntensityTonnesPerMwh"] = 0d;
+                    }
+                }
+            }
+        }
+
+        SetPropertyIgnoreCase(scenario, "schemaVersion", ArtifactSchemaVersions.ScenarioConfig);
+        return Encoding.UTF8.GetBytes(JsonFile.SerializeExact(scenario));
+    }
+
+    private static bool TryGetPropertyIgnoreCase(
+        JsonElement element,
+        string propertyName,
+        out JsonElement value)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (JsonProperty property in element.EnumerateObject())
+            {
+                if (string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase))
+                {
+                    value = property.Value;
+                    return true;
+                }
+            }
+        }
+
+        value = default;
+        return false;
+    }
+
+    private static bool TryGetPropertyIgnoreCase(
+        JsonObject json,
+        string propertyName,
+        out JsonNode? value)
+    {
+        foreach (KeyValuePair<string, JsonNode?> property in json)
+        {
+            if (string.Equals(property.Key, propertyName, StringComparison.OrdinalIgnoreCase))
+            {
+                value = property.Value;
+                return true;
+            }
+        }
+
+        value = null;
+        return false;
+    }
+
+    private static void SetPropertyIgnoreCase(JsonObject json, string propertyName, JsonNode? value)
+    {
+        foreach (KeyValuePair<string, JsonNode?> property in json)
+        {
+            if (string.Equals(property.Key, propertyName, StringComparison.OrdinalIgnoreCase))
+            {
+                json[property.Key] = value;
+                return;
+            }
+        }
+
+        json[propertyName] = value;
     }
 
     private static void RequireCurrentSchemaVersion(int declared)
