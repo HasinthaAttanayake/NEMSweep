@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using AwesomeAssertions;
 using NEMSweep.CLI.Configuration;
+using NEMSweep.Contracts;
 
 namespace NEMSweep.CLI.Tests.Configuration;
 
@@ -261,22 +262,47 @@ public sealed class ScenarioConfigTests
             .WithMessage("*NSW1*Coal*emissionsIntensityTonnesPerMwh*");
     }
 
-    /// <summary>
-    /// A real file written for the previous schema is missing what this one requires, so the
-    /// version has to be checked before deserialisation or the reader is told about a property
-    /// rather than about the version their whole file predates.
-    /// </summary>
     [Fact]
-    public void Load_ReportsTheVersionForAPreviousSchemaFileMissingANewlyRequiredField()
+    public void Load_UpgradesVersion5ByAddingTheLegacyZeroEmissionsIntensity()
     {
-        var act = () => Load(config =>
+        ScenarioSettings scenario = Load(config =>
         {
             config["schemaVersion"] = 5;
             GeneratingProfile(config).Remove("emissionsIntensityTonnesPerMwh");
         });
 
+        scenario.SchemaVersion.Should().Be(ArtifactSchemaVersions.ScenarioConfig);
+        scenario.Regions.Single().GeneratingFleets.Single().TechnologyProfile
+            .EmissionsIntensityTonnesPerMwh.Should().Be(0);
+    }
+
+    [Fact]
+    public void Load_UpgradesVersion5WithCaseInsensitivePropertyNames()
+    {
+        ScenarioSettings scenario = Load(config =>
+        {
+            Rename(config, "schemaVersion", "SchemaVersion");
+            config["SchemaVersion"] = 5;
+            Rename(config, "regions", "Regions");
+            JsonObject region = config["Regions"]![0]!.AsObject();
+            Rename(region, "generatingFleets", "GeneratingFleets");
+            JsonObject fleet = region["GeneratingFleets"]![0]!.AsObject();
+            Rename(fleet, "technologyProfile", "TechnologyProfile");
+            fleet["TechnologyProfile"]!.AsObject().Remove("emissionsIntensityTonnesPerMwh");
+        });
+
+        scenario.SchemaVersion.Should().Be(ArtifactSchemaVersions.ScenarioConfig);
+        scenario.Regions.Single().GeneratingFleets.Single().TechnologyProfile
+            .EmissionsIntensityTonnesPerMwh.Should().Be(0);
+    }
+
+    [Fact]
+    public void Load_RejectsSchemaVersion5ThatDefinesEmissionsIntensity()
+    {
+        var act = () => Load(config => config["schemaVersion"] = 5);
+
         act.Should().Throw<FormatException>()
-            .WithMessage("*found 5*expected 6*");
+            .WithMessage("*schema version 5*emissionsIntensityTonnesPerMwh*");
     }
 
     [Fact]
@@ -321,6 +347,7 @@ public sealed class ScenarioConfigTests
             }]
           }]
         }
+
         """)!.AsObject();
         mutate(config);
         string path = Path.Combine(Path.GetTempPath(), $"scenario-{Guid.NewGuid():N}.json");
@@ -333,6 +360,13 @@ public sealed class ScenarioConfigTests
         {
             File.Delete(path);
         }
+    }
+
+    private static void Rename(JsonObject json, string oldName, string newName)
+    {
+        JsonNode? value = json[oldName];
+        json.Remove(oldName);
+        json[newName] = value;
     }
 
     private static void AddVicRegion(JsonObject config)

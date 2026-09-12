@@ -27,6 +27,18 @@ under the **data root**. Both are yours to choose; see the
 Read `NEMSweep.CLI/Scenarios/DispatchResultsExport.cs` and `NEMSweep.CLI/Scenarios/SweepArtifactExport.cs` if
 you need the exact shape beyond what this page covers.
 
+### Rerunning one published sweep point
+
+Each point config is a complete resolved scenario, so it is sufficient to rerun that point: use
+the matching NEMSweep version, the point's config, and access to the demand and weather artifacts
+it names. No baseline scenario or sweep definition is needed to rerun an individual point.
+
+The data root is deliberately external to the configuration and can change or disappear. Results
+still record each consumed demand and weather artifact's filename, schema version, and SHA-256
+digest, while demand artifacts retain descriptive archive filenames. NEMSweep does not bundle the
+inputs or reconstruct their upstream retrieval history; a rerun against different input artifact
+bytes is a different run and can produce different results.
+
 ## Schema versions
 
 Every artifact carries a `schemaVersion` field, and the current value for each artifact type is
