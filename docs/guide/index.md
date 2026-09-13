@@ -19,17 +19,27 @@ same commands, same workspace, mounts in place of directories. See
 
 ## Install without cloning
 
-If you only want to run NEMSweep, install the published .NET tool rather than building from source:
+If you only want to run NEMSweep, install the published
+[NEMSweep.CLI](https://www.nuget.org/packages/NEMSweep.CLI) .NET tool rather than building from
+source. Pin the version you want to reproduce:
 
 ```bash
-dotnet tool install --global NEMSweep.CLI
+dotnet tool install --global NEMSweep.CLI --version 0.1.0
 ```
 
 Everything below is then `nemsweep <command>` in place of
 `dotnet run --project NEMSweep.CLI -- <command>`, and the workspace is configured with `--data-root`
 and `--output` or their environment variables rather than with a settings file next to a build. To
 build against the framework instead of running it, add the `NEMSweep.Model` and `NEMSweep.Contracts`
-packages to your own project.
+packages to your own project:
+
+```bash
+dotnet add package NEMSweep.Model --version 0.1.0
+dotnet add package NEMSweep.Contracts --version 0.1.0
+```
+
+Use the same package version for both references. Later releases are opt-in: replace `0.1.0` only
+when you intend to upgrade, then rerun your tests and scenario validation.
 
 ## Clone, build, test
 
