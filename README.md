@@ -179,24 +179,35 @@ Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Install
 
 The CLI is published to NuGet as a .NET tool, so a machine with the .NET 10 SDK needs neither a
-clone nor a container to run it:
+clone nor a container to run it. The examples pin the first release; substitute a later version
+when you deliberately upgrade:
 
 ```bash
-dotnet tool install --global NEMSweep.CLI
+dotnet tool install --global NEMSweep.CLI --version 0.1.0
 ```
 
 That installs the `nemsweep` command. The framework and its published artifact contracts are
-packages of their own, for building something else on top of the model rather than running it:
+packages of their own, for building something else on top of the model rather than running it.
+They are published as [NEMSweep.Model](https://www.nuget.org/packages/NEMSweep.Model),
+[NEMSweep.Contracts](https://www.nuget.org/packages/NEMSweep.Contracts), and
+[NEMSweep.CLI](https://www.nuget.org/packages/NEMSweep.CLI):
 
 ```bash
-dotnet add package NEMSweep.Model
+dotnet add package NEMSweep.Model --version 0.1.0
 ```
 
 ```bash
-dotnet add package NEMSweep.Contracts
+dotnet add package NEMSweep.Contracts --version 0.1.0
 ```
 
-Releases are cut by pushing a `v*` tag, which is the version the packages are published at.
+Update an installed CLI explicitly:
+
+```bash
+dotnet tool update --global NEMSweep.CLI --version 0.1.0
+```
+
+Releases are cut by pushing a `v*` tag, which is the version the packages are published at through
+NuGet trusted publishing.
 
 ## Local development
 

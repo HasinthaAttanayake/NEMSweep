@@ -9,10 +9,10 @@ framework's, and the CLI resamples half-hourly demand to it.
 by zero to three positional arguments, matched by a pattern in
 `NEMSweep.CLI/Application/CommandRouter.cs`. This page documents every command it routes.
 
-Install it as a .NET tool, which puts `nemsweep` on your path:
+Install the version you want to reproduce as a .NET tool, which puts `nemsweep` on your path:
 
 ```bash
-dotnet tool install --global NEMSweep.CLI
+dotnet tool install --global NEMSweep.CLI --version 0.1.0
 ```
 
 From a clone, the equivalent of every `nemsweep` invocation below is
@@ -346,4 +346,3 @@ paths are relative to your current working directory unless they are absolute. W
 `weather-{region}.json` (the region is lower-cased in the file name) under the data root, and prints
 the provenance report, the daylight DNI source shares and their total, and a count of each series
 constructed.
-
