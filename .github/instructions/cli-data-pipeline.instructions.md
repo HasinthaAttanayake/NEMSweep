@@ -20,7 +20,12 @@ applyTo: ["NEMSweep.CLI/**", "NEMSweep.CLI.Tests/**"]
   from the command boundary.
 - Test parsers with small synthetic fixtures and temporary files. Add contract
   tests when an exporter or generated JSON shape changes.
-- Regenerate the published artifacts with
-  `dotnet run --project .\NEMSweep.CLI\NEMSweep.CLI.csproj -- --run-scenario --output .\published-data`
-  after changing its producer or committed inputs. Without `--output` a run writes to
-  `out/` and leaves the published artifacts untouched.
+- Keep portable core demand/weather ingestion separate from legacy NEM generation
+  history. Scenario fleets, not historical workbooks, determine simulated assets.
+- Preserve original region identity in contracts; use the shared filename mapping
+  rather than inserting free-form region IDs into paths.
+- Fixed-fleet execution must preserve declared capacity and emit no sizing
+  evidence. Preserve legacy automatic sizing through version-aware migration.
+- Regenerate affected artifacts with the CLI producer into an isolated output
+  directory for validation. Publishing versioned artifacts requires coordinated
+  consumer support; do not hand-edit generated JSON or publish incompatible data.

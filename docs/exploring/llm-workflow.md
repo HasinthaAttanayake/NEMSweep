@@ -12,7 +12,7 @@ NEMSweep publishes that contract deliberately. This page is how to hand it over.
 Three properties make NEMSweep unusually safe to point a language model at:
 
 - **The schemas are machine-readable and self-describing.** `--describe-schema` emits JSON Schema
-  (draft 2020-12) for both input formats, generated from the same constants the validator enforces,
+  (draft 2020-12) for the current input formats, generated from the same constants the validator enforces,
   so the published schema cannot drift from what the tool accepts.
 - **Validation is strict and early.** Deserialisation rejects unknown properties rather than
   ignoring them, and both `--fan-out-sweep` and `--run-sweep` validate every generated config before
@@ -39,16 +39,15 @@ dotnet run --project NEMSweep.CLI -- --describe-schema scenario
 dotnet run --project NEMSweep.CLI -- --describe-schema sweep
 ```
 
-These are the authoritative field contracts. Paste both into context. Do not paraphrase them:
+These are the authoritative current scenario and sweep contracts. Paste both into context. For a new portable bundle, also supply `--describe-schema manifest`, `demand` and `weather`; those define raw inputs and derived artifacts. Do not paraphrase contracts:
 paraphrase is where field names get invented.
 
 They are also committed, so a model that can fetch a URL does not need you to paste anything:
 
-- `https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/scenario-v6.json`
-- `https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/sweep-v1.json`
+- `https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/scenario-v7.json`
+- `https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/sweep-v2.json`
 
-CI regenerates both and fails if they have drifted from the validator, so the published file cannot
-go stale against what the tool actually accepts. See [Schemas](../guide/schemas.md).
+CI regenerates current schemas and fails if they have drifted from the validator, so published schemas cannot go stale against what the tool actually accepts. See [Schemas](../guide/schemas.md).
 
 ### 2. The baseline scenario
 

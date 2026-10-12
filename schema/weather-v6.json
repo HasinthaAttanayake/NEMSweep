@@ -1,0 +1,160 @@
+{
+  "$defs": {
+    "location": {
+      "properties": {
+        "city": {
+          "type": "string"
+        },
+        "latitude": {
+          "maximum": 90,
+          "minimum": -90,
+          "type": "number"
+        },
+        "longitude": {
+          "maximum": 180,
+          "minimum": -180,
+          "type": "number"
+        },
+        "wmo": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "city",
+        "wmo",
+        "latitude",
+        "longitude"
+      ],
+      "type": "object"
+    },
+    "solar": {
+      "properties": {
+        "diffuseHorizontalRadiationWhPerSquareMetre": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "directNormalRadiationWhPerSquareMetre": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "dryBulbTemperatureDegreesCelsius": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "globalHorizontalRadiationWhPerSquareMetre": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "location": {
+          "$ref": "#/$defs/location"
+        },
+        "productionMegawattsAtOneMegawattAc": {
+          "description": "Recomputed from weather resource; not an input control.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "solarZenithDegrees": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "sourceFile": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceFile",
+        "location",
+        "globalHorizontalRadiationWhPerSquareMetre",
+        "directNormalRadiationWhPerSquareMetre",
+        "diffuseHorizontalRadiationWhPerSquareMetre",
+        "solarZenithDegrees",
+        "dryBulbTemperatureDegreesCelsius",
+        "productionMegawattsAtOneMegawattAc"
+      ],
+      "type": "object"
+    },
+    "wind": {
+      "properties": {
+        "location": {
+          "$ref": "#/$defs/location"
+        },
+        "measurementHeightMetres": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "productionMegawattsAtOneMegawattInstalled": {
+          "description": "Recomputed from weather resource; not an input control.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "sourceFile": {
+          "type": "string"
+        },
+        "windSpeedMetresPerSecond": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "sourceFile",
+        "location",
+        "windSpeedMetresPerSecond",
+        "measurementHeightMetres",
+        "productionMegawattsAtOneMegawattInstalled"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/weather-v6.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Hourly weather observations and derived generation traces for one region.",
+  "properties": {
+    "regionId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "resolution": {
+      "description": "TimeSpan, emitted as 01:00:00 for hourly weather.",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 6
+    },
+    "solar": {
+      "$ref": "#/$defs/solar"
+    },
+    "start": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "wind": {
+      "$ref": "#/$defs/wind"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "regionId",
+    "start",
+    "resolution",
+    "solar",
+    "wind"
+  ],
+  "title": "NEMSweep weather resource artifact",
+  "type": "object"
+}

@@ -1,0 +1,83 @@
+{
+  "$defs": {
+    "period": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "start": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "type": "object"
+    },
+    "region": {
+      "additionalProperties": false,
+      "properties": {
+        "regionId": {
+          "description": "Must have no leading or trailing whitespace. Custom IDs are limited to 100 UTF-8 bytes after invariant uppercase normalization.",
+          "minLength": 1,
+          "pattern": "^\\S(?:.*\\S)?$",
+          "type": "string"
+        },
+        "weatherDirectory": {
+          "maxLength": 255,
+          "minLength": 1,
+          "pattern": "^[^/\\\\:\u003C\u003E\u0022|?*]\u002B$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "regionId",
+        "weatherDirectory"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/manifest-v2.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "format": "uri",
+      "type": "string"
+    },
+    "bundleId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "name": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "period": {
+      "$ref": "#/$defs/period"
+    },
+    "regions": {
+      "items": {
+        "$ref": "#/$defs/region"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": 2
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "bundleId",
+    "name",
+    "period",
+    "regions"
+  ],
+  "title": "NEMSweep input bundle manifest (v2)",
+  "type": "object"
+}

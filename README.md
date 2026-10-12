@@ -26,6 +26,9 @@ the National Electricity Market's UTC+10; a run works in one fixed offset with n
 your own software.
 
 **Documentation:** [how to run it, what it assumes, and how to explore the scenario space](docs/index.md)
+
+**Custom-grid onboarding:** [generate and run a synthetic portable grid](docs/guide/custom-grids.md)
+
 **Live results:** [https://www.nemsweep.com/](https://www.nemsweep.com/)
 
 ## The three layers
@@ -37,13 +40,10 @@ engine.
 | Layer | What it is | Where it lives |
 |---|---|---|
 | Framework | The dispatch, reliability, storage-sizing and cost engine described above. No hardcoded region list and no AEMO coupling. Fixed one-hour timestep; the market-time offset is a run parameter that defaults to UTC+10. Deterministic, no package dependencies, embeddable. | `NEMSweep.Model`, `NEMSweep.Contracts` |
-| NEM scoping | The command-line tool that binds the framework to Australia. It ingests AEMO operational demand, EnergyPlus Weather data and AEMO generation data, and validates scenarios against the five National Electricity Market regions (NSW1, QLD1, SA1, TAS1, VIC1). | `NEMSweep.CLI` |
+| CLI input pipelines | The command-line tool supports legacy NEM-specific imports and format-2 portable bundles containing AEMO-style operational demand and EPW weather for arbitrary region IDs; generation fleets are declared in scenarios. | `NEMSweep.CLI` |
 | Published example | One scenario: the National Electricity Market configured for the 2026 financial year, plus a sweep that adds data-centre load across the regions. Everything on nemsweep.com is this one example. | the repository artifacts, the live site |
 
-The five NEM regions are the CLI's constraint, enforced because the data it ingests is National
-Electricity Market data. The one-hour timestep is the framework's, fixed in `NEMSweep.Model`. The
-market-time offset is a run parameter the framework reads from the scenario period; the CLI takes it
-from the ingested data, so a NEM run gets UTC+10.
+Legacy NEM-only import paths remain limited to the five NEM regions. Format-2 bundles map portable region IDs to weather directories without a generation workbook. The one-hour timestep is the framework's, fixed in `NEMSweep.Model`. The market-time offset is a run parameter the framework reads from the scenario period; the CLI takes it from ingested data, so NEM data typically uses UTC+10.
 
 ## What the framework does
 

@@ -1,9 +1,6 @@
 # CLI reference
 
-`NEMSweep.CLI` is the command-line tool that runs the framework against National Electricity Market
-data. This page is about that tool only: the framework (`NEMSweep.Model`, `NEMSweep.Contracts`) has
-no command line. The five-region rule the CLI enforces is the CLI's; the one-hour timestep is the
-framework's, and the CLI resamples half-hourly demand to it.
+`NEMSweep.CLI` turns input bundles into versioned demand and weather artifacts, validates scenario/sweep inputs, and runs them through the framework. Bundle format 2 and scenario schema 7 accept portable region IDs; legacy bundle format 1 and some single-source import commands remain NEM-specific. The framework (`NEMSweep.Model`, `NEMSweep.Contracts`) has no command line. It dispatches hourly on one fixed market-time offset; ingestion resamples the half-hour demand artifact to that timestep.
 
 `NEMSweep.CLI` is a single executable with no options parser: each command is a flag literal followed
 by zero to three positional arguments, matched by a pattern in
@@ -212,11 +209,9 @@ dotnet run --project NEMSweep.CLI -- --describe-schema sweep
 
 | Argument | Optional | Default |
 |---|---|---|
-| format: `scenario` or `sweep` | no | n/a |
+| format: `manifest`, `legacy-manifest`, `demand`, `weather`, `scenario` or `sweep` | no | n/a |
 
-Prints a JSON Schema (draft 2020-12) for the requested format to standard output. This is the
-machine-readable contract for a scenario config or a sweep definition. Hand it to a validation
-tool, or to an LLM you want to generate scenarios or sweeps for you.
+Prints the selected versioned JSON Schema (draft 2020-12) to standard output. The formats cover current/legacy bundle manifests, ingested demand/weather artifacts, and scenario/sweep configs. See [Schemas](schemas.md) for versions and compatibility. Hand a schema to a validation tool or an LLM that generates inputs.
 
 ### `--new-scenario`
 
@@ -228,9 +223,7 @@ dotnet run --project NEMSweep.CLI -- --new-scenario > scenarios/mine.json
 |---|---|---|
 | none | n/a | n/a |
 
-Prints the smallest scenario configuration that will actually run: one region, one generating fleet,
-one storage fleet. Written to standard output rather than to a file, so it composes with a redirect
-and never overwrites anything by surprise. Like `--describe-schema` it needs no workspace, so it
+Prints a compact fixed-fleet scenario: one region, one generating fleet and an empty `storageFleets` array. It includes the required reliability target and omits `storageSizing`. Written to standard output rather than to a file, so it composes with a redirect and never overwrites anything by surprise. Like `--describe-schema` it needs no workspace, so it
 works before you have written a settings file.
 
 The published `scenarios/nem-fy2026-all-regions.json` stays the worked example of a real system.
@@ -239,8 +232,7 @@ to read in one go.
 
 ## Input bundles
 
-An input bundle is a folder of source data (demand archives, EPW weather files and a generation
-workbook) plus a `manifest.json`.
+An input bundle is a folder of source data (demand archives and EPW weather files) plus a `manifest.json`. Current format 2 has no generation-workbook dependency; see [Input bundles](input-bundles.md) for the format details.
 
 ### `--validate-inputs`
 
@@ -256,9 +248,7 @@ dotnet run --project NEMSweep.CLI -- --validate-inputs path/to/input-bundle
 |---|---|---|
 | input bundle path | yes | `inputBundleRoot` from the loaded CLI settings |
 
-Loads and validates the demand, weather and generation-information data in the bundle, and prints
-a validity summary for each. **This command writes nothing at all.** It is read-only by design, so
-it is safe to run against a bundle you have not committed to yet.
+Loads and validates demand and weather sources, plus the generation-information workbook when a legacy format-1 bundle requires it. It prints a validity summary and writes nothing, so it is safe to run against a bundle you have not committed to yet.
 
 ### `--ingest`
 
@@ -274,13 +264,7 @@ dotnet run --project NEMSweep.CLI -- --ingest path/to/input-bundle
 |---|---|---|
 | input bundle path | yes | `inputBundleRoot` from the loaded CLI settings |
 
-Runs the identical validation `--validate-inputs` performs, then, only if that validation
-succeeds, writes every artifact: `demand-{region}.json` per region, `weather-{region}.json` per
-region, and `generation-information.json`, all under the **data root**. Ingest produces the
-artifacts scenarios read, so it writes where they are read from; only results belong under the
-output root. If validation fails, `--ingest`
-writes nothing, which is the same guarantee `--validate-inputs` gives you with the write step
-appended when the bundle is good.
+Runs the identical validation `--validate-inputs` performs, then writes one `demand-{region}.json` and one `weather-{region}.json` per region under the **data root**. Legacy format 1 also writes `generation-information.json`; format 2 has no workbook or generation-information artifact. If validation fails, `--ingest` writes nothing.
 
 `--ingest` supersedes `--import-demand`, `--generation-information` and `--epw-report`: one bundle,
 one pass, and it produces the same artifacts those three single-source commands produce
@@ -340,9 +324,6 @@ dotnet run --project NEMSweep.CLI -- --epw-report NSW1 path/to/solar.epw path/to
 | solar EPW path | no | n/a |
 | wind EPW path | yes | the solar EPW path (one file used for both) |
 
-The region argument is validated against the five NEM regions (`NSW1`, `QLD1`, `SA1`, `TAS1`,
-`VIC1`); anything else is rejected before any file is read, and before settings are loaded. The EPW
-paths are relative to your current working directory unless they are absolute. Writes
-`weather-{region}.json` (the region is lower-cased in the file name) under the data root, and prints
+The region argument may be any nonblank portable region ID that can be represented in an artifact filename; known NEM IDs retain their lowercase names and custom IDs use the portable encoded filename. The EPW paths are relative to your current working directory unless they are absolute. Writes `weather-{region}.json` under the data root, and prints
 the provenance report, the daylight DNI source shares and their total, and a count of each series
 constructed.
