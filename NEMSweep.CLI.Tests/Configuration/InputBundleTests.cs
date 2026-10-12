@@ -120,7 +120,7 @@ public sealed class InputBundleTests
     [Fact]
     public void Load_UnsupportedSchema_ThrowsFormatExceptionNamingManifest()
     {
-        using var fixture = new BundleFixture { SchemaVersion = 2 };
+        using var fixture = new BundleFixture { SchemaVersion = 3 };
 
         var act = () => fixture.Load();
         act.Should().Throw<FormatException>().WithMessage("*manifest.json*");
@@ -179,6 +179,142 @@ public sealed class InputBundleTests
         bundle.Manifest.Period.Start.Offset.Should().Be(TimeSpan.FromHours(8));
     }
 
+    [Fact]
+    public void Load_V2Manifest_PreservesFreeFormRegionIdAndUsesWeatherDirectoryWithoutGeneration()
+    {
+        using var fixture = new BundleFixture
+        {
+            SchemaVersion = 2,
+            ManifestRegions = ["Northern Grid / Zone"],
+        };
+        fixture.ManifestWeatherDirectories["Northern Grid / Zone"] = "north-zone";
+        fixture.AddRootWeather("Northern Grid / Zone", "weather.epw");
+        Directory.Delete(Path.Combine(fixture.RootPath, "generation"), recursive: true);
+
+        InputBundle bundle = fixture.Load();
+
+        bundle.RegionIds.Should().ContainSingle().Which.Should().Be("Northern Grid / Zone");
+        bundle.WeatherByRegion.Keys.Should().ContainSingle().Which.Should().Be("Northern Grid / Zone");
+        bundle.WeatherByRegion["Northern Grid / Zone"].SolarEpwPath
+            .Should().Contain(Path.Combine("weather", "north-zone"));
+        bundle.GenerationInformationPath.Should().BeNull();
+        bundle.Manifest.Regions[0].WeatherDirectory.Should().Be("north-zone");
+    }
+
+    [Fact]
+    public void Load_V2Manifest_AcceptsRootSchemaHintButRejectsUnknownFields()
+    {
+        using var fixture = new BundleFixture { SchemaVersion = 2 };
+        fixture.AddRootWeather("NSW1", "weather.epw");
+        fixture.ManifestOverrides["$schema"] = "https://example.test/input-bundle.schema.json";
+        fixture.ManifestOverrides["futureField"] = "unexpected";
+
+        var act = () => fixture.Load();
+
+        act.Should().Throw<FormatException>()
+            .WithMessage("*schema version 2*manifest.json*check the $schema hint*");
+    }
+
+    [Fact]
+    public void Load_V1Manifest_RemainsPermissiveForUnknownFields()
+    {
+        using var fixture = new BundleFixture();
+        fixture.AddRootWeather("NSW1", "weather.epw");
+        fixture.ManifestOverrides["futureField"] = "ignored";
+
+        InputBundle bundle = fixture.Load();
+
+        bundle.RegionIds.Should().ContainSingle().Which.Should().Be("NSW1");
+        bundle.GenerationInformationPath.Should().NotBeNull();
+    }
+
+    [Theory]
+    [InlineData("..", "safe directory name")]
+    [InlineData("../outside", "safe directory name")]
+    [InlineData("folder/name", "safe directory name")]
+    [InlineData("CON", "reserved Windows name")]
+    [InlineData("LPT1.txt", "reserved Windows name")]
+    [InlineData("station*", "safe directory name")]
+    [InlineData("station?", "safe directory name")]
+    [InlineData("station\"", "safe directory name")]
+    [InlineData("station<", "safe directory name")]
+    [InlineData("station>", "safe directory name")]
+    [InlineData("station|", "safe directory name")]
+    public void Load_V2Manifest_RejectsUnsafeWeatherDirectory(string directory, string errorDetail)
+    {
+        using var fixture = new BundleFixture { SchemaVersion = 2 };
+        fixture.ManifestWeatherDirectories["NSW1"] = directory;
+
+        var act = () => fixture.Load();
+
+        act.Should().Throw<FormatException>().WithMessage($"*weatherDirectory*{errorDetail}*");
+    }
+
+    [Fact]
+    public void Load_V2Manifest_RejectsCaseInsensitiveWeatherDirectoryCollisions()
+    {
+        using var fixture = new BundleFixture
+        {
+            SchemaVersion = 2,
+            ManifestRegions = ["north", "south"],
+        };
+        fixture.ManifestWeatherDirectories["north"] = "Weather";
+        fixture.ManifestWeatherDirectories["south"] = "weather";
+
+        var act = () => fixture.Load();
+
+        act.Should().Throw<FormatException>().WithMessage("*colliding weatherDirectory*");
+    }
+
+    [Fact]
+    public void Load_V2Manifest_RejectsCaseInsensitiveRegionIdCollisions()
+    {
+        using var fixture = new BundleFixture
+        {
+            SchemaVersion = 2,
+            ManifestRegions = ["north", "NORTH"],
+        };
+
+        var act = () => fixture.Load();
+
+        act.Should().Throw<FormatException>().WithMessage("*duplicate region*");
+    }
+
+    [Theory]
+    [InlineData(" north")]
+    [InlineData("north ")]
+    [InlineData("\tnorth")]
+    [InlineData("north\n")]
+    public void Load_V2Manifest_RejectsSurroundingRegionIdWhitespace(string regionId)
+    {
+        using var fixture = new BundleFixture
+        {
+            SchemaVersion = 2,
+            ManifestRegions = [regionId],
+        };
+
+        var act = () => fixture.Load();
+
+        act.Should().Throw<FormatException>().WithMessage("*surrounding whitespace*trims region IDs*");
+    }
+
+    [Theory]
+    [InlineData("x", 101)]
+    [InlineData("\u03b1", 51)]
+    public void Load_V2Manifest_RejectsUnpublishableRegionBeforeDiscoveringSources(string character, int count)
+    {
+        using var fixture = new BundleFixture
+        {
+            SchemaVersion = 2,
+            ManifestRegions = [string.Concat(Enumerable.Repeat(character, count))],
+        };
+
+        var act = () => fixture.Load();
+
+        act.Should().Throw<FormatException>()
+            .WithMessage("*manifest.json*cannot be published safely*100 UTF-8 bytes*");
+    }
+
     private sealed class BundleFixture : IDisposable
     {
         public BundleFixture()
@@ -195,11 +331,12 @@ public sealed class InputBundleTests
         public string RootFolderName { get; init; }
         public int SchemaVersion { get; init; } = 1;
         public string[] ManifestRegions { get; set; } = ["NSW1"];
+        public Dictionary<string, string> ManifestWeatherDirectories { get; } = new(StringComparer.Ordinal);
         public Dictionary<string, string> ManifestOverrides { get; } = new(StringComparer.Ordinal);
 
         public void AddRootWeather(string region, params string[] fileNames)
         {
-            string path = Path.Combine(RootPath, "weather", region);
+            string path = Path.Combine(RootPath, "weather", WeatherDirectoryFor(region));
             Directory.CreateDirectory(path);
             foreach (string fileName in fileNames)
             {
@@ -209,7 +346,7 @@ public sealed class InputBundleTests
 
         public void AddRoleWeather(string region, string solarFileName, string windFileName)
         {
-            string regionPath = Path.Combine(RootPath, "weather", region);
+            string regionPath = Path.Combine(RootPath, "weather", WeatherDirectoryFor(region));
             Directory.CreateDirectory(Path.Combine(regionPath, "solar"));
             Directory.CreateDirectory(Path.Combine(regionPath, "wind"));
             File.WriteAllBytes(Path.Combine(regionPath, "solar", solarFileName), []);
@@ -224,7 +361,13 @@ public sealed class InputBundleTests
                 ["bundleId"] = RootFolderName,
                 ["name"] = "Test bundle",
                 ["period"] = new { start = "2026-01-01T00:00:00+10:00", end = "2026-01-02T00:00:00+10:00" },
-                ["regions"] = ManifestRegions,
+                ["regions"] = SchemaVersion == 1
+                    ? ManifestRegions
+                    : ManifestRegions.Select(regionId => new
+                    {
+                        regionId,
+                        weatherDirectory = WeatherDirectoryFor(regionId),
+                    }).ToArray(),
             };
             foreach ((string key, string value) in ManifestOverrides)
             {
@@ -236,6 +379,11 @@ public sealed class InputBundleTests
             File.WriteAllText(Path.Combine(RootPath, "manifest.json"), JsonSerializer.Serialize(manifest));
             return InputBundle.Load(RootPath);
         }
+
+        private string WeatherDirectoryFor(string regionId) =>
+            ManifestWeatherDirectories.TryGetValue(regionId, out string? directory)
+                ? directory
+                : regionId;
 
         public void Dispose() => Directory.Delete(RootPath, recursive: true);
     }

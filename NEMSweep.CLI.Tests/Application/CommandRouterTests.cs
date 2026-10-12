@@ -140,7 +140,7 @@ public sealed class CommandRouterTests
     }
 
     [Fact]
-    public void EpwReport_RejectsARegionThatIsNotANemRegion()
+    public void EpwReport_AllowsFreeFormRegionIds()
     {
         using var fixture = new CliFixture();
         using var output = new StringWriter();
@@ -150,7 +150,22 @@ public sealed class CommandRouterTests
         int exitCode = application.Run(["--epw-report", "NSW", "solar.epw"]);
 
         exitCode.Should().Be(1);
-        error.ToString().Should().Contain("is not a NEM region");
+        error.ToString().Should().StartWith("EPW report failed:");
+        error.ToString().Should().NotContain("NEM region");
+    }
+
+    [Fact]
+    public void EpwReport_RejectsABlankRegionId()
+    {
+        using var fixture = new CliFixture();
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var application = new CommandRouter(fixture.RootPath, fixture.RootPath, output, error);
+
+        int exitCode = application.Run(["--epw-report", " ", "solar.epw"]);
+
+        exitCode.Should().Be(1);
+        error.ToString().Should().Contain("regionId");
     }
 
     [Theory]

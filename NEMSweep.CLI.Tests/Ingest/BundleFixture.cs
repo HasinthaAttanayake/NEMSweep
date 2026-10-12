@@ -26,24 +26,39 @@ internal sealed class BundleFixture : IDisposable
     private readonly DateTimeOffset periodStart = new(2026, 1, 1, 0, 0, 0, TimeSpan.FromHours(10));
     private readonly string[] regions;
     private readonly int days;
+    private readonly int schemaVersion;
+    private readonly IReadOnlyDictionary<string, string> weatherDirectories;
 
-    public BundleFixture(string[] regions, int days = 1)
+    public BundleFixture(
+        string[] regions,
+        int days = 1,
+        int schemaVersion = 1,
+        IReadOnlyDictionary<string, string>? weatherDirectories = null)
     {
         this.regions = regions;
         this.days = days;
+        this.schemaVersion = schemaVersion;
+        this.weatherDirectories = weatherDirectories ?? new Dictionary<string, string>();
         RootPath = Path.Combine(Path.GetTempPath(), $"nemsweep-ingest-{Guid.NewGuid():N}");
         BundlePath = Path.Combine(RootPath, "bundle");
         OutputRoot = Path.Combine(RootPath, "output");
         Directory.CreateDirectory(Path.Combine(BundlePath, "demand", "operational-demand-hh"));
-        Directory.CreateDirectory(Path.Combine(BundlePath, "generation", "generation-information"));
+        if (schemaVersion == 1)
+        {
+            Directory.CreateDirectory(Path.Combine(BundlePath, "generation", "generation-information"));
+        }
+
         foreach (string region in regions)
         {
-            string weatherPath = Path.Combine(BundlePath, "weather", region);
+            string weatherPath = Path.Combine(BundlePath, "weather", WeatherDirectoryFor(region));
             Directory.CreateDirectory(weatherPath);
             File.WriteAllText(Path.Combine(weatherPath, "weather.epw"), BuildEpw());
         }
         WriteManifest();
-        WriteGenerationWorkbook();
+        if (schemaVersion == 1)
+        {
+            WriteGenerationWorkbook();
+        }
         foreach (string region in regions)
         {
             ReplaceDemandRows(region, days);
@@ -66,7 +81,11 @@ internal sealed class BundleFixture : IDisposable
 
     public void ReplaceDemandRows(string region, int rowDays)
     {
-        string path = Path.Combine(BundlePath, "demand", "operational-demand-hh", $"{region}.zip");
+        string path = Path.Combine(
+            BundlePath,
+            "demand",
+            "operational-demand-hh",
+            $"{RegionFileNames.For(region)}.zip");
         if (File.Exists(path)) File.Delete(path);
         string[] lines =
         [
@@ -93,12 +112,23 @@ internal sealed class BundleFixture : IDisposable
 
     private void WriteManifest() => File.WriteAllText(Path.Combine(BundlePath, "manifest.json"), JsonSerializer.Serialize(new
     {
-        schemaVersion = 1,
+        schemaVersion,
         bundleId = "bundle",
         name = "Test bundle",
         period = new { start = periodStart, end = periodStart.AddDays(days) },
-        regions,
+        regions = schemaVersion == 1
+            ? (object)regions
+            : regions.Select(regionId => new
+            {
+                regionId,
+                weatherDirectory = WeatherDirectoryFor(regionId),
+            }).ToArray(),
     }));
+
+    private string WeatherDirectoryFor(string regionId) =>
+        weatherDirectories.TryGetValue(regionId, out string? directory)
+            ? directory
+            : regionId;
 
     private void WriteGenerationWorkbook()
     {

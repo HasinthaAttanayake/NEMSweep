@@ -13,10 +13,15 @@ internal sealed record InputBundle(
     InputBundleManifestDTO Manifest,
     IReadOnlyList<string> DemandArchivePaths,
     IReadOnlyDictionary<string, RegionWeatherSources> WeatherByRegion,
-    string GenerationInformationPath,
+    string? GenerationInformationPath,
     IReadOnlyList<string> Warnings)
 {
-    public const int SupportedSchemaVersion = 1;
+    public const int LegacySchemaVersion = 1;
+    public const int SupportedSchemaVersion = 2;
+
+    public IReadOnlyList<string> RegionIds => Manifest.Regions
+        .Select(region => region.RegionId)
+        .ToArray();
 
     public static InputBundle Load(string rootPath)
     {
@@ -33,18 +38,7 @@ internal sealed record InputBundle(
             throw new FormatException("Input bundle is missing 'manifest.json'.");
         }
 
-        InputBundleManifestDTO manifest;
-        try
-        {
-            manifest = JsonSerializer.Deserialize<InputBundleManifestDTO>(
-                File.ReadAllBytes(manifestPath),
-                JsonFile.ReadOptions)
-                ?? throw new FormatException("Input bundle 'manifest.json' is empty.");
-        }
-        catch (JsonException exception)
-        {
-            throw new FormatException("Input bundle 'manifest.json' is not valid JSON.", exception);
-        }
+        InputBundleManifestDTO manifest = ReadManifest(File.ReadAllBytes(manifestPath));
         ValidateManifest(manifest);
 
         var warnings = new List<string>();
@@ -71,15 +65,93 @@ internal sealed record InputBundle(
 
         string weatherDirectory = Path.Combine(root, "weather");
         var weatherByRegion = new Dictionary<string, RegionWeatherSources>(StringComparer.OrdinalIgnoreCase);
-        foreach (string regionId in manifest.Regions)
+        foreach (InputBundleRegionDTO region in manifest.Regions)
         {
-            string regionDirectory = Path.Combine(weatherDirectory, regionId);
+            string regionId = region.RegionId;
+            string regionDirectory = Path.Combine(weatherDirectory, region.WeatherDirectory);
             if (!Directory.Exists(regionDirectory))
             {
-                throw new FormatException($"Input bundle is missing weather folder 'weather/{regionId}'.");
+                throw new FormatException(
+                    $"Input bundle is missing weather folder 'weather/{region.WeatherDirectory}' for region '{regionId}'.");
             }
 
             weatherByRegion.Add(regionId, DiscoverWeatherSources(root, regionId, regionDirectory));
+        }
+
+        string? generationInformationPath = DiscoverGenerationInformation(root, manifest.SchemaVersion);
+        return new InputBundle(
+            manifest,
+            demandArchivePaths,
+            weatherByRegion,
+            generationInformationPath,
+            warnings);
+    }
+
+    private static InputBundleManifestDTO ReadManifest(byte[] bytes)
+    {
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(bytes);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                throw new FormatException("Input bundle 'manifest.json' must contain a JSON object.");
+            }
+
+            JsonElement schemaProperty = document.RootElement.EnumerateObject()
+                .FirstOrDefault(property => property.Name.Equals("schemaVersion", StringComparison.OrdinalIgnoreCase))
+                .Value;
+            if (schemaProperty.ValueKind != JsonValueKind.Number
+                || !schemaProperty.TryGetInt32(out int schemaVersion))
+            {
+                throw new FormatException(
+                    "Input bundle manifest field 'schemaVersion' in 'manifest.json' is required and must be an integer.");
+            }
+
+            if (schemaVersion == LegacySchemaVersion)
+            {
+                LegacyInputBundleManifestDTO legacy = JsonSerializer.Deserialize<LegacyInputBundleManifestDTO>(
+                    bytes,
+                    JsonFile.ReadOptions)
+                    ?? throw new FormatException("Input bundle 'manifest.json' is empty.");
+                return new InputBundleManifestDTO(
+                    legacy.SchemaVersion,
+                    legacy.BundleId,
+                    legacy.Name,
+                    legacy.Period,
+                    (legacy.Regions ?? [])
+                        .Select(regionId => new InputBundleRegionDTO(regionId ?? string.Empty, regionId ?? string.Empty))
+                        .ToArray());
+            }
+
+            if (schemaVersion == SupportedSchemaVersion)
+            {
+                try
+                {
+                    return JsonFile.ReadConfig<InputBundleManifestDTO>(bytes)
+                        ?? throw new FormatException("Input bundle 'manifest.json' is empty.");
+                }
+                catch (JsonException exception)
+                {
+                    throw new FormatException(
+                        "Input bundle schema version 2 'manifest.json' is invalid; check the $schema hint and remove unknown or malformed fields.",
+                        exception);
+                }
+            }
+
+            throw new FormatException(
+                $"Input bundle manifest schema version {schemaVersion} in 'manifest.json' is not supported; expected 1 or {SupportedSchemaVersion}.");
+        }
+        catch (JsonException exception)
+        {
+            throw new FormatException("Input bundle 'manifest.json' is not valid JSON.", exception);
+        }
+    }
+
+    private static string? DiscoverGenerationInformation(string root, int schemaVersion)
+    {
+        if (schemaVersion == SupportedSchemaVersion)
+        {
+            return null;
         }
 
         string generationDirectory = Path.Combine(root, "generation", "generation-information");
@@ -97,7 +169,7 @@ internal sealed record InputBundle(
                 $"Input bundle 'generation/generation-information' must contain exactly one .xlsx file; found {generationPaths.Length}.");
         }
 
-        return new InputBundle(manifest, demandArchivePaths, weatherByRegion, generationPaths[0], warnings);
+        return generationPaths[0];
     }
 
     private static RegionWeatherSources DiscoverWeatherSources(string root, string regionId, string regionDirectory)
@@ -148,10 +220,10 @@ internal sealed record InputBundle(
 
     private static void ValidateManifest(InputBundleManifestDTO manifest)
     {
-        if (manifest.SchemaVersion != SupportedSchemaVersion)
+        if (manifest.SchemaVersion is not LegacySchemaVersion and not SupportedSchemaVersion)
         {
             throw new FormatException(
-                $"Input bundle manifest schema version {manifest.SchemaVersion} in 'manifest.json' is not supported; expected {SupportedSchemaVersion}.");
+                $"Input bundle manifest schema version {manifest.SchemaVersion} in 'manifest.json' is not supported; expected 1 or {SupportedSchemaVersion}.");
         }
 
         if (string.IsNullOrWhiteSpace(manifest.BundleId))
@@ -194,9 +266,29 @@ internal sealed record InputBundle(
         }
 
         var regionIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (string? regionId in manifest.Regions)
+        var weatherDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (InputBundleRegionDTO? region in manifest.Regions)
         {
-            if (string.IsNullOrWhiteSpace(regionId) || !NemRegions.IsKnown(regionId))
+            if (region is null)
+            {
+                throw new FormatException("Input bundle manifest region in 'manifest.json' must be an object.");
+            }
+
+            string? regionId = region.RegionId;
+            if (string.IsNullOrWhiteSpace(regionId))
+            {
+                throw new FormatException("Input bundle manifest regionId in 'manifest.json' must not be blank.");
+            }
+
+            if (manifest.SchemaVersion == SupportedSchemaVersion
+                && !regionId.Equals(regionId.Trim(), StringComparison.Ordinal))
+            {
+                throw new FormatException(
+                    $"Input bundle manifest regionId '{regionId}' in 'manifest.json' must not have surrounding whitespace; "
+                    + "operational-demand parsing trims region IDs.");
+            }
+
+            if (manifest.SchemaVersion == LegacySchemaVersion && !NemRegions.IsKnown(regionId))
             {
                 throw new FormatException($"Input bundle manifest region '{regionId}' in 'manifest.json' is not a known NEM region.");
             }
@@ -205,6 +297,70 @@ internal sealed record InputBundle(
             {
                 throw new FormatException($"Input bundle manifest contains duplicate region '{regionId}' in 'manifest.json'.");
             }
+
+            if (manifest.SchemaVersion == SupportedSchemaVersion)
+            {
+                try
+                {
+                    _ = RegionFileNames.For(regionId);
+                }
+                catch (ArgumentException exception)
+                {
+                    throw new FormatException(
+                        $"Input bundle manifest regionId '{regionId}' in 'manifest.json' cannot be published safely: {exception.Message}",
+                        exception);
+                }
+
+                string? weatherDirectory = region.WeatherDirectory;
+                ValidateWeatherDirectory(weatherDirectory);
+                if (!weatherDirectories.Add(weatherDirectory!))
+                {
+                    throw new FormatException(
+                        $"Input bundle manifest contains colliding weatherDirectory '{weatherDirectory}' in 'manifest.json'.");
+                }
+            }
         }
     }
+
+    private static void ValidateWeatherDirectory(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)
+            || value.Length > 255
+            || value is "." or ".."
+            || value.EndsWith(' ') || value.EndsWith('.')
+            || value.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
+            || value.IndexOfAny(['<', '>', ':', '"', '/', '\\', '|', '?', '*']) >= 0
+            || value.Any(char.IsControl))
+        {
+            throw new FormatException(
+                $"Input bundle manifest weatherDirectory '{value}' in 'manifest.json' must be one safe directory name.");
+        }
+
+        string deviceName = value.Split('.')[0].TrimEnd(' ');
+        if (deviceName.Equals("CON", StringComparison.OrdinalIgnoreCase)
+            || deviceName.Equals("PRN", StringComparison.OrdinalIgnoreCase)
+            || deviceName.Equals("AUX", StringComparison.OrdinalIgnoreCase)
+            || deviceName.Equals("NUL", StringComparison.OrdinalIgnoreCase)
+            || deviceName.Equals("CONIN$", StringComparison.OrdinalIgnoreCase)
+            || deviceName.Equals("CONOUT$", StringComparison.OrdinalIgnoreCase)
+            || IsNumberedDevice(deviceName, "COM")
+            || IsNumberedDevice(deviceName, "LPT"))
+        {
+            throw new FormatException(
+                $"Input bundle manifest weatherDirectory '{value}' in 'manifest.json' is a reserved Windows name.");
+        }
+    }
+
+    private static bool IsNumberedDevice(string name, string prefix) =>
+        name.Length == prefix.Length + 1
+        && name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+        && name[^1] is >= '1' and <= '9';
+
+    private sealed record LegacyInputBundleManifestDTO(
+        [property: System.Text.Json.Serialization.JsonPropertyName("schemaVersion")]
+        int SchemaVersion,
+        string BundleId,
+        string Name,
+        InputBundlePeriodDTO Period,
+        string?[]? Regions);
 }

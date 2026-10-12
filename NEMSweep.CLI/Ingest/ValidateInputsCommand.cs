@@ -13,7 +13,7 @@ internal sealed record ValidatedInputs(
     InputBundle Bundle,
     IReadOnlyDictionary<string, OperationalDemandData> DemandByRegion,
     IReadOnlyDictionary<string, WeatherDataDTO> WeatherByRegion,
-    GenerationInformationDTO GenerationInformation);
+    GenerationInformationDTO? GenerationInformation);
 
 internal static class ValidateInputsCommand
 {
@@ -40,11 +40,15 @@ internal static class ValidateInputsCommand
             context.Output.WriteLine($"Weather {region}: valid.");
         }
 
-        context.Output.WriteLine(
-            $"Generation information: valid ({validated.GenerationInformation.Rows.Length} rows).");
+        if (validated.GenerationInformation is not null)
+        {
+            context.Output.WriteLine(
+                $"Generation information: valid ({validated.GenerationInformation.Rows.Length} rows).");
+        }
+
         context.Output.WriteLine(
             $"Validated input bundle '{validated.Bundle.Manifest.BundleId}' for "
-            + $"{validated.Bundle.Manifest.Regions.Length} regions; no files written.");
+            + $"{validated.Bundle.RegionIds.Count} regions; no files written.");
         return 0;
     }
 
@@ -57,7 +61,7 @@ internal static class ValidateInputsCommand
         double marketOffsetHours = bundle.Manifest.Period.Start.Offset.TotalHours;
         IReadOnlyDictionary<string, OperationalDemandData> demandByRegion = OperationalDemandParser.Read(
             bundle.DemandArchivePaths,
-            bundle.Manifest.Regions,
+            bundle.RegionIds,
             bundle.Manifest.Period.Start,
             bundle.Manifest.Period.End);
 
@@ -80,11 +84,14 @@ internal static class ValidateInputsCommand
                 Path.GetFileName(sources.WindEpwPath)));
         }
 
-        IReadOnlyList<GenerationInformationRow> generationRows =
-            GenerationInformationParser.Read(bundle.GenerationInformationPath);
-        GenerationInformationDTO generation = GenerationInformationExport.Create(
-            bundle.GenerationInformationPath,
-            generationRows);
+        GenerationInformationDTO? generation = null;
+        if (bundle.GenerationInformationPath is string generationInformationPath)
+        {
+            IReadOnlyList<GenerationInformationRow> generationRows =
+                GenerationInformationParser.Read(generationInformationPath);
+            generation = GenerationInformationExport.Create(generationInformationPath, generationRows);
+        }
+
         return new ValidatedInputs(bundle, demandByRegion, weatherByRegion, generation);
     }
 

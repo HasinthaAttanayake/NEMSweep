@@ -72,9 +72,9 @@ internal sealed class WorkspacePaths
     public string OutputPath(string fileName) => Path.Combine(OutputRoot, fileName);
 
     /// <summary>Path to one region's weather artifact under the data root.</summary>
-    /// <param name="regionId">NEM region identifier.</param>
+    /// <param name="regionId">Region identifier.</param>
     public string WeatherDataPath(string regionId) =>
-        DataPath($"weather-{regionId.ToLowerInvariant()}.json");
+        DataPath($"weather-{RegionFileNames.For(regionId)}.json");
 
     /// <summary>
     /// Expresses a path for provenance: relative to the data root where the artifact came from

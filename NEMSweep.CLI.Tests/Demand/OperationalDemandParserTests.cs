@@ -158,6 +158,25 @@ public sealed class OperationalDemandParserTests
     }
 
     [Fact]
+    public void Read_RoundTripsCsvEscapedFreeFormRegionId()
+    {
+        using var fixture = new DemandArchiveFixture();
+        const string regionId = "North, \"Central\" Grid / Å";
+        fixture.AddRows(
+            "escaped-region.zip",
+            [(PeriodStart + TimeSpan.FromMinutes(30), regionId, 123)]);
+
+        OperationalDemandData result = OperationalDemandParser.Read(
+            [fixture.PathFor("escaped-region.zip")],
+            [regionId],
+            PeriodStart,
+            PeriodStart.AddMinutes(30))[regionId];
+
+        result.Region.Should().Be(regionId);
+        result.Demand[0].Megawatts.Should().Be(123);
+    }
+
+    [Fact]
     public void Read_UsesExplicitEndAndExcludesRowsAtEnd()
     {
         using var fixture = new DemandArchiveFixture();
@@ -258,11 +277,21 @@ public sealed class OperationalDemandParserTests
 
             lines.AddRange(rows.Select(row => intervalFirst
                 ? FormattableString.Invariant(
-                    $"D,OPERATIONAL_DEMAND,ACTUAL,3,{row.IntervalEnd:yyyy/MM/dd HH:mm:ss},{row.Region},{row.Megawatts}")
+                    $"D,OPERATIONAL_DEMAND,ACTUAL,3,{row.IntervalEnd:yyyy/MM/dd HH:mm:ss},{CsvField(row.Region)},{row.Megawatts}")
                 : FormattableString.Invariant(
-                    $"D,OPERATIONAL_DEMAND,ACTUAL,3,{row.Region},{row.IntervalEnd:yyyy/MM/dd HH:mm:ss},{row.Megawatts}")));
+                    $"D,OPERATIONAL_DEMAND,ACTUAL,3,{CsvField(row.Region)},{row.IntervalEnd:yyyy/MM/dd HH:mm:ss},{row.Megawatts}")));
             lines.Add("C,END OF REPORT");
             return string.Join(Environment.NewLine, lines);
+        }
+
+        private static string CsvField(string value)
+        {
+            if (!value.Any(character => character is ',' or '"' or '\r' or '\n'))
+            {
+                return value;
+            }
+
+            return $"\"{value.Replace("\"", "\"\"")}\"";
         }
 
         private static void WriteEntry(ZipArchive archive, string name, string contents)

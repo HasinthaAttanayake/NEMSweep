@@ -1,5 +1,6 @@
 using NEMSweep.CLI.Application;
 using NEMSweep.CLI.Configuration;
+using NEMSweep.CLI.Infrastructure;
 using NEMSweep.Contracts;
 
 namespace NEMSweep.CLI.Demand;
@@ -13,7 +14,7 @@ internal static class OperationalDemandCommand
         InputBundle inputBundle = InputBundle.Load(inputBundleRoot);
         IReadOnlyDictionary<string, OperationalDemandData> demandByRegion = OperationalDemandParser.Read(
             inputBundle.DemandArchivePaths,
-            inputBundle.Manifest.Regions,
+            inputBundle.RegionIds,
             inputBundle.Manifest.Period.Start,
             inputBundle.Manifest.Period.End);
         string outputDirectory = string.IsNullOrWhiteSpace(outputDirectoryPath)
@@ -25,7 +26,7 @@ internal static class OperationalDemandCommand
         {
             string regionOutputPath = Path.Combine(
                 outputDirectory,
-                $"demand-{demandData.Region.ToLowerInvariant()}.json");
+                $"demand-{RegionFileNames.For(demandData.Region)}.json");
             ModelInputOutputDTO result = OperationalDemandExport.Create(demandData);
             OperationalDemandExport.WriteJson(result, regionOutputPath);
             context.Output.WriteLine(
