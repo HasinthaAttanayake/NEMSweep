@@ -6,6 +6,19 @@ validates it first, then writes the derived artifacts to the data root. The curr
 accepts portable region identifiers and does not need a generation workbook. Legacy format 1 remains
 available for existing NEM bundles that carry one.
 
+The shipped CLI settings default to `data/nemsweep-inputs-v2`, a format-2 bundle. The former
+`data/nemsweep-inputs` location is the **legacy** format-1 bundle; keep it when preserving historical
+generation inputs. Raw bundles are supplied locally and are not shipped in the repository or tool
+package. An explicit bundle path or `inputBundleRoot` in `appsettings.local.json` overrides the
+default, so existing local settings can continue to select the legacy bundle.
+
+To create a format-2 counterpart without altering a legacy bundle, copy its
+`demand/operational-demand-hh/` and `weather/` trees into a separate directory. Preserve the source
+bytes, period and region identities; write a version-2 manifest with an explicit weather-directory
+mapping for each region. Do not copy the generation workbook or unused reference files: they are
+not core simulation inputs. Validate the new bundle and ingest it into a separate data root before
+using it. The original bundle remains available for legacy commands.
+
 ## Bundle layout
 
 ```text

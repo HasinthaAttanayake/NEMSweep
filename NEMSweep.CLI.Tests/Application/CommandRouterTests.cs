@@ -272,6 +272,19 @@ public sealed class CommandRouterTests
     }
 
     [Fact]
+    public void Settings_ShippedExampleDefaultsToCoreBundle()
+    {
+        using var fixture = new CliFixture();
+        File.Copy(
+            Path.Combine(AppContext.BaseDirectory, "appsettings.example.json"),
+            Path.Combine(fixture.RootPath, "appsettings.example.json"));
+
+        CliSettings settings = CliSettings.Load(fixture.RootPath);
+
+        settings.InputBundleRoot.Should().Be("data/nemsweep-inputs-v2");
+    }
+
+    [Fact]
     public void Settings_PreferLocalFileOverExample()
     {
         using var fixture = new CliFixture();
