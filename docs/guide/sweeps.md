@@ -28,6 +28,8 @@ A sweep is one JSON file.
 | `baselineConfigPath` | string | yes | Path to the scenario config every point patches. |
 | `points` | array of [point](#points) | yes, at least one | The runs that make up the sweep. |
 
+Sweep version 2 accepts `executionMode` and `reliability` patches alongside the existing scenario overrides. A legacy scenario baseline is upgraded to the current scenario shape before a version-2 patch is applied; when normalization changes an existing `$schema` hint, it is updated to the current scenario schema. Version 1 keeps its historical patch shape and rejects these newer override fields.
+
 ### `points[]`
 
 | Field | Type | Required | Meaning |

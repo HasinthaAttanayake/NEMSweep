@@ -1,152 +1,157 @@
 # Input bundles
 
-An input bundle is the raw material `NEMSweep.CLI` turns into the per-region artifacts a scenario
-reads. It is a directory of upstream source files (AEMO demand archives, an AEMO generation
-workbook and EnergyPlus weather files) plus a manifest describing what the bundle claims to cover.
-It exists so that everything a run depends on can be validated as a unit, in one place, before
-anything derived from it is written. Bundle ingestion is all-or-nothing: `--ingest` loads the whole
-bundle, checks the shape and content of every file in it, and only then produces the per-region
-JSON that scenarios reference.
+An input bundle is the raw material `NEMSweep.CLI` turns into the per-region demand and weather
+artifacts a scenario reads. `--validate-inputs` parses the complete bundle without writing; `--ingest`
+validates it first, then writes the derived artifacts to the data root. The current bundle format
+accepts portable region identifiers and does not need a generation workbook. Legacy format 1 remains
+available for existing NEM bundles that carry one.
 
-The single-source commands (`--import-demand`, `--generation-information` and `--epw-report`) read
-one kind of source at a time and are there for iterating on one of them. They bypass the
-whole-bundle check, so a bundle you intend to publish from should still go through
-`--validate-inputs` and `--ingest`.
+## Bundle layout
 
-The bundle path is the `inputBundleRoot` setting, resolved against your working directory, and
-`data/nemsweep-inputs/` in the committed example settings. It is gitignored, because it is large and
-is fetched from third-party sources rather than carried in the repository. This page describes the
-shape `InputBundle.Load` requires, so you do not need a copy open to follow it.
-
-## Directory layout
-
-`InputBundle.Load` enforces this shape exactly; a bundle that deviates from it fails to load rather
-than being partially accepted.
-
-```
+```text
 <bundle-root>/
   manifest.json
   demand/
     operational-demand-hh/
-      *.zip                  (at least one; anything under a "reference" path segment is excluded)
+      *.zip                  (one or more archives; nested ZIPs are also read)
   weather/
-    <REGION>/
-      *.epw                  (exactly one file, used for both solar and wind), OR
-      solar/
-        *.epw                (exactly one file)
-      wind/
-        *.epw                (exactly one file)
-  generation/
+    <weatherDirectory>/
+      *.epw                  (one file used for both roles), OR
+      solar/*.epw            (exactly one EPW),
+      wind/*.epw             (exactly one EPW)
+  generation/                (format 1 only)
     generation-information/
-      *.xlsx                 (exactly one file)
+      *.xlsx                  (exactly one workbook)
 ```
 
-One `weather/<REGION>/` folder is required for every region listed in the manifest's `regions`
-array. Each region's weather folder must take one of two shapes: either a single `.epw` file
-directly in the region folder (used for both the solar and wind role), or a `solar/` subdirectory
-and a `wind/` subdirectory, each containing exactly one `.epw` file. Any other shape is rejected:
-two files loose in the region folder, an extra subdirectory, or zero files in a role folder.
+Demand ZIP archives are discovered recursively below `demand/operational-demand-hh/`; paths with a
+`reference` segment are excluded. Every manifest region must map to one weather directory. That
+directory contains either one EPW directly, used for both solar and wind, or exactly one EPW in each
+of `solar/` and `wind/`; mixed layouts, extra entries and missing files are rejected.
 
-Demand archives are discovered recursively under `demand/operational-demand-hh/`, but any path
-containing a `reference` segment is skipped, so you can keep original downloads alongside the
-archives NEMSweep actually reads without them being picked up twice.
+## Manifest formats
 
-## The manifest
+New bundles use schema version 2. Add the optional `$schema` hint for editor completion and use an
+explicit mapping from a free-form region identity to its weather folder:
 
-`manifest.json` at the bundle root:
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/manifest-v2.json",
+  "schemaVersion": 2,
+  "bundleId": "island-study",
+  "name": "Synthetic island grid",
+  "period": {
+    "start": "2025-01-01T00:00:00+10:00",
+    "end": "2026-01-01T00:00:00+10:00"
+  },
+  "regions": [
+    { "regionId": "Island-X", "weatherDirectory": "station-01" }
+  ]
+}
+```
 
-| Field | Type | Required | Meaning |
-|---|---|---|---|
-| `schemaVersion` | integer | yes | Must equal the version the CLI supports (currently `1`). |
-| `bundleId` | string | yes | Identifier for the bundle. Expected to match the name of the folder it lives in; a mismatch is a warning, not a rejection. |
-| `name` | string | yes | Human-readable name. |
-| `period` | object | yes | `start` and `end`, both timestamps; `end` must be after `start`, and both must carry the same UTC offset. That offset is the market-time offset the ingested demand and weather are normalised to (UTC+10 for AEMO NEM data). The calendar period the bundle's inputs are intended to cover. |
-| `regions` | array of string | yes, at least one | NEM region identifiers (`NSW1`, `QLD1`, `SA1`, `TAS1`, `VIC1`) the bundle supplies weather for. Every entry must be a recognised region, and duplicates are rejected. |
+`regionId` is preserved in demand/weather artifacts and scenario configurations. It must be nonblank
+and have no surrounding whitespace; internal spaces and punctuation are allowed. Custom IDs must
+fit the filename encoder's 100 UTF-8 byte limit after invariant uppercase normalization; invalid
+UTF-16 is rejected. Commas, quotes and Unicode are preserved when demand CSV uses standard
+escaping. IDs are unique case-insensitively. `weatherDirectory` is a separate, readable, single safe
+path segment below `weather/`, is at most 255 characters, and is also unique case-insensitively. The
+loader rejects path separators, dot-only names, trailing spaces or dots, invalid/control characters
+and Windows reserved device names. Custom region artifact filenames use uppercase-invariant UTF-8
+hex encoding, so the original ID never becomes a path component; known NEM names retain their
+established lowercase filenames.
+The `period` is half-open: `start` is inclusive and `end` exclusive. Both are timestamps with the
+same usable fixed UTC offset (within UTC−12 to UTC+14 at quarter-hour steps). This offset becomes the
+market-time offset for ingested demand and weather; daylight-saving transitions are not modelled.
 
-## Where the source data comes from
+A version 2 manifest is strict: unknown or malformed properties fail, except root `$schema`, which
+is removed before deserialisation. See [`manifest-v2.json`](https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/manifest-v2.json). Version 1
+is a compatibility format: `regions` is an array of known NEM region strings, extra fields are
+permissively ignored, and the generation workbook remains required. See
+[`legacy-manifest-v1.json`](https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/legacy-manifest-v1.json). New bundles should use version 2.
 
-- **Demand.** AEMO's actual operational demand half-hourly archives (`PUBLIC_ACTUAL_OPERATIONAL
-  _DEMAND_HH_*` and similar AEMO nemweb archive naming). NEMSweep reads the `.zip` archives in place
-  rather than requiring you to extract them first.
-- **Generation.** AEMO's Generation Information workbook, a single `.xlsx` file listing existing
-  and committed generating unit capacity, technology, and status.
-- **Weather.** EnergyPlus Weather (EPW) files, the standard hourly weather-file format used by
-  building- and energy-simulation tools. Here they supply solar radiation, wind speed, and ambient
-  temperature for one representative site per region.
+## Demand ZIP records
 
-## Weather role assignment
+The ZIP contains AEMO-style CSV records. The importer selects `OPERATIONAL_DEMAND` / `ACTUAL` rows,
+uses the `I` row to locate columns, and reads matching `D` records. The relevant header and record
+shape is:
 
-Each region names two EPW sources: a **solar** site and a **wind** site. They are chosen
-independently and for different reasons, the solar site for the quality of its solar resource and
-the wind site for the quality of its wind resource, so they are frequently different physical
-locations within the region.
+```text
+I,OPERATIONAL_DEMAND,ACTUAL,3,INTERVAL_DATETIME,REGIONID,OPERATIONAL_DEMAND
+D,OPERATIONAL_DEMAND,ACTUAL,3,2025/01/01 00:30:00,Island-X,45.0
+```
 
-This matters beyond generation shape. The **solar** site's coordinates are the model's only source
-of that region's location: they drive the region's solar-geometry calculation and are published as
-its coordinates on each result and in `dim_region`. Two things do not use them: transmission cost
-takes a declared `routeLengthKm`, and the network map draws each region at its coastline centroid.
+`INTERVAL_DATETIME` uses `yyyy/MM/dd HH:mm:ss` and labels the **end** of the half-hour interval;
+the importer associates the value with the preceding 30 minutes. Values are interval-average MW.
+The manifest offset is applied to the timestamps. Every interval for every declared region across the
+manifest period must be present. Identical overlapping records are deduplicated; conflicting values
+for one interval fail validation. Negative demand is clamped to zero and reported as a warning with
+a count; other malformed, missing, non-finite, or misaligned demand fails.
 
-No file in the repository records why a given site was chosen for a given role. That context is
-currently held only by the person who built the bundle. Document your own reasoning somewhere
-durable if you change an assignment.
+## EPW weather sources
 
-### The FY2026 bundle's current assignment
+A weather file is an hourly EnergyPlus Weather (EPW) file. NEMSweep reads the `LOCATION` header for
+city, WMO station, latitude, longitude and source time zone; the `HOLIDAYS/DAYLIGHT SAVING` header
+for the leap-year flag; and `DATA PERIODS` for the one hourly period. The data must contain one
+contiguous calendar year: 8,760 rows when the leap flag is `No`, or 8,784 when it is `Yes`. EPW hour
+labels are 1–24, with hour 1 denoting the first hour of its date. The source year itself is ignored.
+Subhourly EPW sources and multiple data periods are rejected.
 
-Checked directly against `data/nemsweep-inputs/manifest.json` and the `weather/` subdirectory
-contents. The bundle currently covers all five NEM regions:
+From each 22-column data row the importer consumes dry-bulb temperature (column 7), global
+horizontal radiation (14), direct normal radiation (15), diffuse horizontal radiation (16), and wind
+speed (22). EnergyPlus missing-value sentinels and implausible values are errors: radiation must be
+finite in `[0, 9999)`, wind speed finite in `[0, 40]` m/s (so its `999` sentinel is rejected), and
+dry-bulb temperature finite in `[-70, 70]` °C. The EPW time zone must be within one hour of the
+manifest market offset; accepted series are shifted/interpolated onto that offset's hourly grid.
+Leap-year sequence validation includes February 29 when the header says the source is a leap year.
 
-| Region | Solar site | Wind site |
-|---|---|---|
-| NSW1 | Dubbo City Regional Airport | Armidale Airport |
-| QLD1 | Gladstone Airport | Kingaroy Airport |
-| SA1 | Port Augusta Airport | Port Augusta Airport (same file as solar) |
-| TAS1 | Cape Grim Baseline Air Pollution Station | Cape Grim Baseline Air Pollution Station (same file as solar) |
-| VIC1 | Ballarat Airport | Ballarat Airport (same file as solar) |
+Solar and wind roles can use separate EPWs. The solar site's coordinates supply the model's solar
+geometry and reported regional location; the wind site's coordinates remain source provenance.
 
-SA1, TAS1 and VIC1 each supply one EPW file directly under `weather/<REGION>/` rather than separate
-`solar/`/`wind/` subfolders, so the same site serves both roles for those three regions. NSW1 and
-QLD1 supply distinct solar and wind sites. This table reflects the file layout at the time this page
-was written; treat the manifest and the `weather/` folder as the source of truth if they have since
-changed. The bundle's own `README.md` predates the QLD1, SA1 and TAS1 additions and still describes
-an NSW1/VIC1-only bundle, so it is stale against the current manifest and folder contents.
+## Derived artifacts
 
-## Validating and ingesting
+Successful ingestion writes one demand artifact and one weather artifact per region into the data
+root. Filenames are `demand-<region-file-name>.json` and `weather-<region-file-name>.json`; use those
+basenames in scenario `demandFile` and `weatherFile` fields. Format schemas are available with
+`--describe-schema demand` and `--describe-schema weather`, or at
+[`demand-v2.json`](https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/demand-v2.json) and [`weather-v6.json`](https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/weather-v6.json).
 
-Validation and ingestion are two separate steps, and only one of them writes anything.
+The demand artifact has `schemaVersion`, `scenario` (`id`, `region`, `periodStart`, exclusive
+`periodEnd`, `resolution`, `aggregation`), `generatedAt` in UTC, `dataSources.demandSourceFiles`, and
+`dataSeries.demandMw`. The values remain half-hour interval-average MW; the scenario runner resamples
+them to the model's hourly timestep. Timestamps are ISO 8601 date-times carrying the market offset;
+`resolution` is a serialized `TimeSpan` (`00:30:00`).
+
+The weather artifact has `schemaVersion`, `regionId`, `start`, `resolution`, `solar` and `wind`.
+Each role records its source filename and `location`; solar contains radiation, solar zenith and
+ambient-temperature arrays, and wind contains speed and measurement height. Those arrays are
+positional against `start` at the hourly `resolution` (`01:00:00`). The `production...` arrays are
+model-derived, recomputed during ingestion from the EPW weather inputs; they are result traces, not
+configuration controls to edit. All series in one run share the same fixed UTC offset.
+
+For output values, dispatch traces and provenance digests, see [Outputs](outputs.md). The version
+numbers of other artifacts are listed by `--describe-schema`; result layouts are documented in the
+[API reference](../api/index.md).
+
+## Validate and ingest
+
+From the repository root, pass the bundle path and choose a data root. These commands do not require
+the repository's ignored NEM source bundle:
 
 ```bash
-dotnet run --project NEMSweep.CLI -- --validate-inputs
+dotnet run --project NEMSweep.CLI -- --validate-inputs examples/custom-grid/generated/bundle
+
+dotnet run --project NEMSweep.CLI -- --ingest examples/custom-grid/generated/bundle \
+  --data-root examples/custom-grid/generated/data
 ```
 
-`--validate-inputs` loads the manifest, discovers every file the bundle shape requires, parses the
-demand archives, the weather files and the generation workbook, and reports what it found,
-including any negative demand intervals it had to clamp to zero. It writes nothing to disk. Run it
-first, especially after replacing any source file.
-
-```bash
-dotnet run --project NEMSweep.CLI -- --ingest
-```
-
-`--ingest` runs the same validation and then writes the per-region `demand-<region>.json` and
-`weather-<region>.json` files plus `generation-information.json` that scenario configs reference via
-`demandFile` and `weatherFile`. Both commands accept an optional bundle path argument to validate or
-ingest a bundle other than the configured default. See [CLI reference](cli.md) for the full command
-list.
-
-## What validation rejects
-
-Malformed, incomplete, duplicated, or misaligned source data is an explicit failure, not something
-NEMSweep tries to repair on your behalf. This includes: a demand archive missing an expected column,
-two demand readings that conflict for the same interval, weather series that don't line up on the
-calendar-hour grid the scenario period expects (including a weather source with no entry for 29
-February), and a generation workbook missing a required column. The one narrow exception is
-negative demand values, which are clamped to zero rather than rejected. That clamping is reported
-as a warning at validation time, not silently absorbed.
+Validation writes nothing. Ingestion validates all demand and weather inputs before writing; for v1
+it additionally reads the generation workbook and emits `generation-information.json`. For a
+runnable all-synthetic example, including generation of the complete annual bundle and scenario
+files, see [Custom grids](custom-grids.md).
 
 ## See also
 
-- [Scenario configuration](scenarios.md): how `demandFile` and `weatherFile` are referenced once a
-  bundle has been ingested.
-- [Limitations](../assumptions/limitations.md): where the typical-year weather and the
-  solar-site-as-region-location choices affect a result.
-- [CLI reference](cli.md): the full set of commands, including `--validate-inputs` and `--ingest`.
+- [Scenario configuration](scenarios.md): how a scenario binds its regions to ingested artifacts.
+- [CLI reference](cli.md): command syntax and root overrides.
+- [Limitations](../assumptions/limitations.md): model assumptions that affect results.

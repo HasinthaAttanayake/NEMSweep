@@ -1,82 +1,81 @@
 # Schemas
 
-The `NEMSweep.CLI` scenario config and sweep definition each have a published JSON Schema
-(draft 2020-12). Point an editor at one and you get autocomplete on field names, validation as you
-type, and hover documentation. For hand-editing JSON that is the difference between guessing and
-being guided.
+`NEMSweep.CLI` emits JSON Schema (draft 2020-12) for its editable inputs and the two derived input
+artifacts. Editors use `$schema` for completion, inline validation and field documentation; the CLI
+also prints the same versioned documents locally, without requiring a workspace or network access.
 
-The schemas describe the two CLI input formats. They say nothing about the framework, which has no
-JSON interface of its own.
+## Formats
 
-## Use them
+| `--describe-schema` format | Committed document | Describes |
+|---|---|---|
+| `manifest` | `schema/manifest-v2.json` | Current strict input-bundle manifest; region ID to weather-folder mapping. |
+| `legacy-manifest` | `schema/legacy-manifest-v1.json` | Permissive compatibility manifest with string NEM regions. |
+| `demand` | `schema/demand-v2.json` | Half-hour demand artifact produced by ingestion. |
+| `weather` | `schema/weather-v6.json` | Hourly weather and derived renewable traces produced by ingestion. |
+| `scenario` | `schema/scenario-v7.json` | Current scenario configuration. |
+| `sweep` | `schema/sweep-v2.json` | Current sweep definition and override patches. |
 
-Add `$schema` to the top of your file:
+`schema/scenario-v6.json` and `schema/sweep-v1.json` are retained unchanged for files already
+pinned to those historical schema URLs. New files should point to version 7 and 2, respectively.
+Schema filenames and `$id` values are versioned so a later document cannot silently change the
+meaning of a cached schema.
+
+Add the current schema URL at the root of an editable JSON file:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/scenario-v6.json",
-  "schemaVersion": 6,
+  "$schema": "https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/scenario-v7.json",
+  "schemaVersion": 7,
   "id": "my-scenario"
 }
 ```
 
-That is all. Every mainstream editor reads `$schema`, fetches it, and validates against it. The
-scaffold from `--new-scenario` already declares it, and so does `scenarios/starter-nsw1.json`.
+The same hint is accepted for scenario and sweep configs and for strict bundle manifest version 2. When a legacy scenario is normalized for a version-2 sweep, an existing `$schema` hint is updated to the current scenario URL.
+It is not a serialized field and does not enter input provenance or hashes. The CLI otherwise rejects
+unknown properties in these current config shapes. Legacy manifest version 1 is the exception: it
+is deliberately permissive for compatibility and remains limited to known NEM region names.
 
-The repository is the host. The raw endpoint serves with a permissive cross-origin header and
-editors do not mind that it returns `text/plain`, so putting the file anywhere else would be
-presentation rather than capability.
+## Scenario execution modes
 
-| File | Schema | Status |
-|---|---|---|
-| Scenario config | `schema/scenario-v6.json` | Current; what the CLI accepts. |
-| Scenario config | `schema/scenario-v5.json` | Superseded, and kept. |
-| Sweep definition | `schema/sweep-v1.json` | Current. |
+Scenario version 7 defaults an omitted `executionMode` to `fixedFleet`. The required `reliability`
+object always carries an explicit `targetUsePercentage` in `(0, 100]`; `standardName` is an optional
+label. In `fixedFleet`, the declared generating and storage fleets are dispatched unchanged and
+`storageSizing` must be omitted or `null`. An empty `storageFleets` array is valid.
 
-File names carry the version, so bumping a schema does not invalidate files pinned to the old one.
-Each schema's `$id` is that same versioned URL, which is what keeps a later version from colliding
-with this one in a tool that caches schemas by identity.
+`sizeBattery` requires `storageSizing` with `maximumPowerMw` and `maximumEnergyMwh`, and optionally
+`maximumPasses`. Every region must also declare a `Battery` entry in `storageFleets`, because that
+entry supplies the Battery cost and technology assumptions; a zero/zero initial capacity is valid.
+These are only the bounded Battery-sizing search limits. Reliability fields belong under
+`reliability`, not inside `storageSizing`. Scenario v5/v6 inputs are upgraded by the CLI to v7
+sizeBattery scenarios; their reliability values are moved out of the old sizing object, with the
+historic default applied when the old target was absent. An upgraded config still has to satisfy the
+current Battery-template requirement.
 
-Superseded files stay in the repository, frozen, for exactly that reason: a file pinned to
-`scenario-v5.json` keeps validating in an editor rather than resolving to a 404. The CLI upgrades
-schema 5 to the current format by adding the explicit zero emissions intensity that preserves its
-pre-emissions behavior. Older schemas still fail by version number rather than looking like a
-broken editor. Only the current schema is regenerated and diffed by CI.
+Sweep version 2 can patch `executionMode` and `reliability`, and normalizes a legacy scenario
+baseline before applying each patch. Version 1 keeps its historical override shape, accepts the
+legacy `storageSizing` patches, and rejects the newer `executionMode` and `reliability` override
+fields. A schema describes the patch shape; only fan-out validation against the merged scenario can
+establish that a particular patch leaves a runnable scenario.
 
-`--describe-schema scenario` and `--describe-schema sweep` still print the same documents to
-standard output, which is the route to take when you want the schema without a network round trip,
-or want to hand it to something that cannot fetch a URL.
+## Print or regenerate schemas
 
-## `$schema` is a hint, not a field
-
-The loader removes it before deserialising. It describes the document rather than forming part of
-it, so it never reaches provenance, a serialised copy, or a hash.
-
-This carve-out is deliberate and narrow. Deserialisation otherwise **rejects unknown properties**
-rather than ignoring them, which is what makes a mistyped or invented field fail loudly in seconds.
-Without the carve-out you would be choosing between an editor that can validate your file and a file
-that loads.
-
-## Keeping them honest
-
-The schemas are generated from the same constants the validator enforces, so a committed copy can
-fall behind them silently. CI regenerates both and diffs them against what is committed, and fails
-the build if they differ. Regenerate after changing a constant:
-
-```bash
-dotnet run --project NEMSweep.CLI -- --describe-schema scenario > schema/scenario-v6.json
+```powershell
+dotnet run --project .\NEMSweep.CLI -- --describe-schema scenario
+dotnet run --project .\NEMSweep.CLI -- --describe-schema manifest
 ```
 
-## What a schema cannot check
+Redirect the selected format to its committed file after changing its producer, for example:
 
-A schema checks shape. It cannot check that your numbers mean what you think they mean, and there
-is one case worth knowing about.
+```powershell
+dotnet run --project .\NEMSweep.CLI -- --describe-schema scenario > schema/scenario-v7.json
+```
 
-**`axisValue` is a display value.** Nothing in the model reads it: it positions a point on the
-sweep's x-axis and no more. A point labelled +3,000 MW whose overrides actually add 2,900 runs
-perfectly and produces a chart that is quietly wrong. The one part of this that can be caught
-generically is now caught, because two points cannot both sit at the same axis value and a duplicate
-is what a copy-pasted point looks like. Agreement between an axis value and what the overrides
-actually change is still yours to check.
+CI regenerates every current document and diffs it against the committed copy. Do not hand-edit
+those generated JSON files; the CLI producer is authoritative. Historical schemas are not
+regenerated, which keeps them frozen.
 
-See [Sweeps](sweeps.md) for the merge-patch rules the overrides follow.
+A schema checks JSON shape, not all semantic or cross-file constraints. For example, the CLI checks
+period-offset agreement, uniqueness of region IDs and weather folders, filesystem-safe names,
+source coverage and array alignment in addition to the constraints expressible in JSON Schema. See
+[Input bundles](input-bundles.md), [Scenario configuration](scenarios.md), [Sweeps](sweeps.md), and
+[Outputs](outputs.md) for those rules and their context.

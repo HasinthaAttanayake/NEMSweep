@@ -1,0 +1,97 @@
+{
+  "$defs": {
+    "dataSeries": {
+      "properties": {
+        "demandMw": {
+          "items": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "demandMw"
+      ],
+      "type": "object"
+    },
+    "dataSources": {
+      "properties": {
+        "demandSourceFiles": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "demandSourceFiles"
+      ],
+      "type": "object"
+    },
+    "scenario": {
+      "properties": {
+        "aggregation": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "periodEnd": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "periodStart": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "resolution": {
+          "description": "TimeSpan, emitted as 00:30:00 for half-hour demand.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "region",
+        "periodStart",
+        "periodEnd",
+        "resolution",
+        "aggregation"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/demand-v2.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Half-hour interval-average demand in MW; periodEnd is exclusive.",
+  "properties": {
+    "dataSeries": {
+      "$ref": "#/$defs/dataSeries"
+    },
+    "dataSources": {
+      "$ref": "#/$defs/dataSources"
+    },
+    "generatedAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "scenario": {
+      "$ref": "#/$defs/scenario"
+    },
+    "schemaVersion": {
+      "const": 2
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "scenario",
+    "generatedAt",
+    "dataSources",
+    "dataSeries"
+  ],
+  "title": "NEMSweep operational demand artifact",
+  "type": "object"
+}

@@ -6,8 +6,9 @@ interconnectors linking it to other regions, the cost basis the run is priced ag
 bounds the storage-sizing search may use to grow a region's Battery capacity. `--run-scenario` reads
 one of these, dispatches it over the period its demand series cover, and writes the results.
 
-The five-region rule below is the CLI's, enforced because the demand and weather artifacts it
-ingests are National Electricity Market data. The framework itself takes region identifiers as
+The CLI accepts free-form region IDs in scenarios when they refer to ingested artifacts, including
+IDs created by a format-2 portable input bundle. Legacy NEM-only import paths remain limited to the
+five National Electricity Market regions. The framework itself also treats region identifiers as
 free-form strings.
 
 The authoritative machine-readable form of everything on this page is the published JSON Schema:
@@ -20,10 +21,12 @@ Run that to see the exact `schemaVersion` the installed CLI accepts, and to vali
 before you run it. This page does not repeat that number, because it changes independently of the
 documentation.
 
-The CLI also upgrades the immediately preceding scenario schema where its omitted field has a
-defined legacy meaning. The current compatibility upgrade adds a zero operational-emissions
-intensity to generation profiles from the pre-emissions schema, preserving that version's
-behavior. Other older schemas are rejected rather than guessed at.
+The CLI upgrades supported legacy scenario versions 5 and 6 to version 7 `sizeBattery` configs.
+Legacy reliability fields are moved out of `storageSizing`, with the historical default applied
+when an older config has no target. The pre-emissions shape also gains a zero operational-emissions
+intensity on generation profiles to preserve its prior behavior. The normalized config must still
+meet current validation, including a `Battery` assumptions fleet in every region. Other older
+schemas are rejected rather than guessed at.
 
 ## How the file is read
 
@@ -46,10 +49,22 @@ habit from carrying over into a multi-region config.
 | `id` | string | yes | n/a | Scenario identifier. Reported by `--validate-scenario` and carried on sweep-generated point configs, but **not** written into a dispatch result: neither `results.json` nor `results-{region}.json` records it. It does not appear in any published path either, because an ordinary run writes fixed `results*.json` names and sweep paths are keyed by sweep and point ID. Keep your own note of which config produced a result. |
 | `name` | string | yes | n/a | Human-readable name. |
 | `costBasis` | object | yes | n/a | See [`costBasis`](#costbasis). |
-| `regions` | array of [region](#regions) | yes, at least one | n/a | One entry per NEM region the scenario dispatches. |
-| `storageSizing` | object | yes | n/a | See [`storageSizing`](#storagesizing). |
+| `executionMode` | string | no, defaults to `fixedFleet` | n/a | `fixedFleet` dispatches declared fleets unchanged; `sizeBattery` runs the bounded Battery sizing search. |
+| `reliability` | object | yes | n/a | Required target and optional standard label, used by both execution modes. |
+| `regions` | array of [region](#regions) | yes, at least one | n/a | One entry per region, with IDs matching the ingested artifacts. |
+| `storageSizing` | object or null | mode-dependent | n/a | Required as an object for `sizeBattery`; omitted or `null` for `fixedFleet`. |
 | `interconnectors` | array of [interconnector](#interconnectors) | no | n/a | Directed transmission links between regions. |
 | `provenance` | object | no | n/a | Free-form; the CLI overwrites this on sweep-generated configs, so treat it as informational rather than as configuration. |
+
+## `reliability`
+
+| Field | Type | Required | Unit | Meaning |
+|---|---|---|---|---|
+| `targetUsePercentage` | number | yes | percentage of demand energy, `(0, 100]` | Maximum unserved energy as a percentage of demand energy. Both the system and each individual region must meet the target. |
+| `standardName` | string or null | no | n/a | Optional descriptive label recorded with the reliability result; it does not affect dispatch. |
+
+This target is required in both execution modes. `fixedFleet` reports the declared fleets' result even
+when the target is missed; `sizeBattery` uses it to guide the bounded Battery search.
 
 ## `costBasis`
 
@@ -62,12 +77,14 @@ habit from carrying over into a multi-region config.
 
 | Field | Type | Required | Unit | Meaning |
 |---|---|---|---|---|
-| `regionId` | string | yes | n/a | One of the five NEM regions: `NSW1`, `QLD1`, `SA1`, `TAS1`, `VIC1`. Must be distinct across `regions`. |
+| `regionId` | string | yes | n/a | Exact ID matching the demand and weather artifacts. IDs must be distinct and have no leading or trailing whitespace. Custom IDs may be at most 100 UTF-8 bytes after invariant uppercase normalization; known NEM IDs keep their existing filenames. |
 | `demandFile` | string | yes | n/a | Path to this region's demand series (as written by `--ingest`). |
 | `weatherFile` | string | yes | n/a | Path to this region's weather series (as written by `--ingest`). |
 | `generatingFleets` | array of [generating fleet](#regionsgeneratingfleets) | yes, at least one | n/a | This region's generation. Technologies must be distinct within the region. |
-| `storageFleets` | array of [storage fleet](#regionsstoragefleets) | yes, at least one | n/a | This region's storage. Technologies must be distinct within the region. |
+| `storageFleets` | array of [storage fleet](#regionsstoragefleets) | yes, may be empty | n/a | This region's declared storage. Technologies must be distinct. `sizeBattery` additionally requires a `Battery` fleet in every region to provide its cost and technology assumptions; zero initial capacity is valid. |
 | `dataCentreNameplateMw` | number | no, default 0 | MW | A flat, full-load-factor additive demand component, representing new load such as a data centre. |
+
+Scenario validation also calls the portable filename encoder before dispatch. Custom IDs exceeding the 100-byte normalized limit or containing invalid UTF-16 are rejected. Free-form IDs can contain spaces, punctuation, commas, quotes and Unicode; if an ID appears in a demand CSV field, quote it using standard CSV escaping.
 
 An interconnector endpoint must name a region that appears in `regions` (see
 [below](#interconnectors)).
@@ -155,18 +172,15 @@ are dispatched as declared and are not resized by the search.
 
 ## `storageSizing`
 
+`storageSizing` is present only when `executionMode` is `sizeBattery`. It contains only search
+bounds; reliability is configured separately in the required root `reliability` object.
+
 | Field | Type | Required | Unit | Meaning |
 |---|---|---|---|---|
 | `maximumPowerMw` | number | yes | MW | Largest Battery power the sizing search may consider, applied **per region**, not to the system total. |
 | `maximumEnergyMwh` | number | yes | MWh | Largest Battery energy the sizing search may consider, applied **per region**. Must support at least four hours at `maximumPowerMw`. |
-| `targetUsePercentage` | number | no, default `0.002` | percentage of demand energy, `(0, 100]` | The reliability target: maximum unserved energy as a percentage of demand energy. Both the whole system and every individual region must be within it. `0.002` is the National Electricity Rules reliability standard. |
 | `maximumPasses` | integer | no, default `256` | count | Cap on whole-system dispatch passes the sizing search may spend. Each pass re-dispatches every region for the full period, so this bounds wall-clock cost. Reaching it is a reportable outcome, not a crash. |
-| `reliabilityStandardName` | string or null | no | n/a | Free-form label recorded against the run's reliability result. Does not affect dispatch. |
 
-The two maxima are commercial limits you supply, not physical ones. If the search reaches either
-one without meeting the target, the run still completes and reports which region hit the limit and
-by how much it remained short. "No Battery within these bounds meets the standard" is itself a
-published result, not a failure of the tool.
 
 ## `interconnectors[]`
 

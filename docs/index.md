@@ -26,14 +26,10 @@ one of these three layers, and mistaking one for another is the most common way 
 | Layer | What it is | Where it lives |
 |---|---|---|
 | Framework | The dispatch, reliability, storage-sizing and cost engine. No hardcoded region list and no AEMO coupling: region identifiers are free-form strings. Fixed one-hour timestep. The market-time offset is a run parameter, read from the scenario period and defaulting to UTC+10. Deterministic, no package dependencies, embeddable. | `NEMSweep.Model`, `NEMSweep.Contracts` |
-| NEM scoping | The command-line tool that binds the framework to Australia. It ingests AEMO operational demand, EnergyPlus Weather data and AEMO generation data, and validates scenarios against the five National Electricity Market regions (NSW1, QLD1, SA1, TAS1, VIC1). | `NEMSweep.CLI` |
+| CLI input pipelines | Legacy NEM-specific imports plus format-2 portable bundles with arbitrary region IDs, AEMO-style operational demand and EPW weather. Generation fleets are declared in scenarios. | `NEMSweep.CLI` |
 | Published example | One scenario: the National Electricity Market configured for the 2026 financial year, plus a sweep that adds data-centre load across the regions. Everything on the [results site](https://www.nemsweep.com/) is this one example. | the repository artifacts |
 
-The five NEM regions are the CLI's constraint, enforced because the data it ingests is National
-Electricity Market data. The one-hour timestep is the framework's, fixed in `NEMSweep.Model`; the
-market-time offset is a run parameter it reads from the scenario period, and the CLI takes that from
-the ingested data, so a NEM run works in UTC+10. Sub-hourly demand input is resampled to the hourly
-timestep during ingestion.
+Legacy NEM-only import paths remain limited to the five NEM regions. Format-2 bundles map portable region IDs to weather directories without a generation workbook. The one-hour timestep is the framework's, fixed in `NEMSweep.Model`; the market-time offset is a run parameter it reads from the scenario period, and the CLI takes that from the ingested data, so NEM data typically uses UTC+10. Sub-hourly demand input is resampled to the hourly timestep during ingestion.
 
 ## Where to start
 
@@ -41,6 +37,7 @@ timestep during ingestion.
 |---|---|
 | Install NEMSweep and run your first scenario | [Guide](guide/index.md) |
 | Understand what the model does | [Concepts](concepts/index.md) |
+| Build and run a synthetic custom-region example without source data | [Custom grids](guide/custom-grids.md) |
 | Know what the model assumes, and where it will mislead you | [Assumptions](assumptions/index.md) |
 | Design a study, or drive NEMSweep with an LLM | [Exploring](exploring/index.md) |
 | Look up a type, a field, or a published JSON schema | [API reference](api/index.md) |

@@ -22,12 +22,22 @@ jobs:
     - name: Check committed schemas match the validator
       run: |
         set -euo pipefail
-        fail() { echo "::error::schema/$1 is stale; regenerate it with --describe-schema $2"; exit 1; }
-        dotnet run --project NEMSweep.CLI -c Release -- --describe-schema scenario > scenario.actual.json
-        dotnet run --project NEMSweep.CLI -c Release -- --describe-schema sweep > sweep.actual.json
-        diff -u schema/scenario-v6.json scenario.actual.json || fail scenario-v6.json scenario
-        diff -u schema/sweep-v1.json sweep.actual.json || fail sweep-v1.json sweep
-
+        check_schema() {
+          format="$1"
+          filename="$2"
+          actual="${RUNNER_TEMP}/${filename}.actual.json"
+          dotnet run --project NEMSweep.CLI -c Release -- --describe-schema "$format" > "$actual"
+          diff -u "schema/${filename}" "$actual" || {
+            echo "::error::schema/${filename} is stale; regenerate it with --describe-schema ${format}"
+            exit 1
+          }
+        }
+        check_schema manifest manifest-v2.json
+        check_schema legacy-manifest legacy-manifest-v1.json
+        check_schema demand demand-v2.json
+        check_schema weather weather-v6.json
+        check_schema scenario scenario-v7.json
+        check_schema sweep sweep-v2.json
     # Packing on every change, and throwing the packages away, is what stops a packaging break
     # being discovered only when a release tag is pushed. Nothing is published from here.
     - name: Pack

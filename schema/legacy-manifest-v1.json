@@ -1,0 +1,56 @@
+{
+  "$defs": {
+    "period": {
+      "properties": {
+        "end": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "start": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/legacy-manifest-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "bundleId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "name": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "period": {
+      "$ref": "#/$defs/period"
+    },
+    "regions": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": 1
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "bundleId",
+    "name",
+    "period",
+    "regions"
+  ],
+  "title": "NEMSweep legacy input bundle manifest (v1)",
+  "type": "object"
+}
