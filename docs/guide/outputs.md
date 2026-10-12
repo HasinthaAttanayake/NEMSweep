@@ -46,6 +46,18 @@ defined in one place: `NEMSweep.Contracts/ArtifactSchemaVersions.cs`. This page 
 numbers, because they would go stale the moment a schema changes. Consult the
 [API reference](../api/index.md) for the current values.
 
+Schema versions cover serialized meaning as well as JSON structure. The current system and
+regional dispatch details, overviews, and sweep index distinguish region-specific storage-sizing
+blockers from the whole-run aggregate outcome. Earlier regional artifacts inherited the run's
+failure outcome even when growth had not been tested for that region. Do not apply the current
+regional interpretation to those older artifacts.
+
+Consumers must support the corresponding artifact versions before newly generated outputs are
+published. In particular, the results site's Contracts package and schema registry must be upgraded
+alongside its regenerated artifacts. Updating these schema markers does not itself publish a
+NuGet package or cut a release; older published artifacts remain on their original versions until
+that coordinated publication.
+
 ## Sweep scalar vocabulary
 
 A sweep publishes one set of scalars per point per region (and one for the system as a whole), in

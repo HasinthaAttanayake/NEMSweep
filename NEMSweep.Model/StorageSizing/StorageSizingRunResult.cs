@@ -7,7 +7,8 @@ namespace NEMSweep.Model.StorageSizing;
 
 /// <summary>
 /// Final result of a whole-system Battery sizing search, including the selected system and
-/// regional dispatch evidence.
+/// regional dispatch evidence. The whole-system status summarizes termination; each regional
+/// result retains its own target verdict, blocker status, and termination evidence.
 /// </summary>
 public sealed class StorageSizingRunResult
 {
@@ -21,8 +22,15 @@ public sealed class StorageSizingRunResult
     /// </param>
     /// <param name="installedBatteryAssessments">Assessment of the Battery capacities installed before the search began.</param>
     /// <param name="dispatchPassCount">Number of whole-system dispatch passes performed. Must not be negative.</param>
-    /// <param name="status">Terminal status of the sizing search.</param>
-    /// <param name="terminationEvidence">Human-readable evidence explaining the terminal status.</param>
+    /// <param name="status">
+    /// Terminal status of the whole-system sizing search. On no-progress termination, capacity
+    /// limit takes precedence if any failing region has no larger candidate; otherwise the status
+    /// is stagnation.
+    /// </param>
+    /// <param name="terminationEvidence">
+    /// Human-readable evidence explaining the terminal status, including all current regional
+    /// blockers when growth makes no progress.
+    /// </param>
     /// <param name="energyLimitedAssessment">
     /// Whole-system generation-availability evidence when the result is energy-limited; null otherwise.
     /// Must cite <paramref name="powerSystem"/>'s identity when supplied.
@@ -162,9 +170,15 @@ public sealed class StorageSizingRunResult
     public IReadOnlyList<InstalledBatteryAssessment> InstalledBatteryAssessments { get; }
     /// <summary>Number of whole-system dispatch passes performed by the search.</summary>
     public int DispatchPassCount { get; }
-    /// <summary>Terminal status of the sizing search.</summary>
+    /// <summary>
+    /// Terminal status of the whole-system sizing search. This can differ from individual regional
+    /// statuses when blockers differ across failing regions.
+    /// </summary>
     public StorageSizingStatus Status { get; }
-    /// <summary>Human-readable evidence explaining the terminal status.</summary>
+    /// <summary>
+    /// Human-readable evidence explaining the terminal status and, on no-progress termination, all
+    /// currently failing regions and their blockers.
+    /// </summary>
     public string TerminationEvidence { get; }
     /// <summary>
     /// Whole-system generation-availability evidence when the result is energy-limited; otherwise

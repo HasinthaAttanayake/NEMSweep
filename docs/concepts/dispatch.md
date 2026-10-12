@@ -62,6 +62,12 @@ runs last of all, after that region's own storage, and it is invisible to transf
 reachable only from inside the region's own completion step, never from generation, exports, or
 storage charging.
 
+Imports serve immediate demand deficits before local storage runs; they do not directly charge a
+battery. Storage discharge happens after transfer, so stored energy cannot be exported. The Hydro
+reserve fallback remains local and runs only after storage. Neither dispatch nor sizing sets aside
+storage as a forecast reserve: dispatch sees the current interval, and sizing tests the realized
+system outcomes.
+
 ## Merit order
 
 Within the generation step, fleets dispatch in ascending short-run marginal cost (SRMC), tie-broken

@@ -3,7 +3,10 @@ using NEMSweep.Model.Units;
 
 namespace NEMSweep.Model.StorageSizing;
 
-/// <summary>Final Battery sizing and dispatch evidence for one region.</summary>
+/// <summary>
+/// Final Battery sizing and dispatch evidence for one region, including its target verdict and
+/// region-specific terminal blocker.
+/// </summary>
 public sealed record RegionalSizingResult
 {
     /// <summary>Validates and creates a regional sizing result.</summary>
@@ -51,9 +54,12 @@ public sealed record RegionalSizingResult
     /// verdict so that everything downstream reports the same answer the sizing decision used.
     /// </summary>
     public bool MeetsTarget { get; }
-    /// <summary>Terminal status as it applies to this region.</summary>
+    /// <summary>
+    /// Terminal status as it applies to this region; it can differ from the whole-system status
+    /// when other failing regions have different blockers.
+    /// </summary>
     public StorageSizingStatus Status { get; }
-    /// <summary>Human-readable evidence explaining the regional status.</summary>
+    /// <summary>Human-readable evidence explaining this region's terminal status.</summary>
     public string TerminationEvidence { get; }
     /// <summary>Reliability calculated from <see cref="DispatchOutcome"/>.</summary>
     public ReliabilityMetrics Reliability => DispatchOutcome.Reliability;

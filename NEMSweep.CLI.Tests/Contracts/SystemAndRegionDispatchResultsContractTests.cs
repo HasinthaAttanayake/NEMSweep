@@ -7,6 +7,16 @@ namespace NEMSweep.CLI.Tests.Contracts;
 public sealed class SystemAndRegionDispatchResultsContractTests
 {
     [Fact]
+    public void StorageSizingBlockerSemantics_UseDistinctResultOverviewAndSweepSchemaVersions()
+    {
+        ArtifactSchemaVersions.SystemDispatchResults.Should().Be(16);
+        ArtifactSchemaVersions.SystemDispatchOverview.Should().Be(5);
+        ArtifactSchemaVersions.RegionDispatchResults.Should().Be(11);
+        ArtifactSchemaVersions.RegionDispatchOverview.Should().Be(4);
+        ArtifactSchemaVersions.SweepIndex.Should().Be(12);
+    }
+
+    [Fact]
     public void SystemDispatchResults_RoundTripsPopulatedEvidenceWithExplicitUnits()
     {
         DateTimeOffset start = new(2026, 7, 1, 0, 0, 0, TimeSpan.FromHours(10));

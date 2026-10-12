@@ -78,6 +78,40 @@ public sealed class CoupledStorageSizingTests
     }
 
     [Fact]
+    public void Size_PassLimitAfterAcceptedGrowth_RetainsMatchingCapacityDispatchAndTransferEvidence()
+    {
+        PowerSystem system = TwoRegionSystem(
+            nswDemand: [0, 0, 100, 100],
+            vicDemand: [10, 10, 10, 10],
+            nswCapacityMw: 60,
+            vicCapacityMw: 200,
+            linkMw: 10,
+            linkFromRegionId: "VIC1",
+            linkToRegionId: "NSW1");
+
+        StorageSizingRunResult result = StorageSizingService.Size(system, Options(maximumPasses: 3));
+        SystemDispatchRunResult expected = Dispatcher.DispatchSystem(result.PowerSystem);
+
+        result.Status.Should().Be(StorageSizingStatus.PassLimitReached);
+        result.DispatchPassCount.Should().Be(3);
+        result.Trajectory.Should().HaveCount(3);
+        result.Regions.Single(region => region.DispatchOutcome.RegionId == "NSW1")
+            .BatterySizing.EnergyCapacity.Should().Be(Energy.FromMegawattHours(120));
+        result.InterconnectorFlows.Should().BeEquivalentTo(expected.InterconnectorFlows);
+        result.InterconnectorFlows.Single().Flow.Integrate().Should().BeGreaterThan(Energy.Zero);
+        foreach (RegionalSizingResult region in result.Regions)
+        {
+            DispatchOutcome dispatch = expected.RegionalOutcomes.Single(
+                outcome => outcome.RegionId == region.DispatchOutcome.RegionId);
+            region.Reliability.Should().Be(dispatch.Reliability);
+            Enumerable.Range(0, dispatch.Unserved.Length)
+                .Select(index => region.DispatchOutcome.Unserved[index])
+                .Should().Equal(Enumerable.Range(0, dispatch.Unserved.Length)
+                    .Select(index => dispatch.Unserved[index]));
+        }
+    }
+
+    [Fact]
     public void Size_CoupledRegionsThatCannotComply_TerminatesAndReportsTheBindingBound()
     {
         PowerSystem system = TwoRegionSystem(
