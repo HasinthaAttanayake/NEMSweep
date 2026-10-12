@@ -80,7 +80,8 @@ one.
 
 NEMSweep's storage policy has **no foresight**. It sees the current interval only: the residual after
 generation has met demand, and each fleet's headroom. It cannot pre-charge in anticipation of
-tomorrow's shortfall because no forward view of residual demand is provided to it.
+tomorrow's shortfall because no forward view of residual demand is provided to it. It does not hold
+stored energy in reserve for forecast events.
 
 That cuts two ways, and which way dominates depends on the scenario:
 
@@ -99,19 +100,28 @@ makes sweeps practical. It is a deliberate trade, but it is a real limitation.
 ## 5. Sizing finds a near-frontier point, not an optimum
 
 The storage sizing search grows Battery capacity until every region is inside the reliability
-target, then refines each changed region's power and energy coordinate by coordinate. The result is
-a **deterministic coordinate-wise near-frontier point**.
+target, then refines each changed region's power and energy coordinate by coordinate. While regions
+fail, it grows one at a time in descending total unserved MWh, with ordinal region-ID tie-breaking.
+It re-dispatches and re-ranks after each accepted change. A region's best candidate is accepted only
+if it reduces that region's own unserved energy by more than 0.001 MWh; blocked regions are skipped
+while other failing regions are tried, and reconsidered after an accepted change. Once all regions
+pass, refinement remains ordinal, power first and then energy. The result is a **deterministic
+coordinate-wise near-frontier point**.
 
 It is not a global minimum, and it is emphatically not cost-optimal: nothing in the search prices
-the capacity it adds. A different search order could land on a different but equally compliant
-point. Two sizing results are comparable to each other because the procedure is deterministic;
-neither is "the answer".
+the capacity it adds. The main-growth priority is intentional and can change successful sizing
+results compared with growing regions in ordinal order. A different search order could land on a
+different but equally compliant point. Two sizing results are comparable to each other because the
+procedure is deterministic; neither is "the answer".
 
-A sizing run that does not meet the target reports which bound stopped it. Only the
-`energyLimited` outcome, where total available generation energy across the system is below total
-demand energy, proves that no Battery could have met the target. A capacity ceiling, a pass budget,
-or storage that has stopped reducing unserved energy each report a limit of the search rather than
-a limit of the system.
+A sizing run that does not meet the target reports the final blocker for each failing region. If no
+change is accepted, its aggregate outcome is `batteryCapacityLimitReached` when any failing region
+has no larger candidate, otherwise `storageNoLongerImprovesReliability`; reaching just one
+dimension's ceiling is not enough when a larger candidate remains on another dimension. Evidence
+lists all blockers. These outcomes, like a pass-budget stop, are bounded-search evidence, not a
+global infeasibility or optimality result. Only the `energyLimited` outcome, where total available
+generation energy across the system is below total demand energy, proves that no Battery could have
+met the target under that energy deficit.
 
 The same applies to inter-regional transfer, which serves regions in priority order by successive
 max-flow solves. That guarantees a higher-priority region is never starved by a lower-priority one,

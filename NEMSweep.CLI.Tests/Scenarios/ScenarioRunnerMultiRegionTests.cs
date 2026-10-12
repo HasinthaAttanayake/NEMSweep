@@ -153,6 +153,69 @@ public sealed class ScenarioRunnerMultiRegionTests
     }
 
     [Fact]
+    public void Run_MixedRegionalBlockers_PublishesDistinctRegionalOutcomesAndAggregateCapacityLimit()
+    {
+        double[] spikyDemand = Enumerable.Repeat(20d, 8_760).ToArray();
+        for (int hour = 100; hour < spikyDemand.Length; hour += 400)
+        {
+            spikyDemand[hour] = 300;
+        }
+
+        using var fixture = new RunnerFixture
+        {
+            NswDemandSeries = Enumerable.Repeat(110d, 8_760).ToArray(),
+            VicDemandSeries = spikyDemand,
+            MaximumPowerMw = 50,
+            MaximumEnergyMwh = 200,
+            MaximumPasses = 64,
+        };
+        fixture.WriteScenario();
+        var context = new CliContext(fixture.Paths, fixture.Settings, TextWriter.Null);
+
+        ScenarioCommand.Run(context, "scenario.json").Should().Be(0);
+
+        SystemDispatchResultsDTO system = JsonSerializer.Deserialize<SystemDispatchResultsDTO>(
+            File.ReadAllBytes(fixture.Paths.DispatchResultsPath), JsonFile.ReadOptions)!;
+        string outputDirectory = Path.GetDirectoryName(fixture.Paths.DispatchResultsPath)!;
+        RegionDispatchResultsDTO nsw = JsonSerializer.Deserialize<RegionDispatchResultsDTO>(
+            File.ReadAllBytes(Path.Combine(outputDirectory, "results-nsw1.json")), JsonFile.ReadOptions)!;
+        RegionDispatchResultsDTO vic = JsonSerializer.Deserialize<RegionDispatchResultsDTO>(
+            File.ReadAllBytes(Path.Combine(outputDirectory, "results-vic1.json")), JsonFile.ReadOptions)!;
+        SystemDispatchOverviewDTO overview = JsonSerializer.Deserialize<SystemDispatchOverviewDTO>(
+            File.ReadAllBytes(Path.Combine(outputDirectory, "results-overview.json")), JsonFile.ReadOptions)!;
+        RegionDispatchOverviewDTO nswOverview = JsonSerializer.Deserialize<RegionDispatchOverviewDTO>(
+            File.ReadAllBytes(Path.Combine(outputDirectory, "results-nsw1-overview.json")), JsonFile.ReadOptions)!;
+        RegionDispatchOverviewDTO vicOverview = JsonSerializer.Deserialize<RegionDispatchOverviewDTO>(
+            File.ReadAllBytes(Path.Combine(outputDirectory, "results-vic1-overview.json")), JsonFile.ReadOptions)!;
+
+        system.SchemaVersion.Should().Be(16);
+        overview.SchemaVersion.Should().Be(5);
+        nsw.SchemaVersion.Should().Be(11);
+        vic.SchemaVersion.Should().Be(11);
+        nswOverview.SchemaVersion.Should().Be(4);
+        vicOverview.SchemaVersion.Should().Be(4);
+        system.StorageSizing.Outcome.Should().Be(StorageSizingOutcome.BatteryCapacityLimitReached);
+        nsw.StorageSizing.Outcome.Should().Be(StorageSizingOutcome.StorageNoLongerImprovesReliability);
+        vic.StorageSizing.Outcome.Should().Be(StorageSizingOutcome.BatteryCapacityLimitReached);
+        system.RegionSummariesById["NSW1"].StorageSizing.Outcome.Should().Be(nsw.StorageSizing.Outcome);
+        system.RegionSummariesById["VIC1"].StorageSizing.Outcome.Should().Be(vic.StorageSizing.Outcome);
+        overview.StorageSizing.Outcome.Should().Be(system.StorageSizing.Outcome);
+        overview.RegionSummariesById["NSW1"].StorageSizing.Outcome.Should().Be(nsw.StorageSizing.Outcome);
+        overview.RegionSummariesById["VIC1"].StorageSizing.Outcome.Should().Be(vic.StorageSizing.Outcome);
+        nswOverview.StorageSizing.Outcome.Should().Be(nsw.StorageSizing.Outcome);
+        vicOverview.StorageSizing.Outcome.Should().Be(vic.StorageSizing.Outcome);
+        nsw.StorageSizing.FinalEnergyMwh.Should().Be(0);
+        vic.StorageSizing.FinalEnergyMwh.Should().Be(200);
+        vic.StorageSizing.FinalPowerMw.Should().Be(50);
+        system.StorageSizing.FinalEnergyMwh.Should().Be(200);
+        system.StorageSizing.EnergyLimitedEvidence.Should().BeNull();
+        system.StorageSizing.PassesUsed.Should().BeLessThanOrEqualTo(64);
+        system.Reliability.WithinTarget.Should().BeFalse();
+        nsw.RunId.Should().Be(system.RunId);
+        vic.RunId.Should().Be(system.RunId);
+    }
+
+    [Fact]
     public void Run_PublishesNonCompliantResultInsteadOfThrowingWhenSizingCannotMeetTarget()
     {
         double[] spikyDemand = Enumerable.Repeat(10d, 8_760).ToArray();
@@ -279,6 +342,7 @@ public sealed class ScenarioRunnerMultiRegionTests
         public double VicDataCentreNameplateMw { get; init; }
         public bool IncludeInterconnector { get; init; }
         public double[]? NswDemandSeries { get; init; }
+        public double[]? VicDemandSeries { get; init; }
         public double MaximumPowerMw { get; init; } = 100;
         public double MaximumEnergyMwh { get; init; } = 400;
         public int MaximumPasses { get; init; } = 4;
@@ -318,6 +382,11 @@ public sealed class ScenarioRunnerMultiRegionTests
             if (NswDemandSeries is not null)
             {
                 WriteDemand("nsw1", "NSW1", fixtureStart, NswDemandSeries);
+            }
+
+            if (VicDemandSeries is not null)
+            {
+                WriteDemand("vic1", "VIC1", VicStart, VicDemandSeries);
             }
 
             string interconnectors = IncludeInterconnector

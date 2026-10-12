@@ -516,14 +516,31 @@ After the floor, growth is geometric: each iteration offers the region's current
 Battery power doubled, its current energy doubled, and both doubled together,
 each clamped to the configured maxima and to the four-hour duration floor. The
 reliability metrics do not set the growth factor; they choose between the
-resulting probes. Every candidate is dispatched across the whole system, and the
-search takes the one that materially reduces USE by the most, breaking ties on
-peak unserved power. When none improves USE, the search returns
-`StorageNoLongerImprovesReliability`; this identifies solver stagnation and does
-not claim whether generation timing or storage policy is the underlying cause.
-Explicit MW, MWh, and pass bounds also provide termination; reaching a capacity
-bound before a larger probe is feasible returns `BatteryCapacityLimitReached`,
-while exhausting dispatch passes returns `PassLimitReached`.
+resulting probes. Growth considers one currently failing region at a time. It
+prioritises descending total unserved energy (MWh), breaking ties by ordinal
+region ID. Every candidate is dispatched across the whole system, but is judged
+by its effect on the candidate region's own unserved energy: its best candidate
+is accepted only when it reduces that energy by more than 0.001 MWh. Peak
+unserved power does not replace this threshold.
+
+After an accepted change, the whole system is dispatched again and every
+failing region is re-ranked. A region with no larger candidate, or whose best
+candidate does not clear the improvement threshold, is skipped while other
+failing regions are tried; it is reconsidered after the next accepted change.
+The search stops only when all currently failing regions are blocked, the
+dispatch-pass bound is exhausted, or the system-level energy-limited assessment
+applies. Each regional result reports its own blocker. If no change is accepted
+while failures remain, the aggregate status is `BatteryCapacityLimitReached` if
+any failing region has no larger candidate, and
+`StorageNoLongerImprovesReliability` otherwise. A single power or energy cap
+does not establish exhaustion if a larger candidate remains on another
+dimension. Aggregate termination evidence lists all blockers.
+
+These capacity-limit and no-improvement outcomes describe bounded-search
+evidence, not global infeasibility or optimality; only the total-energy
+shortfall below can establish that storage cannot meet the target. The changed
+priority is intentional and can change successful runs compared with ordinal
+region growth.
 
 When a dispatch fails its USE target, `EnergyLimitedAssessment` also evaluates
 the whole `PowerSystem`. It sums generator availability and demand from every
@@ -537,12 +554,11 @@ system-level proof. A total-energy shortfall proves infeasibility even if future
 interconnectors permit unrestricted transfers; it does not establish network
 feasibility when total energy is adequate.
 
-Growth and every refinement probe dispatch the entire linked system. The growth phase
-advances a failing region in deterministic ordinal region order; once every region
-complies, full-system probes refine each changed region's power and energy to 1 MW and
-1 MWh precision while retaining only compliant candidates and their matching
-interconnector-flow evidence. The result is a deterministic coordinate-wise
-near-frontier point, not a globally minimum or cost-optimal point.
+Growth and every refinement probe dispatch the entire linked system. Once every region
+complies, full-system probes refine each changed region in ordinal region order, power
+first and then energy, to 1 MW and 1 MWh precision while retaining only compliant
+candidates and their matching interconnector-flow evidence. The result is a deterministic
+coordinate-wise near-frontier point, not a globally minimum or cost-optimal point.
 
 ## Storage
 

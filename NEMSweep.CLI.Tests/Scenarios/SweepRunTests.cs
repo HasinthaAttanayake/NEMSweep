@@ -37,6 +37,14 @@ public sealed class SweepRunTests
         Status(fixture, "p1")["status"]!.GetValue<string>().Should().Be("succeeded");
         JsonObject index = ReadIndex(fixture);
         index["schemaVersion"]!.GetValue<int>().Should().Be(ArtifactSchemaVersions.SweepIndex);
+        index["schemaVersion"]!.GetValue<int>().Should().Be(12);
+        JsonObject schemaVersions = index["provenance"]!["schemaVersions"]!.AsObject();
+        schemaVersions["systemDispatchResults"]!.GetValue<int>().Should().Be(16);
+        schemaVersions["systemDispatchOverview"]!.GetValue<int>().Should().Be(5);
+        schemaVersions["regionDispatchResults"]!.GetValue<int>().Should().Be(11);
+        schemaVersions["regionDispatchOverview"]!.GetValue<int>().Should().Be(4);
+        schemaVersions["sweepIndex"]!.GetValue<int>().Should().Be(12);
+        schemaVersions.ContainsKey("dispatchResults").Should().BeFalse();
         index["points"]!.AsArray().Should().HaveCount(2);
         JsonObject firstPoint = index["points"]![0]!.AsObject();
         firstPoint["status"]!.GetValue<string>().Should().Be("succeeded");

@@ -419,11 +419,14 @@ internal static class SweepArtifactExport
             inputs.Values.OrderBy(input => input.Path, StringComparer.Ordinal).ToArray(),
             new Dictionary<string, int>(StringComparer.Ordinal)
             {
-                ["dispatchResults"] = ArtifactSchemaVersions.DispatchResults,
                 ["operationalDemand"] = ArtifactSchemaVersions.OperationalDemand,
+                ["regionDispatchOverview"] = ArtifactSchemaVersions.RegionDispatchOverview,
+                ["regionDispatchResults"] = ArtifactSchemaVersions.RegionDispatchResults,
                 ["regularSeries"] = ArtifactSchemaVersions.RegularSeries,
                 ["sweepDefinition"] = definition.SchemaVersion,
                 ["sweepIndex"] = ArtifactSchemaVersions.SweepIndex,
+                ["systemDispatchOverview"] = ArtifactSchemaVersions.SystemDispatchOverview,
+                ["systemDispatchResults"] = ArtifactSchemaVersions.SystemDispatchResults,
                 ["weather"] = ArtifactSchemaVersions.Weather,
             });
     }

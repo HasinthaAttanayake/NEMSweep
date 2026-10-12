@@ -127,73 +127,81 @@ internal sealed class StorageSizingSearch
         var failingByRegion = failingOutcomes.ToDictionary(
             outcome => outcome.RegionId,
             StringComparer.OrdinalIgnoreCase);
-        // One region grows per call, then the caller re-dispatches. Growing every failing
-        // region in one pass would credit each one with reliability the others' new capacity
-        // supplied, so the search would overshoot and install capacity no region needed.
-        // Lowest region id first, purely so the trajectory is deterministic.
-        Region? region = _candidate.Regions
+        var blockers = new Dictionary<string, GrowthBlocker>(StringComparer.OrdinalIgnoreCase);
+        // Adopt only one regional change before re-dispatching and reranking shortages.
+        // Blockers belong to this candidate only; another change may alter their prospects.
+        IEnumerable<Region> failingRegions = _candidate.Regions
             .Where(candidate => failingByRegion.ContainsKey(candidate.RegionId))
-            .OrderBy(candidate => candidate.RegionId, StringComparer.Ordinal)
-            .FirstOrDefault();
-        if (region is null)
+            .OrderByDescending(candidate => failingByRegion[candidate.RegionId].Reliability.UnservedEnergy)
+            .ThenBy(candidate => candidate.RegionId, StringComparer.Ordinal);
+        foreach (Region region in failingRegions)
         {
+            DispatchOutcome outcome = failingByRegion[region.RegionId];
+
+            Region[] growthCandidates = GrowthCandidates(region);
+            if (growthCandidates.Length == 0)
+            {
+                int firstUnservedIndex = Enumerable.Range(0, outcome.Unserved.Length)
+                    .First(index => outcome.Unserved[index] > Power.Zero);
+                blockers.Add(region.RegionId, new GrowthBlocker(
+                    StorageSizingStatus.BatteryCapacityLimitReached,
+                    $"The Battery capacity bounds are insufficient for region {region.RegionId}: "
+                    + $"{BatterySizingDescription(region)} reached; "
+                    + $"{outcome.Reliability.UnservedEnergy.MegawattHours:F3} MWh remains unserved "
+                    + $"across {outcome.Reliability.UnservedHours} hours, first at "
+                    + $"{outcome.Unserved.InstantAt(firstUnservedIndex):O}; peak shortfall is "
+                    + $"{outcome.Reliability.PeakUnservedPower.Megawatts:F3} MW."));
+                continue;
+            }
+
+            var probes = new List<GrowthProbe>(growthCandidates.Length);
+            foreach (Region growthCandidate in growthCandidates)
+            {
+                PowerSystem probeSystem = ReplaceRegion(_candidate, growthCandidate);
+                if (!TryDispatch(probeSystem, out IReadOnlyList<DispatchOutcome> probeOutcomes))
+                {
+                    return CreateResult(
+                        _candidate,
+                        StorageSizingStatus.PassLimitReached,
+                        "The dispatch pass limit was reached while testing larger Battery candidates.");
+                }
+
+                probes.Add(new GrowthProbe(
+                    growthCandidate,
+                    probeOutcomes.Single(candidate => string.Equals(
+                        candidate.RegionId,
+                        region.RegionId,
+                        StringComparison.OrdinalIgnoreCase)).Reliability));
+            }
+
+            GrowthProbe? bestProbe = probes
+                .Where(probe => MateriallyImproves(outcome.Reliability, probe.Reliability))
+                .OrderBy(probe => probe.Reliability.UnservedEnergy)
+                .ThenBy(probe => probe.Reliability.PeakUnservedPower)
+                .FirstOrDefault();
+            if (bestProbe is null)
+            {
+                blockers.Add(region.RegionId, new GrowthBlocker(
+                    StorageSizingStatus.StorageNoLongerImprovesReliability,
+                    StagnationEvidence(region, outcome.Reliability, probes)));
+                continue;
+            }
+
+            _candidate = ReplaceRegion(_candidate, bestProbe.Region);
+            _changedRegions.Add(region.RegionId);
             return null;
         }
 
-        DispatchOutcome outcome = failingByRegion[region.RegionId];
-
-        Region[] growthCandidates = GrowthCandidates(region);
-        if (growthCandidates.Length == 0)
-        {
-            int firstUnservedIndex = Enumerable.Range(0, outcome.Unserved.Length)
-                .First(index => outcome.Unserved[index] > Power.Zero);
-            return CreateResult(
-                _candidate,
-                StorageSizingStatus.BatteryCapacityLimitReached,
-                $"The Battery capacity bounds are insufficient for region {region.RegionId}: "
-                + $"{BatterySizingDescription(region)} reached; "
-                + $"{outcome.Reliability.UnservedEnergy.MegawattHours:F3} MWh remains unserved "
-                + $"across {outcome.Reliability.UnservedHours} hours, first at "
-                + $"{outcome.Unserved.InstantAt(firstUnservedIndex):O}; peak shortfall is "
-                + $"{outcome.Reliability.PeakUnservedPower.Megawatts:F3} MW.");
-        }
-
-        var probes = new List<GrowthProbe>(growthCandidates.Length);
-        foreach (Region growthCandidate in growthCandidates)
-        {
-            PowerSystem probeSystem = ReplaceRegion(_candidate, growthCandidate);
-            if (!TryDispatch(probeSystem, out IReadOnlyList<DispatchOutcome> probeOutcomes))
-            {
-                return CreateResult(
-                    _candidate,
-                    StorageSizingStatus.PassLimitReached,
-                    "The dispatch pass limit was reached while testing larger Battery candidates.");
-            }
-
-            probes.Add(new GrowthProbe(
-                growthCandidate,
-                probeOutcomes.Single(candidate => string.Equals(
-                    candidate.RegionId,
-                    region.RegionId,
-                    StringComparison.OrdinalIgnoreCase)).Reliability));
-        }
-
-        GrowthProbe? bestProbe = probes
-            .Where(probe => MateriallyImproves(outcome.Reliability, probe.Reliability))
-            .OrderBy(probe => probe.Reliability.UnservedEnergy)
-            .ThenBy(probe => probe.Reliability.PeakUnservedPower)
-            .FirstOrDefault();
-        if (bestProbe is null)
-        {
-            return CreateResult(
-                _candidate,
-                StorageSizingStatus.StorageNoLongerImprovesReliability,
-                StagnationEvidence(region, outcome.Reliability, probes));
-        }
-
-        _candidate = ReplaceRegion(_candidate, bestProbe.Region);
-        _changedRegions.Add(region.RegionId);
-        return null;
+        StorageSizingStatus status = blockers.Values.Any(
+            blocker => blocker.Status == StorageSizingStatus.BatteryCapacityLimitReached)
+            ? StorageSizingStatus.BatteryCapacityLimitReached
+            : StorageSizingStatus.StorageNoLongerImprovesReliability;
+        return CreateResult(
+            _candidate,
+            status,
+            string.Join(" ", blockers.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                .Select(pair => pair.Value.Evidence)),
+            regionalBlockers: blockers);
     }
 
     private Region[] GrowthCandidates(Region region)
@@ -411,7 +419,8 @@ internal sealed class StorageSizingSearch
         PowerSystem powerSystem,
         StorageSizingStatus status,
         string evidence,
-        EnergyLimitedAssessment? energyLimitedAssessment = null)
+        EnergyLimitedAssessment? energyLimitedAssessment = null,
+        IReadOnlyDictionary<string, GrowthBlocker>? regionalBlockers = null)
     {
         var outcomeByRegion = _outcomes.ToDictionary(
             outcome => outcome.RegionId,
@@ -426,7 +435,8 @@ internal sealed class StorageSizingSearch
                 outcomeByRegion[region.RegionId],
                 installedByRegion[region.RegionId].BatteryCapacity,
                 status,
-                evidence))
+                evidence,
+                regionalBlockers?.GetValueOrDefault(region.RegionId)))
             .ToArray();
 
         return new StorageSizingRunResult(
@@ -446,7 +456,8 @@ internal sealed class StorageSizingSearch
         DispatchOutcome outcome,
         RegionalBatterySizing installedCapacity,
         StorageSizingStatus runStatus,
-        string runEvidence)
+        string runEvidence,
+        GrowthBlocker? blocker)
     {
         StorageFleet? battery = FindBattery(region);
         Energy energyCapacity = battery?.StorageCapacity ?? Energy.Zero;
@@ -455,10 +466,10 @@ internal sealed class StorageSizingSearch
 
         StorageSizingStatus status = meetsTarget
             ? StorageSizingStatus.TargetMet
-            : runStatus;
+            : blocker?.Status ?? runStatus;
         string evidence = meetsTarget
             ? "The region meets its USE target."
-            : runEvidence;
+            : blocker?.Evidence ?? runEvidence;
 
         return new RegionalSizingResult(
             outcome,
@@ -527,4 +538,5 @@ internal sealed class StorageSizingSearch
                 : region).ToArray());
 
     private sealed record GrowthProbe(Region Region, ReliabilityMetrics Reliability);
+    private sealed record GrowthBlocker(StorageSizingStatus Status, string Evidence);
 }

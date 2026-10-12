@@ -260,6 +260,252 @@ public sealed class StorageSizingServiceTests
     }
 
     [Fact]
+    public void Size_FailingRegionsWithDifferentPercentageRanking_PrioritisesTotalUnservedMwh()
+    {
+        PowerSystem system = MultiRegionSystem(
+            SolarRegion("NSW1", [0, 40], [2_000, 0]),
+            SolarRegion("VIC1", [90, 50], [2_000, 0]));
+
+        StorageSizingRunResult result = StorageSizingService.Size(
+            system,
+            Options(maximumPowerMw: 60, maximumEnergyMwh: 240, maximumPasses: 2));
+
+        StorageSizingPass initial = result.Trajectory[0];
+        initial.Regions.Single(region => region.RegionId == "VIC1").UnservedEnergy
+            .Should().Be(Energy.FromMegawattHours(50));
+        initial.Regions.Single(region => region.RegionId == "NSW1").UnservedEnergy
+            .Should().Be(Energy.FromMegawattHours(40));
+        result.InstalledBatteryAssessments.Single(region => region.BatteryCapacity.RegionId == "VIC1")
+            .Reliability.UnservedEnergyPercentageOfDemand.Should().BeLessThan(
+                result.InstalledBatteryAssessments.Single(region => region.BatteryCapacity.RegionId == "NSW1")
+                    .Reliability.UnservedEnergyPercentageOfDemand);
+        result.Trajectory[1].Regions.Single(region => region.RegionId == "VIC1")
+            .EnergyCapacity.Should().Be(Energy.FromMegawattHours(120));
+        result.Trajectory[1].Regions.Single(region => region.RegionId == "NSW1")
+            .EnergyCapacity.Should().Be(Energy.Zero);
+    }
+
+    [Fact]
+    public void Size_AcceptedGrowthChangesWorstShortage_ReranksBeforeNextGrowth()
+    {
+        PowerSystem system = MultiRegionSystem(
+            SolarRegion("NSW1", [0, 40], [2_000, 0]),
+            SolarRegion("VIC1", [0, 50], [2_000, 0]));
+
+        StorageSizingRunResult result = StorageSizingService.Size(
+            system,
+            Options(maximumPowerMw: 60, maximumEnergyMwh: 240, maximumPasses: 4));
+
+        result.Trajectory[1].Regions.Single(region => region.RegionId == "VIC1")
+            .EnergyCapacity.Should().Be(Energy.FromMegawattHours(120));
+        result.Trajectory[2].Regions.Single(region => region.RegionId == "VIC1")
+            .UnservedEnergy.Should().BeLessThan(Energy.FromMegawattHours(40));
+        result.Trajectory[3].Regions.Should().OnlyContain(
+            region => region.EnergyCapacity == Energy.FromMegawattHours(120));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Size_EqualShortages_UsesOrdinalRegionIdRegardlessOfDeclarationOrder(bool reverse)
+    {
+        Region nsw = SolarRegion("NSW1", [0, 40], [2_000, 0]);
+        Region vic = SolarRegion("VIC1", [0, 40], [2_000, 0]);
+        PowerSystem system = reverse ? MultiRegionSystem(vic, nsw) : MultiRegionSystem(nsw, vic);
+
+        StorageSizingRunResult result = StorageSizingService.Size(
+            system,
+            Options(maximumPowerMw: 60, maximumEnergyMwh: 240, maximumPasses: 2));
+
+        result.Trajectory[1].Regions.Single(region => region.RegionId == "NSW1")
+            .EnergyCapacity.Should().Be(Energy.FromMegawattHours(120));
+        result.Trajectory[1].Regions.Single(region => region.RegionId == "VIC1")
+            .EnergyCapacity.Should().Be(Energy.Zero);
+    }
+
+    [Fact]
+    public void Size_WorstShortageGrowthCompletes_RefinesChangedRegionsInOrdinalOrder()
+    {
+        PowerSystem system = MultiRegionSystem(
+            SolarRegion("VIC1", [0, 50], [2_000, 0]),
+            SolarRegion("NSW1", [0, 40], [2_000, 0]));
+
+        StorageSizingRunResult result = StorageSizingService.Size(
+            system, Options(maximumPowerMw: 60, maximumEnergyMwh: 240));
+
+        result.Status.Should().Be(StorageSizingStatus.TargetMet);
+        result.Regions.Should().OnlyContain(region => region.MeetsTarget);
+        (StorageSizingPass before, StorageSizingPass after) = result.Trajectory
+            .Zip(result.Trajectory.Skip(1))
+            .First(pair => pair.Second.Regions.Any(region =>
+                region.PowerCapacity < pair.First.Regions.Single(
+                    previous => previous.RegionId == region.RegionId).PowerCapacity));
+        before.Regions.Should().OnlyContain(region => region.UnservedEnergy == Energy.Zero);
+        after.Regions.Single(region => region.RegionId == "NSW1").PowerCapacity
+            .Should().BeLessThan(before.Regions.Single(region => region.RegionId == "NSW1").PowerCapacity);
+        after.Regions.Single(region => region.RegionId == "VIC1").PowerCapacity
+            .Should().Be(before.Regions.Single(region => region.RegionId == "VIC1").PowerCapacity);
+    }
+
+    [Fact]
+    public void Size_CompliantRegionHasLargerAbsoluteShortage_DoesNotGrowIt()
+    {
+        PowerSystem system = MultiRegionSystem(
+            SolarRegion("NSW1", [0, 40], [2_000, 0]),
+            SolarRegion("VIC1", [90, 50], [2_000, 0]));
+        var options = new StorageSizingOptions(
+            Power.FromMegawatts(60),
+            Energy.FromMegawattHours(240),
+            targetUsePercentage: 40,
+            maximumPasses: 2);
+
+        StorageSizingRunResult result = StorageSizingService.Size(system, options);
+
+        result.Trajectory[1].Regions.Single(region => region.RegionId == "NSW1")
+            .EnergyCapacity.Should().Be(Energy.FromMegawattHours(120));
+        result.Trajectory[1].Regions.Single(region => region.RegionId == "VIC1")
+            .EnergyCapacity.Should().Be(Energy.Zero);
+        result.Regions.Single(region => region.DispatchOutcome.RegionId == "VIC1")
+            .Status.Should().Be(StorageSizingStatus.TargetMet);
+    }
+
+    [Fact]
+    public void Size_WorstRegionStagnates_GrowsLaterRegionAndRetriesStalledRegion()
+    {
+        PowerSystem system = MultiRegionSystem(
+            CoalRegion("NSW1", 0, [50, 50])
+                .WithBatteryStorage(Energy.FromMegawattHours(120), Power.FromMegawatts(30)),
+            SolarRegion("VIC1", [0, 30], [2_000, 0]),
+            CoalRegion("QLD1", 1_000, [0, 0]));
+        StorageSizingOptions options = Options(maximumPowerMw: 60, maximumEnergyMwh: 240);
+
+        StorageSizingRunResult result = StorageSizingService.Size(system, options);
+        StorageSizingRunResult repeated = StorageSizingService.Size(system, options);
+
+        result.Status.Should().Be(StorageSizingStatus.StorageNoLongerImprovesReliability);
+        RegionalSizingResult vic = result.Regions.Single(region => region.DispatchOutcome.RegionId == "VIC1");
+        vic.MeetsTarget.Should().BeTrue();
+        vic.BatterySizing.WasChanged.Should().BeTrue();
+        result.Trajectory.Count(pass => pass.Regions.Single(region => region.RegionId == "NSW1")
+            .EnergyCapacity == Energy.FromMegawattHours(240)).Should().BeGreaterThan(2);
+        result.Regions.Single(region => region.DispatchOutcome.RegionId == "NSW1")
+            .TerminationEvidence.Should().Contain("region NSW1").And.NotContain("region VIC1");
+        repeated.Trajectory.Should().BeEquivalentTo(result.Trajectory, options => options.WithStrictOrdering());
+        repeated.Regions.Select(region => region.BatterySizing)
+            .Should().Equal(result.Regions.Select(region => region.BatterySizing));
+    }
+
+    [Fact]
+    public void Size_WorstRegionHasNoLargerCandidate_GrowsLaterRegion()
+    {
+        PowerSystem system = MultiRegionSystem(
+            CoalRegion("NSW1", 0, [50, 50])
+                .WithBatteryStorage(Energy.FromMegawattHours(240), Power.FromMegawatts(60)),
+            SolarRegion("VIC1", [0, 30], [2_000, 0]),
+            CoalRegion("QLD1", 1_000, [0, 0]));
+
+        StorageSizingRunResult result = StorageSizingService.Size(
+            system, Options(maximumPowerMw: 60, maximumEnergyMwh: 240));
+
+        result.Status.Should().Be(StorageSizingStatus.BatteryCapacityLimitReached);
+        result.Regions.Single(region => region.DispatchOutcome.RegionId == "NSW1")
+            .Status.Should().Be(StorageSizingStatus.BatteryCapacityLimitReached);
+        RegionalSizingResult vic = result.Regions.Single(region => region.DispatchOutcome.RegionId == "VIC1");
+        vic.Status.Should().Be(StorageSizingStatus.TargetMet);
+        vic.BatterySizing.WasChanged.Should().BeTrue();
+        vic.Reliability.UnservedEnergy.Should().Be(Energy.Zero);
+    }
+
+    [Fact]
+    public void Size_MixedRegionalBlockers_ReportsActualReasonsAndAggregateCapacityLimit()
+    {
+        PowerSystem system = MultiRegionSystem(
+            CoalRegion("NSW1", 0, [50, 50])
+                .WithBatteryStorage(Energy.FromMegawattHours(240), Power.FromMegawatts(60)),
+            CoalRegion("VIC1", 0, [10, 10])
+                .WithBatteryStorage(Energy.FromMegawattHours(120), Power.FromMegawatts(30)),
+            CoalRegion("QLD1", 1_000, [0, 0]));
+
+        StorageSizingRunResult result = StorageSizingService.Size(
+            system, Options(maximumPowerMw: 60, maximumEnergyMwh: 240));
+
+        result.Status.Should().Be(StorageSizingStatus.BatteryCapacityLimitReached);
+        result.Regions.Single(region => region.DispatchOutcome.RegionId == "NSW1")
+            .Status.Should().Be(StorageSizingStatus.BatteryCapacityLimitReached);
+        RegionalSizingResult vic = result.Regions.Single(region => region.DispatchOutcome.RegionId == "VIC1");
+        vic.Status.Should().Be(StorageSizingStatus.StorageNoLongerImprovesReliability);
+        vic.TerminationEvidence.Should().Contain("region VIC1").And.NotContain("region NSW1");
+        result.TerminationEvidence.Should().Contain("region NSW1").And.Contain("region VIC1");
+        result.Regions.Single(region => region.DispatchOutcome.RegionId == "QLD1")
+            .Status.Should().Be(StorageSizingStatus.TargetMet);
+    }
+
+    [Fact]
+    public void Size_AllFailingRegionsStagnate_TestsEachAndOrdersFinalEvidenceByRegionId()
+    {
+        PowerSystem system = MultiRegionSystem(
+            CoalRegion("NSW1", 0, [10, 10])
+                .WithBatteryStorage(Energy.FromMegawattHours(120), Power.FromMegawatts(30)),
+            CoalRegion("VIC1", 0, [20, 20])
+                .WithBatteryStorage(Energy.FromMegawattHours(120), Power.FromMegawatts(30)),
+            CoalRegion("QLD1", 1_000, [0, 0]));
+
+        StorageSizingRunResult result = StorageSizingService.Size(
+            system, Options(maximumPowerMw: 60, maximumEnergyMwh: 240));
+
+        result.Status.Should().Be(StorageSizingStatus.StorageNoLongerImprovesReliability);
+        result.DispatchPassCount.Should().Be(5);
+        result.Trajectory[1].Regions.Single(region => region.RegionId == "VIC1")
+            .EnergyCapacity.Should().Be(Energy.FromMegawattHours(240));
+        result.Trajectory[3].Regions.Single(region => region.RegionId == "NSW1")
+            .EnergyCapacity.Should().Be(Energy.FromMegawattHours(240));
+        result.TerminationEvidence.IndexOf("region NSW1", StringComparison.Ordinal)
+            .Should().BeLessThan(result.TerminationEvidence.IndexOf("region VIC1", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Size_PassLimitDuringRetriedRegion_ReportsMatchingAcceptedCandidateWithoutStaleBlockers()
+    {
+        PowerSystem system = MultiRegionSystem(
+            CoalRegion("NSW1", 0, [50, 50])
+                .WithBatteryStorage(Energy.FromMegawattHours(120), Power.FromMegawatts(30)),
+            SolarRegion("VIC1", [0, 30], [2_000, 0]),
+            CoalRegion("QLD1", 1_000, [0, 0]));
+
+        StorageSizingRunResult result = StorageSizingService.Size(
+            system, Options(maximumPowerMw: 60, maximumEnergyMwh: 240, maximumPasses: 6));
+
+        result.Status.Should().Be(StorageSizingStatus.PassLimitReached);
+        result.DispatchPassCount.Should().Be(6);
+        result.Trajectory.Should().HaveCount(6);
+        result.Regions.Should().OnlyContain(region => region.Status == StorageSizingStatus.PassLimitReached
+            || region.Status == StorageSizingStatus.TargetMet);
+        result.Regions.Single(region => region.DispatchOutcome.RegionId == "NSW1")
+            .BatterySizing.EnergyCapacity.Should().Be(Energy.FromMegawattHours(120));
+        RegionalSizingResult vic = result.Regions.Single(region => region.DispatchOutcome.RegionId == "VIC1");
+        vic.BatterySizing.EnergyCapacity.Should().Be(Energy.FromMegawattHours(120));
+        vic.Reliability.UnservedEnergy.Should().Be(
+            result.Trajectory[4].Regions.Single(region => region.RegionId == "VIC1").UnservedEnergy);
+    }
+
+    [Fact]
+    public void Size_OnlyEnergyIsCapped_TestsRemainingPowerCandidateBeforeReportingStagnation()
+    {
+        PowerSystem system = MultiRegionSystem(
+            CoalRegion("NSW1", 0, [10, 10])
+                .WithBatteryStorage(Energy.FromMegawattHours(240), Power.FromMegawatts(30)),
+            CoalRegion("QLD1", 20, [10, 10]));
+
+        StorageSizingRunResult result = StorageSizingService.Size(
+            system, Options(maximumPowerMw: 60, maximumEnergyMwh: 240));
+
+        result.Status.Should().Be(StorageSizingStatus.StorageNoLongerImprovesReliability);
+        result.DispatchPassCount.Should().Be(2);
+        result.Trajectory[1].Regions.Single(region => region.RegionId == "NSW1")
+            .PowerCapacity.Should().Be(Power.FromMegawatts(60));
+    }
+
+    [Fact]
     public void Size_PassLimitReached_ReturnsLastDispatchEvidence()
     {
         PowerSystem system = SolarSystem(
@@ -342,6 +588,9 @@ public sealed class StorageSizingServiceTests
                 maximumPasses: maximumPasses);
 
     private static StorageTechnologyProfile BatteryProfile() => new(15u, 0.87);
+
+    private static PowerSystem MultiRegionSystem(params Region[] regions) =>
+        new(new PowerSystemId("multi-region-sizing"), new ScenarioId("test-scenario"), regions);
 
     private static PowerSystem SolarSystem(
         string regionId,
