@@ -3,36 +3,34 @@ using System.Text.Json.Serialization;
 namespace NEMSweep.Contracts;
 
 /// <summary>
-/// Declares what an input bundle folder contains: <c>manifest.json</c> at the bundle root.
-/// Everything else in the bundle (demand archives, per-region weather, the generation-information
-/// workbook) is discovered from the folder shape rather than listed here; this manifest exists so
-/// the bundle can be identified and validated before that discovery runs.
+/// Declares the identity, period, and source weather-directory mapping for an input bundle. Schema
+/// version 1 manifests used string entries in <c>regions</c>; the CLI normalizes those entries to
+/// this version 2 shape when it loads a legacy bundle.
 /// </summary>
-/// <param name="SchemaVersion">
-/// Schema version of this manifest. Ingestion rejects a bundle whose version it does not support.
-/// </param>
-/// <param name="BundleId">
-/// Identifier for the bundle. Expected to match the name of the folder the manifest lives in;
-/// a mismatch is a warning, not a rejection.
-/// </param>
+/// <param name="SchemaVersion">Schema version of this manifest.</param>
+/// <param name="BundleId">Identifier for the bundle.</param>
 /// <param name="Name">Human-readable name of the bundle.</param>
 /// <param name="Period">Calendar period the bundle's inputs are intended to cover.</param>
-/// <param name="Regions">
-/// NEM region identifiers (for example <c>NSW1</c>) the bundle supplies weather for. Every entry
-/// must be a recognised NEM region and the array must not be empty or contain duplicates.
-/// </param>
+/// <param name="Regions">Region identities and their corresponding weather subdirectories.</param>
 public sealed record InputBundleManifestDTO(
     [property: JsonPropertyName("schemaVersion")]
     int SchemaVersion,
     string BundleId,
     string Name,
     InputBundlePeriodDTO Period,
-    string[] Regions);
+    InputBundleRegionDTO[] Regions);
+
+/// <summary>A bundle region identity and the safe, readable directory containing its weather.</summary>
+/// <param name="RegionId">Original, free-form region identifier retained in produced data.</param>
+/// <param name="WeatherDirectory">Single directory name under the bundle's <c>weather</c> folder.</param>
+public sealed record InputBundleRegionDTO(
+    string RegionId,
+    string WeatherDirectory);
 
 /// <summary>Calendar period a bundle's inputs are intended to cover.</summary>
 /// <param name="Start">
 /// Inclusive start of the period. Its UTC offset is the market-time offset the ingested demand and
-/// weather are normalised to (the NEM's is UTC+10); <see cref="End"/> must carry the same offset.
+/// weather are normalised to; <see cref="End"/> must carry the same offset.
 /// </param>
 /// <param name="End">Exclusive end of the period; must be after <see cref="Start"/> and carry the same offset.</param>
 public sealed record InputBundlePeriodDTO(

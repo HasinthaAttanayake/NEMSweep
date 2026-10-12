@@ -73,7 +73,7 @@ internal sealed class CommandRouter
             // reading settings the run was never going to reach.
             if (commandArgs is ["--epw-report", var epwRegionId, ..])
             {
-                RequireKnownRegion(epwRegionId);
+                RequireRegionId(epwRegionId);
             }
 
             // Matched to a handler before the workspace is built, so an unroutable command line is
@@ -102,11 +102,11 @@ internal sealed class CommandRouter
                 ["--generation-information", var path] =>
                     context => GenerationInformationCommand.Run(context, path),
                 ["--epw-report", var regionId, var solarPath] =>
-                    context => EpwCommands.WriteReport(context, RequireKnownRegion(regionId), solarPath),
+                    context => EpwCommands.WriteReport(context, RequireRegionId(regionId), solarPath),
                 ["--epw-report", var regionId, var solarPath, var windPath] =>
                     context => EpwCommands.WriteReport(
                         context,
-                        RequireKnownRegion(regionId),
+                        RequireRegionId(regionId),
                         solarPath,
                         windPath),
                 _ => null,
@@ -139,16 +139,15 @@ internal sealed class CommandRouter
     }
 
     /// <summary>
-    /// Rejects a region argument that is not one of the five NEM regions. Region identity is a bare
-    /// string throughout the pipeline, so a typo here would otherwise publish a
-    /// <c>weather-{typo}.json</c> artifact that nothing ever reads.
+    /// Region identities are free-form strings, but the EPW command needs a nonblank identity that
+    /// can be represented in a portable artifact filename.
     /// </summary>
-    private static string RequireKnownRegion(string regionId) =>
-        NemRegions.IsKnown(regionId)
-            ? regionId
-            : throw new ArgumentException(
-                $"Region '{regionId}' is not a NEM region. Expected one of: "
-                + $"{string.Join(", ", NemRegions.All.Order(StringComparer.Ordinal))}.");
+    private static string RequireRegionId(string regionId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(regionId);
+        RegionFileNames.For(regionId);
+        return regionId;
+    }
 
     private int PrintVersion()
     {
