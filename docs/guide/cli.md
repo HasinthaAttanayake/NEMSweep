@@ -32,6 +32,12 @@ you supply them, and each takes the first of three sources.
 The environment variables exist because a container's settings file sits in a read-only image
 layer, so a flag or a variable is the only way to redirect a run there.
 
+The shipped `inputBundleRoot` setting is `data/nemsweep-inputs-v2` for current format-2 demand/weather
+bundles. `--validate-inputs` and `--ingest` use it when no bundle path is supplied. The former
+`data/nemsweep-inputs` bundle is legacy format 1 and remains supported when explicitly selected or
+configured in `appsettings.local.json`; local settings still take precedence over shipped defaults.
+See [Input bundles](input-bundles.md) for the layouts and non-destructive migration steps.
+
 Both overrides may appear anywhere on the command line. They are stripped before the command itself
 is matched, so they never occupy one of a command's positional arguments:
 
