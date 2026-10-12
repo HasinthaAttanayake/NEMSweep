@@ -16,6 +16,45 @@ namespace NEMSweep.CLI.Tests.Scenarios;
 public sealed class SweepRunTests
 {
     [Fact]
+    public void Run_Version2SweepOverLegacyBaseline_PublishesFixedAndSizedModes()
+    {
+        using var fixture = new SweepRunFixture();
+        fixture.WriteDefinition("""
+            [{ "pointId": "fixed", "axisValue": 0, "label": "Declared fleet",
+               "overrides": { "executionMode": "fixedFleet", "storageSizing": null } },
+             { "pointId": "sized", "axisValue": 1, "label": "Sized fleet", "overrides": {} }]
+            """);
+        JsonObject definition = JsonNode.Parse(File.ReadAllBytes(fixture.DefinitionPath))!.AsObject();
+        definition["schemaVersion"] = 2;
+        File.WriteAllText(fixture.DefinitionPath, definition.ToJsonString());
+        string baselinePath = Path.Combine(fixture.RootPath, "scenarios", "baseline.json");
+        JsonObject baseline = JsonNode.Parse(File.ReadAllBytes(baselinePath))!.AsObject();
+        baseline["$schema"] =
+            "https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/scenario-v6.json";
+        File.WriteAllText(baselinePath, baseline.ToJsonString());
+
+        SweepRunCommand.Run(fixture.CreateContext(TextWriter.Null), "sweeps/test-sweep.json")
+            .Should().Be(0);
+
+        JsonObject index = ReadIndex(fixture);
+        JsonObject fixedPoint = index["points"]![0]!.AsObject();
+        fixedPoint["status"]!.GetValue<string>().Should().Be("succeeded");
+        fixedPoint["executionMode"]!.GetValue<string>().Should().Be("fixedFleet");
+        fixedPoint["storageSizing"].Should().BeNull();
+        JsonObject sizedPoint = index["points"]![1]!.AsObject();
+        sizedPoint["executionMode"]!.GetValue<string>().Should().Be("sizeBattery");
+        sizedPoint["storageSizing"].Should().NotBeNull();
+        JsonObject fixedDetail = JsonNode.Parse(File.ReadAllBytes(fixture.PointResultPath("fixed")))!.AsObject();
+        fixedDetail["executionMode"]!.GetValue<string>().Should().Be("fixedFleet");
+        fixedDetail["storageSizing"].Should().BeNull();
+        JsonObject config = JsonNode.Parse(File.ReadAllBytes(PublishedConfig(fixture, fixedPoint)))!.AsObject();
+        config["schemaVersion"]!.GetValue<int>().Should().Be(7);
+        config["$schema"]!.GetValue<string>().Should().EndWith("/scenario-v7.json");
+        config["reliability"]!["targetUsePercentage"]!.GetValue<double>().Should().Be(0.002);
+        fixedPoint["scalars"]!["storageEnergyMwh"]!.GetValue<double>().Should().Be(0);
+    }
+
+    [Fact]
     public void Run_WritesPublishedIndexAndSucceededPointArtifacts()
     {
         using var fixture = new SweepRunFixture();
@@ -37,13 +76,13 @@ public sealed class SweepRunTests
         Status(fixture, "p1")["status"]!.GetValue<string>().Should().Be("succeeded");
         JsonObject index = ReadIndex(fixture);
         index["schemaVersion"]!.GetValue<int>().Should().Be(ArtifactSchemaVersions.SweepIndex);
-        index["schemaVersion"]!.GetValue<int>().Should().Be(12);
+        index["schemaVersion"]!.GetValue<int>().Should().Be(13);
         JsonObject schemaVersions = index["provenance"]!["schemaVersions"]!.AsObject();
-        schemaVersions["systemDispatchResults"]!.GetValue<int>().Should().Be(16);
-        schemaVersions["systemDispatchOverview"]!.GetValue<int>().Should().Be(5);
-        schemaVersions["regionDispatchResults"]!.GetValue<int>().Should().Be(11);
-        schemaVersions["regionDispatchOverview"]!.GetValue<int>().Should().Be(4);
-        schemaVersions["sweepIndex"]!.GetValue<int>().Should().Be(12);
+        schemaVersions["systemDispatchResults"]!.GetValue<int>().Should().Be(17);
+        schemaVersions["systemDispatchOverview"]!.GetValue<int>().Should().Be(6);
+        schemaVersions["regionDispatchResults"]!.GetValue<int>().Should().Be(12);
+        schemaVersions["regionDispatchOverview"]!.GetValue<int>().Should().Be(5);
+        schemaVersions["sweepIndex"]!.GetValue<int>().Should().Be(13);
         schemaVersions.ContainsKey("dispatchResults").Should().BeFalse();
         index["points"]!.AsArray().Should().HaveCount(2);
         JsonObject firstPoint = index["points"]![0]!.AsObject();

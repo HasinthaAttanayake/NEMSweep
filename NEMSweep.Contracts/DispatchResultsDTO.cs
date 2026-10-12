@@ -18,10 +18,11 @@ namespace NEMSweep.Contracts;
 /// <param name="PowerSystem">The realised fleet the scenario was dispatched against.</param>
 /// <param name="DataSeries">The interval-by-interval dispatch series.</param>
 /// <param name="Metrics">Integrated energy totals and reliability diagnostics for the run.</param>
-/// <param name="Reliability">The reliability target this run was sized against and the outcome.</param>
-/// <param name="StorageSizing">What, if anything, the storage sizing loop did to meet the target.</param>
+/// <param name="Reliability">The reliability target this run was assessed against and the outcome.</param>
+/// <param name="StorageSizing">Sizing evidence, or null when fixed-fleet execution deliberately bypassed sizing.</param>
 /// <param name="Cost">Annualised and levelised cost evidence for the run.</param>
 /// <param name="Emissions">Annual operational emissions evidence for the run.</param>
+/// <param name="ExecutionMode">Whether the declared fleet was dispatched or Battery capacity was sized.</param>
 public sealed record DispatchResultsDTO(
     int SchemaVersion,
     DispatchScenarioDTO Scenario,
@@ -31,9 +32,10 @@ public sealed record DispatchResultsDTO(
     DispatchSeriesDTO DataSeries,
     DispatchMetricsDTO Metrics,
     ReliabilityBasisDTO Reliability,
-    StorageSizingOutcomeDTO StorageSizing,
+    StorageSizingOutcomeDTO? StorageSizing,
     DispatchCostDTO Cost,
-    [property: JsonRequired] DispatchEmissionsDTO Emissions);
+    [property: JsonRequired] DispatchEmissionsDTO Emissions,
+    [property: JsonRequired] SimulationExecutionMode ExecutionMode = SimulationExecutionMode.SizeBattery);
 
 /// <summary>The scenario identity and dispatched period for a single-scenario dispatch result.</summary>
 /// <param name="Id">Scenario identifier.</param>

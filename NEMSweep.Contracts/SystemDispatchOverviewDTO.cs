@@ -17,7 +17,8 @@ public sealed record SystemDispatchOverviewDTO(
     Dictionary<string, RegionDispatchSummaryDTO> RegionSummariesById,
     DispatchMetricsDTO Metrics,
     ReliabilityBasisDTO Reliability,
-    StorageSizingOutcomeDTO StorageSizing,
+    StorageSizingOutcomeDTO? StorageSizing,
     DispatchCostDTO Cost,
     [property: JsonRequired] DispatchEmissionsDTO Emissions,
-    [property: JsonRequired] DispatchTopologyDTO Topology);
+    [property: JsonRequired] DispatchTopologyDTO Topology,
+    [property: JsonRequired] SimulationExecutionMode ExecutionMode = SimulationExecutionMode.SizeBattery);

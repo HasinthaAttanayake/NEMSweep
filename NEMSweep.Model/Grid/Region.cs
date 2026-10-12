@@ -5,10 +5,10 @@ using NEMSweep.Model.Weather;
 
 namespace NEMSweep.Model.Grid;
 
-/// <summary>A NEM region whose grid-model series are represented hourly.</summary>
+/// <summary>A grid region whose model series are represented hourly.</summary>
 public sealed class Region
 {
-    /// <summary>Identifies the NEM region, for example <c>NSW1</c>.</summary>
+    /// <summary>Identifies the region with a nonblank free-form string.</summary>
     public string RegionId { get; }
     /// <summary>The region's base demand plus any labelled additive components.</summary>
     public DemandProfile Demand { get; }
@@ -29,7 +29,7 @@ public sealed class Region
     public RegionalResourceProfile? ResourceProfile { get; }
 
     /// <summary>Validates and creates a realised region.</summary>
-    /// <param name="regionId">The NEM region this realises, for example <c>NSW1</c>.</param>
+    /// <param name="regionId">The nonblank region identifier this realises.</param>
     /// <param name="generatingFleets">
     /// At least one fleet, with distinct generation technologies. A Solar or Wind fleet
     /// requires <paramref name="resourceProfile"/>.

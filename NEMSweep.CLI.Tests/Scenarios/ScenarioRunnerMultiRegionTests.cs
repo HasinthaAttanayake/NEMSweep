@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using AwesomeAssertions;
 using NEMSweep.CLI.Application;
 using NEMSweep.CLI.Configuration;
@@ -6,6 +7,7 @@ using NEMSweep.CLI.Infrastructure;
 using NEMSweep.CLI.Scenarios;
 using NEMSweep.Contracts;
 using NEMSweep.Model.Grid;
+using NEMSweep.Model.Simulation;
 using NEMSweep.Model.StorageSizing;
 using NEMSweep.Model.Units;
 using DomainScenario = NEMSweep.Model.Scenarios.Scenario;
@@ -16,6 +18,126 @@ namespace NEMSweep.CLI.Tests.Scenarios;
 public sealed class ScenarioRunnerMultiRegionTests
 {
     [Fact]
+    public void Run_FixedFleetWithCustomRegionAndNoStorage_PublishesReliabilityFailureWithoutSizing()
+    {
+        using var fixture = new RunnerFixture
+        {
+            VicDemandSeries = Enumerable.Repeat(140d, 8_760).ToArray(),
+            IncludeInterconnector = true,
+        };
+        fixture.WriteScenario();
+        const string regionId = "North/Coast: \u03b1";
+        fixture.MakeFixedFleet(regionId, emptyStorage: true);
+        var warnings = new StringWriter();
+        var context = new CliContext(fixture.Paths, fixture.Settings, warnings);
+
+        ScenarioCommand.Run(context, "scenario.json").Should().Be(0);
+
+        SystemDispatchResultsDTO system = JsonSerializer.Deserialize<SystemDispatchResultsDTO>(
+            File.ReadAllBytes(fixture.Paths.DispatchResultsPath), JsonFile.ReadOptions)!;
+        system.ExecutionMode.Should().Be(SimulationExecutionMode.FixedFleet);
+        system.StorageSizing.Should().BeNull();
+        system.Reliability.WithinTarget.Should().BeFalse();
+        warnings.ToString().Should().NotBeEmpty();
+        RegionDispatchSummaryDTO summary = system.RegionSummariesById[regionId];
+        summary.StorageSizing.Should().BeNull();
+        summary.ExecutionMode.Should().Be(SimulationExecutionMode.FixedFleet);
+        summary.StoragePowerMw.Should().Be(0);
+        summary.StorageEnergyMwh.Should().Be(0);
+        summary.DetailPath.Should().Be($"results-{RegionFileNames.For(regionId)}.json");
+        RegionDispatchResultsDTO detail = JsonSerializer.Deserialize<RegionDispatchResultsDTO>(
+            File.ReadAllBytes(fixture.Paths.OutputPath(summary.DetailPath)), JsonFile.ReadOptions)!;
+        detail.RegionId.Should().Be(regionId);
+        detail.ExecutionMode.Should().Be(system.ExecutionMode);
+        detail.StorageSizing.Should().BeNull();
+        detail.PowerSystem.StorageFleets.Should().BeEmpty();
+        detail.PowerSystem.Fleets.Single().NameplateCapacityMw.Should().Be(100);
+        system.Topology.Links.Single().FromRegionId.Should().Be(regionId);
+        system.Interconnectors.Single().FlowMw.Should().Contain(value => value > 0);
+        SweepArtifactExport.CreateScalars(system).StorageEnergyMwh.Should().Be(0);
+        SystemDispatchOverviewDTO overview = JsonSerializer.Deserialize<SystemDispatchOverviewDTO>(
+            File.ReadAllBytes(fixture.Paths.OutputPath("results-overview.json")), JsonFile.ReadOptions)!;
+        overview.ExecutionMode.Should().Be(system.ExecutionMode);
+        overview.StorageSizing.Should().BeNull();
+    }
+
+    [Fact]
+    public void Run_FixedFleetWithUndersizedInstalledBattery_PreservesDeclaredCapacity()
+    {
+        using var fixture = new RunnerFixture();
+        fixture.WriteScenario();
+        fixture.MakeFixedFleet("NSW1", emptyStorage: false);
+        ScenarioSettings settings = ScenarioConfig.Load(Path.Combine(fixture.RootPath, "scenario.json"));
+
+        ScenarioDispatchResult result = ScenarioRunner.RunDispatch(settings, fixture.Paths);
+
+        result.SizingResult.Should().BeNull();
+        result.Dispatch.RegionalOutcomes.Should().HaveCount(2);
+        StorageFleet battery = result.PowerSystem.Regions[0].StorageFleets.Should().ContainSingle().Subject;
+        battery.PowerCapacity.Megawatts.Should().Be(10);
+        battery.StorageCapacity.MegawattHours.Should().Be(40);
+        result.Dispatch.Should().BeEquivalentTo(Dispatcher.DispatchSystem(result.PowerSystem));
+    }
+
+    [Theory]
+    [InlineData("fixedFleet")]
+    [InlineData("sizeBattery")]
+    public void Run_StorageSummariesAndSweepScalarsIncludeAllStorageTechnologies(string executionMode)
+    {
+        using var fixture = new RunnerFixture();
+        fixture.WriteScenario();
+        fixture.MakeFixedFleet("NSW1", emptyStorage: false);
+        string path = Path.Combine(fixture.RootPath, "scenario.json");
+        JsonObject config = JsonNode.Parse(File.ReadAllBytes(path))!.AsObject();
+        config["executionMode"] = executionMode;
+        if (executionMode == "sizeBattery")
+        {
+            config["storageSizing"] = new JsonObject
+            {
+                ["maximumPowerMw"] = 10_000,
+                ["maximumEnergyMwh"] = 100_000,
+            };
+        }
+        JsonArray storage = config["regions"]![0]!["storageFleets"]!.AsArray();
+        JsonNode hydro = storage[0]!.DeepClone();
+        hydro["technology"] = "PumpedHydro";
+        hydro["initialPowerCapacityMw"] = 25;
+        hydro["initialEnergyCapacityMwh"] = 100;
+        storage.Add(hydro);
+        File.WriteAllText(path, config.ToJsonString());
+
+        ScenarioCommand.Run(new CliContext(fixture.Paths, fixture.Settings, TextWriter.Null), "scenario.json")
+            .Should().Be(0);
+
+        SystemDispatchResultsDTO system = JsonSerializer.Deserialize<SystemDispatchResultsDTO>(
+            File.ReadAllBytes(fixture.Paths.DispatchResultsPath), JsonFile.ReadOptions)!;
+        system.RegionSummariesById["NSW1"].StoragePowerMw.Should().Be(35);
+        system.RegionSummariesById["NSW1"].StorageEnergyMwh.Should().Be(140);
+        SweepArtifactExport.CreateScalars(system).StoragePowerMw.Should().Be(45);
+        SweepArtifactExport.CreateScalars(system).StorageEnergyMwh.Should().Be(180);
+    }
+
+    [Fact]
+    public void RunDispatch_DemandPeriodDoesNotMatchValues_FailsAtInputStage()
+    {
+        using var fixture = new RunnerFixture();
+        string path = fixture.Paths.DataPath("demand-nsw1.json");
+        ModelInputOutputDTO demand = JsonSerializer.Deserialize<ModelInputOutputDTO>(
+            File.ReadAllBytes(path), JsonFile.ReadOptions)!;
+        ContractsScenario period = demand.Scenario;
+        period.PeriodEnd = period.PeriodEnd.AddHours(1);
+        demand.Scenario = period;
+        File.WriteAllText(path, JsonSerializer.Serialize(demand));
+
+        var act = () => fixture.Run();
+
+        ScenarioRunException exception = act.Should().Throw<ScenarioRunException>().Which;
+        exception.Stage.Should().Be(SweepFailureStage.Input);
+        exception.Code.Should().Be("invalidInput");
+        exception.Message.Should().Contain("length must agree");
+    }
+
+    [Fact]
     public void RunDispatch_LoadsEachRegionalInputAndProducesTwoRegionalResults()
     {
         using var fixture = new RunnerFixture();
@@ -23,7 +145,7 @@ public sealed class ScenarioRunnerMultiRegionTests
 
         result.PowerSystem.Regions.Select(region => region.RegionId)
             .Should().Equal("NSW1", "VIC1");
-        result.SizingResult.Regions.Select(region => region.DispatchOutcome.RegionId)
+        result.SizingResult!.Regions.Select(region => region.DispatchOutcome.RegionId)
             .Should().Equal("NSW1", "VIC1");
         result.DemandInputs.Keys.Should().BeEquivalentTo("NSW1", "VIC1");
         result.WeatherInputs.Keys.Should().BeEquivalentTo("NSW1", "VIC1");
@@ -147,7 +269,7 @@ public sealed class ScenarioRunnerMultiRegionTests
         link.FromRegionId.Should().Be("NSW1");
         link.ToRegionId.Should().Be("VIC1");
         link.Capacity.Should().Be(Power.FromMegawatts(30));
-        result.SizingResult.InterconnectorFlows.Should().ContainSingle();
+        result.SizingResult!.InterconnectorFlows.Should().ContainSingle();
         result.SizingResult.InterconnectorFlows[0].Flow.Length.Should().Be(8_760);
         result.SizingResult.InterconnectorFlows[0].Losses.Length.Should().Be(8_760);
     }
@@ -188,22 +310,22 @@ public sealed class ScenarioRunnerMultiRegionTests
         RegionDispatchOverviewDTO vicOverview = JsonSerializer.Deserialize<RegionDispatchOverviewDTO>(
             File.ReadAllBytes(Path.Combine(outputDirectory, "results-vic1-overview.json")), JsonFile.ReadOptions)!;
 
-        system.SchemaVersion.Should().Be(16);
-        overview.SchemaVersion.Should().Be(5);
-        nsw.SchemaVersion.Should().Be(11);
-        vic.SchemaVersion.Should().Be(11);
-        nswOverview.SchemaVersion.Should().Be(4);
-        vicOverview.SchemaVersion.Should().Be(4);
-        system.StorageSizing.Outcome.Should().Be(StorageSizingOutcome.BatteryCapacityLimitReached);
-        nsw.StorageSizing.Outcome.Should().Be(StorageSizingOutcome.StorageNoLongerImprovesReliability);
-        vic.StorageSizing.Outcome.Should().Be(StorageSizingOutcome.BatteryCapacityLimitReached);
-        system.RegionSummariesById["NSW1"].StorageSizing.Outcome.Should().Be(nsw.StorageSizing.Outcome);
-        system.RegionSummariesById["VIC1"].StorageSizing.Outcome.Should().Be(vic.StorageSizing.Outcome);
-        overview.StorageSizing.Outcome.Should().Be(system.StorageSizing.Outcome);
-        overview.RegionSummariesById["NSW1"].StorageSizing.Outcome.Should().Be(nsw.StorageSizing.Outcome);
-        overview.RegionSummariesById["VIC1"].StorageSizing.Outcome.Should().Be(vic.StorageSizing.Outcome);
-        nswOverview.StorageSizing.Outcome.Should().Be(nsw.StorageSizing.Outcome);
-        vicOverview.StorageSizing.Outcome.Should().Be(vic.StorageSizing.Outcome);
+        system.SchemaVersion.Should().Be(17);
+        overview.SchemaVersion.Should().Be(6);
+        nsw.SchemaVersion.Should().Be(12);
+        vic.SchemaVersion.Should().Be(12);
+        nswOverview.SchemaVersion.Should().Be(5);
+        vicOverview.SchemaVersion.Should().Be(5);
+        system.StorageSizing!.Outcome.Should().Be(StorageSizingOutcome.BatteryCapacityLimitReached);
+        nsw.StorageSizing!.Outcome.Should().Be(StorageSizingOutcome.StorageNoLongerImprovesReliability);
+        vic.StorageSizing!.Outcome.Should().Be(StorageSizingOutcome.BatteryCapacityLimitReached);
+        system.RegionSummariesById["NSW1"].StorageSizing!.Outcome.Should().Be(nsw.StorageSizing.Outcome);
+        system.RegionSummariesById["VIC1"].StorageSizing!.Outcome.Should().Be(vic.StorageSizing.Outcome);
+        overview.StorageSizing!.Outcome.Should().Be(system.StorageSizing.Outcome);
+        overview.RegionSummariesById["NSW1"].StorageSizing!.Outcome.Should().Be(nsw.StorageSizing.Outcome);
+        overview.RegionSummariesById["VIC1"].StorageSizing!.Outcome.Should().Be(vic.StorageSizing.Outcome);
+        nswOverview.StorageSizing!.Outcome.Should().Be(nsw.StorageSizing.Outcome);
+        vicOverview.StorageSizing!.Outcome.Should().Be(vic.StorageSizing.Outcome);
         nsw.StorageSizing.FinalEnergyMwh.Should().Be(0);
         vic.StorageSizing.FinalEnergyMwh.Should().Be(200);
         vic.StorageSizing.FinalPowerMw.Should().Be(50);
@@ -239,7 +361,7 @@ public sealed class ScenarioRunnerMultiRegionTests
             File.ReadAllBytes(fixture.Paths.DispatchResultsPath),
             JsonFile.ReadOptions)!;
         system.Reliability.WithinTarget.Should().BeFalse();
-        system.StorageSizing.Outcome.Should().BeOneOf(
+        system.StorageSizing!.Outcome.Should().BeOneOf(
             StorageSizingOutcome.StorageNoLongerImprovesReliability,
             StorageSizingOutcome.BatteryCapacityLimitReached,
             StorageSizingOutcome.PassLimitReached);
@@ -263,7 +385,7 @@ public sealed class ScenarioRunnerMultiRegionTests
             File.ReadAllBytes(fixture.Paths.DispatchResultsPath),
             JsonFile.ReadOptions)!;
         system.RegionIds.Should().Equal("NSW1", "VIC1");
-        system.StorageSizing.MaximumPowerMw.Should().Be(200);
+        system.StorageSizing!.MaximumPowerMw.Should().Be(200);
         system.StorageSizing.MaximumEnergyMwh.Should().Be(800);
         system.StorageSizing.FinalPowerMw.Should().BeLessThanOrEqualTo(system.StorageSizing.MaximumPowerMw);
         system.StorageSizing.FinalEnergyMwh.Should().BeLessThanOrEqualTo(system.StorageSizing.MaximumEnergyMwh);
@@ -273,7 +395,7 @@ public sealed class ScenarioRunnerMultiRegionTests
                 Path.GetDirectoryName(fixture.Paths.DispatchResultsPath)!,
                 "results-nsw1.json")),
             JsonFile.ReadOptions)!;
-        region.StorageSizing.MaximumPowerMw.Should().Be(100);
+        region.StorageSizing!.MaximumPowerMw.Should().Be(100);
         region.StorageSizing.MaximumEnergyMwh.Should().Be(400);
     }
 
@@ -410,7 +532,46 @@ public sealed class ScenarioRunnerMultiRegionTests
                 [Region("NSW1", "demand-nsw1.json", "weather-nsw1.json", NswDataCentreNameplateMw),
                  Region("VIC1", "demand-vic1.json", "weather-vic1.json", VicDataCentreNameplateMw)],
                 new StorageSizingSettings(100, 400, MaximumPasses: 4),
-                Interconnectors: IncludeInterconnector ? [InterconnectorSettings()] : null);
+                Interconnectors: IncludeInterconnector ? [InterconnectorSettings()] : null,
+                Reliability: new ReliabilitySettings(0.002),
+                ExecutionMode: SimulationExecutionMode.SizeBattery);
+
+        public void MakeFixedFleet(string nswRegionId, bool emptyStorage)
+        {
+            string path = Path.Combine(RootPath, "scenario.json");
+            JsonObject config = ScenarioConfig.UpgradeConfig(JsonNode.Parse(File.ReadAllBytes(path))!.AsObject());
+            config["executionMode"] = "fixedFleet";
+            config.Remove("storageSizing");
+            foreach (JsonNode? node in config["regions"]!.AsArray())
+            {
+                JsonObject region = node!.AsObject();
+                if (emptyStorage)
+                {
+                    region["storageFleets"] = new JsonArray();
+                }
+                else
+                {
+                    region["storageFleets"]![0]!["initialEnergyCapacityMwh"] = 40;
+                    region["storageFleets"]![0]!["initialPowerCapacityMw"] = 10;
+                }
+            }
+            config["regions"]![0]!["regionId"] = nswRegionId;
+            foreach (JsonNode? link in config["interconnectors"]?.AsArray() ?? [])
+            {
+                if (link!["fromRegionId"]!.GetValue<string>() == "NSW1")
+                {
+                    link["fromRegionId"] = nswRegionId;
+                }
+                if (link["toRegionId"]!.GetValue<string>() == "NSW1")
+                {
+                    link["toRegionId"] = nswRegionId;
+                }
+            }
+            WriteDemand("nsw1", nswRegionId, fixtureStart,
+                NswDemandSeries ?? Enumerable.Repeat(10d, 8_760).ToArray());
+            WriteWeather("nsw1", nswRegionId);
+            File.WriteAllText(path, config.ToJsonString());
+        }
 
         private static ScenarioInterconnectorSettings InterconnectorSettings() => new(
             "NSW1",

@@ -63,7 +63,8 @@ internal sealed class CommandRouter
                     return PrintUsage(_output, 0);
                 case ["--version"]:
                     return PrintVersion();
-                case ["--describe-schema", var schemaFormat] when schemaFormat is "scenario" or "sweep":
+                case ["--describe-schema", var schemaFormat] when schemaFormat is
+                    "scenario" or "sweep" or "manifest" or "legacy-manifest" or "demand" or "weather":
                     return SchemaDescriptionCommand.Run(_output, schemaFormat);
                 case ["--new-scenario"]:
                     return ScenarioScaffoldCommand.Run(_output);
@@ -177,7 +178,7 @@ internal sealed class CommandRouter
         writer.WriteLine("  nemsweep --run-scenario [scenario-config.json]");
         writer.WriteLine("  nemsweep --fan-out-sweep <sweep-definition.json>");
         writer.WriteLine("  nemsweep --run-sweep <sweep-definition.json>");
-        writer.WriteLine("  nemsweep --describe-schema <scenario|sweep>");
+        writer.WriteLine("  nemsweep --describe-schema <scenario|sweep|manifest|legacy-manifest|demand|weather>");
         writer.WriteLine("  nemsweep --new-scenario");
         writer.WriteLine();
         writer.WriteLine("  Input bundles:");

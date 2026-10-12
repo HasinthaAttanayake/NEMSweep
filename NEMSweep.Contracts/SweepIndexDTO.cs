@@ -138,6 +138,7 @@ public sealed record SweepInputFileDTO(
 /// when the point succeeded.
 /// </param>
 /// <param name="DurationMs">Wall-clock time this point's run took, in milliseconds, when recorded.</param>
+/// <param name="ExecutionMode">Selected execution mode for a completed point, or null when it failed.</param>
 public sealed record SweepIndexPointDTO(
     string PointId,
     string Label,
@@ -153,7 +154,8 @@ public sealed record SweepIndexPointDTO(
     SweepPointRegionScalarsDTO[]? RegionScalars = null,
     SweepPointRegionDetailDTO[]? RegionDetails = null,
     string? OverviewPath = null,
-    double? DurationMs = null);
+    double? DurationMs = null,
+    SimulationExecutionMode? ExecutionMode = null);
 
 /// <summary>Scalar results for one region of a succeeded, multi-region sweep point.</summary>
 /// <param name="RegionId">NEM region these scalars describe (for example <c>NSW1</c>).</param>

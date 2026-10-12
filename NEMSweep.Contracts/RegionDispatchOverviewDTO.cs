@@ -17,8 +17,9 @@ public sealed record RegionDispatchOverviewDTO(
     DispatchPowerSystemDTO PowerSystem,
     DispatchMetricsDTO Metrics,
     ReliabilityBasisDTO Reliability,
-    StorageSizingOutcomeDTO StorageSizing,
+    StorageSizingOutcomeDTO? StorageSizing,
     DispatchCostDTO Cost,
     [property: JsonRequired] DispatchEmissionsDTO Emissions,
     Dictionary<string, double> DeliveredGenerationByTechnologyMwh,
-    double TransmissionLossesMwh);
+    double TransmissionLossesMwh,
+    [property: JsonRequired] SimulationExecutionMode ExecutionMode = SimulationExecutionMode.SizeBattery);

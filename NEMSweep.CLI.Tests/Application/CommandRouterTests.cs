@@ -267,7 +267,7 @@ public sealed class CommandRouterTests
 
         application.Run(["--describe-schema"]).Should().Be(2);
         application.Run(["--describe-schema", "contract"]).Should().Be(2);
-        error.ToString().Should().Contain("--describe-schema <scenario|sweep>");
+        error.ToString().Should().Contain("--describe-schema <scenario|sweep|manifest|legacy-manifest|demand|weather>");
         output.ToString().Should().BeEmpty();
     }
 

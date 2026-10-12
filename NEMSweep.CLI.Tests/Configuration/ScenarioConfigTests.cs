@@ -9,12 +9,160 @@ namespace NEMSweep.CLI.Tests.Configuration;
 public sealed class ScenarioConfigTests
 {
     [Fact]
+    public void Load_NewConfigDefaultsToFixedFleetAndAcceptsCustomRegionWithoutStorage()
+    {
+        ScenarioSettings scenario = Load(config =>
+        {
+            MakeCurrentFixedFleet(config);
+            Region(config)["regionId"] = "North / Coast";
+            Region(config)["storageFleets"] = new JsonArray();
+        });
+
+        scenario.ExecutionMode.Should().Be(SimulationExecutionMode.FixedFleet);
+        scenario.StorageSizing.Should().BeNull();
+        scenario.Reliability!.TargetUsePercentage.Should().Be(0.002);
+        scenario.Regions.Single().RegionId.Should().Be("North / Coast");
+        scenario.Regions.Single().StorageFleets.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Load_NewConfigRequiresExplicitReliabilityTarget()
+    {
+        var act = () => Load(config =>
+        {
+            MakeCurrentFixedFleet(config);
+            config["reliability"] = new JsonObject();
+        });
+
+        act.Should().Throw<JsonException>().WithMessage("*targetUsePercentage*");
+    }
+
+    [Fact]
+    public void Load_FixedFleetRejectsSizingControls()
+    {
+        var act = () => Load(config =>
+        {
+            config["schemaVersion"] = 7;
+            config["reliability"] = new JsonObject { ["targetUsePercentage"] = 0.002 };
+        });
+
+        act.Should().Throw<FormatException>().WithMessage("*fixedFleet*storageSizing*");
+    }
+
+    [Fact]
+    public void Load_SizeBatteryRequiresBounds()
+    {
+        var act = () => Load(config =>
+        {
+            MakeCurrentFixedFleet(config);
+            config["executionMode"] = "sizeBattery";
+        });
+
+        act.Should().Throw<FormatException>().WithMessage("*sizeBattery*storageSizing*");
+    }
+
+    [Fact]
+    public void Load_SizeBatteryRequiresDeclaredBatteryAssumptions()
+    {
+        var act = () => Load(config =>
+        {
+            config["schemaVersion"] = 7;
+            config["executionMode"] = "sizeBattery";
+            config["reliability"] = new JsonObject { ["targetUsePercentage"] = 0.002 };
+            Region(config)["storageFleets"] = new JsonArray();
+        });
+
+        act.Should().Throw<FormatException>().WithMessage("*Battery*assumptions*sizeBattery*");
+    }
+
+    [Theory]
+    [InlineData(5)]
+    [InlineData(6)]
+    public void Load_LegacyPumpedHydroOnlyScenario_RequiresBatteryAssumptionsBeforeSizing(int schemaVersion)
+    {
+        var act = () => Load(config =>
+        {
+            config["schemaVersion"] = schemaVersion;
+            Region(config)["storageFleets"]![0]!["technology"] = "PumpedHydro";
+            if (schemaVersion == 5)
+            {
+                Region(config)["generatingFleets"]![0]!["technologyProfile"]!.AsObject()
+                    .Remove("emissionsIntensityTonnesPerMwh");
+            }
+        });
+
+        act.Should().Throw<FormatException>().WithMessage("*Battery*assumptions*sizeBattery*");
+    }
+
+    [Theory]
+    [InlineData(" North")]
+    [InlineData("North ")]
+    public void Load_CustomRegionWithEdgeWhitespace_RejectsUnportableIdentity(string regionId)
+    {
+        var act = () => Load(config =>
+        {
+            config["schemaVersion"] = 7;
+            config["storageSizing"] = null;
+            config["reliability"] = new JsonObject { ["targetUsePercentage"] = 0.002 };
+            Region(config)["regionId"] = regionId;
+        });
+
+        act.Should().Throw<FormatException>().WithMessage("*leading or trailing whitespace*");
+    }
+
+    [Fact]
+    public void Load_CustomRegionExceedingUtf8FilenameBound_RejectsBeforeDispatch()
+    {
+        var act = () => Load(config =>
+        {
+            config["schemaVersion"] = 7;
+            config["storageSizing"] = null;
+            config["reliability"] = new JsonObject { ["targetUsePercentage"] = 0.002 };
+            Region(config)["regionId"] = new string('\u03b1', 51);
+        });
+
+        act.Should().Throw<FormatException>().WithMessage("*cannot be published safely*100 UTF-8 bytes*");
+    }
+
+    [Fact]
+    public void Load_LegacyConfigPreservesSizingAndReliabilityDefaults()
+    {
+        ScenarioSettings scenario = Load(_ => { });
+
+        scenario.SchemaVersion.Should().Be(7);
+        scenario.ExecutionMode.Should().Be(SimulationExecutionMode.SizeBattery);
+        scenario.Reliability!.TargetUsePercentage.Should().Be(0.002);
+        scenario.StorageSizing.Should().NotBeNull();
+    }
+
+    [Theory]
+    [InlineData("invalid")]
+    [InlineData(0)]
+    public void Load_RejectsInvalidExecutionMode(object mode)
+    {
+        var act = () => Load(config =>
+        {
+            MakeCurrentFixedFleet(config);
+            config["executionMode"] = JsonSerializer.SerializeToNode(mode);
+        });
+
+        act.Should().Throw<Exception>();
+    }
+
+    private static void MakeCurrentFixedFleet(JsonObject config)
+    {
+        config["schemaVersion"] = 7;
+        config.Remove("storageSizing");
+        config["reliability"] = new JsonObject { ["targetUsePercentage"] = 0.002 };
+    }
+
+    [Fact]
     public void Load_RequiresCurrentSchemaVersion()
     {
         var act = () => Load(config => config["schemaVersion"] = 1);
 
         act.Should().Throw<FormatException>()
-            .WithMessage("*found 1*expected 6*");
+            .WithMessage("*found 1*expected 7*");
     }
 
     [Fact]

@@ -43,6 +43,10 @@ internal static class SweepFanOutCommand
         SweepDefinition definition = SweepDefinition.Load(definitionPath, context.Paths);
         JsonNode baseline = JsonNode.Parse(File.ReadAllBytes(definition.BaselineConfigFullPath(context.Paths)))
             ?? throw new FormatException($"Sweep '{definition.SweepId}': baseline config is empty.");
+        if (definition.SchemaVersion == 2)
+        {
+            baseline = ScenarioConfig.UpgradeConfig(baseline.AsObject());
+        }
         return (definition, baseline);
     }
 

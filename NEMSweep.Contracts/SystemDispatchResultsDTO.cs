@@ -8,6 +8,7 @@ namespace NEMSweep.Contracts;
 /// AUD or AUD/MWh as named. <see cref="RegionIds"/> defines the regions represented by every
 /// region-keyed member and preserves the system's deterministic region order.
 /// </summary>
+/// <remarks>Sizing evidence is null for fixed-fleet execution; reliability is assessed in both modes.</remarks>
 public sealed record SystemDispatchResultsDTO(
     int SchemaVersion,
     string RunId,
@@ -20,13 +21,14 @@ public sealed record SystemDispatchResultsDTO(
     DispatchSeriesDTO DataSeries,
     DispatchMetricsDTO Metrics,
     ReliabilityBasisDTO Reliability,
-    StorageSizingOutcomeDTO StorageSizing,
+    StorageSizingOutcomeDTO? StorageSizing,
     DispatchCostDTO Cost,
     [property: JsonRequired] DispatchEmissionsDTO Emissions,
     [property: JsonRequired] DispatchTopologyDTO Topology,
     [property: JsonRequired] DispatchInterconnectorDTO[] Interconnectors,
     DispatchCostBasisDTO? CostBasis = null,
-    DispatchModelProvenanceDTO? Provenance = null);
+    DispatchModelProvenanceDTO? Provenance = null,
+    [property: JsonRequired] SimulationExecutionMode ExecutionMode = SimulationExecutionMode.SizeBattery);
 
 /// <summary>
 /// The model build that produced a result. <see cref="DispatchSourcesDTO"/> already pins the input
@@ -56,13 +58,19 @@ public sealed record DispatchTopologyLinkDTO(
     [property: JsonRequired] string ToRegionId,
     [property: JsonRequired] double CapacityMw);
 
-/// <summary>Summary evidence for one region within a system dispatch run.</summary>
+/// <summary>
+/// Summary evidence for one region within a system dispatch run. Installed storage capacities
+/// include every storage technology and do not depend on whether Battery sizing was enabled.
+/// </summary>
 public sealed record RegionDispatchSummaryDTO(
     DispatchMetricsDTO Metrics,
     ReliabilityBasisDTO Reliability,
-    StorageSizingOutcomeDTO StorageSizing,
+    StorageSizingOutcomeDTO? StorageSizing,
     DispatchCostDTO Cost,
     [property: JsonRequired] DispatchEmissionsDTO Emissions,
     [property: JsonRequired] Dictionary<string, double> DeliveredGenerationByTechnologyMwh,
     [property: JsonRequired] string DetailPath,
-    [property: JsonRequired] string OverviewPath);
+    [property: JsonRequired] string OverviewPath,
+    [property: JsonRequired] SimulationExecutionMode ExecutionMode = SimulationExecutionMode.SizeBattery,
+    [property: JsonRequired] double StoragePowerMw = 0,
+    [property: JsonRequired] double StorageEnergyMwh = 0);

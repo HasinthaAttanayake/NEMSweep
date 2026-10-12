@@ -206,8 +206,8 @@ internal static class SweepArtifactExport
         return CreateScalars(
             result.Metrics,
             result.DataSeries,
-            result.StorageSizing.FinalPowerMw,
-            result.StorageSizing.FinalEnergyMwh,
+            result.RegionSummariesById.Values.Sum(region => region.StoragePowerMw),
+            result.RegionSummariesById.Values.Sum(region => region.StorageEnergyMwh),
             result.Cost,
             result.Emissions);
     }
