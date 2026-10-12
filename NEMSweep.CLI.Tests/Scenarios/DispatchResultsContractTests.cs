@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using NEMSweep.CLI.Demand;
+using NEMSweep.CLI.Configuration;
 using NEMSweep.CLI.Scenarios;
 using NEMSweep.Contracts;
 using NEMSweep.Model.Economics;
@@ -211,7 +212,10 @@ public sealed class DispatchResultsContractTests
                 ["NSW1"] = new LoadedInput<WeatherDataDTO>(
                     weather,
                     new DispatchInputArtifactDTO("weather.json", 5, new string('b', 64))),
-            });
+            },
+            new SystemDispatchRunResult([outcome], sizingResult.InterconnectorFlows),
+            new ReliabilitySettings(0.002),
+            SimulationExecutionMode.SizeBattery);
 
         string rootPath = Path.Combine(Path.GetTempPath(), $"nemsweep-dispatch-export-{Guid.NewGuid():N}");
         Directory.CreateDirectory(rootPath);

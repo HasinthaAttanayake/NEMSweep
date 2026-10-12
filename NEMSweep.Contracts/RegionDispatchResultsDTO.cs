@@ -9,6 +9,7 @@ namespace NEMSweep.Contracts;
 /// are interval values in MW or MWh as named; integrated metrics use MWh, reliability values are
 /// percentages of demand, and cost values use AUD or AUD/MWh as named.
 /// </summary>
+/// <remarks>Sizing evidence is null for fixed-fleet execution; the realised fleet remains explicit.</remarks>
 public sealed record RegionDispatchResultsDTO(
     int SchemaVersion,
     string RunId,
@@ -21,6 +22,7 @@ public sealed record RegionDispatchResultsDTO(
     DispatchSeriesDTO DataSeries,
     DispatchMetricsDTO Metrics,
     ReliabilityBasisDTO Reliability,
-    StorageSizingOutcomeDTO StorageSizing,
+    StorageSizingOutcomeDTO? StorageSizing,
     DispatchCostDTO Cost,
-    [property: JsonRequired] DispatchEmissionsDTO Emissions);
+    [property: JsonRequired] DispatchEmissionsDTO Emissions,
+    [property: JsonRequired] SimulationExecutionMode ExecutionMode = SimulationExecutionMode.SizeBattery);

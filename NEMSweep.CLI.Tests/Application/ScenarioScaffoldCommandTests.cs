@@ -26,7 +26,10 @@ public sealed class ScenarioScaffoldCommandTests
             scenario.SchemaVersion.Should().Be(ArtifactSchemaVersions.ScenarioConfig);
             scenario.Regions.Should().ContainSingle();
             scenario.Regions[0].GeneratingFleets.Should().ContainSingle();
-            scenario.Regions[0].StorageFleets.Should().ContainSingle();
+            scenario.ExecutionMode.Should().Be(SimulationExecutionMode.FixedFleet);
+            scenario.Reliability!.TargetUsePercentage.Should().Be(0.002);
+            scenario.StorageSizing.Should().BeNull();
+            scenario.Regions[0].StorageFleets.Should().BeEmpty();
         }
         finally
         {
@@ -44,6 +47,9 @@ public sealed class ScenarioScaffoldCommandTests
         // scaffold carrying a path would teach otherwise.
         output.ToString().Should().Contain("\"demandFile\": \"demand-nsw1.json\"");
         output.ToString().Should().Contain("\"weatherFile\": \"weather-nsw1.json\"");
+        output.ToString().Should().Contain("\"executionMode\": \"fixedFleet\"");
+        output.ToString().Should().Contain("\"reliability\": {");
+        output.ToString().Should().NotContain("\"storageSizing\"");
         output.ToString().Should().NotContain("wwwroot");
     }
 

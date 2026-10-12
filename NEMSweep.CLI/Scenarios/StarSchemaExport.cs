@@ -150,7 +150,7 @@ internal static class StarSchemaExport
 
     private static IEnumerable<string[]> PointDimension(IEnumerable<SweepIndexPointDTO> points)
     {
-        yield return ["pointId", "label", "axisValue", "status", "storageSizingOutcome"];
+        yield return ["pointId", "label", "axisValue", "status", "storageSizingOutcome", "executionMode"];
         foreach (SweepIndexPointDTO point in points)
         {
             yield return
@@ -162,6 +162,7 @@ internal static class StarSchemaExport
                 Text(point.AxisValue, JsonFile.DecimalPlaces("axisValue")),
                 point.Status.ToString(),
                 point.StorageSizing?.Outcome.ToString() ?? string.Empty,
+                point.ExecutionMode?.ToString() ?? string.Empty,
             ];
         }
     }

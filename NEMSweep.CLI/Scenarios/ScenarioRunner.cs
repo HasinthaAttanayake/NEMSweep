@@ -7,6 +7,7 @@ using NEMSweep.Model.Economics;
 using NEMSweep.Model.Grid;
 using NEMSweep.Model.Scenarios;
 using NEMSweep.Model.Series;
+using NEMSweep.Model.Simulation;
 using NEMSweep.Model.StorageSizing;
 using NEMSweep.Model.Units;
 using NEMSweep.Model.Weather;
@@ -99,16 +100,35 @@ internal static class ScenarioRunner
             demandByRegion,
             resourcesByRegion,
             CreateDataCentreDemandComponents(settings, scenario));
-        StorageSizingOptions sizingOptions = ScenarioConfig.CreateSizingOptions(settings.StorageSizing);
-        StorageSizingRunResult sizingResult = Size(powerSystem, sizingOptions);
+        ReliabilitySettings reliability = settings.Reliability
+            ?? throw new FormatException("Scenario reliability is required.");
+        StorageSizingRunResult? sizingResult = null;
+        SystemDispatchRunResult dispatch;
+        if (settings.ExecutionMode == SimulationExecutionMode.SizeBattery)
+        {
+            sizingResult = Size(powerSystem, ScenarioConfig.CreateSizingOptions(
+                settings.StorageSizing ?? throw new FormatException("Sizing bounds are required."),
+                reliability.TargetUsePercentage));
+            powerSystem = sizingResult.PowerSystem;
+            dispatch = new SystemDispatchRunResult(
+                sizingResult.Regions.Select(region => region.DispatchOutcome).ToArray(),
+                sizingResult.InterconnectorFlows);
+        }
+        else
+        {
+            dispatch = DispatchFixedFleet(powerSystem);
+        }
         return new ScenarioDispatchResult(
             scenario,
             powerSystem,
             sizingResult,
-            Cost(scenario, sizingResult),
-            Emissions(scenario, sizingResult),
+            Cost(scenario, powerSystem, dispatch),
+            Emissions(scenario, powerSystem, dispatch),
             demandInputs,
-            weatherInputs);
+            weatherInputs,
+            dispatch,
+            reliability,
+            settings.ExecutionMode);
     }
 
     /// <summary>
@@ -149,13 +169,27 @@ internal static class ScenarioRunner
         return result;
     }
 
-    private static PowerSystemCostBreakdown Cost(
-        DomainScenario scenario,
-        StorageSizingRunResult sizingResult)
+    private static SystemDispatchRunResult DispatchFixedFleet(PowerSystem powerSystem)
     {
         try
         {
-            return PowerSystemCostCalculator.Calculate(scenario, sizingResult);
+            return Dispatcher.DispatchSystem(powerSystem);
+        }
+        catch (Exception exception) when (exception is not ScenarioRunException)
+        {
+            throw new ScenarioRunException(
+                SweepFailureStage.Dispatch, "dispatchFailed", exception.Message, exception);
+        }
+    }
+
+    private static PowerSystemCostBreakdown Cost(
+        DomainScenario scenario,
+        PowerSystem powerSystem,
+        SystemDispatchRunResult dispatch)
+    {
+        try
+        {
+            return PowerSystemCostCalculator.Calculate(scenario, powerSystem, dispatch.RegionalOutcomes);
         }
         catch (Exception exception) when (exception is not ScenarioRunException)
         {
@@ -169,11 +203,12 @@ internal static class ScenarioRunner
 
     private static EmissionsSummary Emissions(
         DomainScenario scenario,
-        StorageSizingRunResult sizingResult)
+        PowerSystem powerSystem,
+        SystemDispatchRunResult dispatch)
     {
         try
         {
-            return EmissionsCalculator.Calculate(scenario, sizingResult);
+            return EmissionsCalculator.Calculate(scenario, powerSystem, dispatch.RegionalOutcomes);
         }
         catch (Exception exception) when (exception is not ScenarioRunException)
         {
@@ -216,6 +251,23 @@ internal static class ScenarioRunner
                 $"Demand source schema {demand.SchemaVersion} is not supported; expected schema "
                 + $"{ArtifactSchemaVersions.OperationalDemand}.");
         }
+        double[]? values = demand.DataSeries.DemandMw;
+        if (values is null || values.Length == 0
+            || values.Any(value => !double.IsFinite(value) || value < 0))
+        {
+            throw new FormatException("Demand source requires nonempty, finite, non-negative demandMw.");
+        }
+        if (demand.Scenario.Resolution <= TimeSpan.Zero
+            || demand.Scenario.PeriodStart.Offset != demand.Scenario.PeriodEnd.Offset
+            || demand.Scenario.PeriodEnd - demand.Scenario.PeriodStart
+                != TimeSpan.FromTicks(checked(demand.Scenario.Resolution.Ticks * values.LongLength)))
+        {
+            throw new FormatException("Demand period bounds, resolution and demandMw length must agree.");
+        }
+        if (demand.DataSources.DemandSourceFiles is null)
+        {
+            throw new FormatException("Demand source requires demandSourceFiles provenance.");
+        }
 
         var demandData = new OperationalDemandData(
             demand.Scenario.Region,
@@ -241,6 +293,10 @@ internal static class ScenarioRunner
             throw new FormatException(
                 $"Weather source schema {weather.SchemaVersion} is not supported; expected schema "
                 + $"{ArtifactSchemaVersions.Weather}.");
+        }
+        if (weather.Solar is null || weather.Wind is null)
+        {
+            throw new FormatException("Weather source requires solar and wind roles.");
         }
 
         return new LoadedInput<WeatherDataDTO>(
@@ -408,7 +464,9 @@ internal static class ScenarioRunner
 
         SolarWeatherData solar = weather.Solar;
         WindWeatherData wind = weather.Wind;
-        int sourceLength = solar.GlobalHorizontalRadiationWhPerSquareMetre.Length;
+        double[] globalSource = solar.GlobalHorizontalRadiationWhPerSquareMetre
+            ?? throw new FormatException("Weather source requires global horizontal radiation.");
+        int sourceLength = globalSource.Length;
         double[][] sourceSeries =
         [
             solar.DirectNormalRadiationWhPerSquareMetre,
@@ -419,7 +477,7 @@ internal static class ScenarioRunner
             wind.WindSpeedMetresPerSecond,
             wind.ProductionMegawattsAtOneMegawattInstalled,
         ];
-        if (sourceLength == 0 || sourceSeries.Any(values => values.Length != sourceLength))
+        if (sourceLength == 0 || sourceSeries.Any(values => values is null || values.Length != sourceLength))
         {
             throw new FormatException("Weather source series are empty or misaligned.");
         }
@@ -452,7 +510,7 @@ internal static class ScenarioRunner
                     reason);
             }
 
-            globalHorizontalRadiation[index] = solar.GlobalHorizontalRadiationWhPerSquareMetre[sourceIndex];
+            globalHorizontalRadiation[index] = globalSource[sourceIndex];
             directNormalRadiation[index] = solar.DirectNormalRadiationWhPerSquareMetre[sourceIndex];
             diffuseHorizontalRadiation[index] = solar.DiffuseHorizontalRadiationWhPerSquareMetre[sourceIndex];
             dryBulbTemperature[index] = solar.DryBulbTemperatureDegreesCelsius[sourceIndex];
@@ -489,8 +547,11 @@ internal sealed record LoadedInput<T>(
 internal sealed record ScenarioDispatchResult(
     DomainScenario Scenario,
     PowerSystem PowerSystem,
-    StorageSizingRunResult SizingResult,
+    StorageSizingRunResult? SizingResult,
     PowerSystemCostBreakdown CostBreakdown,
     EmissionsSummary EmissionsSummary,
     IReadOnlyDictionary<string, LoadedInput<OperationalDemandData>> DemandInputs,
-    IReadOnlyDictionary<string, LoadedInput<WeatherDataDTO>> WeatherInputs);
+    IReadOnlyDictionary<string, LoadedInput<WeatherDataDTO>> WeatherInputs,
+    SystemDispatchRunResult Dispatch,
+    ReliabilitySettings Reliability,
+    SimulationExecutionMode ExecutionMode);

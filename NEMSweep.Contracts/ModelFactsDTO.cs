@@ -6,7 +6,7 @@ namespace NEMSweep.Contracts;
 // interval index are facts the model establishes; clients read them rather than deriving them.
 
 /// <summary>
-/// The reliability target a run was sized against, the reliability it achieved, and the verdict.
+/// The reliability target a run was assessed against, the reliability it achieved, and the verdict.
 /// Percentages are percentages of demand energy, matching
 /// <see cref="DispatchMetricsDTO.UnservedEnergyPercentageOfDemand"/>.
 /// </summary>

@@ -153,7 +153,8 @@ internal static class SweepRunCommand
                     regionScalars.ToArray(),
                     regionDetails.ToArray(),
                     $"points/{point.PointId}-overview.json",
-                    pointStopwatch.Elapsed.TotalMilliseconds));
+                    pointStopwatch.Elapsed.TotalMilliseconds,
+                    systemResult.ExecutionMode));
                 context.Output.WriteLine($"Sweep point {point.PointId}: succeeded.");
             }
             catch (Exception exception)

@@ -110,8 +110,10 @@ internal static class ScenarioCommand
             publication = DispatchResultsExport.WritePublication(
                 new DispatchPublicationRequest(
                     dispatch,
-                    ScenarioConfig.CreateSizingOptions(settings.StorageSizing),
-                    settings.StorageSizing.ReliabilityStandardName,
+                    settings.StorageSizing is { } sizing
+                        ? ScenarioConfig.CreateSizingOptions(sizing, dispatch.Reliability.TargetUsePercentage)
+                        : null,
+                    dispatch.Reliability.StandardName,
                     regionFileNamePrefix,
                     provenance),
                 finalResultsPath);
@@ -144,7 +146,7 @@ internal static class ScenarioCommand
         if (resultsPath is null)
         {
             context.Output.WriteLine(
-                $"Dispatched {dispatch.SizingResult.Regions[0].DispatchOutcome.Demand.Length} hourly intervals for "
+                $"Dispatched {dispatch.Dispatch.RegionalOutcomes[0].Demand.Length} hourly intervals for "
                 + $"{string.Join(", ", dispatch.PowerSystem.Regions.Select(region => region.RegionId))}.");
             context.Output.WriteLine(
                 $"Wrote scenario results to: {Path.GetFullPath(finalResultsPath)}");

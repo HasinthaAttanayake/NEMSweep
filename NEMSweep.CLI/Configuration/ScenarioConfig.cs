@@ -27,11 +27,14 @@ internal static class ScenarioConfig
             throw new JsonException("Scenario input fields must be defined on each region.");
         }
 
-        byte[] currentSchemaContents = UpgradeVersion5(contents, document.RootElement);
+        bool legacy = TryGetPropertyIgnoreCase(document.RootElement, "schemaVersion", out JsonElement version)
+            && version.ValueKind == JsonValueKind.Number
+            && version.TryGetInt32(out int declared) && declared is 5 or 6;
+        byte[] currentSchemaContents = UpgradeLegacy(contents, document.RootElement);
 
         ScenarioSettings scenario = JsonFile.ReadConfig<ScenarioSettings>(currentSchemaContents)
             ?? throw new FormatException("Scenario config is empty.");
-        Validate(scenario);
+        Validate(scenario, legacy);
         return scenario;
     }
 
@@ -40,18 +43,27 @@ internal static class ScenarioConfig
     /// mapping lives, so a dispatch run and the artifact it publishes cannot describe different
     /// bounds.
     /// </summary>
-    public static StorageSizingOptions CreateSizingOptions(StorageSizingSettings sizing)
+    public static StorageSizingOptions CreateSizingOptions(
+        StorageSizingSettings sizing,
+        double targetUsePercentage = StorageSizingOptions.DefaultTargetUsePercentage)
     {
         ArgumentNullException.ThrowIfNull(sizing);
         return new StorageSizingOptions(
             Power.FromMegawatts(sizing.MaximumPowerMw),
             Energy.FromMegawattHours(sizing.MaximumEnergyMwh),
-            sizing.TargetUsePercentage,
+            targetUsePercentage,
             sizing.MaximumPasses);
     }
 
+    internal static JsonObject UpgradeConfig(JsonObject config)
+    {
+        byte[] contents = Encoding.UTF8.GetBytes(JsonFile.SerializeExact(config));
+        using JsonDocument document = JsonDocument.Parse(contents);
+        return JsonNode.Parse(UpgradeLegacy(contents, document.RootElement))!.AsObject();
+    }
+
     /// <summary>Upgrades the one supported legacy scenario format to the current format.</summary>
-    private static byte[] UpgradeVersion5(byte[] contents, JsonElement root)
+    private static byte[] UpgradeLegacy(byte[] contents, JsonElement root)
     {
         if (!TryGetPropertyIgnoreCase(root, "schemaVersion", out JsonElement version)
             || version.ValueKind != JsonValueKind.Number
@@ -62,10 +74,15 @@ internal static class ScenarioConfig
 
         if (declared == ArtifactSchemaVersions.ScenarioConfig)
         {
+            if (TryGetPropertyIgnoreCase(root, "executionMode", out JsonElement mode)
+                && mode.ValueKind != JsonValueKind.String)
+            {
+                throw new FormatException("scenario.executionMode must be fixedFleet or sizeBattery.");
+            }
             return contents;
         }
 
-        if (declared != 5)
+        if (declared is not (5 or 6))
         {
             throw new FormatException(
                 $"Scenario config schema version found {declared}; "
@@ -74,7 +91,13 @@ internal static class ScenarioConfig
 
         JsonObject scenario = JsonNode.Parse(contents)?.AsObject()
             ?? throw new FormatException("Scenario config is empty.");
-        if (TryGetPropertyIgnoreCase(scenario, "regions", out JsonNode? regionsNode)
+        if (TryGetPropertyIgnoreCase(scenario, "executionMode", out _)
+            || TryGetPropertyIgnoreCase(scenario, "reliability", out _))
+        {
+            throw new FormatException("Legacy scenario configs must not define executionMode or reliability.");
+        }
+
+        if (declared == 5 && TryGetPropertyIgnoreCase(scenario, "regions", out JsonNode? regionsNode)
             && regionsNode is JsonArray regions)
         {
             foreach (JsonNode? regionNode in regions)
@@ -113,7 +136,34 @@ internal static class ScenarioConfig
             }
         }
 
+        if (!TryGetPropertyIgnoreCase(scenario, "storageSizing", out JsonNode? sizingNode)
+            || sizingNode is not JsonObject sizing)
+        {
+            throw new FormatException("Legacy scenario config must define storageSizing.");
+        }
+
+        var reliability = new JsonObject();
+        reliability["targetUsePercentage"] = TryGetPropertyIgnoreCase(sizing, "targetUsePercentage", out JsonNode? target)
+            ? target?.DeepClone()
+            : JsonValue.Create(StorageSizingOptions.DefaultTargetUsePercentage);
+        reliability["standardName"] = TryGetPropertyIgnoreCase(sizing, "reliabilityStandardName", out JsonNode? standard)
+            ? standard?.DeepClone()
+            : null;
+        foreach (string key in sizing.Select(pair => pair.Key).Where(key =>
+                     key.Equals("targetUsePercentage", StringComparison.OrdinalIgnoreCase)
+                     || key.Equals("reliabilityStandardName", StringComparison.OrdinalIgnoreCase)).ToArray())
+        {
+            sizing.Remove(key);
+        }
+
+        scenario["reliability"] = reliability;
+        scenario["executionMode"] = "sizeBattery";
         SetPropertyIgnoreCase(scenario, "schemaVersion", ArtifactSchemaVersions.ScenarioConfig);
+        if (scenario.ContainsKey("$schema"))
+        {
+            scenario["$schema"] =
+                $"https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/scenario-v{ArtifactSchemaVersions.ScenarioConfig}.json";
+        }
         return Encoding.UTF8.GetBytes(JsonFile.SerializeExact(scenario));
     }
 
@@ -180,7 +230,7 @@ internal static class ScenarioConfig
         }
     }
 
-    private static void Validate(ScenarioSettings scenario)
+    private static void Validate(ScenarioSettings scenario, bool legacy)
     {
         ArgumentNullException.ThrowIfNull(scenario);
         RequireCurrentSchemaVersion(scenario.SchemaVersion);
@@ -200,13 +250,30 @@ internal static class ScenarioConfig
             throw new FormatException("scenario.regions must define at least one region.");
         }
 
-        ArgumentNullException.ThrowIfNull(scenario.StorageSizing);
-        if (double.IsNaN(scenario.StorageSizing.TargetUsePercentage)
-            || double.IsInfinity(scenario.StorageSizing.TargetUsePercentage)
-            || scenario.StorageSizing.TargetUsePercentage <= 0
-            || scenario.StorageSizing.TargetUsePercentage > 100)
+        if (scenario.Reliability is null)
         {
-            throw new FormatException($"scenario.storageSizing.targetUsePercentage {scenario.StorageSizing.TargetUsePercentage} must be greater than 0 and at most 100.");
+            throw new FormatException("scenario.reliability with an explicit targetUsePercentage is required.");
+        }
+        if (!Enum.IsDefined(scenario.ExecutionMode))
+        {
+            throw new FormatException("scenario.executionMode must be fixedFleet or sizeBattery.");
+        }
+        if (double.IsNaN(scenario.Reliability.TargetUsePercentage)
+            || double.IsInfinity(scenario.Reliability.TargetUsePercentage)
+            || scenario.Reliability.TargetUsePercentage <= 0
+            || scenario.Reliability.TargetUsePercentage > 100)
+        {
+            throw new FormatException($"scenario.reliability.targetUsePercentage {scenario.Reliability.TargetUsePercentage} must be greater than 0 and at most 100.");
+        }
+        if (scenario.ExecutionMode == SimulationExecutionMode.FixedFleet && scenario.StorageSizing is not null)
+        {
+            throw new FormatException("fixedFleet must omit storageSizing or set it to null.");
+        }
+        if (scenario.ExecutionMode == SimulationExecutionMode.SizeBattery)
+        {
+            _ = CreateSizingOptions(scenario.StorageSizing
+                ?? throw new FormatException("sizeBattery requires storageSizing bounds."),
+                scenario.Reliability.TargetUsePercentage);
         }
 
         var regionIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -217,9 +284,29 @@ internal static class ScenarioConfig
                 throw new FormatException("scenario.regions.regionId must be a known, non-blank region ID.");
             }
 
-            if (!NemRegions.IsKnown(region.RegionId))
+            if (legacy && !NemRegions.IsKnown(region.RegionId))
             {
                 throw new FormatException($"scenario.regions region '{region.RegionId}' is not a known NEM region.");
+            }
+
+            if (!legacy)
+            {
+                if (region.RegionId != region.RegionId.Trim())
+                {
+                    throw new FormatException(
+                        $"scenario.regions region '{region.RegionId}' must not have leading or trailing whitespace.");
+                }
+
+                try
+                {
+                    _ = RegionFileNames.For(region.RegionId);
+                }
+                catch (ArgumentException exception)
+                {
+                    throw new FormatException(
+                        $"scenario.regions region '{region.RegionId}' cannot be published safely: {exception.Message}",
+                        exception);
+                }
             }
 
             if (!regionIds.Add(region.RegionId))
@@ -244,13 +331,21 @@ internal static class ScenarioConfig
                 throw new FormatException($"scenario.regions region '{region.RegionId}' must define generatingFleets.");
             }
 
-            if (region.StorageFleets is null || region.StorageFleets.Length == 0)
+            if (region.StorageFleets is null
+                || (legacy && region.StorageFleets.Length == 0))
             {
                 throw new FormatException($"scenario.regions region '{region.RegionId}' must define storageFleets.");
             }
 
             ValidateGeneratingFleets(region);
             ValidateStorageFleets(region);
+            if (scenario.ExecutionMode == SimulationExecutionMode.SizeBattery
+                && !region.StorageFleets.Any(fleet =>
+                    fleet.Technology.Equals("Battery", StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new FormatException(
+                    $"scenario.regions region '{region.RegionId}' must declare Battery cost and technology assumptions for sizeBattery; zero installed capacity is allowed.");
+            }
         }
 
         ValidateInterconnectors(scenario.Interconnectors, regionIds);
@@ -436,9 +531,11 @@ internal sealed record ScenarioSettings(
     string Name,
     CostBasisSettings CostBasis,
     ScenarioRegionSettings[] Regions,
-    StorageSizingSettings StorageSizing,
+    StorageSizingSettings? StorageSizing,
     JsonObject? Provenance = null,
-    ScenarioInterconnectorSettings[]? Interconnectors = null)
+    ScenarioInterconnectorSettings[]? Interconnectors = null,
+    ReliabilitySettings? Reliability = null,
+    SimulationExecutionMode ExecutionMode = SimulationExecutionMode.FixedFleet)
 {
     [JsonIgnore]
     public string DemandFile => Regions.Single().DemandFile;
@@ -463,9 +560,11 @@ internal sealed record CostBasisSettings(int Year, decimal RealDiscountRate);
 internal sealed record StorageSizingSettings(
     double MaximumPowerMw,
     double MaximumEnergyMwh,
-    double TargetUsePercentage = 0.002,
-    int MaximumPasses = 256,
-    string? ReliabilityStandardName = null);
+    int MaximumPasses = 256);
+
+internal sealed record ReliabilitySettings(
+    [property: JsonRequired] double TargetUsePercentage,
+    string? StandardName = null);
 
 internal sealed record GeneratingFleetSettings(
     string Technology,

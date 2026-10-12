@@ -1,8 +1,9 @@
 {
-  "$schema": "https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/scenario-v6.json",
-  "schemaVersion": 6,
+  "$schema": "https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/schema/scenario-v7.json",
+  "schemaVersion": 7,
   "id": "starter-nsw1",
   "name": "Starter: NSW1 alone",
+  "executionMode": "sizeBattery",
   "costBasis": {
     "year": 2026,
     "realDiscountRate": 0.07
@@ -10,9 +11,11 @@
   "storageSizing": {
     "maximumPowerMw": 10000,
     "maximumEnergyMwh": 100000,
+    "maximumPasses": 512
+  },
+  "reliability": {
     "targetUsePercentage": 0.002,
-    "maximumPasses": 512,
-    "reliabilityStandardName": "NEM reliability standard"
+    "standardName": "NEM reliability standard"
   },
   "regions": [
     {

@@ -16,14 +16,19 @@ internal static class SchemaDescriptionCommand
 
     /// <summary>Writes a format's JSON Schema. Needs no workspace, only somewhere to write.</summary>
     /// <param name="output">Where the schema is written.</param>
-    /// <param name="format">Either <c>scenario</c> or <c>sweep</c>.</param>
+    /// <param name="format">The versioned input or derived-artifact format.</param>
     public static int Run(TextWriter output, string format)
     {
         string schema = format switch
         {
+            "manifest" => InputArtifactSchemaDescriptions.Manifest,
+            "legacy-manifest" => InputArtifactSchemaDescriptions.LegacyManifest,
+            "demand" => InputArtifactSchemaDescriptions.Demand,
+            "weather" => InputArtifactSchemaDescriptions.Weather,
             "scenario" => ScenarioSchema,
             "sweep" => SweepSchema,
-            _ => throw new ArgumentException("Schema format must be 'scenario' or 'sweep'."),
+            _ => throw new ArgumentException(
+                "Schema format must be 'manifest', 'legacy-manifest', 'demand', 'weather', 'scenario', or 'sweep'."),
         };
 
         output.WriteLine(JsonFile.SerializeExact(JsonNode.Parse(schema)!));
@@ -37,17 +42,48 @@ internal static class SchemaDescriptionCommand
           "title": "NEMSweep scenario configuration",
           "type": "object",
           "additionalProperties": false,
-          "required": ["schemaVersion", "id", "name", "costBasis", "regions", "storageSizing"],
+          "required": ["schemaVersion", "id", "name", "costBasis", "reliability", "regions"],
           "properties": {
             "schemaVersion": { "const": {{ArtifactSchemaVersions.ScenarioConfig}} },
             "id": { "type": "string", "minLength": 1 },
             "name": { "type": "string", "minLength": 1 },
+            "executionMode": { "enum": ["fixedFleet", "sizeBattery"], "default": "fixedFleet" },
             "costBasis": { "$ref": "#/$defs/costBasis" },
             "regions": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/region" } },
-            "storageSizing": { "$ref": "#/$defs/storageSizing" },
+            "storageSizing": { "anyOf": [{ "$ref": "#/$defs/storageSizing" }, { "type": "null" }] },
+            "reliability": { "$ref": "#/$defs/reliability" },
             "interconnectors": { "type": "array", "items": { "$ref": "#/$defs/interconnector" } },
             "provenance": { "type": "object" }
           },
+          "allOf": [
+            {
+              "if": {
+                "properties": { "executionMode": { "const": "sizeBattery" } },
+                "required": ["executionMode"]
+              },
+              "then": {
+                "required": ["storageSizing"],
+                "properties": {
+                  "storageSizing": { "$ref": "#/$defs/storageSizing" },
+                  "regions": {
+                    "items": {
+                      "properties": {
+                        "storageFleets": {
+                          "contains": {
+                            "type": "object",
+                            "properties": { "technology": { "const": "Battery" } },
+                            "required": ["technology"]
+                          },
+                          "minContains": 1
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "else": { "properties": { "storageSizing": { "type": "null" } } }
+            }
+          ],
           "$defs": {
             "costBasis": {
               "type": "object", "additionalProperties": false,
@@ -63,18 +99,24 @@ internal static class SchemaDescriptionCommand
               "properties": {
                 "maximumPowerMw": { "type": "number" },
                 "maximumEnergyMwh": { "type": "number" },
+                "maximumPasses": { "type": "integer" }
+              }
+            },
+            "reliability": {
+              "type": "object", "additionalProperties": false,
+              "required": ["targetUsePercentage"],
+              "properties": {
                 "targetUsePercentage": { "type": "number", "exclusiveMinimum": 0, "maximum": 100 },
-                "maximumPasses": { "type": "integer" },
-                "reliabilityStandardName": { "type": ["string", "null"] }
+                "standardName": { "type": ["string", "null"] }
               }
             },
             "region": {
               "type": "object", "additionalProperties": false,
               "required": ["regionId", "generatingFleets", "storageFleets", "demandFile", "weatherFile"],
               "properties": {
-                "regionId": { "type": "string", "minLength": 1 },
+                "regionId": { "type": "string", "minLength": 1, "pattern": "^\\S(?:.*\\S)?$", "description": "Must have no leading or trailing whitespace. Custom IDs are limited to 100 UTF-8 bytes after invariant uppercase normalization; known NEM IDs retain their legacy filenames." },
                 "generatingFleets": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/generatingFleet" } },
-                "storageFleets": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/storageFleet" } },
+                "storageFleets": { "type": "array", "items": { "$ref": "#/$defs/storageFleet" } },
                 "demandFile": { "type": "string", "minLength": 1 },
                 "weatherFile": { "type": "string", "minLength": 1 },
                 "dataCentreNameplateMw": { "type": "number", "minimum": 0 }
@@ -205,8 +247,17 @@ internal static class SchemaDescriptionCommand
                 "costBasis": { "$ref": "#/$defs/costBasisOverride" },
                 "regions": { "type": ["array", "null"], "items": { "$ref": "#/$defs/regionOverride" } },
                 "storageSizing": { "$ref": "#/$defs/storageSizingOverride" },
+                "executionMode": { "type": ["string", "null"], "enum": ["fixedFleet", "sizeBattery", null] },
+                "reliability": { "$ref": "#/$defs/reliabilityOverride" },
                 "interconnectors": { "type": ["array", "null"], "items": { "$ref": "#/$defs/interconnectorOverride" } },
                 "provenance": { "type": ["object", "null"] }
+              }
+            },
+            "reliabilityOverride": {
+              "type": ["object", "null"], "additionalProperties": false,
+              "properties": {
+                "targetUsePercentage": { "type": ["number", "null"], "exclusiveMinimum": 0, "maximum": 100 },
+                "standardName": { "type": ["string", "null"] }
               }
             },
             "costBasisOverride": {
@@ -217,8 +268,7 @@ internal static class SchemaDescriptionCommand
               "type": ["object", "null"], "additionalProperties": false,
               "properties": {
                 "maximumPowerMw": { "type": ["number", "null"] }, "maximumEnergyMwh": { "type": ["number", "null"] },
-                "targetUsePercentage": { "type": ["number", "null"] }, "maximumPasses": { "type": ["integer", "null"] },
-                "reliabilityStandardName": { "type": ["string", "null"] }
+                "maximumPasses": { "type": ["integer", "null"] }
               }
             },
             "regionOverride": {

@@ -60,6 +60,8 @@ internal sealed class StarSchemaFixture : IDisposable
               "id": "star-schema",
               "name": "Star schema fixture",
               "costBasis": { "year": 2026, "realDiscountRate": 0.07 },
+              "executionMode": "sizeBattery",
+              "reliability": { "targetUsePercentage": 0.002 },
               "storageSizing": { "maximumPowerMw": 100, "maximumEnergyMwh": 400 },
               "regions": [{
                 "regionId": "NSW1",

@@ -32,9 +32,8 @@ internal static class ScenarioScaffoldCommand
         + $"scenario-v{ArtifactSchemaVersions.ScenarioConfig}.json";
 
     /// <summary>
-    /// One region, one generating fleet, one storage fleet. The file names are what the data root is
-    /// searched for, and the storage sizing block is what decides whether the run grows storage to
-    /// meet the reliability target or reports why it could not.
+    /// One region and one dispatchable generating fleet. Fixed-fleet execution is the safe starting
+    /// point: it runs the fleet as declared and does not grow or resize storage.
     /// </summary>
     /// <remarks>
     /// The fleet is a single dispatchable generator sized to serve the region, so a first run
@@ -47,16 +46,14 @@ internal static class ScenarioScaffoldCommand
           "schemaVersion": {{ArtifactSchemaVersions.ScenarioConfig}},
           "id": "my-scenario",
           "name": "My scenario",
+          "executionMode": "fixedFleet",
           "costBasis": {
             "year": 2026,
             "realDiscountRate": 0.07
           },
-          "storageSizing": {
-            "maximumPowerMw": 10000,
-            "maximumEnergyMwh": 100000,
+          "reliability": {
             "targetUsePercentage": 0.002,
-            "maximumPasses": 512,
-            "reliabilityStandardName": "NEM reliability standard"
+            "standardName": "NEM reliability standard"
           },
           "regions": [
             {
@@ -80,22 +77,7 @@ internal static class ScenarioScaffoldCommand
                   }
                 }
               ],
-              "storageFleets": [
-                {
-                  "technology": "Battery",
-                  "initialEnergyCapacityMwh": 0,
-                  "initialPowerCapacityMw": 0,
-                  "costParameters": {
-                    "powerCapitalCostAudPerMw": 470000,
-                    "energyCapitalCostAudPerMwh": 250000,
-                    "fixedOperatingCostAudPerMwYear": 15000
-                  },
-                  "technologyProfile": {
-                    "technicalLifeYears": 20,
-                    "roundTripEfficiency": 0.87
-                  }
-                }
-              ]
+              "storageFleets": []
             }
           ]
         }

@@ -7,13 +7,32 @@ namespace NEMSweep.CLI.Tests.Contracts;
 public sealed class SystemAndRegionDispatchResultsContractTests
 {
     [Fact]
-    public void StorageSizingBlockerSemantics_UseDistinctResultOverviewAndSweepSchemaVersions()
+    public void OptionalSizingSemantics_UseDistinctResultOverviewAndSweepSchemaVersions()
     {
-        ArtifactSchemaVersions.SystemDispatchResults.Should().Be(16);
-        ArtifactSchemaVersions.SystemDispatchOverview.Should().Be(5);
-        ArtifactSchemaVersions.RegionDispatchResults.Should().Be(11);
-        ArtifactSchemaVersions.RegionDispatchOverview.Should().Be(4);
-        ArtifactSchemaVersions.SweepIndex.Should().Be(12);
+        ArtifactSchemaVersions.SystemDispatchResults.Should().Be(17);
+        ArtifactSchemaVersions.SystemDispatchOverview.Should().Be(6);
+        ArtifactSchemaVersions.RegionDispatchResults.Should().Be(12);
+        ArtifactSchemaVersions.RegionDispatchOverview.Should().Be(5);
+        ArtifactSchemaVersions.SweepIndex.Should().Be(13);
+    }
+
+    [Fact]
+    public void SystemDispatchResults_FixedFleet_RoundTripsExplicitModeAndNullSizing()
+    {
+        SystemDispatchResultsDTO result = CreateSystemResult(
+            new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.FromHours(10))) with
+        {
+            ExecutionMode = SimulationExecutionMode.FixedFleet,
+            StorageSizing = null,
+        };
+        string json = JsonSerializer.Serialize(result, CamelCaseOptions);
+
+        SystemDispatchResultsDTO roundTripped = JsonSerializer.Deserialize<SystemDispatchResultsDTO>(
+            json, CaseInsensitiveOptions)!;
+
+        roundTripped.Should().BeEquivalentTo(result);
+        json.Should().Contain("\"executionMode\":\"fixedFleet\"");
+        json.Should().Contain("\"storageSizing\":null");
     }
 
     [Fact]

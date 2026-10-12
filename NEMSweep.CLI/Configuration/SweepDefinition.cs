@@ -37,7 +37,7 @@ internal sealed record SweepDefinition(
 
     private void Validate(WorkspacePaths paths)
     {
-        if (SchemaVersion != ArtifactSchemaVersions.SweepDefinition)
+        if (SchemaVersion != 1 && SchemaVersion != ArtifactSchemaVersions.SweepDefinition)
         {
             throw new FormatException(
                 $"Sweep '{SweepId}': schema version {SchemaVersion} is not supported; "
@@ -91,6 +91,12 @@ internal sealed record SweepDefinition(
             if (point.Overrides is null)
             {
                 throw new FormatException($"Sweep '{SweepId}', point '{point.PointId}': overrides are required.");
+            }
+            if (SchemaVersion == 1 && point.Overrides.Any(pair =>
+                    pair.Key.Equals("executionMode", StringComparison.OrdinalIgnoreCase)
+                    || pair.Key.Equals("reliability", StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new FormatException($"Sweep '{SweepId}': executionMode and reliability overrides require schema version 2.");
             }
 
             // Nothing in the model reads axisValue: it labels the x-axis and no more, so a wrong one

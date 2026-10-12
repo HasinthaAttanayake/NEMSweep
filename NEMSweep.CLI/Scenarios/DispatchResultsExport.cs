@@ -20,16 +20,17 @@ internal sealed record DispatchExportRequest(
     DispatchInputArtifactDTO WeatherInput,
     WeatherBasisDTO WeatherBasis,
     DomainScenario Scenario,
-    StorageSizingRunResult SizingResult,
-    StorageSizingOptions SizingOptions,
+    StorageSizingRunResult? SizingResult,
+    StorageSizingOptions? SizingOptions,
     string? ReliabilityStandardName,
+    double TargetUsePercentage,
     PowerSystemCostBreakdown CostBreakdown,
     string? RegionId = null,
     double[]? TransmissionLossesMw = null);
 
 internal sealed record DispatchPublicationRequest(
     ScenarioDispatchResult Dispatch,
-    StorageSizingOptions SizingOptions,
+    StorageSizingOptions? SizingOptions,
     string? ReliabilityStandardName,
     string? RegionFileNamePrefix = null,
     DispatchModelProvenanceDTO? Provenance = null);
@@ -77,15 +78,12 @@ internal static class DispatchResultsExport
     private static DispatchPublication CreatePublication(DispatchPublicationRequest request)
     {
         ScenarioDispatchResult dispatch = request.Dispatch;
-        StorageSizingRunResult sizingResult = dispatch.SizingResult;
         SystemDispatchOutcome systemOutcome = SystemDispatchOutcome.Create(
-            sizingResult.PowerSystem,
-            new SystemDispatchRunResult(
-                sizingResult.Regions.Select(region => region.DispatchOutcome).ToArray(),
-                sizingResult.InterconnectorFlows));
+            dispatch.PowerSystem,
+            dispatch.Dispatch);
         SystemReliabilityAssessment systemReliability = SystemReliabilityAssessment.Create(
             systemOutcome,
-            request.SizingOptions.TargetUsePercentage);
+            dispatch.Reliability.TargetUsePercentage);
         string runId = Guid.NewGuid().ToString("N");
         var regions = new Dictionary<string, RegionDispatchResultsDTO>(StringComparer.OrdinalIgnoreCase);
         var regionOverviews = new Dictionary<string, RegionDispatchOverviewDTO>(StringComparer.OrdinalIgnoreCase);
@@ -144,7 +142,9 @@ internal static class DispatchResultsExport
                 systemReliability.AchievedUsePercentage,
                 systemReliability.WithinTarget,
                 request.ReliabilityStandardName),
-            CreateSystemStorageSizingOutcome(request, dispatch.SizingResult),
+            dispatch.SizingResult is { } sizing
+                ? CreateSystemStorageSizingOutcome(request, sizing)
+                : null,
             CreateCost(dispatch.CostBreakdown),
             CreateEmissions(dispatch.EmissionsSummary),
             new DispatchTopologyDTO(
@@ -158,7 +158,8 @@ internal static class DispatchResultsExport
             new DispatchCostBasisDTO(
                 dispatch.Scenario.CostBasis.Year,
                 dispatch.Scenario.CostBasis.RealDiscountRate),
-            request.Provenance);
+            request.Provenance,
+            dispatch.ExecutionMode);
     }
 
     /// <summary>Pairs each solved interconnector flow with its declared scenario link.</summary>
@@ -209,7 +210,8 @@ internal static class DispatchResultsExport
             system.StorageSizing,
             system.Cost,
             system.Emissions,
-            system.Topology);
+            system.Topology,
+            system.ExecutionMode);
 
     /// <summary>One region's slice of a publication: the two artifacts and the two index entries.</summary>
     private sealed record RegionPublication(
@@ -231,7 +233,7 @@ internal static class DispatchResultsExport
         string regionId)
     {
         ScenarioDispatchResult dispatch = request.Dispatch;
-        StorageSizingRunResult sizingResult = dispatch.SizingResult;
+        StorageSizingRunResult? sizingResult = dispatch.SizingResult;
         RegionCostBreakdown regionalCost = dispatch.CostBreakdown.Regions.Single(
             cost => string.Equals(cost.RegionId, regionId, StringComparison.OrdinalIgnoreCase));
         DispatchInputArtifactDTO demandInput = dispatch.DemandInputs[regionId].Artifact;
@@ -242,7 +244,7 @@ internal static class DispatchResultsExport
             weatherInput,
             WeatherBasis.Create(dispatch.WeatherInputs[regionId].Value),
             demandData.SourceArchives.ToArray());
-        DispatchEvidence evidence = CreateEvidence(new DispatchExportRequest(
+        var exportRequest = new DispatchExportRequest(
             demandData,
             demandInput,
             weatherInput,
@@ -251,9 +253,16 @@ internal static class DispatchResultsExport
             sizingResult,
             request.SizingOptions,
             request.ReliabilityStandardName,
+            dispatch.Reliability.TargetUsePercentage,
             dispatch.CostBreakdown,
             regionId,
-            IncomingTransmissionLossesMw(systemOutcome, regionId)));
+            IncomingTransmissionLossesMw(systemOutcome, regionId));
+        DispatchOutcome outcome = dispatch.Dispatch.RegionalOutcomes.Single(result =>
+            string.Equals(result.RegionId, regionId, StringComparison.OrdinalIgnoreCase));
+        DispatchEvidence evidence = CreateEvidence(
+            exportRequest, dispatch.PowerSystem, outcome,
+            sizingResult?.Regions.Single(result =>
+                string.Equals(result.DispatchOutcome.RegionId, regionId, StringComparison.OrdinalIgnoreCase)));
         DispatchCostDTO cost = CreateCost(regionalCost);
         RegionEmissionsSummary regionalEmissions = dispatch.EmissionsSummary.Regions.Single(
             emissions => string.Equals(
@@ -275,8 +284,9 @@ internal static class DispatchResultsExport
             evidence.Reliability,
             evidence.StorageSizing,
             cost,
-            emissions);
-        string detailPath = $"{request.RegionFileNamePrefix ?? "results-"}{regionId.ToLowerInvariant()}.json";
+            emissions,
+            dispatch.ExecutionMode);
+        string detailPath = $"{request.RegionFileNamePrefix ?? "results-"}{RegionFileNames.For(regionId)}.json";
         Dictionary<string, double> deliveredGenerationByTechnologyMwh =
             evidence.DataSeries.DeliveredGenerationByTechnologyMw.ToDictionary(
                 entry => entry.Key,
@@ -298,7 +308,8 @@ internal static class DispatchResultsExport
             cost,
             emissions,
             deliveredGenerationByTechnologyMwh,
-            evidence.DataSeries.TransmissionLossesMw.Sum() * evidence.Scenario.Resolution.TotalHours);
+            evidence.DataSeries.TransmissionLossesMw.Sum() * evidence.Scenario.Resolution.TotalHours,
+            dispatch.ExecutionMode);
 
         return new RegionPublication(
             detailPath,
@@ -314,11 +325,14 @@ internal static class DispatchResultsExport
                 emissions,
                 deliveredGenerationByTechnologyMwh,
                 detailPath,
-                overviewPath));
+                overviewPath,
+                dispatch.ExecutionMode,
+                evidence.PowerSystem.StorageFleets.Sum(fleet => fleet.PowerCapacityMw),
+                evidence.PowerSystem.StorageFleets.Sum(fleet => fleet.EnergyCapacityMwh)));
     }
 
     private static string LinkId(string fromRegionId, string toRegionId) =>
-        $"{fromRegionId.ToUpperInvariant()}->{toRegionId.ToUpperInvariant()}";
+        $"{RegionFileNames.For(fromRegionId).ToUpperInvariant()}->{RegionFileNames.For(toRegionId).ToUpperInvariant()}";
 
     private static double[] IncomingTransmissionLossesMw(
         SystemDispatchOutcome outcome,
@@ -415,7 +429,7 @@ internal static class DispatchResultsExport
             installed.Sum(assessment => assessment.BatteryCapacity.PowerCapacity.Megawatts),
             sizingResult.Regions.Sum(region => region.BatterySizing.EnergyCapacity.MegawattHours),
             sizingResult.Regions.Sum(region => region.BatterySizing.PowerCapacity.Megawatts),
-            request.SizingOptions.MaximumEnergy.MegawattHours * regionCount,
+            (request.SizingOptions ?? throw new InvalidOperationException("Sizing options are required.")).MaximumEnergy.MegawattHours * regionCount,
             request.SizingOptions.MaximumPower.Megawatts * regionCount,
             sizingResult.DispatchPassCount,
             EvidenceFor(sizingResult.EnergyLimitedAssessment),
@@ -618,20 +632,16 @@ internal static class DispatchResultsExport
         DispatchSeriesDTO DataSeries,
         DispatchMetricsDTO Metrics,
         ReliabilityBasisDTO Reliability,
-        StorageSizingOutcomeDTO StorageSizing,
+        StorageSizingOutcomeDTO? StorageSizing,
         DispatchOutcome Outcome);
 
-    private static DispatchEvidence CreateEvidence(DispatchExportRequest request)
+    private static DispatchEvidence CreateEvidence(
+        DispatchExportRequest request,
+        PowerSystem powerSystem,
+        DispatchOutcome outcome,
+        RegionalSizingResult? regionalSizing)
     {
-        StorageSizingRunResult sizingResult = request.SizingResult;
-        PowerSystem powerSystem = sizingResult.PowerSystem;
-        RegionalSizingResult regionalSizing = request.RegionId is null
-            ? sizingResult.Regions.Single()
-            : sizingResult.Regions.Single(result => string.Equals(
-                result.DispatchOutcome.RegionId,
-                request.RegionId,
-                StringComparison.OrdinalIgnoreCase));
-        DispatchOutcome outcome = regionalSizing.DispatchOutcome;
+        double target = request.TargetUsePercentage;
         var deliveredGenerationByTechnology = new Dictionary<string, FlowSeries>();
         foreach ((GenerationTechnology technology, FlowSeries availableGeneration) in
                  outcome.PerFleetGeneration.OrderBy(entry => entry.Key))
@@ -728,11 +738,11 @@ internal static class DispatchResultsExport
                 reliability.PeakUnservedPower.Megawatts,
                 CreateIntervalPointers(outcome)),
             new ReliabilityBasisDTO(
-                request.SizingOptions.TargetUsePercentage,
+                target,
                 reliability.UnservedEnergyPercentageOfDemand,
-                regionalSizing.MeetsTarget,
+                reliability.UnservedEnergyPercentageOfDemand <= target,
                 request.ReliabilityStandardName),
-            CreateStorageSizingOutcome(request, regionalSizing),
+            regionalSizing is null ? null : CreateStorageSizingOutcome(request, regionalSizing),
             outcome);
     }
 
@@ -740,7 +750,11 @@ internal static class DispatchResultsExport
         DispatchExportRequest request,
         RegionalSizingResult regionalSizing)
     {
-        InstalledBatteryAssessment installed = request.SizingResult.InstalledBatteryAssessments
+        StorageSizingRunResult sizing = request.SizingResult
+            ?? throw new InvalidOperationException("Sizing evidence is required.");
+        StorageSizingOptions options = request.SizingOptions
+            ?? throw new InvalidOperationException("Sizing options are required.");
+        InstalledBatteryAssessment installed = sizing.InstalledBatteryAssessments
             .Single(assessment => string.Equals(
                 assessment.BatteryCapacity.RegionId,
                 regionalSizing.BatterySizing.RegionId,
@@ -751,11 +765,11 @@ internal static class DispatchResultsExport
             installed.BatteryCapacity.PowerCapacity.Megawatts,
             regionalSizing.BatterySizing.EnergyCapacity.MegawattHours,
             regionalSizing.BatterySizing.PowerCapacity.Megawatts,
-            request.SizingOptions.MaximumEnergy.MegawattHours,
-            request.SizingOptions.MaximumPower.Megawatts,
-            request.SizingResult.DispatchPassCount,
-            EvidenceFor(request.SizingResult.EnergyLimitedAssessment),
-            request.SizingResult.Trajectory.Select(pass =>
+            options.MaximumEnergy.MegawattHours,
+            options.MaximumPower.Megawatts,
+            sizing.DispatchPassCount,
+            EvidenceFor(sizing.EnergyLimitedAssessment),
+            sizing.Trajectory.Select(pass =>
             {
                 StorageSizingRegionPass regionPass = pass.Regions.Single(snapshot => string.Equals(
                     snapshot.RegionId,
