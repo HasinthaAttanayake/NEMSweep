@@ -97,10 +97,15 @@ you ingest them, or pass `--data-root` per run.
 
 ## Ingest the input artifacts
 
+Building your own input bundle? Start with
+[AEMO NEMWeb demand and Climate.OneBuilding EPW weather](input-bundles.md#finding-sources-for-your-own-bundle).
+That guide covers source selection, unchanged files, typical-year provenance and
+the separate data-attribution/licensing requirements.
+
 A scenario reads a `demand-{region}.json` and a `weather-{region}.json` per region, plus
-`generation-information.json`. Those are produced, not committed: you assemble an
-[input bundle](input-bundles.md) of upstream AEMO demand archives, an AEMO Generation Information
-workbook and EnergyPlus Weather files, then run
+the generation fleet defined in its scenario configuration. The demand and weather
+artifacts are produced, not committed: assemble a current **format-2**
+[input bundle](input-bundles.md) of demand archives and EPW weather files, then run
 
 ```bash
 dotnet run --project NEMSweep.CLI -- --validate-inputs
@@ -113,6 +118,11 @@ dotnet run --project NEMSweep.CLI -- --ingest
 `--validate-inputs` writes nothing and reports what it found. `--ingest` runs the same checks and
 then writes the artifacts into the data root. [Input bundles](input-bundles.md) covers the bundle
 shape, the manifest, and which upstream file supplies what.
+
+**Legacy format 1 only:** existing NEM bundles additionally contain an AEMO
+Generation Information workbook. Their ingestion produces `generation-information.json`
+for legacy generation-information commands. Format-2 ingestion and scenario runs
+do not require that workbook or artifact; scenario configuration supplies the fleet.
 
 ## Run your first scenario
 
