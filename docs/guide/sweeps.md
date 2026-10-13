@@ -213,7 +213,7 @@ A two-point sweep of storage capital cost, run against the committed FY2026 exam
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "sweepId": "battery-capex-sensitivity",
   "name": "Battery capital cost sensitivity",
   "axis": {
