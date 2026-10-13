@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 7,
+  "id": "synthetic-island-baseline",
+  "name": "Synthetic Island-X demonstration",
+  "executionMode": "fixedFleet",
+  "costBasis": { "year": 2025, "realDiscountRate": 0.05 },
+  "reliability": { "targetUsePercentage": 0.01, "standardName": "Synthetic demonstration target" },
+  "regions": [
+    {
+      "regionId": "Island-X",
+      "demandFile": "demand-region-49534C414E442D58.json",
+      "weatherFile": "weather-region-49534C414E442D58.json",
+      "generatingFleets": [
+        {
+          "technology": "Gas",
+          "nameplateCapacityMw": 50,
+          "costParameters": {
+            "capitalCostAudPerMw": 1000000,
+            "fixedOperatingCostAudPerMwYear": 12000,
+            "variableOperatingCostAudPerMwh": 10,
+            "fuelPriceAudPerGj": 10
+          },
+          "technologyProfile": {
+            "heatRateGjPerMwh": 7,
+            "technicalLifeYears": 30,
+            "emissionsIntensityTonnesPerMwh": 0.4
+          }
+        }
+      ],
+      "storageFleets": [
+        {
+          "technology": "Battery",
+          "initialEnergyCapacityMwh": 0,
+          "initialPowerCapacityMw": 0,
+          "costParameters": {
+            "powerCapitalCostAudPerMw": 200000,
+            "energyCapitalCostAudPerMwh": 150000,
+            "fixedOperatingCostAudPerMwYear": 10000
+          },
+          "technologyProfile": { "technicalLifeYears": 15, "roundTripEfficiency": 0.9 }
+        }
+      ]
+    }
+  ]
+}

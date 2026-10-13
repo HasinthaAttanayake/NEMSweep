@@ -90,6 +90,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="QuickStart\Templates\simple.json" LogicalName="Starter.Simple" />
+    <EmbeddedResource Include="..\scenarios\nem-fy2026-all-regions.json" LogicalName="Starter.Advanced" />
+    <EmbeddedResource Include="..\sweeps\datacentre-nameplate-fy2026.json" LogicalName="Starter.FullSweep" />
+    <EmbeddedResource Include="QuickStart\samples.json" LogicalName="Starter.Catalogue" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="appsettings.example.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

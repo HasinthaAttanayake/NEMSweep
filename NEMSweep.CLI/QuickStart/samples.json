@@ -1,0 +1,16 @@
+[
+  {
+    "id": "simple",
+    "revision": "v2026.10.1",
+    "url": "https://github.com/HasinthaAttanayake/NEMSweep.Samples/releases/download/v2026.10.1/simple-v2.zip",
+    "length": 1557670,
+    "sha256": "39b9ba1996ef720fdffba6e89cc46082ed82e4b277f036e5e296d5880970d3e9"
+  },
+  {
+    "id": "advanced",
+    "revision": "v2026.10.1",
+    "url": "https://github.com/HasinthaAttanayake/NEMSweep.Samples/releases/download/v2026.10.1/advanced-v2.zip",
+    "length": 21242283,
+    "sha256": "13d85377dd9c8466c19859536786b317658c61573f54cca7a77d7469ccf9473f"
+  }
+]

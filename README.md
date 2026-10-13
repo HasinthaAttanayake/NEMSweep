@@ -216,6 +216,29 @@ NuGet trusted publishing.
 
 ## Local development
 
+### Hosted starters
+
+The public [NEMSweep.Samples](https://github.com/HasinthaAttanayake/NEMSweep.Samples)
+repository provides reviewable starter recipes. Simple is a synthetic Island-X
+grid. Advanced preserves the real Australian NEM FY2026 AEMO demand archives,
+all seven original TMYx 2011-2025 EPWs and the existing fleet/cost/link assumptions.
+The weather profiles are typical years, not measured FY2026 weather. Scenario
+assumptions remain examples; neither starter distributes published model results.
+
+The new source-build CLI supports `--quick-start`, or explicit
+`--quick-start simple` / `--quick-start advanced`, to explain, download, verify
+and ingest a starter into a new study directory without running a model.
+The reviewed [data release, `v2026.10.1`](https://github.com/HasinthaAttanayake/NEMSweep.Samples/releases/tag/v2026.10.1)
+is published with both bundles. Anonymous public downloads and complete CLI
+quick-start preparation have been verified for Simple and Advanced.
+The data release is separate from the software release: this feature is not in
+the previously published `0.1.0` NuGet package. Use this source build until a
+compatible CLI version is published.
+See [Hosted starters](docs/guide/synthetic-starters.md) for publication status,
+local alternatives, manual downloads, formats and run commands.
+
+### Build or run the CLI
+
 There are three ways to run NEMSweep: install the tool as above, clone it and build it with the
 .NET SDK, or run the published container image, which needs no toolchain and works under Docker or
 Podman.
