@@ -38,6 +38,7 @@ Legacy NEM-only import paths remain limited to the five NEM regions. Format-2 bu
 | Install NEMSweep and run your first scenario | [Guide](guide/index.md) |
 | Understand what the model does | [Concepts](concepts/index.md) |
 | Build and run a synthetic custom-region example without source data | [Custom grids](guide/custom-grids.md) |
+| Find real demand/weather sources and assemble your own bundle | [Input sources and data terms](guide/input-bundles.md#finding-sources-for-your-own-bundle) |
 | Know what the model assumes, and where it will mislead you | [Assumptions](assumptions/index.md) |
 | Design a study, or drive NEMSweep with an LLM | [Exploring](exploring/index.md) |
 | Look up a type, a field, or a published JSON schema | [API reference](api/index.md) |
@@ -112,5 +113,5 @@ forecast:
   data-centre nameplate load across the regions, one run per step.
 
 The example demonstrates what the framework does. It is not the limit of what the framework does.
-Its artifacts derive from AEMO and EnergyPlus Weather sources under their own terms. Run your own
+Its artifacts derive from AEMO data and third-party EPW weather sources under their own terms. Run your own
 scenario before quoting a figure from it.

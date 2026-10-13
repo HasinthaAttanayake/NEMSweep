@@ -19,6 +19,53 @@ mapping for each region. Do not copy the generation workbook or unused reference
 not core simulation inputs. Validate the new bundle and ingest it into a separate data root before
 using it. The original bundle remains available for legacy commands.
 
+## Finding sources for your own bundle
+
+You can supply your own demand and weather; format-2 bundles are not restricted
+to Australian NEM regions. For real Australian inputs, these are useful starting points:
+
+| Input | Upstream source | What to select |
+|---|---|---|
+| Demand | [AEMO NEMWeb market data](https://www.aemo.com.au/energy-systems/electricity/national-electricity-market-nem/data-nem/market-data-nemweb) | Actual operational-demand half-hourly archives covering every declared region and interval in your manifest period. The page links current and archive reports. |
+| Weather | [Climate.OneBuilding.org](https://climate.onebuilding.org/) and its [Australian EPW collection](https://climate.onebuilding.org/WMO_Region_5_Southwest_Pacific/AUS_Australia/index.html) | EPWs for representative solar/wind sites, with the source period and site recorded. The collection offers multiple typical-year record windows. |
+
+Keep demand ZIPs intact: the importer reads their nested archives. For weather,
+extract the original `.epw` from each publisher ZIP into the layout below, retaining
+its filename and every byte, including the first eight header lines. Keep one file
+for both roles, or select separate solar/wind sites and explain those choices in
+your study documentation. The solar site's location drives the model's solar geometry.
+
+A suffix such as `TMYx.2011-2025` describes the historical window used to assemble
+a typical year, **not** weather measured during a FY2026 demand/scenario period.
+Check the EPW coverage and source offset against the requirements below, then
+write a format-2 manifest and run `--validate-inputs` before `--ingest`.
+
+### Data licences and attribution
+
+NEMSweep's BSD-3-Clause software licence does not relicense third-party inputs.
+AEMO's [Copyright Permissions Notice](https://www.aemo.com.au/privacy-and-legal-notices/copyright-permissions)
+permits use of public AEMO Material with accurate and appropriate attribution;
+its [Privacy and Legal Notices](https://www.aemo.com.au/privacy-and-legal-notices) also apply.
+Credit AEMO, the dataset and period used, and distinguish your model results from
+the original source.
+
+For Climate.OneBuilding TMYx files, use the publisher's
+[official citation and disclaimer](https://climate.onebuilding.org/contact/default.html):
+
+> Lawrie, Linda K, Drury B Crawley. 2026. Development of Global Typical Meteorological Years (TMYx). https://climate.onebuilding.org
+
+The [source description](https://climate.onebuilding.org/sources/default.html)
+credits NOAA/NCEI ISD observations and ERA5 reanalysis solar data, courtesy of
+Oikolab. Check the specific files' redistribution terms: downloading publicly
+available EPWs or supplying a citation does not itself grant permission to rehost
+them. Put credits and processing notes beside your study, not in edited EPW headers.
+
+Keep the upstream URLs, original filenames, period/record window, known download
+dates, SHA256 hashes and applicable terms with the bundle. Do not invent an
+unrecorded download date or infer one from repackaged ZIP timestamps.
+See [Data licensing and provenance](https://github.com/HasinthaAttanayake/NEMSweep/blob/main/DATA-LICENSE.md)
+for the software/data distinction and the published example's sources.
+
 ## Bundle layout
 
 ```text

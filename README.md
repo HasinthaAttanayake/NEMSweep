@@ -4,7 +4,9 @@ NEMSweep is a free, open-source tool that checks whether a proposed electricity 
 a full year of real demand hour by hour, works out how much storage it would take if it couldn't,
 and tells you what that costs.
 
-Repository: <https://github.com/HasinthaAttanayake/NEMSweep>. Licence: [BSD-3-Clause](LICENSE.md).
+Repository: <https://github.com/HasinthaAttanayake/NEMSweep>.
+Software licence: [BSD-3-Clause](LICENSE.md).
+Third-party data: [source attribution and reuse conditions](DATA-LICENSE.md).
 
 NEMSweep ships with no numbers of its own. Every cost, every carbon intensity, every demand trace
 and every weather year is supplied by whoever runs it. The model does the accounting. The
@@ -28,6 +30,8 @@ your own software.
 **Documentation:** [how to run it, what it assumes, and how to explore the scenario space](docs/index.md)
 
 **Custom-grid onboarding:** [generate and run a synthetic portable grid](docs/guide/custom-grids.md)
+
+**Bring your own inputs:** [find demand/weather sources and assemble a bundle](docs/guide/input-bundles.md#finding-sources-for-your-own-bundle)
 
 **Live results:** [https://www.nemsweep.com/](https://www.nemsweep.com/)
 
@@ -118,7 +122,7 @@ Generation mix, economics, the reliability standard and transmission capacity ar
 inputs, and each can be swept the same way. [Designing a study](docs/exploring/index.md) covers how.
 
 The example's artifacts are published with the results site. They are an illustrative example, not
-a dataset, and they derive from AEMO and EnergyPlus Weather sources under their own terms. Run your
+a dataset, and they derive from AEMO data and third-party EPW weather sources under their own terms. Run your
 own scenario before quoting a figure.
 
 ## Repository
@@ -155,7 +159,8 @@ dependencies, so a project reference from a clone, or a reference to the built a
 takes to embed them.
 
 The data is not covered by that licence. The demand, generation and weather artifacts derive from
-AEMO and EnergyPlus Weather sources with their own terms. Read [DATA-LICENSE.md](DATA-LICENSE.md)
+AEMO data and third-party EPW weather sources with their own terms. EPW is a format,
+not a licence. Read [DATA-LICENSE.md](DATA-LICENSE.md)
 before redistributing any of it. This repository carries none of them: the artifacts published
 alongside the results site are an illustrative example, not a dataset.
 
