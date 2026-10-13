@@ -3,10 +3,17 @@
 This page takes you from a fresh clone to a dispatch result on screen. It is for anyone who wants to
 run NEMSweep locally.
 
-Everything on this page is `NEMSweep.CLI`, the command-line tool that runs the framework against
-National Electricity Market data. The framework itself (`NEMSweep.Model`, `NEMSweep.Contracts`) has
-no command line and no data; the CLI is what ingests AEMO and EnergyPlus Weather inputs, validates
-scenarios against the five NEM regions, and writes the published artifacts.
+Everything on this page is `NEMSweep.CLI`, the command-line tool that ingests raw
+inputs and runs portable grid scenarios. It accepts custom region IDs through
+format-2 bundles, as well as National Electricity Market inputs. The framework
+itself (`NEMSweep.Model`, `NEMSweep.Contracts`) has no command line and no data.
+
+For ready-to-edit configurations, see [Hosted starters](synthetic-starters.md):
+Simple is a synthetic Island-X grid; Advanced preserves real Australian NEM FY2026
+AEMO demand, original TMYx EPW weather and the existing five-region
+fleet/cost/link assumptions. Its CLI download
+route is a source-build feature pending the reviewed samples release. For an
+immediately local recipe, see [Custom grids](custom-grids.md).
 
 ## Prerequisites
 

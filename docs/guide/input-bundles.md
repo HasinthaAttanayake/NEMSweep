@@ -12,6 +12,13 @@ generation inputs. Raw bundles are supplied locally and are not shipped in the r
 package. An explicit bundle path or `inputBundleRoot` in `appsettings.local.json` overrides the
 default, so existing local settings can continue to select the legacy bundle.
 
+Hosted starter bundles have a separate public
+[samples repository](https://github.com/HasinthaAttanayake/NEMSweep.Samples).
+Simple is synthetic; Advanced preserves real FY2026 AEMO demand and original EPW weather.
+See [Hosted starters](synthetic-starters.md) for production recipes, the
+pending reviewed release, manual ingestion and the CLI quick-start route.
+They use this same format 2; dataset revisions do not change the input schema.
+
 To create a format-2 counterpart without altering a legacy bundle, copy its
 `demand/operational-demand-hh/` and `weather/` trees into a separate directory. Preserve the source
 bytes, period and region identities; write a version-2 manifest with an explicit weather-directory

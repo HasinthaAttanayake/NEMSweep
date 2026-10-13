@@ -61,7 +61,9 @@ nemsweep --run-scenario scenarios/my-scenario.json --output ./study --csv
 
 The JSON is written exactly as before either way. See [CSV tables](csv-tables.md).
 
-`--help`, `--version` and `--describe-schema` answer without a workspace at all, so they work before
+`--help`, `--version`, `--describe-schema` and `--quick-start` work without loading local settings.
+Quick-start owns a new study directory and rejects all global workspace/format overrides.
+The other workspace-free commands work before
 you have written any settings file.
 
 ## Exit codes
@@ -87,6 +89,32 @@ dotnet run --project NEMSweep.CLI -- --version
 ```
 
 Prints the assembly's informational version (falling back to its assembly version, or `unknown`).
+
+## Hosted quick-start
+
+```powershell
+nemsweep --quick-start
+nemsweep --quick-start simple .\my-first-study
+nemsweep --quick-start advanced .\my-nem-study
+```
+
+Explains Simple (Island-X) and Advanced (five connected NEM regions), prompts
+when no choice is supplied, or uses the explicit selection for automation.
+Simple uses synthetic data; Advanced preserves real Australian NEM FY2026 AEMO
+demand and original TMYx 2011-2025 EPWs (not measured FY2026 weather).
+Downloads a pinned format-2 bundle, verifies length/hash, prepares
+current-spec configurations and automatically ingests the data. **No simulations
+or sweeps are run.** The destination must not already exist, including as an
+empty directory; failures leave no partially prepared study.
+
+With no destination, uses `nemsweep-starter-simple` or `nemsweep-starter-advanced`
+under the current directory. Redirected stdin requires explicit selection.
+Preparation is settings-independent and rejects `--data-root`, `--output`,
+`--csv` and `--format`; later study runs accept them normally.
+
+See [Hosted starters](synthetic-starters.md) for the source-build requirement,
+**pending sample-publication status**, download safety, assumptions and run
+instructions. This feature is not present in the earlier `0.1.0` package.
 
 ## Scenario and sweep runs
 

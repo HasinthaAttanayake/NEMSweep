@@ -2,6 +2,8 @@
   href: index.md
 - name: CLI reference
   href: cli.md
+- name: Synthetic starters
+  href: synthetic-starters.md
 - name: Running the container
   href: container.md
 - name: Sweeps

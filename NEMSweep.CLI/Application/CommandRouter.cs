@@ -4,6 +4,7 @@ using NEMSweep.CLI.Demand;
 using NEMSweep.CLI.Generation;
 using NEMSweep.CLI.Infrastructure;
 using NEMSweep.CLI.Ingest;
+using NEMSweep.CLI.QuickStart;
 using NEMSweep.CLI.Scenarios;
 using NEMSweep.CLI.Weather;
 using NEMSweep.Contracts;
@@ -30,22 +31,38 @@ internal sealed class CommandRouter
     private readonly string _workingRoot;
     private readonly TextWriter _output;
     private readonly TextWriter _error;
+    private readonly TextReader _input;
+    private readonly bool _inputRedirected;
+    private readonly HttpClient? _quickStartClient;
+    private readonly IReadOnlyList<StarterSample>? _samples;
 
     /// <summary>Creates a router for one process.</summary>
     /// <param name="settingsDirectory">Directory the settings file is loaded from.</param>
     /// <param name="workingRoot">Base for relative paths, normally the current directory.</param>
     /// <param name="output">Standard output.</param>
     /// <param name="error">Standard error.</param>
+    /// <param name="input">Selection input, or the process console.</param>
+    /// <param name="inputRedirected">Whether selection input is redirected.</param>
+    /// <param name="quickStartClient">Optional injected downloader for offline tests.</param>
+    /// <param name="samples">Optional injected catalogue for offline tests.</param>
     public CommandRouter(
         string settingsDirectory,
         string workingRoot,
         TextWriter output,
-        TextWriter error)
+        TextWriter error,
+        TextReader? input = null,
+        bool? inputRedirected = null,
+        HttpClient? quickStartClient = null,
+        IReadOnlyList<StarterSample>? samples = null)
     {
         _settingsDirectory = settingsDirectory;
         _workingRoot = workingRoot;
         _output = output;
         _error = error;
+        _input = input ?? Console.In;
+        _inputRedirected = inputRedirected ?? Console.IsInputRedirected;
+        _quickStartClient = quickStartClient;
+        _samples = samples;
     }
 
     /// <summary>Routes one command line and returns the process exit code.</summary>
@@ -53,6 +70,22 @@ internal sealed class CommandRouter
     {
         try
         {
+            if (args.Contains("--quick-start", StringComparer.Ordinal))
+            {
+                if (args.FirstOrDefault() != "--quick-start"
+                    || args.Skip(1).Any(arg => arg.StartsWith("--", StringComparison.Ordinal)))
+                {
+                    throw new UsageException("Quick-start does not accept workspace/output/format overrides or other flags.");
+                }
+                if (_quickStartClient is not null)
+                {
+                    return QuickStartCommand.Run(args, _workingRoot, _input, _inputRedirected,
+                        _output, _error, _quickStartClient, _samples ?? StarterSample.LoadCatalogue());
+                }
+                using var client = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+                return QuickStartCommand.Run(args, _workingRoot, _input, _inputRedirected,
+                    _output, _error, client, _samples ?? StarterSample.LoadCatalogue());
+            }
             CliOptions options = CliOptions.Parse(args, out string[] commandArgs);
 
             // Answered without a workspace, so asking how to use the tool, or for a schema, never
@@ -166,6 +199,9 @@ internal sealed class CommandRouter
         writer.WriteLine("Usage:");
         writer.WriteLine("  nemsweep --help");
         writer.WriteLine("  nemsweep --version");
+        writer.WriteLine("  nemsweep --quick-start [simple|advanced] [new-study-directory]");
+        writer.WriteLine("    Explain, download and ingest a Simple or Advanced starter; never run simulations.");
+        writer.WriteLine("    No workspace overrides apply. The destination must not already exist.");
         writer.WriteLine();
         writer.WriteLine("  Workspace overrides, accepted alongside any command below:");
         writer.WriteLine("  --data-root <dir>   where inputs are read from  (env NEMSWEEP_DATA_ROOT)");
@@ -200,6 +236,7 @@ internal sealed class CommandRouter
         "--run-sweep" => "Sweep run",
         "--describe-schema" => "Schema description",
         "--new-scenario" => "Scenario scaffold",
+        "--quick-start" => "Quick-start",
         "--validate-inputs" => "Input validation",
         "--ingest" => "Input ingest",
         "--import-demand" => "Operational-demand import",
