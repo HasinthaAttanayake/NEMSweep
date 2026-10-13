@@ -1,17 +1,20 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "nem-fy2026-all-regions",
   "name": "NEM FY2026 all regions",
   "costBasis": {
     "year": 2026,
     "realDiscountRate": 0.07
   },
+  "executionMode": "sizeBattery",
+  "reliability": {
+    "targetUsePercentage": 0.002,
+    "standardName": "NEM reliability standard"
+  },
   "storageSizing": {
     "maximumPowerMw": 10000,
     "maximumEnergyMwh": 100000,
-    "targetUsePercentage": 0.002,
-    "maximumPasses": 512,
-    "reliabilityStandardName": "NEM reliability standard"
+    "maximumPasses": 512
   },
   "interconnectors": [
     {
