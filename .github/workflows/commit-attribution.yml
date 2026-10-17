@@ -1,0 +1,53 @@
+name: Check Commit Attribution
+
+on:
+  pull_request_target:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  reject-ai-coauthorship:
+    name: Reject AI co-authorship
+    runs-on: ubuntu-latest
+    steps:
+    # The workflow definition comes from main. Checking out the PR head only reads its Git metadata;
+    # this job must never execute files supplied by the pull request.
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
+        fetch-depth: 0
+        persist-credentials: false
+
+    - name: Reject recognised AI co-author trailers
+      shell: bash
+      env:
+        EVENT_NAME: ${{ github.event_name }}
+        PUSH_BEFORE: ${{ github.event.before }}
+        PUSH_AFTER: ${{ github.sha }}
+        PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      run: |
+        set -euo pipefail
+
+        if [[ "$EVENT_NAME" == "pull_request_target" ]]; then
+          commits="$(git rev-list --reverse "${PR_BASE_SHA}..${PR_HEAD_SHA}")"
+        elif [[ "$PUSH_BEFORE" =~ ^0+$ ]]; then
+          commits="$(git rev-list --reverse "$PUSH_AFTER")"
+        else
+          commits="$(git rev-list --reverse "${PUSH_BEFORE}..${PUSH_AFTER}")"
+        fi
+
+        pattern='^Co-authored-by:[[:space:]]*(Copilot|GitHub Copilot)[[:space:]]*<223556219\+Copilot@users\.noreply\.github\.com>$|^Co-authored-by:[[:space:]]*(Claude|Claude Code)[[:space:]]*<noreply@anthropic\.com>$'
+
+        while IFS= read -r commit; do
+          [[ -n "$commit" ]] || continue
+
+          if git show -s --format=%B "$commit" | grep --extended-regexp --ignore-case --quiet "$pattern"; then
+            echo "::error::Commit $commit declares a recognised AI as a co-author. Remove the Co-authored-by trailer and amend the commit before merging."
+            exit 1
+          fi
+        done <<< "$commits"
