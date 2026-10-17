@@ -70,6 +70,12 @@ and does not depend on artifacts that will one day live elsewhere.
 Explain **why**, not what: the diff already says what. A commit message that states the problem, the
 decision and the reason it was made is what makes the change reviewable in a year.
 
+AI-assisted contributions are welcome. The human who commits a change is accountable for reviewing
+it and for its effect on the project. Do not add AI systems as commit co-authors. The `Check Commit
+Attribution` workflow rejects trailers for recognised AI identities on pull requests and direct
+pushes to `main`. Human co-authors remain welcome; remove an AI `Co-authored-by` trailer before
+opening or updating a pull request.
+
 Keep a pull request to one coherent change. If you find something else worth fixing on the way,
 that is a second pull request.
 
