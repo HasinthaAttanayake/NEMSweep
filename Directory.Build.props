@@ -37,13 +37,23 @@
     Test projects set IsPackable=false themselves, so nothing here needs to exclude them.
   -->
   <PropertyGroup>
-    <VersionPrefix>0.1.0</VersionPrefix>
+    <VersionPrefix>0.3.0</VersionPrefix>
     <PackageLicenseExpression>BSD-3-Clause</PackageLicenseExpression>
     <PackageProjectUrl>https://www.nemsweep.com/</PackageProjectUrl>
     <RepositoryUrl>https://github.com/HasinthaAttanayake/NEMSweep</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>electricity;energy;power-system;dispatch;nem;australia;simulation</PackageTags>
+  </PropertyGroup>
+
+  <!--
+    The release targeted by the documentation, not a claim of publication on nuget.org. Every
+    install snippet in the README, docs/ and skills/ must pin this version, and
+    DocumentedVersionTests fails the build if one drifts. Release preparation can update this
+    before publication; the README records that install commands require published packages.
+  -->
+  <PropertyGroup>
+    <DocumentedCliVersion>0.3.0</DocumentedCliVersion>
   </PropertyGroup>
 
   <!--

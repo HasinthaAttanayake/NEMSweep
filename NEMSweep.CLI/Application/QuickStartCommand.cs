@@ -81,7 +81,7 @@ internal static class QuickStartCommand
             Console.CancelKeyPress -= cancel;
         }
         output.WriteLine($"Prepared study: {destination}");
-        WriteRunInstructions(output, destination);
+        WriteRunInstructions(output, destination, sample);
         return 0;
     }
 
@@ -171,18 +171,86 @@ internal static class QuickStartCommand
 
         Preparation has not run any model. The two-point mode sweep compares a
         fixed baseline with sizing; Simple's standalone fixed scenario instead
-        has 80 MW of Gas to make a readable first run.
-        Advanced also supplies `sweeps/datacentre-full.json` (25 points, potentially
-        substantial compute); its fleet/cost/link assumptions and sweep overrides
-        match the repository example, alongside its original AEMO demand and EPWs.
+        has 80 MW of Gas to make a readable first run, so the sweep's `fixed`
+        point is not that scenario.
+        {(sample.Id == "simple" ? SimpleSweeps : AdvancedSweeps)}
         All baseline paths are relative to this study directory, so it can be moved.
 
+        {EngineLimitations}
+        {(sample.Id == "simple" ? "" : "\n" + NemSampleDataFacts)}
         Input formats: https://github.com/HasinthaAttanayake/NEMSweep/blob/main/docs/guide/schemas.md
         Samples: https://github.com/HasinthaAttanayake/NEMSweep.Samples
         """;
 
-    private static void WriteRunInstructions(TextWriter output, string destination)
+    /// <summary>
+    /// What else each starter carries, named per starter so a guide never points at a file its own
+    /// study does not contain.
+    /// </summary>
+    private const string SimpleSweeps = "This starter supplies no further sweeps.";
+
+    private const string AdvancedSweeps = """
+        This starter also supplies `sweeps/datacentre-full.json` (25 points,
+        potentially substantial compute); its fleet/cost/link assumptions and sweep
+        overrides match the repository example, alongside its original AEMO demand
+        and EPWs.
+        """;
+
+    /// <summary>
+    /// Limitations of the engine itself, true of every run whatever the data. They are kept apart from
+    /// <see cref="NemSampleDataFacts"/> so a reader never mistakes a property of the NEM sample for a rule
+    /// about the model and then misdescribes their own study. Nothing dataset-specific belongs here.
+    /// </summary>
+    private const string EngineLimitations = """
+
+        ## Limitations of the model
+
+        These hold for every NEMSweep run, whatever data it uses.
+
+        - This is one system against the demand and weather supplied, with no stochastic draws. It reports
+          a realised outcome, not an expectation; the difference between two scenarios is more trustworthy
+          than the level of either.
+        - Generation is dispatched in merit order by short-run marginal cost. There is no market bidding,
+          no unit commitment, no security-constrained dispatch and no investment valuation.
+        - Only Battery capacity is sized. Every other storage technology, all generation and all
+          transmission stay exactly as the scenario declared them.
+        - Storage charge and discharge follows a fixed rule with no foresight of later intervals, so the
+          capacity the search settles on can be too small against a prolonged shortfall or too large
+          against a system able to arbitrage.
+        - The reliability target is the one the scenario set, and it is tested over the modelled period
+          only. It is not a multi-year expectation.
+        - Cost is the levelised cost of building and running the declared system per MWh served. It
+          excludes network, retail, scheme and tax costs, so it is not a retail price.
+        - Emissions are operational combustion only, charged on generated energy and reported per MWh
+          served. They are not a life-cycle figure.
+
+        Details: <https://docs.nemsweep.com/assumptions/limitations.html>
+        """;
+
+    /// <summary>
+    /// Facts about the Advanced starter's NEM sample data only. They are labelled as dataset facts and are
+    /// written only into the Advanced guide, because the synthetic Simple starter shares none of them.
+    /// </summary>
+    private const string NemSampleDataFacts = """
+        ## About this NEM sample data (not a property of the engine)
+
+        These facts describe the Advanced starter's data and scenarios, and nothing else.
+
+        - Weather is one typical meteorological year per region, assembled from 2011-2025 observations.
+          Hard years such as a long wind drought are absent, so storage need is probably understated.
+        - The fleet is the FY2025-26 NEM, with about 16,000 MWh of pumped hydro held fixed and excluded
+          from the battery figures.
+        - The reliability target is 0.002% of demand unmet, the level of the NEM reliability standard.
+        - The data-centre sweep adds flat, full-load-factor demand across the regions. It adds no new
+          generation and no new transmission.
+        - Scenario assumptions are examples, not forecasts, calibrated models or certified results.
+        """;
+
+    private static void WriteRunInstructions(TextWriter output, string destination, StarterSample sample)
     {
+        bool advanced = sample.Id != "simple";
+        output.WriteLine(advanced
+            ? "Prepared the Advanced starter: five connected NEM regions."
+            : "Prepared the Simple starter: the smallest starter, and it runs in seconds.");
         output.WriteLine("No simulations were run. Change to the study directory before running:");
         output.WriteLine(OperatingSystem.IsWindows()
             ? $"  Set-Location -LiteralPath '{destination.Replace("'", "''")}'  # PowerShell"
@@ -190,6 +258,11 @@ internal static class QuickStartCommand
         output.WriteLine("  nemsweep --run-scenario scenarios/fixed-scenario.json --data-root ./data --output ./out/fixed");
         output.WriteLine("  nemsweep --run-scenario scenarios/sized-scenario.json --data-root ./data --output ./out/sized");
         output.WriteLine("  nemsweep --run-sweep sweeps/demo.json --data-root ./data --output ./out/demo --csv");
-        output.WriteLine("See the study README for assumptions and the optional Advanced full sweep.");
+        if (advanced)
+        {
+            output.WriteLine("Optional and expensive, not run by quick-start (about a minute per point, 25 points):");
+            output.WriteLine("  nemsweep --run-sweep sweeps/datacentre-full.json --data-root ./data --output ./out/datacentre-full --csv");
+        }
+        output.WriteLine("See the study README for assumptions and limitations.");
     }
 }

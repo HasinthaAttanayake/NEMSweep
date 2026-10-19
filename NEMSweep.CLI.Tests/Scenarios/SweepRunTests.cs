@@ -76,13 +76,13 @@ public sealed class SweepRunTests
         Status(fixture, "p1")["status"]!.GetValue<string>().Should().Be("succeeded");
         JsonObject index = ReadIndex(fixture);
         index["schemaVersion"]!.GetValue<int>().Should().Be(ArtifactSchemaVersions.SweepIndex);
-        index["schemaVersion"]!.GetValue<int>().Should().Be(13);
+        index["schemaVersion"]!.GetValue<int>().Should().Be(14);
         JsonObject schemaVersions = index["provenance"]!["schemaVersions"]!.AsObject();
-        schemaVersions["systemDispatchResults"]!.GetValue<int>().Should().Be(17);
-        schemaVersions["systemDispatchOverview"]!.GetValue<int>().Should().Be(6);
-        schemaVersions["regionDispatchResults"]!.GetValue<int>().Should().Be(12);
-        schemaVersions["regionDispatchOverview"]!.GetValue<int>().Should().Be(5);
-        schemaVersions["sweepIndex"]!.GetValue<int>().Should().Be(13);
+        schemaVersions["systemDispatchResults"]!.GetValue<int>().Should().Be(18);
+        schemaVersions["systemDispatchOverview"]!.GetValue<int>().Should().Be(7);
+        schemaVersions["regionDispatchResults"]!.GetValue<int>().Should().Be(13);
+        schemaVersions["regionDispatchOverview"]!.GetValue<int>().Should().Be(6);
+        schemaVersions["sweepIndex"]!.GetValue<int>().Should().Be(14);
         schemaVersions.ContainsKey("dispatchResults").Should().BeFalse();
         index["points"]!.AsArray().Should().HaveCount(2);
         JsonObject firstPoint = index["points"]![0]!.AsObject();
@@ -200,7 +200,11 @@ public sealed class SweepRunTests
         failedPoint["failure"]!["stage"]!.GetValue<string>().Should().Be("input");
         failedPoint["failure"]!["code"]!.GetValue<string>().Should().Be("invalidConfig");
         failedPoint["failure"]!["message"]!.GetValue<string>().Should().NotBeNullOrWhiteSpace();
-        output.ToString().Should().NotContain("failed");
+        // The per-point failure detail belongs on standard error, so a caller piping results does
+        // not have to filter it out. The end-of-run summary table does carry each point's status,
+        // a failed one included, because a summary that quietly omitted it would be worse.
+        output.ToString().Should().NotContain("Sweep point p1: failed:");
+        output.ToString().Should().NotContain("failed points:");
         error.ToString().Should().Contain("Sweep point p1: failed:");
         error.ToString().Should().Contain("failed points: p1");
     }
@@ -546,6 +550,224 @@ public sealed class SweepRunTests
         scalars.PeakUnservedPowerMw.Should().Be(10);
     }
 
+    [Fact]
+    public void CreateScalars_RegionalStorageUsesPublishedBreakdownInsteadOfRoundedInputs()
+    {
+        using var fixture = new SweepRunFixture();
+        fixture.WriteDefinition("""[{ "pointId": "p0", "axisValue": 0, "label": "Base", "overrides": {} }]""");
+        SweepRunCommand.Run(fixture.CreateContext(TextWriter.Null), "sweeps/test-sweep.json")
+            .Should().Be(0);
+        string path = fixture.RegionResultPath("p0", "NSW1");
+        JsonObject json = JsonNode.Parse(File.ReadAllBytes(path))!.AsObject();
+        RestoreExternalizedBaseDemand(path, json);
+        RegionDispatchResultsDTO result = json.Deserialize<RegionDispatchResultsDTO>(JsonFile.ReadOptions)!;
+        result = result with
+        {
+            PowerSystem = result.PowerSystem with
+            {
+                StorageFleets = [new DispatchStorageFleetDTO("Battery", 300.1, 300.1)],
+            },
+            StorageSizing = new StorageSizingOutcomeDTO(
+                StorageSizingOutcome.Resized, 150.0, 150.0, 300.1, 300.1, 400, 100, 2),
+        };
+        // Before serialization: 150.04 declared, 300.08 installed, 150.04 added.
+        var published = new StorageCapacityBreakdownDTO(150.0, 150.0, 150.0, 150.0, 300.1, 300.1, 0, 0, 0, 0);
+
+        SweepPointScalarResultsDTO scalars = SweepArtifactExport.CreateScalars(result, published);
+
+        scalars.DeclaredBatteryEnergyMwh.Should().Be(150.0);
+        scalars.AddedBatteryEnergyMwh.Should().Be(150.0);
+        scalars.TotalBatteryEnergyMwh.Should().Be(300.1);
+    }
+
+    [Fact]
+    public void Run_PartialCsv_FirstRunWritesSelectedDimensionAndPreservesUntouchedRows()
+    {
+        using var fixture = new SweepRunFixture();
+        fixture.WriteDefinition("""
+            [{ "pointId": "p0", "axisValue": 0, "label": "Base,\nquoted \"label\"", "overrides": {} },
+             { "pointId": "p1", "axisValue": 1, "label": "Changed", "overrides": {} }]
+            """);
+        SweepRunCommand.Run(fixture.CreateContext(TextWriter.Null, points: ["p0"], csv: true),
+            "sweeps/test-sweep.json").Should().Be(0);
+        string csvPath = Path.Combine(fixture.SweepDataPath, "csv", "dim_point.csv");
+        string first = File.ReadAllText(csvPath);
+        first.Should().Contain("p0,").And.NotContain("p1,");
+        string factsPath = Path.Combine(fixture.SweepDataPath, "csv", "points", "p0", "fact_scalars.csv");
+        byte[] facts = File.ReadAllBytes(factsPath);
+
+        SweepRunCommand.Run(fixture.CreateContext(TextWriter.Null, points: ["p1"], csv: true),
+            "sweeps/test-sweep.json").Should().Be(0);
+
+        File.ReadAllText(csvPath).Should().StartWith(first).And.Contain("p1,");
+        File.ReadAllBytes(factsPath).Should().Equal(facts);
+    }
+
+    [Fact]
+    public void Run_PartialCsv_FailedRerunRemovesSelectedFactsAndPreservesUntouchedPoint()
+    {
+        using var fixture = new SweepRunFixture();
+        fixture.WriteDefinition("""
+            [{ "pointId": "p0", "axisValue": 0, "label": "Base", "overrides": {} },
+             { "pointId": "p1", "axisValue": 1, "label": "Changed", "overrides": {} }]
+            """);
+        SweepRunCommand.Run(fixture.CreateContext(TextWriter.Null, csv: true), "sweeps/test-sweep.json")
+            .Should().Be(0);
+        string csvDirectory = Path.Combine(fixture.SweepDataPath, "csv");
+        string untouchedFacts = Path.Combine(csvDirectory, "points", "p0", "fact_scalars.csv");
+        byte[] before = File.ReadAllBytes(untouchedFacts);
+        fixture.WriteDefinition("""
+            [{ "pointId": "p0", "axisValue": 0, "label": "Base", "overrides": {} },
+             { "pointId": "p1", "axisValue": 1, "label": "Changed", "overrides": { "costBasis": { "year": 1000 } } }]
+            """);
+
+        SweepRunCommand.Run(fixture.CreateContext(TextWriter.Null, points: ["p1"], csv: true),
+            "sweeps/test-sweep.json").Should().Be(1);
+
+        Directory.Exists(Path.Combine(csvDirectory, "points", "p1")).Should().BeFalse();
+        File.ReadAllBytes(untouchedFacts).Should().Equal(before);
+        File.ReadAllText(Path.Combine(csvDirectory, "dim_point.csv"))
+            .Should().Contain("p0,Base,0,Succeeded,").And.Contain("p1,Changed,1,Failed,");
+    }
+
+    [Fact]
+    public void Run_PointsSelection_RunsOnlyTheNamedPoints()
+    {
+        using var fixture = new SweepRunFixture();
+        fixture.WriteDefinition("""
+            [{ "pointId": "p0", "axisValue": 0, "label": "Base", "overrides": {} },
+             { "pointId": "p1", "axisValue": 1, "label": "Changed", "overrides": { "name": "Changed scenario" } }]
+            """);
+        using var output = new StringWriter();
+
+        SweepRunCommand.Run(fixture.CreateContext(output, points: ["p1"]), "sweeps/test-sweep.json")
+            .Should().Be(0);
+
+        File.Exists(fixture.PointResultPath("p1")).Should().BeTrue();
+        File.Exists(fixture.PointResultPath("p0")).Should().BeFalse();
+    }
+
+    /// <summary>
+    /// The results site reads <c>index.json</c> as the whole sweep. Rewriting it from a subset
+    /// would silently drop every point this run did not touch, so a partial run publishes its own
+    /// point artifacts and leaves everything that speaks for the sweep as a whole alone.
+    /// </summary>
+    [Fact]
+    public void Run_PointsSelection_LeavesTheIndexAndSummaryUntouchedAndSaysSo()
+    {
+        using var fixture = new SweepRunFixture();
+        fixture.WriteDefinition("""
+            [{ "pointId": "p0", "axisValue": 0, "label": "Base", "overrides": {} },
+             { "pointId": "p1", "axisValue": 1, "label": "Changed", "overrides": { "name": "Changed scenario" } }]
+            """);
+        SweepRunCommand.Run(fixture.CreateContext(TextWriter.Null), "sweeps/test-sweep.json")
+            .Should().Be(0);
+        byte[] indexBefore = File.ReadAllBytes(fixture.IndexPath);
+        byte[] summaryBefore = File.ReadAllBytes(fixture.SummaryJsonPath);
+        using var output = new StringWriter();
+
+        SweepRunCommand.Run(fixture.CreateContext(output, points: ["p1"]), "sweeps/test-sweep.json")
+            .Should().Be(0);
+
+        File.ReadAllBytes(fixture.IndexPath).Should().Equal(indexBefore);
+        File.ReadAllBytes(fixture.SummaryJsonPath).Should().Equal(summaryBefore);
+        output.ToString().Should().Contain("Partial run of 1 of 2 points");
+        output.ToString().Should().Contain("rerun without --points");
+    }
+
+    [Fact]
+    public void Run_PointsNamingAnUnknownId_FailsAndListsTheRealIds()
+    {
+        using var fixture = new SweepRunFixture();
+        fixture.WriteDefinition("""
+            [{ "pointId": "p0", "axisValue": 0, "label": "Base", "overrides": {} }]
+            """);
+
+        Action run = () => SweepRunCommand.Run(
+            fixture.CreateContext(TextWriter.Null, points: ["p9"]),
+            "sweeps/test-sweep.json");
+
+        run.Should().Throw<UsageException>()
+            .WithMessage("*has no point p9*")
+            .WithMessage("*Its points are: p0*");
+    }
+
+    [Fact]
+    public void Run_WritesSummaryArtifactsAndPrintsTheTable()
+    {
+        using var fixture = new SweepRunFixture();
+        fixture.WriteDefinition("""
+            [{ "pointId": "p0", "axisValue": 0, "label": "Base", "overrides": {} },
+             { "pointId": "p1", "axisValue": 25, "label": "Changed", "overrides": { "name": "Changed scenario" } }]
+            """);
+        using var output = new StringWriter();
+
+        SweepRunCommand.Run(fixture.CreateContext(output), "sweeps/test-sweep.json").Should().Be(0);
+
+        JsonObject summary = JsonNode.Parse(File.ReadAllText(fixture.SummaryJsonPath))!.AsObject();
+        summary["sweepId"]!.GetValue<string>().Should().Be("test-sweep");
+        summary["axis"]!["label"]!.GetValue<string>().Should().Be("Capacity");
+        JsonArray points = summary["points"]!.AsArray();
+        points.Should().HaveCount(2);
+        points[0]!["pointId"]!.GetValue<string>().Should().Be("p0");
+        points[0]!["reliabilityTargetMet"]!.GetValue<bool>().Should().BeTrue();
+        points[1]!["axisValue"]!.GetValue<double>().Should().Be(25);
+
+        string[] csv = File.ReadAllLines(fixture.SummaryCsvPath);
+        csv[0].Should().Be(
+            "pointId,label,axisValue,status,reliabilityTargetMet,"
+            + "unservedEnergyPercentageOfDemand,totalBatteryEnergyMwh,slcoeAudPerMwh");
+        csv.Should().HaveCount(3);
+        csv[1].Should().StartWith("\"p0\",\"Base\",0,\"succeeded\",true,");
+
+        output.ToString().Should().Contain("Capacity (MW)");
+        output.ToString().Should().Contain("battery MWh");
+    }
+
+    /// <summary>
+    /// <c>status</c> answers whether the run completed, which is not the question a reader asks of
+    /// it. A point that dispatched a full period and missed its target is <c>succeeded</c>, so the
+    /// verdict needs a field of its own.
+    /// </summary>
+    [Fact]
+    public void Run_StatusFile_RecordsTheReliabilityVerdictSeparatelyFromCompletion()
+    {
+        using var fixture = new SweepRunFixture();
+        fixture.WriteDefinition("""
+            [{ "pointId": "p0", "axisValue": 0, "label": "Base", "overrides": {} }]
+            """);
+
+        SweepRunCommand.Run(fixture.CreateContext(TextWriter.Null), "sweeps/test-sweep.json")
+            .Should().Be(0);
+
+        JsonObject status = Status(fixture, "p0");
+        status["status"]!.GetValue<string>().Should().Be("succeeded");
+        status["reliabilityTargetMet"]!.GetValue<bool>().Should().BeTrue();
+    }
+
+    [Fact]
+    public void Run_MissedTarget_SucceedsUnlessFailOnUnmetWasAskedFor()
+    {
+        using var fixture = new SweepRunFixture();
+        fixture.WriteUnmeetableDefinition();
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+
+        int withoutFlag = SweepRunCommand.Run(
+            fixture.CreateContext(output, error),
+            "sweeps/test-sweep.json");
+        int withFlag = SweepRunCommand.Run(
+            fixture.CreateContext(output, error, failOnUnmet: true),
+            "sweeps/test-sweep.json");
+
+        withoutFlag.Should().Be(0);
+        withFlag.Should().Be(1);
+        Status(fixture, "p0")["status"]!.GetValue<string>().Should().Be("succeeded");
+        Status(fixture, "p0")["reliabilityTargetMet"]!.GetValue<bool>().Should().BeFalse();
+        error.ToString().Should().Contain("reliability target not met at points: p0");
+        output.ToString().Should().Contain("NOT met");
+    }
+
     private static JsonObject Status(SweepRunFixture fixture, string pointId) =>
         JsonNode.Parse(File.ReadAllText(fixture.PointStatusPath(pointId)))!.AsObject();
 
@@ -613,7 +835,7 @@ public sealed class SweepRunTests
 
         public SweepRunFixture()
         {
-            RootPath = Path.Combine(Path.GetTempPath(), $"nemsweep-sweep-run-{Guid.NewGuid():N}");
+            RootPath = Path.Combine(Directory.GetCurrentDirectory(), $"nemsweep-sweep-run-{Guid.NewGuid():N}");
             Directory.CreateDirectory(Path.Combine(RootPath, "sweeps"));
             Directory.CreateDirectory(Path.Combine(RootPath, "scenarios"));
             File.WriteAllText(Path.Combine(RootPath, "NEMSweep.slnx"), string.Empty);
@@ -662,14 +884,24 @@ public sealed class SweepRunTests
         public CliContext CreateContext(
             TextWriter output,
             TextWriter? error = null,
-            string? dataRoot = null) =>
+            string? dataRoot = null,
+            IReadOnlyList<string>? points = null,
+            bool failOnUnmet = false,
+            bool csv = false) =>
             new(
                 dataRoot is null
                     ? Paths
                     : WorkspacePaths.FromRoots(RootPath, Path.Combine(RootPath, dataRoot), Path.Combine(RootPath, "out")),
                 Settings,
                 output,
-                error);
+                error,
+                Csv: csv,
+                Points: points,
+                FailOnUnmet: failOnUnmet);
+
+        public string SummaryJsonPath => Path.Combine(SweepDataPath, "summary.json");
+
+        public string SummaryCsvPath => Path.Combine(SweepDataPath, "summary.csv");
 
         public string PointResultPath(string pointId) => Path.Combine(
             SweepDataPath, "points", $"{pointId}.json");
@@ -699,6 +931,17 @@ public sealed class SweepRunTests
             Path.Combine(RootPath, "sweeps", "test-sweep.json"),
             $$"""
             { "schemaVersion": 1, "sweepId": "test-sweep", "name": "Test sweep", "axis": { "label": "Capacity", "unit": "MW" }, "baselineConfigPath": "scenarios/baseline.json", "points": {{points}} }
+            """);
+
+        /// <summary>
+        /// A single point whose generation energy is far below its demand energy, so no battery
+        /// within the baseline's bounds can close the gap: the run completes and misses its target.
+        /// </summary>
+        public void WriteUnmeetableDefinition() => WriteDefinition("""
+            [{ "pointId": "p0", "axisValue": 0, "label": "Starved",
+               "overrides": {
+                 "regions": [{ "regionId": "NSW1",
+                   "generatingFleets": [{ "technology": "Gas", "nameplateCapacityMw": 1 }] }] } }]
             """);
 
         public void WriteTwoRegionBaseline()

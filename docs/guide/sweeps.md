@@ -183,6 +183,132 @@ The sweep as a whole is not published atomically. Point results, status files, t
 the manifest are written as the run proceeds, so an interrupted sweep can leave a partially updated
 `sweeps/<sweepId>/` directory. Rerun the sweep to bring it back into a consistent state.
 
+## Running only some of a sweep's points
+
+`--points` takes a comma-separated list of point IDs and runs only those.
+
+```bash
+nemsweep --run-sweep sweeps/my-sweep.json --data-root ./data --output ./out --points p0,p9,p10
+```
+
+An ID the definition does not declare is an error, and the message lists the IDs it does declare.
+Running the ones that matched and staying quiet about a typo would publish a different set of
+results than you asked for.
+
+Selecting fewer than all defined points is a partial run; listing every point with `--points`
+is still a full run.
+
+**A partial run deliberately leaves the sweep's aggregate artifacts alone.** It writes each selected
+point's result, status and config, and it does **not** rewrite `index.json`, the `sweeps/index.json`
+manifest, or `summary.csv` and `summary.json`. Rebuilding the index from a subset would drop every
+point the run did not touch, and the results site reads that index as the whole sweep. The run says
+so on stdout:
+
+```text
+Partial run of 2 of 5 points. index.json, the sweep manifest and the summary files were left as they were; rerun without --points to republish them.
+```
+
+So `--points` is the iteration loop: use it while you are working on one part of an axis, and run
+the whole sweep when you want the published artifacts to be current. The summary table still prints
+for the points that ran.
+
+### Without the flag: fan out, then run one config
+
+The other route, which also works on an older CLI. `--fan-out-sweep` has already written each point
+as a complete standalone scenario, so running one reproduces exactly what that point would have run
+inside the sweep.
+
+```bash
+nemsweep --fan-out-sweep sweeps/my-sweep.json --data-root ./data --output ./out
+```
+
+```bash
+nemsweep --run-scenario sweeps/<sweepId>/configs/p9.json --data-root ./data --output ./out/p9
+```
+
+This writes an ordinary `results*.json` set rather than a sweep artifact, so it does not join the
+sweep's index at all. Fan-out writes those configs to
+`sweeps/<sweepId>/configs/<pointId>.json`, relative to your working directory, and validates each
+one (`NEMSweep.CLI/Scenarios/SweepFanOutCommand.cs`).
+
+**Do not hand-trim the definition instead.** Deleting points from a copy of the sweep file works,
+but the copy needs a different `sweepId` or it publishes over the full sweep's output directory, and
+the trimmed file is then a second definition to keep in step with the first.
+
+## Mapping point IDs to axis values
+
+A point ID is an opaque label. `p9` does not say "4,500 MW"; nothing in the ID encodes the axis
+value, and nothing checks that the two agree.
+
+`--fan-out-sweep` prints the mapping and writes it beside the configs it generated, as
+`sweeps/<sweepId>/configs/points.csv` relative to your working directory (the fan-out working area,
+not the output root):
+
+```text
+point  Data centre nameplate added (MW)  label
+p0                                    0  Baseline
+p9                                 4500  +4,500 MW
+p10                                5000  +5,000 MW
+```
+
+```text
+pointId,axisValue,label,axisLabel,axisUnit
+"p0",0,"Baseline","Data centre nameplate added","MW"
+"p9",4500,"+4,500 MW","Data centre nameplate added","MW"
+```
+
+Four places hold the mapping, and which one to read depends on where you are:
+
+| Where | When it is available | How to read it |
+|---|---|---|
+| `sweeps/<sweepId>/configs/points.csv`, under your working directory | after a fan-out | The table above, as CSV. |
+| The sweep definition itself | always | Each entry of `points[]` carries `pointId`, `axisValue` and `label`. |
+| `--run-sweep` console output | during a run | One line per point: `Running sweep point p9 (Data centre nameplate added=4500 MW).` |
+| `sweeps/<sweepId>/index.json` | after a run | Each entry of `points[]` carries `pointId`, `axisValue`, `label`, `status` and that point's `scalars`. |
+
+## The summary: what the sweep found
+
+At the end of a full run, a sweep writes two files beside its index and prints the same rows:
+
+```text
+point  Data centre nameplate added (MW)  target  unmet %  battery MWh   SLCoE
+p0                                    0     met   0.0000      14387.1  148.40
+p9                                 4500     met   0.0014      97640.8  144.45
+p10                                5000  NOT met   0.0241     104221.0  146.02
+```
+
+| Artifact | What it is |
+|---|---|
+| `sweeps/<sweepId>/summary.json` | One row per point: `pointId`, `label`, `axisValue`, `status`, `reliabilityTargetMet`, `unservedEnergyPercentageOfDemand`, `totalBatteryEnergyMwh`, `slcoeAudPerMwh`, plus the sweep's axis caption. |
+| `sweeps/<sweepId>/summary.csv` | The same rows as CSV, with that header. |
+
+Both are projections of `index.json`, which already carries every one of these values; they exist
+because reading the shape of a sweep off the index means writing a program, and the shape of the
+sweep is why it was run. A value a point does not have, because it failed to run, is published as
+`null` in the JSON and as an empty field in the CSV, never as a zero.
+
+Two columns are worth naming precisely. `reliabilityTargetMet` is **not** `status`: a point that
+dispatched a full period and missed its target has `status: "succeeded"` and
+`reliabilityTargetMet: false`. And `totalBatteryEnergyMwh` is battery alone, not the
+`storageEnergyMwh` scalar, which also counts storage the sizing search cannot grow.
+
+## Where the output lands
+
+The output directory is named after the definition's `sweepId` field, **not** after the definition's
+filename. `sweeps/my-sweep.json` with `"sweepId": "battery-capex"` publishes to
+`<output root>/sweeps/battery-capex/`, and nothing warns that the two names differ. Two definitions
+sharing a `sweepId` publish over each other.
+
+`sweepId` must match `^[a-z0-9][a-z0-9-]*$`: lower-case letters, digits and hyphens, starting with a
+letter or digit. That is the restriction it is, because the value becomes a directory name. The same
+pattern applies to each `pointId`, which becomes a filename. Both are checked when the definition
+loads, so a bad ID fails the run rather than producing an awkward path; `--fan-out-sweep` or
+`--validate-scenario` catches it in seconds, without dispatching anything.
+
+Pick a `sweepId` that names the study rather than the file, keep it stable across reruns so results
+land in one place, and change it when you want a variant published alongside the original rather
+than over it.
+
 ## How long it takes
 
 Runtime is the cost of one dispatch pass multiplied by the number of passes the storage sizing search

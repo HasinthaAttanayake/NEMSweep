@@ -4,6 +4,11 @@ This documentation is for analysts and engineers running NEMSweep, or reading re
 produced with it. It covers how to run the model, what it assumes, how to design a study, and the
 shape of every artifact it writes.
 
+**Driving NEMSweep from an AI agent?** Read the
+[agent guide](https://raw.githubusercontent.com/HasinthaAttanayake/NEMSweep/main/skills/nemsweep/SKILL.md),
+which is the single source of guidance for agents, and [`llms.txt`](llms.txt) for the index of raw
+Markdown sources.
+
 NEMSweep is a deterministic engine for grid dispatch, reliability assessment, storage sizing and
 system cost. You describe a set of regions, each with its demand, generation and storage, and a
 reliability standard. The engine dispatches them in merit order for every hour of the modelled

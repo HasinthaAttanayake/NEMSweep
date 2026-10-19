@@ -212,6 +212,208 @@ offset is whatever the demand artifact declares, which for AEMO operational dema
 the NEM's UTC+10. Point the model at a single-timezone market by ingesting that market's
 demand and weather under its own offset instead.
 
+## Which inputs change dispatch, and which change only cost
+
+Worth knowing before you read a result: some of the fields above feed back into the hour-by-hour
+dispatch, and the rest are priced on top of a dispatch that would have been identical without them.
+Change one of the second kind and the physical result — unserved energy, curtailment, the battery
+the search lands on — is unchanged; only the money moves.
+
+The split follows from short-run marginal cost. `GenerationCostParameters.ShortRunMarginalCostFor`
+(`NEMSweep.Model/Scenarios/GenerationCostParameters.cs`) is
+`variableOperatingCostAudPerMwh + fuelPriceAudPerGj * heatRateGjPerMwh`, and
+`NEMSweep.Model/Simulation/GenerationMeritOrder.cs` orders fleets by it. Nothing else in a cost
+block reaches the dispatch.
+
+**Changes dispatch, and therefore cost as well:**
+
+| Field | Why |
+|---|---|
+| `generatingFleets[].costParameters.fuelPriceAudPerGj` | A term of short-run marginal cost, so it can reorder merit order. |
+| `generatingFleets[].costParameters.variableOperatingCostAudPerMwh` | The other term of short-run marginal cost. |
+| `generatingFleets[].technologyProfile.heatRateGjPerMwh` | Multiplies fuel price into short-run marginal cost. |
+| `generatingFleets[].nameplateCapacityMw` | How much a fleet can deliver in an hour. |
+| `generatingFleets[].monthlyCapacityFactors[]` | Hydro's monthly energy budget. |
+| `storageFleets[].initialEnergyCapacityMwh`, `initialPowerCapacityMw` | What storage exists before the search. |
+| `storageFleets[].technologyProfile.roundTripEfficiency` | Energy lost on charge. |
+| `regions[].dataCentreNameplateMw` | Adds flat demand. |
+| `regions[].demandFile`, `weatherFile` | The series being dispatched against. |
+| `interconnectors[].capacityMw` | Caps directed transfer. |
+| `executionMode`, `reliability.targetUsePercentage`, `storageSizing.*` | Whether the battery search runs, what it aims at, and the bounds it may use. |
+
+**Changes only the reported cost:**
+
+| Field | Why |
+|---|---|
+| `generatingFleets[].costParameters.capitalCostAudPerMw` | Annuitised capital; never consulted by dispatch. |
+| `generatingFleets[].costParameters.fixedOperatingCostAudPerMwYear` | A per-MW-year charge on declared capacity. |
+| `generatingFleets[].technologyProfile.technicalLifeYears` | Annuitisation period only. |
+| `storageFleets[].costParameters.*` (`powerCapitalCostAudPerMw`, `energyCapitalCostAudPerMwh`, `fixedOperatingCostAudPerMwYear`) | Priced after the search; the search targets reliability, not cost. |
+| `storageFleets[].technologyProfile.technicalLifeYears` | Annuitisation period only. |
+| `interconnectors[].routeLengthKm`, `capitalCostAudPerKmPerMw`, `fixedOperatingCostAudPerKmPerMwYear`, `technicalLifeYears` | Transmission cost rates; the only interconnector field dispatch reads is `capacityMw`. |
+| `costBasis.year`, `costBasis.realDiscountRate` | The cost basis every AUD figure is expressed and annuitised in. |
+| `reliability.standardName` | A label recorded with the result. |
+
+`generatingFleets[].technologyProfile.emissionsIntensityTonnesPerMwh` is a third case: it changes
+neither dispatch nor cost, only the emissions accounting.
+
+One consequence is worth stating plainly. Sweeping a **capital** cost does not change the system
+that gets built, because the sizing search is driven by the reliability target rather than by cost.
+A battery capital-cost sweep therefore reprices one fixed system across the axis; it does not tell
+you what system a cheaper battery would have led someone to build. Sweeping a **fuel** price does
+move the dispatch, and so can move the battery the search lands on.
+
+## Recipe: change one input
+
+Two routes. Use the first when you want one answer; use the second when you want the before and
+after published together on an axis.
+
+**Edit a copy of the scenario.** A scenario config is one JSON file, so changing one input is
+changing one value. To take the gas fuel price up by 50%, from 10 to 15 AUD/GJ:
+
+```bash
+cp scenarios/sized-scenario.json scenarios/sized-gas15.json
+```
+
+Then in the copy, set the `Gas` fleet's `fuelPriceAudPerGj` to `15` and give the file its own `id`.
+The field is per fleet, per region, so a multi-region scenario has one to change in each region
+that declares `Gas`:
+
+```json
+{
+  "regionId": "Island-X",
+  "generatingFleets": [
+    {
+      "technology": "Gas",
+      "costParameters": { "fuelPriceAudPerGj": 15 }
+    }
+  ]
+}
+```
+
+Validate before running, which catches a typo in seconds rather than after a dispatch:
+
+```bash
+nemsweep --validate-scenario scenarios/sized-gas15.json --data-root ./data --format json
+```
+
+```bash
+nemsweep --run-scenario scenarios/sized-gas15.json --data-root ./data --output ./out/gas15
+```
+
+Compare `cost.slcoeAudPerMwh` and `reliability.achievedUsePercentageOfDemand` in each run's
+`results-overview.json`. Because fuel price is a dispatch input, expect the physical result to move
+too, not only the cost.
+
+**Or write a two-point sweep**, which keeps the baseline and the variant in one artifact and names
+what was varied. This is the same change as a [sweep](sweeps.md) override patch:
+
+```json
+{
+  "schemaVersion": 2,
+  "sweepId": "gas-price-x15",
+  "name": "Gas fuel price +50%",
+  "axis": { "label": "Gas fuel price", "unit": "AUD/GJ" },
+  "baselineConfigPath": "scenarios/sized-scenario.json",
+  "points": [
+    {
+      "pointId": "base",
+      "axisValue": 10,
+      "label": "10 AUD/GJ (baseline)",
+      "overrides": {}
+    },
+    {
+      "pointId": "x15",
+      "axisValue": 15,
+      "label": "15 AUD/GJ (+50%)",
+      "overrides": {
+        "regions": [
+          {
+            "regionId": "Island-X",
+            "generatingFleets": [
+              { "technology": "Gas", "costParameters": { "fuelPriceAudPerGj": 15 } }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+```bash
+nemsweep --run-sweep sweeps/gas-price.json --data-root ./data --output ./out/gas --csv
+```
+
+The keyed-array merge means naming the `Gas` fleet's one changed field is enough: every other cost
+parameter on it, and every other fleet and region, carries over from the baseline. See
+[JSON merge-patch semantics](sweeps.md#json-merge-patch-semantics).
+
+## Recipe: sweep a cost parameter
+
+Battery capital cost from 50% to 150% of the baseline, in five points. The baseline here declares
+`powerCapitalCostAudPerMw: 200000` and `energyCapitalCostAudPerMwh: 150000`, so each point states
+the multiple of those two:
+
+```json
+{
+  "schemaVersion": 2,
+  "sweepId": "battery-capex",
+  "name": "Battery capital cost 50-150%",
+  "axis": { "label": "Battery capital cost", "unit": "% of baseline" },
+  "baselineConfigPath": "scenarios/sized-scenario.json",
+  "points": [
+    {
+      "pointId": "p50",
+      "axisValue": 50,
+      "label": "50% of baseline battery capital cost",
+      "overrides": {
+        "regions": [
+          {
+            "regionId": "Island-X",
+            "storageFleets": [
+              {
+                "technology": "Battery",
+                "costParameters": {
+                  "powerCapitalCostAudPerMw": 100000,
+                  "energyCapitalCostAudPerMwh": 75000
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+Repeat that point for `p75`, `p100`, `p125` and `p150` at 75%, 100%, 125% and 150% of each figure,
+with `axisValue` matching. `p100` can use `"overrides": {}` instead, since it is the baseline.
+Nothing cross-checks `axisValue` against `overrides`, so keeping the two in agreement is yours to
+get right.
+
+```bash
+nemsweep --fan-out-sweep sweeps/battery-capex.json --data-root ./data --output ./out/capex
+```
+
+```bash
+nemsweep --run-sweep sweeps/battery-capex.json --data-root ./data --output ./out/capex --csv
+```
+
+Fan out first and read `sweeps/battery-capex/configs/p50.json` to confirm each point patched what
+you meant, then run. Read the result from `sweeps/battery-capex/index.json`, whose `points[]` carries
+each point's `axisValue` and `scalars`, or from `csv/points/<pointId>/fact_scalars.csv` with `--csv`.
+
+Two things to expect, both consequences of the section above. The storage the search installs is the
+same at every point, because capital cost does not steer the search. And `slcoeAudPerMwh` moves
+close to linearly with the axis, because the only thing changing is the annuitised capital on a
+fixed quantity of storage. A capital-cost sweep is a repricing of one system, which is a narrower
+finding than it can look like on a chart.
+
+To vary a parameter that *does* change dispatch, use the same shape with `fuelPriceAudPerGj` on a
+generating fleet.
+
 ## See also
 
 - [Scenario parameters](../assumptions/scenario-parameters.md): what these values mean in the

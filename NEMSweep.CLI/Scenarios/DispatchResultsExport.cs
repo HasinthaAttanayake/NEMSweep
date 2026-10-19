@@ -126,25 +126,35 @@ internal static class DispatchResultsExport
     {
         ScenarioDispatchResult dispatch = request.Dispatch;
         string[] regionIds = dispatch.PowerSystem.Regions.Select(region => region.RegionId).ToArray();
+        DateTimeOffset periodEnd = systemOutcome.Start.AddTicks(
+            systemOutcome.Resolution.Ticks * systemOutcome.Length);
+        StorageSizingOutcomeDTO? systemSizing = dispatch.SizingResult is { } sizing
+            ? CreateSystemStorageSizingOutcome(request, sizing)
+            : null;
+        // Summed from the region breakdowns rather than recomputed from the system's fleets, so the
+        // system figure is the total of the published regional ones by construction.
+        StorageCapacityBreakdownDTO storageCapacity = StorageCapacityBreakdown.Sum(
+            summaries.Values.Select(summary => summary.StorageCapacity
+                ?? throw new InvalidOperationException(
+                    "Every region summary must carry its installed-storage breakdown.")));
+        var reliability = new ReliabilityBasisDTO(
+            systemReliability.TargetUsePercentage,
+            systemReliability.AchievedUsePercentage,
+            systemReliability.WithinTarget,
+            request.ReliabilityStandardName);
         return new SystemDispatchResultsDTO(
             ArtifactSchemaVersions.SystemDispatchResults,
             runId,
             systemOutcome.Start,
-            systemOutcome.Start.AddTicks(systemOutcome.Resolution.Ticks * systemOutcome.Length),
+            periodEnd,
             systemOutcome.Resolution,
             regionIds,
             sourcesByRegion,
             summaries,
             CreateSystemSeries(systemOutcome, dispatch.PowerSystem),
             CreateMetrics(systemOutcome),
-            new ReliabilityBasisDTO(
-                systemReliability.TargetUsePercentage,
-                systemReliability.AchievedUsePercentage,
-                systemReliability.WithinTarget,
-                request.ReliabilityStandardName),
-            dispatch.SizingResult is { } sizing
-                ? CreateSystemStorageSizingOutcome(request, sizing)
-                : null,
+            reliability,
+            systemSizing,
             CreateCost(dispatch.CostBreakdown),
             CreateEmissions(dispatch.EmissionsSummary),
             new DispatchTopologyDTO(
@@ -159,7 +169,15 @@ internal static class DispatchResultsExport
                 dispatch.Scenario.CostBasis.Year,
                 dispatch.Scenario.CostBasis.RealDiscountRate),
             request.Provenance,
-            dispatch.ExecutionMode);
+            dispatch.ExecutionMode,
+            storageCapacity,
+            RunLimitations.Create(
+                reliability,
+                systemSizing,
+                storageCapacity,
+                sourcesByRegion.Values.Select(sources => sources.WeatherBasis),
+                systemOutcome.Start,
+                periodEnd));
     }
 
     /// <summary>Pairs each solved interconnector flow with its declared scenario link.</summary>
@@ -211,7 +229,9 @@ internal static class DispatchResultsExport
             system.Cost,
             system.Emissions,
             system.Topology,
-            system.ExecutionMode);
+            system.ExecutionMode,
+            system.StorageCapacity,
+            system.Limitations);
 
     /// <summary>One region's slice of a publication: the two artifacts and the two index entries.</summary>
     private sealed record RegionPublication(
@@ -328,7 +348,10 @@ internal static class DispatchResultsExport
                 overviewPath,
                 dispatch.ExecutionMode,
                 evidence.PowerSystem.StorageFleets.Sum(fleet => fleet.PowerCapacityMw),
-                evidence.PowerSystem.StorageFleets.Sum(fleet => fleet.EnergyCapacityMwh)));
+                evidence.PowerSystem.StorageFleets.Sum(fleet => fleet.EnergyCapacityMwh),
+                StorageCapacityBreakdown.From(
+                    evidence.PowerSystem.StorageFleets,
+                    evidence.StorageSizing)));
     }
 
     private static string LinkId(string fromRegionId, string toRegionId) =>

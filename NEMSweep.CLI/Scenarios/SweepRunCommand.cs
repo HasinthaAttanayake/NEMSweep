@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using CsvHelper;
 using NEMSweep.CLI.Application;
 using NEMSweep.CLI.Configuration;
 using NEMSweep.CLI.Infrastructure;
@@ -19,6 +20,8 @@ internal static class SweepRunCommand
             context.Paths.OutputRoot);
         (SweepDefinition definition, JsonNode baseline) =
             SweepFanOutCommand.LoadDefinitionAndBaseline(context, definitionPath);
+        IReadOnlyList<SweepPoint> selectedPoints = SelectPoints(definition, context.Points);
+        bool partialRun = selectedPoints.Count != definition.Points.Length;
         string configOutputDirectory = SweepFanOutCommand.ConfigOutputDirectory(context, definition);
         string sweepDirectory = context.Paths.OutputPath(Path.Combine("sweeps", definition.SweepId));
         string pointsDirectory = Path.Combine(sweepDirectory, "points");
@@ -37,7 +40,7 @@ internal static class SweepRunCommand
         var succeededResults = new List<SystemDispatchResultsDTO>();
         var referencedSeriesPaths = new List<string>();
 
-        foreach (SweepPoint point in definition.Points)
+        foreach (SweepPoint point in selectedPoints)
         {
             string axisValue = point.AxisValue.ToString("G17", CultureInfo.InvariantCulture);
             string publishedConfigPath = Path.Combine(
@@ -107,7 +110,7 @@ internal static class SweepRunCommand
                         ?? throw new FormatException(
                             $"Sweep point '{point.PointId}' regional result for '{regionId}' is empty.");
                     SweepPointScalarResultsDTO regionalScalars =
-                        SweepArtifactExport.CreateScalars(regionalResult);
+                        SweepArtifactExport.CreateScalars(regionalResult, summary.StorageCapacity);
                     string seriesPath = ExternalizeBaseDemand(
                         point.PointId,
                         regionalResultPath,
@@ -136,7 +139,8 @@ internal static class SweepRunCommand
                         point.PointId,
                         point.AxisValue,
                         SweepPointStatus.Succeeded,
-                        null),
+                        null,
+                        systemResult.Reliability.WithinTarget),
                     statusPath);
                 indexPoints.Add(new SweepIndexPointDTO(
                     point.PointId,
@@ -214,6 +218,35 @@ internal static class SweepRunCommand
         {
             TotalDurationMs = runStopwatch.Elapsed.TotalMilliseconds,
         };
+        // A partial run publishes the point artifacts it produced and nothing that speaks for the
+        // sweep as a whole. Rewriting the index from a subset would drop every point this run did
+        // not touch, and the results site reads that index; leaving it stale and saying so is the
+        // lesser of the two wrongs, and the full rerun that restores it is one command.
+        if (partialRun)
+        {
+            if (context.Csv)
+            {
+                string csvDirectory = Path.Combine(sweepDirectory, "csv");
+                foreach (string pointId in failedPointIds)
+                {
+                    string factsDirectory = Path.Combine(csvDirectory, "points", pointId);
+                    if (Directory.Exists(factsDirectory))
+                    {
+                        Directory.Delete(factsDirectory, recursive: true);
+                    }
+                }
+
+                WritePartialPointDimension(indexPoints, csvDirectory);
+            }
+
+            context.Output.WriteLine(
+                $"Partial run of {selectedPoints.Count} of {definition.Points.Length} points. "
+                + "index.json, the sweep manifest and the summary files were left as they were; "
+                + "rerun without --points to republish them.");
+            SweepSummary.WriteTable(context.Output, definition, indexPoints);
+            return ExitCode(context, definition, failedPointIds, indexPoints);
+        }
+
         JsonFile.Write(
             new SweepIndexDTO(
                 ArtifactSchemaVersions.SweepIndex,
@@ -246,16 +279,115 @@ internal static class SweepRunCommand
         // Only once the new index is on disk: a series file is still referenced by the previously
         // published index until that index is replaced.
         SweepArtifactExport.PruneUnreferencedSeries(sweepDirectory, referencedSeriesPaths);
+        SweepSummary.Write(sweepDirectory, definition, indexPoints);
+        SweepSummary.WriteTable(context.Output, definition, indexPoints);
 
-        if (failedPointIds.Count == 0)
+        if (failedPointIds.Count > 0)
+        {
+            (context.Error ?? TextWriter.Null).WriteLine(
+                $"Sweep {definition.SweepId} completed with failed points: "
+                + $"{string.Join(", ", failedPointIds)}.");
+        }
+        else
         {
             context.Output.WriteLine($"Sweep {definition.SweepId} completed.");
+        }
+
+        return ExitCode(context, definition, failedPointIds, indexPoints);
+    }
+
+    private static void WritePartialPointDimension(
+        IReadOnlyCollection<SweepIndexPointDTO> points,
+        string csvDirectory)
+    {
+        string path = Path.Combine(csvDirectory, "dim_point.csv");
+        var selected = points.Select(point => point.PointId).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var retained = new System.Text.StringBuilder();
+        if (File.Exists(path))
+        {
+            using var reader = new StreamReader(path);
+            using var parser = new CsvParser(reader, CultureInfo.InvariantCulture);
+            parser.Read(); // Skip the header; the exporter supplies it.
+            while (parser.Read())
+            {
+                if (!selected.Contains(parser.Record![0]))
+                {
+                    retained.Append(parser.RawRecord);
+                }
+            }
+        }
+
+        StarSchemaExport.WritePointDimension(points, csvDirectory, (file, text) =>
+        {
+            int headerEnd = text.IndexOf('\n') + 1;
+            File.WriteAllText(file, text[..headerEnd] + retained + text[headerEnd..]);
+        });
+    }
+
+    /// <summary>
+    /// A failed point is a failed run and has always exited 1. A point that ran and missed its
+    /// reliability target is a result, not a failure, so it only changes the exit code when the
+    /// caller opted in with <c>--fail-on-unmet</c>.
+    /// </summary>
+    private static int ExitCode(
+        CliContext context,
+        SweepDefinition definition,
+        List<string> failedPointIds,
+        List<SweepIndexPointDTO> indexPoints)
+    {
+        if (failedPointIds.Count > 0)
+        {
+            return 1;
+        }
+
+        if (!context.FailOnUnmet)
+        {
+            return 0;
+        }
+
+        string[] unmet = indexPoints
+            .Where(point => point.Reliability is { WithinTarget: false })
+            .Select(point => point.PointId)
+            .ToArray();
+        if (unmet.Length == 0)
+        {
             return 0;
         }
 
         (context.Error ?? TextWriter.Null).WriteLine(
-            $"Sweep {definition.SweepId} completed with failed points: {string.Join(", ", failedPointIds)}.");
+            $"Sweep {definition.SweepId}: reliability target not met at points: "
+            + $"{string.Join(", ", unmet)}.");
         return 1;
+    }
+
+    /// <summary>
+    /// Narrows a definition's points to the ones <c>--points</c> named, in the definition's own
+    /// order so a selection cannot reorder the axis. An ID that is not in the definition is an
+    /// error: running the points that did match and staying quiet about a typo would publish a
+    /// different set of results than the caller asked for.
+    /// </summary>
+    private static IReadOnlyList<SweepPoint> SelectPoints(
+        SweepDefinition definition,
+        IReadOnlyList<string>? requestedPointIds)
+    {
+        if (requestedPointIds is null)
+        {
+            return definition.Points;
+        }
+
+        var requested = new HashSet<string>(requestedPointIds, StringComparer.Ordinal);
+        SweepPoint[] selected = definition.Points
+            .Where(point => requested.Contains(point.PointId))
+            .ToArray();
+        string[] unknown = requestedPointIds
+            .Where(id => !definition.Points.Any(point =>
+                string.Equals(point.PointId, id, StringComparison.Ordinal)))
+            .ToArray();
+        return unknown.Length == 0
+            ? selected
+            : throw new UsageException(
+                $"Sweep '{definition.SweepId}' has no point {string.Join(", ", unknown)}. "
+                + $"Its points are: {string.Join(", ", definition.Points.Select(point => point.PointId))}.");
     }
 
     /// <summary>Generates one point's scenario config, attributing a merge-patch failure to the
@@ -311,9 +443,20 @@ internal static class SweepRunCommand
     }
 
     /// <summary>Per-point status sidecar, written next to each point's detail artifact.</summary>
+    /// <param name="PointId">The point this status describes.</param>
+    /// <param name="AxisValue">Where that point sits on the sweep's axis.</param>
+    /// <param name="Status">Whether the run itself completed.</param>
+    /// <param name="Failure">Why it did not, when it did not.</param>
+    /// <param name="ReliabilityTargetMet">
+    /// Whether the point met its reliability target, or <see langword="null"/> when it never got
+    /// far enough to have one. <see cref="Status"/> answers a different question: a point that
+    /// dispatched a full period and missed its target is <c>succeeded</c>, which has been read as
+    /// the target having been met.
+    /// </param>
     private sealed record SweepPointStatusFile(
         string PointId,
         double AxisValue,
         SweepPointStatus Status,
-        SweepPointFailureDTO? Failure);
+        SweepPointFailureDTO? Failure,
+        bool? ReliabilityTargetMet = null);
 }

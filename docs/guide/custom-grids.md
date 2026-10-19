@@ -6,6 +6,16 @@ half-hour demand archive and a full non-leap hourly EPW file from deterministic 
 It is a plumbing example only: the invented demand, weather, costs and fleet are not a forecast, a
 measured site, or a recommended system.
 
+## Prerequisites
+
+**This example needs PowerShell**, because the input generator is a PowerShell script. Windows
+PowerShell 5.1 or [PowerShell 7+](https://learn.microsoft.com/powershell/scripting/install/installing-powershell)
+(`pwsh`) both work, and `pwsh` is a cross-platform install on Linux and macOS. The script itself
+uses only PowerShell and the .NET runtime the CLI already needs; there is no second toolchain.
+
+If you cannot install PowerShell, use [Hosted starters](synthetic-starters.md) instead:
+`nemsweep --quick-start simple` prepares an equivalent synthetic one-region study with no scripting.
+
 ## Generate the inputs
 
 From the repository root, run the checked-in PowerShell generator. It writes its results under an

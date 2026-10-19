@@ -9,11 +9,17 @@ by zero to three positional arguments, matched by a pattern in
 Install the version you want to reproduce as a .NET tool, which puts `nemsweep` on your path:
 
 ```bash
-dotnet tool install --global NEMSweep.CLI --version 0.1.0
+dotnet tool install --global NEMSweep.CLI --version 0.3.0
 ```
 
 From a clone, the equivalent of every `nemsweep` invocation below is
 `dotnet run --project NEMSweep.CLI -- ...`.
+
+This page targets 0.3.0, including `--agent-guide`, `--points` and `--fail-on-unmet`.
+Installation requires package publication; until then use this source revision
+(see the [release target notice](https://github.com/HasinthaAttanayake/NEMSweep#install)).
+Check `--help` and `--version` rather than assuming an installed tool or `latest`
+container includes every command documented here.
 
 Paths you pass on the command line are resolved relative to your **current working directory**
 (`WorkspacePaths.ResolveConfiguredPath`). An absolute path is used as given. Nothing searches for a
@@ -27,7 +33,7 @@ you supply them, and each takes the first of three sources.
 | Root | What it holds | Command line | Environment | Setting |
 |---|---|---|---|---|
 | Data | Demand, weather and generation artifacts a scenario reads. Also where `--ingest` writes them. | `--data-root <dir>` | `NEMSWEEP_DATA_ROOT` | `dataRoot` |
-| Output | `results*.json` and everything under `sweeps/`. | `--output <dir>` | `NEMSWEEP_OUTPUT` | `outputRoot` |
+| Output | `results*.json` and published sweep artifacts. Fan-out configs remain under the working directory. | `--output <dir>` | `NEMSWEEP_OUTPUT` | `outputRoot` |
 
 The environment variables exist because a container's settings file sits in a read-only image
 layer, so a flag or a variable is the only way to redirect a run there.
@@ -37,6 +43,17 @@ bundles. `--validate-inputs` and `--ingest` use it when no bundle path is suppli
 `data/nemsweep-inputs` bundle is legacy format 1 and remains supported when explicitly selected or
 configured in `appsettings.local.json`; local settings still take precedence over shipped defaults.
 See [Input bundles](input-bundles.md) for the layouts and non-destructive migration steps.
+
+Two further flags are stripped the same way, and apply to the runs that can assess reliability:
+
+| Flag | Applies to | Meaning |
+|---|---|---|
+| `--fail-on-unmet` | `--run-scenario`, `--run-sweep` | Exit `1` when the reliability target was not met. Without it such a run exits `0`, because the run itself completed. |
+| `--points <id,id,...>` | `--run-sweep` | Run only the named sweep points. |
+
+Passing either to a command that does not act on it is an error rather than a no-op: a caller who
+asked for a subset of points, or for a missed target to fail the run, and silently got neither has
+no way to tell from the exit code.
 
 Both overrides may appear anywhere on the command line. They are stripped before the command itself
 is matched, so they never occupy one of a command's positional arguments:
@@ -112,9 +129,9 @@ under the current directory. Redirected stdin requires explicit selection.
 Preparation is settings-independent and rejects `--data-root`, `--output`,
 `--csv` and `--format`; later study runs accept them normally.
 
-See [Hosted starters](synthetic-starters.md) for the source-build requirement,
-**pending sample-publication status**, download safety, assumptions and run
-instructions. This feature is not present in the earlier `0.1.0` package.
+Simple is the smallest starter, a synthetic one-region Island-X grid; Advanced
+is the NEM worked example. See [Hosted starters](synthetic-starters.md) for
+download safety, assumptions and run instructions.
 
 ## Scenario and sweep runs
 
@@ -202,6 +219,11 @@ Every generated point config is then loaded and validated as a scenario config b
 succeeds. This makes `--fan-out-sweep` the command to run first while you are developing a sweep:
 a bad override surfaces immediately, against every point, without running any dispatch.
 
+It also prints the point-to-axis-value table and writes it as
+`sweeps/{sweepId}/configs/points.csv`, because a point ID encodes nothing about where that point
+sits on the axis and the mapping is otherwise only in the definition the caller just supplied. See
+[Mapping point IDs to axis values](sweeps.md#mapping-point-ids-to-axis-values).
+
 ### `--run-sweep`
 
 ```bash
@@ -212,13 +234,18 @@ dotnet run --project NEMSweep.CLI -- --run-sweep sweeps/my-sweep.json
 |---|---|---|
 | sweep definition path | no | n/a |
 
-Fans out the same point configs as `--fan-out-sweep`, but **without** validating them first, then
-runs `--run-scenario` for each point in turn. A point that fails does not stop the sweep: its
+| Flag | Meaning |
+|---|---|
+| `--points <id,id,...>` | Run only these points. An ID the definition does not declare is an error, and the message lists the ones it does. |
+| `--fail-on-unmet` | Exit `1` when any point missed its reliability target, naming those points on standard error. |
+
+Fans out the same point configs as `--fan-out-sweep`, then runs `--run-scenario` for each point
+in turn, validating each through the scenario loader. A point that fails does not stop the sweep: its
 failure is recorded in that point's `points/{pointId}.status.json` and the sweep continues with the
 remaining points. The command's own exit code is `1` if any point failed, `0` otherwise. Because
-fan-out here skips validation, a config mistake surfaces as a per-point failure buried in the
-sweep's results rather than an upfront error. Run `--fan-out-sweep` on the same definition first to
-catch that class of mistake before spending the time on a full run.
+validation here is per point, a config mistake surfaces as a recorded per-point failure rather
+than aborting the entire sweep upfront. Run `--fan-out-sweep` first while developing a definition
+to inspect and validate its generated configs without dispatching.
 
 Unlike a scenario publication, a sweep is written incrementally: configs, per-point results and
 status files, the sweep index and the manifest each land as they are produced. An interrupted sweep
@@ -229,7 +256,16 @@ Published under `{outputRoot}/sweeps/{sweepId}/`: `index.json` (the sweep index)
 `points/{pointId}.json` and `points/{pointId}.status.json` for each point, a copy of each point's
 `configs/{pointId}.json`, and any base-demand series the points reference under `series/`.
 `sweeps/index.json` (the manifest of all published sweeps) is rewritten from what is on disk after
-every run.
+every full run. A full run also writes `summary.json` and `summary.csv` in the sweep directory and
+prints the same rows as a table; see
+[The summary](sweeps.md#the-summary-what-the-sweep-found).
+
+**Selecting fewer than all defined points makes the run partial.** Selecting every point with
+`--points` is still a full run. A partial run leaves the sweep's aggregate artifacts alone: it
+publishes each selected point's result, status and config, and does not rewrite `index.json`, the
+`sweeps/index.json` manifest, or the summary files: rebuilding the index from a subset would drop
+every point the run did not touch. The run says so on stdout, and the summary table still prints
+for the points that ran. Rerun without `--points` to republish the sweep.
 
 ### `--describe-schema`
 
@@ -263,6 +299,28 @@ works before you have written a settings file.
 The published `scenarios/nem-fy2026-all-regions.json` stays the worked example of a real system.
 `scenarios/starter-nsw1.json` sits between the two: the same NSW1 assets on their own, short enough
 to read in one go.
+
+### `--agent-guide`
+
+```bash
+nemsweep --agent-guide
+```
+
+| Argument | Optional | Default |
+|---|---|---|
+| none | n/a | n/a |
+
+Prints the agent guide that was embedded in this build, which is the repository's
+[`skills/nemsweep/SKILL.md`](https://github.com/HasinthaAttanayake/NEMSweep/blob/main/skills/nemsweep/SKILL.md).
+
+Embedded rather than fetched, deliberately. An agent that reads the copy on `main` is reading about
+a version it may not have installed: the install commands, the flags and the field names all move
+between releases. The embedded copy can only describe the binary printing it. Like
+`--describe-schema` it needs no workspace.
+
+```bash
+nemsweep --agent-guide > AGENT-NOTES.md
+```
 
 ## Input bundles
 

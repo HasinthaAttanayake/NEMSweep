@@ -6,14 +6,20 @@ namespace NEMSweep.CLI.Tests.Contracts;
 
 public sealed class SystemAndRegionDispatchResultsContractTests
 {
+    /// <summary>
+    /// Pins every published dispatch artifact version, so bumping one is a deliberate edit here
+    /// rather than a side effect of adding a field. A consumer, the results site included, reads
+    /// these numbers to decide whether it can parse an artifact at all.
+    /// </summary>
     [Fact]
-    public void OptionalSizingSemantics_UseDistinctResultOverviewAndSweepSchemaVersions()
+    public void PublishedArtifactVersions_ArePinnedSoAConsumerBumpIsDeliberate()
     {
-        ArtifactSchemaVersions.SystemDispatchResults.Should().Be(17);
-        ArtifactSchemaVersions.SystemDispatchOverview.Should().Be(6);
-        ArtifactSchemaVersions.RegionDispatchResults.Should().Be(12);
-        ArtifactSchemaVersions.RegionDispatchOverview.Should().Be(5);
-        ArtifactSchemaVersions.SweepIndex.Should().Be(13);
+        ArtifactSchemaVersions.SystemDispatchResults.Should().Be(18);
+        ArtifactSchemaVersions.SystemDispatchOverview.Should().Be(7);
+        ArtifactSchemaVersions.RegionDispatchResults.Should().Be(13);
+        ArtifactSchemaVersions.RegionDispatchOverview.Should().Be(6);
+        ArtifactSchemaVersions.SweepIndex.Should().Be(14);
+        ArtifactSchemaVersions.DispatchResults.Should().Be(16);
     }
 
     [Fact]

@@ -9,30 +9,75 @@ format-2 bundles, as well as National Electricity Market inputs. The framework
 itself (`NEMSweep.Model`, `NEMSweep.Contracts`) has no command line and no data.
 
 For ready-to-edit configurations, see [Hosted starters](synthetic-starters.md):
-Simple is a synthetic Island-X grid; Advanced preserves real Australian NEM FY2026
-AEMO demand, original TMYx EPW weather and the existing five-region
-fleet/cost/link assumptions. Its CLI download
-route is a source-build feature pending the reviewed samples release. For an
+Simple is the smallest, a synthetic Island-X grid; Advanced is the NEM worked example, preserving
+real Australian NEM FY2026 AEMO demand, original TMYx EPW weather and the existing five-region
+fleet/cost/link assumptions. Both are prepared by `nemsweep --quick-start`. For an
 immediately local recipe, see [Custom grids](custom-grids.md).
 
 ## Prerequisites
 
 NEMSweep targets `net10.0` (see `NEMSweep.Model/NEMSweep.Model.csproj`), so a source build needs the
-.NET 10 SDK. Nothing else is required to build, test or run the CLI.
+.NET 10 SDK, and so does installing the published .NET tool. Nothing else is required to build,
+test or run the CLI.
 
 To run without a toolchain, use the container image instead. The rest of this page still applies:
 same commands, same workspace, mounts in place of directories. See
 [Running the container](container.md).
 
-## Install without cloning
+### Linux
 
-If you only want to run NEMSweep, install the published
-[NEMSweep.CLI](https://www.nuget.org/packages/NEMSweep.CLI) .NET tool rather than building from
-source. Pin the version you want to reproduce:
+Two things catch a fresh Linux machine out, neither specific to NEMSweep.
+
+**No .NET SDK.** Where your distribution does not package .NET 10, Microsoft's script installs it
+into your home directory without root:
 
 ```bash
-dotnet tool install --global NEMSweep.CLI --version 0.1.0
+curl -fsSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel 10.0
 ```
+
+```bash
+export DOTNET_ROOT="$HOME/.dotnet"
+export PATH="$PATH:$DOTNET_ROOT:$DOTNET_ROOT/tools"
+```
+
+**`PATH` after a tool install.** `dotnet tool install --global` writes to `~/.dotnet/tools`, which a
+fresh shell does not search, so `nemsweep` comes back as `command not found` even though the install
+reported success:
+
+```bash
+export PATH="$PATH:$HOME/.dotnet/tools"
+```
+
+Put either `export` in your shell profile to make it persist.
+
+**ICU.** .NET needs the ICU libraries for globalization, and a minimal container or cloud image
+often ships without them. The symptom is a `System.Globalization` stack trace on first run rather
+than a clear message. Install them with the distribution's own package:
+
+```bash
+sudo apt-get update && sudo apt-get install -y libicu-dev
+```
+
+```bash
+sudo dnf install -y libicu
+```
+
+## Install without cloning
+
+If you only want to run NEMSweep, install the
+[NEMSweep.CLI](https://www.nuget.org/packages/NEMSweep.CLI) .NET tool rather than building from
+source. These docs target 0.3.0; installation requires its publication
+(see the [release target notice](https://github.com/HasinthaAttanayake/NEMSweep#install)). Pin the version you want to reproduce:
+
+```bash
+dotnet tool install --global NEMSweep.CLI --version 0.3.0
+```
+
+```bash
+nemsweep --version
+```
+
+The second command confirms the install and prints `NEMSweep.CLI 0.3.0+<commit>`.
 
 Everything below is then `nemsweep <command>` in place of
 `dotnet run --project NEMSweep.CLI -- <command>`, and the workspace is configured with `--data-root`
@@ -41,14 +86,18 @@ build against the framework instead of running it, add the `NEMSweep.Model` and 
 packages to your own project:
 
 ```bash
-dotnet add package NEMSweep.Model --version 0.1.0
-dotnet add package NEMSweep.Contracts --version 0.1.0
+dotnet add package NEMSweep.Model --version 0.3.0
+dotnet add package NEMSweep.Contracts --version 0.3.0
 ```
 
-Use the same package version for both references. Later releases are opt-in: replace `0.1.0` only
+Use the same package version for both references. Later releases are opt-in: replace `0.3.0` only
 when you intend to upgrade, then rerun your tests and scenario validation.
 
 ## Clone, build, test
+
+A source build reports the `VersionPrefix` in `Directory.Build.props`, and a release takes its
+version from the `v*` tag instead. `DocumentedCliVersion` pins the release targeted by the install
+snippets above; neither property confirms that the packages have been published.
 
 ```bash
 git clone https://github.com/HasinthaAttanayake/NEMSweep.git

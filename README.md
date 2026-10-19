@@ -4,6 +4,11 @@ NEMSweep is a free, open-source tool that checks whether a proposed electricity 
 a full year of real demand hour by hour, works out how much storage it would take if it couldn't,
 and tells you what that costs.
 
+**Using NEMSweep from an AI agent?** Read [`skills/nemsweep/SKILL.md`](skills/nemsweep/SKILL.md),
+the one agent-facing guide: install routes, preflight checks, recipes, and how to read and report
+results. The documentation site also publishes [`llms.txt`](docs/llms.txt) at
+<https://docs.nemsweep.com/llms.txt>.
+
 Repository: <https://github.com/HasinthaAttanayake/NEMSweep>.
 Software licence: [BSD-3-Clause](LICENSE.md).
 Third-party data: [source attribution and reuse conditions](DATA-LICENSE.md).
@@ -34,6 +39,125 @@ your own software.
 **Bring your own inputs:** [find demand/weather sources and assemble a bundle](docs/guide/input-bundles.md#finding-sources-for-your-own-bundle)
 
 **Live results:** [https://www.nemsweep.com/](https://www.nemsweep.com/)
+
+## Install
+
+> **Release target: 0.3.0.** These docs and package pins prepare that release; they do not confirm
+> publication. The install, update and package commands require 0.3.0 to be published on NuGet.
+> Until then, build this source revision to use the documented features.
+
+Three routes. Pick one; each block below is complete on its own.
+
+### Route A: .NET tool (needs the .NET 10 SDK)
+
+```bash
+dotnet tool install --global NEMSweep.CLI --version 0.3.0
+```
+
+```bash
+nemsweep --version
+```
+
+That installs the `nemsweep` command and should report `NEMSweep.CLI 0.3.0+<commit>`. On Linux and
+macOS the tool lands in `~/.dotnet/tools`, which a fresh shell does not have on `PATH`:
+
+```bash
+export PATH="$PATH:$HOME/.dotnet/tools"
+```
+
+Add that line to your shell profile to make it stick. On a minimal Linux image .NET also needs ICU,
+or it exits with a globalization error on first run: `apt-get install -y libicu-dev` on
+Debian/Ubuntu, `dnf install -y libicu` on Fedora/RHEL. See
+[Getting started](docs/guide/index.md#prerequisites).
+
+Update an installed CLI explicitly:
+
+```bash
+dotnet tool update --global NEMSweep.CLI --version 0.3.0
+```
+
+### Route B: container (needs no toolchain)
+
+```bash
+docker pull ghcr.io/hasinthaattanayake/nemsweep:latest
+```
+
+```bash
+docker run --rm ghcr.io/hasinthaattanayake/nemsweep:latest --version
+```
+
+The image carries the tool and a .NET runtime, and no model data: demand, weather and generation
+artifacts are inputs you bring. It defaults the data root to `/data` and the output root to `/out`,
+so mount your own directories over those and pass a scenario by **absolute** path inside the
+container:
+
+```bash
+docker run --rm -v ./reference:/data:ro -v ./study:/out ghcr.io/hasinthaattanayake/nemsweep:latest --run-scenario /data/my-scenario.json
+```
+
+Podman takes the same arguments. The image is tagged `latest` and by commit SHA, for `linux/amd64`
+and `linux/arm64`; it is not tagged with a release version.
+You can also prepare a starter without installing .NET on the host: mount a writable parent
+directory and create a new child study directory with container quick-start.
+[Running the container](docs/guide/container.md) covers the mounts, where the input data comes from,
+container quick-start, and pinning a run by image digest.
+
+### Route C: source build (needs the .NET 10 SDK)
+
+```bash
+git clone https://github.com/HasinthaAttanayake/NEMSweep.git
+cd NEMSweep
+```
+
+```bash
+dotnet build NEMSweep.slnx
+```
+
+```bash
+dotnet run --project NEMSweep.CLI -- --version
+```
+
+A source build of `main` reports a version ahead of the published release, because `VersionPrefix`
+in `Directory.Build.props` describes what is being built next. Releases are cut by pushing a `v*`
+tag, which is the version the packages are published at through NuGet trusted publishing.
+
+### Then prepare a study
+
+Download and ingest a ready-made starter into a new directory. No simulation is run.
+For route A (installed tool):
+
+```bash
+nemsweep --quick-start simple ./my-first-study
+```
+
+For route C, run from the cloned repository:
+
+```bash
+dotnet run --project NEMSweep.CLI -- --quick-start simple ./my-first-study
+```
+
+Simple is the smallest starter: one synthetic region, Island-X, which runs in seconds.
+Use `--quick-start advanced ./my-nem-study` with the same route's invocation to prepare the NEM
+worked example instead. The
+destination must not already exist. See [Hosted starters](docs/guide/synthetic-starters.md).
+
+### Embedding the framework
+
+The framework and its published artifact contracts are packages of their own, for building
+something else on top of the model rather than running it. They are published as
+[NEMSweep.Model](https://www.nuget.org/packages/NEMSweep.Model),
+[NEMSweep.Contracts](https://www.nuget.org/packages/NEMSweep.Contracts) and
+[NEMSweep.CLI](https://www.nuget.org/packages/NEMSweep.CLI):
+
+```bash
+dotnet add package NEMSweep.Model --version 0.3.0
+```
+
+```bash
+dotnet add package NEMSweep.Contracts --version 0.3.0
+```
+
+Use the same package version for both references.
 
 ## The three layers
 
@@ -181,83 +305,29 @@ those fields sit in.
 
 Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Install
-
-The CLI is published to NuGet as a .NET tool, so a machine with the .NET 10 SDK needs neither a
-clone nor a container to run it. The examples pin the first release; substitute a later version
-when you deliberately upgrade:
-
-```bash
-dotnet tool install --global NEMSweep.CLI --version 0.1.0
-```
-
-That installs the `nemsweep` command. The framework and its published artifact contracts are
-packages of their own, for building something else on top of the model rather than running it.
-They are published as [NEMSweep.Model](https://www.nuget.org/packages/NEMSweep.Model),
-[NEMSweep.Contracts](https://www.nuget.org/packages/NEMSweep.Contracts), and
-[NEMSweep.CLI](https://www.nuget.org/packages/NEMSweep.CLI):
-
-```bash
-dotnet add package NEMSweep.Model --version 0.1.0
-```
-
-```bash
-dotnet add package NEMSweep.Contracts --version 0.1.0
-```
-
-Update an installed CLI explicitly:
-
-```bash
-dotnet tool update --global NEMSweep.CLI --version 0.1.0
-```
-
-Releases are cut by pushing a `v*` tag, which is the version the packages are published at through
-NuGet trusted publishing.
-
 ## Local development
 
 ### Hosted starters
 
 The public [NEMSweep.Samples](https://github.com/HasinthaAttanayake/NEMSweep.Samples)
-repository provides reviewable starter recipes. Simple is a synthetic Island-X
-grid. Advanced preserves the real Australian NEM FY2026 AEMO demand archives,
-all seven original TMYx 2011-2025 EPWs and the existing fleet/cost/link assumptions.
-The weather profiles are typical years, not measured FY2026 weather. Scenario
+repository provides reviewable starter recipes. **Simple is the smallest:** a synthetic one-region
+Island-X grid. Advanced is the NEM worked example, preserving the real Australian NEM FY2026 AEMO
+demand archives, all seven original TMYx 2011-2025 EPWs and the existing fleet/cost/link
+assumptions. The weather profiles are typical years, not measured FY2026 weather. Scenario
 assumptions remain examples; neither starter distributes published model results.
 
-The new source-build CLI supports `--quick-start`, or explicit
-`--quick-start simple` / `--quick-start advanced`, to explain, download, verify
-and ingest a starter into a new study directory without running a model.
-The reviewed [data release, `v2026.10.1`](https://github.com/HasinthaAttanayake/NEMSweep.Samples/releases/tag/v2026.10.1)
-is published with both bundles. Anonymous public downloads and complete CLI
-quick-start preparation have been verified for Simple and Advanced.
-The data release is separate from the software release: this feature is not in
-the previously published `0.1.0` NuGet package. Use this source build until a
-compatible CLI version is published.
-See [Hosted starters](docs/guide/synthetic-starters.md) for publication status,
-local alternatives, manual downloads, formats and run commands.
+`--quick-start`, or explicit `--quick-start simple` / `--quick-start advanced`, explains, downloads,
+verifies and ingests a starter into a new study directory without running a model. The reviewed
+[data release, `v2026.10.1`](https://github.com/HasinthaAttanayake/NEMSweep.Samples/releases/tag/v2026.10.1)
+is published with both bundles, and the data release is separate from the software release.
+See [Hosted starters](docs/guide/synthetic-starters.md) for local alternatives, manual downloads,
+formats and run commands.
 
-### Build or run the CLI
+### Build, test and run from a clone
 
-There are three ways to run NEMSweep: install the tool as above, clone it and build it with the
-.NET SDK, or run the published container image, which needs no toolchain and works under Docker or
-Podman.
-
-The image is published to the GitHub Container Registry as `ghcr.io/<owner>/nemsweep`, where
-`<owner>` is the repository owner. It contains the tool and nothing else: demand, weather and
-generation artifacts are inputs you bring. The image defaults the data root to `/data` and the
-output root to `/out`, so mount your own directories over those and pass a scenario by absolute
-path:
-
-```bash
-docker run --rm -v ./reference:/data:ro -v ./study:/out ghcr.io/<owner>/nemsweep:latest --run-scenario /data/my-scenario.json
-```
-
-Podman takes the same arguments. [Running the container](docs/guide/container.md) covers the
-mounts, where the input data comes from, and pinning a run by image digest.
-
-NEMSweep targets .NET 10 for a source build. The `dotnet` commands below are identical on Windows,
-macOS and Linux.
+[Install](#install) covers the three ways to get a working `nemsweep`, the container route included.
+This section is the clone: NEMSweep targets .NET 10 for a source build, and the `dotnet` commands
+below are identical on Windows, macOS and Linux.
 
 ```bash
 dotnet build NEMSweep.slnx

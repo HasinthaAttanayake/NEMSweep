@@ -21,4 +21,6 @@ public sealed record SystemDispatchOverviewDTO(
     DispatchCostDTO Cost,
     [property: JsonRequired] DispatchEmissionsDTO Emissions,
     [property: JsonRequired] DispatchTopologyDTO Topology,
-    [property: JsonRequired] SimulationExecutionMode ExecutionMode = SimulationExecutionMode.SizeBattery);
+    [property: JsonRequired] SimulationExecutionMode ExecutionMode = SimulationExecutionMode.SizeBattery,
+    StorageCapacityBreakdownDTO? StorageCapacity = null,
+    RunLimitationsDTO? Limitations = null);

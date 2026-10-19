@@ -152,20 +152,37 @@ internal static class ScenarioCommand
                 $"Wrote scenario results to: {Path.GetFullPath(finalResultsPath)}");
         }
 
-        WarnIfOutsideReliabilityTarget(context, publication);
-        return 0;
+        ReportReliability(context, publication);
+        // The target is a property of the run, not of whether it completed, so a miss is reported
+        // and the run still succeeds unless the caller asked otherwise. Callers that script against
+        // the exit code and do not pass the flag keep the behaviour they already have.
+        return context.FailOnUnmet && !publication.System.Reliability.WithinTarget ? 1 : 0;
     }
 
-    /// <summary>Warns when a publication's system-wide reliability target was not met, so the
-    /// wording cannot drift between the two publication paths that check it.</summary>
-    private static void WarnIfOutsideReliabilityTarget(CliContext context, DispatchPublication publication)
+    /// <summary>
+    /// States the reliability outcome of every run, met or not. Previously only a miss said
+    /// anything, so a run that printed no warning was indistinguishable from one whose reliability
+    /// nobody had thought to check: the absence of a line was carrying the result.
+    /// </summary>
+    /// <remarks>
+    /// The percentages are percentages of demand energy, which is the unit the model works in; the
+    /// line says so, because a bare <c>0.0241%</c> has been read as a fraction and multiplied by a
+    /// hundred more than once.
+    /// </remarks>
+    private static void ReportReliability(CliContext context, DispatchPublication publication)
     {
-        if (!publication.System.Reliability.WithinTarget)
+        ReliabilityBasisDTO reliability = publication.System.Reliability;
+        context.Output.WriteLine(
+            $"reliability: achieved {reliability.AchievedUsePercentageOfDemand:F4}% vs target "
+            + $"{reliability.TargetUsePercentageOfDemand:F4}% of demand: "
+            + (reliability.WithinTarget ? "met" : "NOT met"));
+        if (!reliability.WithinTarget)
         {
+            // Kept verbatim alongside the line above: callers already grep for it.
             context.Output.WriteLine(
                 "WARNING: reliability target not met "
-                + $"(achieved {publication.System.Reliability.AchievedUsePercentageOfDemand:F4}% unserved energy, "
-                + $"target {publication.System.Reliability.TargetUsePercentageOfDemand:F4}%).");
+                + $"(achieved {reliability.AchievedUsePercentageOfDemand:F4}% unserved energy, "
+                + $"target {reliability.TargetUsePercentageOfDemand:F4}%).");
         }
     }
 
