@@ -87,6 +87,7 @@ internal sealed class CommandRouter
                     _output, _error, client, _samples ?? StarterSample.LoadCatalogue());
             }
             CliOptions options = CliOptions.Parse(args, out string[] commandArgs);
+            RejectUnsupportedFlags(options, commandArgs);
 
             // Answered without a workspace, so asking how to use the tool, or for a schema, never
             // fails on a settings file the caller has not written yet.
@@ -101,6 +102,8 @@ internal sealed class CommandRouter
                     return SchemaDescriptionCommand.Run(_output, schemaFormat);
                 case ["--new-scenario"]:
                     return ScenarioScaffoldCommand.Run(_output);
+                case ["--agent-guide"]:
+                    return AgentGuideCommand.Run(_output);
             }
 
             // Checked here rather than inside the handler so a typo is rejected without first
@@ -146,7 +149,12 @@ internal sealed class CommandRouter
                 _ => null,
             };
 
-            return handler is null ? PrintUsage(_error, 2) : handler(CreateContext(options));
+            if (handler is null)
+            {
+                return PrintUsage(_error, 2);
+            }
+
+            return handler(CreateContext(options));
         }
         catch (UsageException exception)
         {
@@ -169,7 +177,66 @@ internal sealed class CommandRouter
             _workingRoot,
             options.DataRoot,
             options.OutputRoot);
-        return new CliContext(paths, settings, _output, _error, options.Csv, options.Format);
+        return new CliContext(
+            paths,
+            settings,
+            _output,
+            _error,
+            options.Csv,
+            options.Format,
+            ParsePoints(options.Points),
+            options.FailOnUnmet);
+    }
+
+    /// <summary>
+    /// Rejects a flag the matched command does not act on. Silently ignoring one is worse than
+    /// failing: a caller who asked for a subset of points, or for a missed target to fail the run,
+    /// and got neither, has no way to tell from the exit code that the flag went nowhere.
+    /// </summary>
+    private static void RejectUnsupportedFlags(CliOptions options, string[] commandArgs)
+    {
+        string? command = commandArgs.FirstOrDefault();
+        if (options.Points is not null && command is not "--run-sweep")
+        {
+            throw new UsageException(
+                $"{CliOptions.PointsFlag} applies to --run-sweep only.");
+        }
+
+        if (options.FailOnUnmet && command is not ("--run-scenario" or "--run-sweep"))
+        {
+            throw new UsageException(
+                $"{CliOptions.FailOnUnmetFlag} applies to --run-scenario and --run-sweep only.");
+        }
+    }
+
+    /// <summary>
+    /// Splits the <c>--points</c> value into point IDs. Blank entries are dropped so a trailing
+    /// comma is not an error, but a value naming nothing at all is: it reads as a request to run a
+    /// subset, and running every point instead would be the opposite of what was asked.
+    /// </summary>
+    private static IReadOnlyList<string>? ParsePoints(string? value)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        string[] ids = value
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (ids.Length == 0)
+        {
+            throw new UsageException($"{CliOptions.PointsFlag} named no point IDs.");
+        }
+
+        string[] duplicates = ids
+            .GroupBy(id => id, StringComparer.Ordinal)
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key)
+            .ToArray();
+        return duplicates.Length == 0
+            ? ids
+            : throw new UsageException(
+                $"{CliOptions.PointsFlag} named {string.Join(", ", duplicates)} more than once.");
     }
 
     /// <summary>
@@ -208,14 +275,19 @@ internal sealed class CommandRouter
         writer.WriteLine("  --output <dir>      where results are written   (env NEMSWEEP_OUTPUT)");
         writer.WriteLine("  --csv               also write the star schema CSV tables");
         writer.WriteLine("  --format <text|json>  report as JSON (--validate-scenario)");
+        writer.WriteLine("  --fail-on-unmet     exit 1 when the reliability target is not met");
+        writer.WriteLine("                      (--run-scenario, --run-sweep)");
         writer.WriteLine();
         writer.WriteLine("  Scenario and sweep runs:");
         writer.WriteLine("  nemsweep --validate-scenario [scenario-config.json]");
         writer.WriteLine("  nemsweep --run-scenario [scenario-config.json]");
         writer.WriteLine("  nemsweep --fan-out-sweep <sweep-definition.json>");
         writer.WriteLine("  nemsweep --run-sweep <sweep-definition.json>");
+        writer.WriteLine("    --points <id,id,...>  run only these sweep points");
         writer.WriteLine("  nemsweep --describe-schema <scenario|sweep|manifest|legacy-manifest|demand|weather>");
         writer.WriteLine("  nemsweep --new-scenario");
+        writer.WriteLine("  nemsweep --agent-guide");
+        writer.WriteLine("    Print the agent guide embedded in this build.");
         writer.WriteLine();
         writer.WriteLine("  Input bundles:");
         writer.WriteLine("  nemsweep --validate-inputs [input-bundle]");
@@ -236,6 +308,7 @@ internal sealed class CommandRouter
         "--run-sweep" => "Sweep run",
         "--describe-schema" => "Schema description",
         "--new-scenario" => "Scenario scaffold",
+        "--agent-guide" => "Agent guide",
         "--quick-start" => "Quick-start",
         "--validate-inputs" => "Input validation",
         "--ingest" => "Input ingest",

@@ -9,7 +9,11 @@ internal static class SweepFanOutCommand
 {
     public static int Run(CliContext context, string definitionPath)
     {
-        WriteConfigs(context, definitionPath, validateGeneratedConfigs: true);
+        SweepDefinition definition = WriteConfigs(
+            context,
+            definitionPath,
+            validateGeneratedConfigs: true);
+        SweepPointMap.Write(context, definition);
         return 0;
     }
 

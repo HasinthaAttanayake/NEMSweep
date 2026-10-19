@@ -56,7 +56,10 @@ needed storage, or outside it because the search was capped, and those are diffe
 
 **SLCoE.** System levelised cost of electricity, in AUD per MWh served. Annuitised capital plus
 fixed and variable operating cost, divided by energy served. It is the cost of building and running
-the system, not a retail bill and not a market price.
+the system, not a retail bill and not a market price. Anywhere it is written as "cost per MWh",
+the denominator is energy served and nothing else;
+[SLCoE](outputs.md#slcoe-what-it-is-and-what-it-divides-by) states the numerator and denominator
+field by field.
 
 **SLCoT.** The transmission equivalent, levelised cost of transmission per MWh served.
 

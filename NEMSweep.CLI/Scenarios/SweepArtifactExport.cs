@@ -196,7 +196,8 @@ internal static class SweepArtifactExport
             result.PowerSystem.StorageFleets.Sum(fleet => fleet.PowerCapacityMw),
             result.PowerSystem.StorageFleets.Sum(fleet => fleet.EnergyCapacityMwh),
             result.Cost,
-            result.Emissions);
+            result.Emissions,
+            StorageCapacityBreakdown.From(result.PowerSystem.StorageFleets, result.StorageSizing));
     }
 
     public static SweepPointScalarResultsDTO CreateScalars(
@@ -209,10 +210,18 @@ internal static class SweepArtifactExport
             result.RegionSummariesById.Values.Sum(region => region.StoragePowerMw),
             result.RegionSummariesById.Values.Sum(region => region.StorageEnergyMwh),
             result.Cost,
-            result.Emissions);
+            result.Emissions,
+            // The published block when the artifact carries one, so a scalar cannot disagree with
+            // the result beside it; summed from the regions for an artifact written before the
+            // block existed.
+            result.StorageCapacity ?? StorageCapacityBreakdown.Sum(
+                result.RegionSummariesById.Values.Select(region => region.StorageCapacity
+                    ?? new StorageCapacityBreakdownDTO(0, 0, 0, 0, 0, 0, 0, 0, 0, 0))));
     }
 
-    public static SweepPointScalarResultsDTO CreateScalars(RegionDispatchResultsDTO result)
+    public static SweepPointScalarResultsDTO CreateScalars(
+        RegionDispatchResultsDTO result,
+        StorageCapacityBreakdownDTO? publishedStorageCapacity = null)
     {
         ArgumentNullException.ThrowIfNull(result);
         return CreateScalars(
@@ -221,7 +230,9 @@ internal static class SweepArtifactExport
             result.PowerSystem.StorageFleets.Sum(fleet => fleet.PowerCapacityMw),
             result.PowerSystem.StorageFleets.Sum(fleet => fleet.EnergyCapacityMwh),
             result.Cost,
-            result.Emissions);
+            result.Emissions,
+            publishedStorageCapacity
+                ?? StorageCapacityBreakdown.From(result.PowerSystem.StorageFleets, result.StorageSizing));
     }
 
     private static SweepPointScalarResultsDTO CreateScalars(
@@ -230,7 +241,8 @@ internal static class SweepArtifactExport
         double storagePowerMw,
         double storageEnergyMwh,
         DispatchCostDTO cost,
-        DispatchEmissionsDTO emissions)
+        DispatchEmissionsDTO emissions,
+        StorageCapacityBreakdownDTO storageCapacity)
     {
         RenewableShareMetrics renewableShare = RenewableShareMetrics.FromDeliveredEnergy(
             dataSeries.DeliveredGenerationByTechnologyMw.ToDictionary(
@@ -260,7 +272,13 @@ internal static class SweepArtifactExport
             emissions.EmissionsIntensityTonnesCO2ePerMwh,
             cost.TransmissionSlcotAudPerMwh,
             cost.TransmissionCostStatus,
-            cost.NetImportedEnergyMwh);
+            cost.NetImportedEnergyMwh,
+            storageCapacity.DeclaredBatteryEnergyMwh,
+            storageCapacity.AddedBatteryEnergyMwh,
+            storageCapacity.TotalBatteryEnergyMwh,
+            storageCapacity.TotalBatteryPowerMw,
+            storageCapacity.PumpedHydroEnergyMwh,
+            storageCapacity.OtherStorageEnergyMwh);
     }
 
     private static GenerationTechnology ParseTechnology(string technology) =>

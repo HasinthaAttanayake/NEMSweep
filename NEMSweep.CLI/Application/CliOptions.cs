@@ -9,12 +9,26 @@ namespace NEMSweep.CLI.Application;
 /// <param name="OutputRoot">Value of <c>--output</c>, or <see langword="null"/> when absent.</param>
 /// <param name="Csv">Whether <c>--csv</c> was given, asking for the star schema alongside the JSON.</param>
 /// <param name="Format">How a command reports its result.</param>
+/// <param name="Points">
+/// Value of <c>--points</c>, a comma-separated list of sweep point IDs, or <see langword="null"/>
+/// when absent. Which IDs are valid depends on the sweep definition, so the list is carried as
+/// written and resolved by the command that reads the definition.
+/// </param>
+/// <param name="FailOnUnmet">
+/// Whether <c>--fail-on-unmet</c> was given, asking for a missed reliability target to be a
+/// non-zero exit. Opt-in because a run that misses its target has still run, and the existing
+/// contract is that such a run exits 0.
+/// </param>
 internal sealed record CliOptions(
     string? DataRoot,
     string? OutputRoot,
     bool Csv = false,
-    OutputFormat Format = OutputFormat.Text)
+    OutputFormat Format = OutputFormat.Text,
+    string? Points = null,
+    bool FailOnUnmet = false)
 {
+    public const string PointsFlag = "--points";
+    public const string FailOnUnmetFlag = "--fail-on-unmet";
     private const string DataRootFlag = "--data-root";
     private const string OutputFlag = "--output";
     private const string CsvFlag = "--csv";
@@ -28,6 +42,8 @@ internal sealed record CliOptions(
         string? dataRoot = null;
         string? outputRoot = null;
         bool csv = false;
+        bool failOnUnmet = false;
+        string? points = null;
         OutputFormat format = OutputFormat.Text;
         var rest = new List<string>(args.Length);
 
@@ -40,7 +56,13 @@ internal sealed record CliOptions(
                 continue;
             }
 
-            if (argument is not (DataRootFlag or OutputFlag or FormatFlag))
+            if (argument is FailOnUnmetFlag)
+            {
+                failOnUnmet = true;
+                continue;
+            }
+
+            if (argument is not (DataRootFlag or OutputFlag or FormatFlag or PointsFlag))
             {
                 rest.Add(argument);
                 continue;
@@ -48,10 +70,12 @@ internal sealed record CliOptions(
 
             if (index + 1 >= args.Length)
             {
-                throw new UsageException(
-                    argument is FormatFlag
-                        ? $"{argument} requires 'text' or 'json'."
-                        : $"{argument} requires a directory.");
+                throw new UsageException(argument switch
+                {
+                    FormatFlag => $"{argument} requires 'text' or 'json'.",
+                    PointsFlag => $"{argument} requires a comma-separated list of point IDs.",
+                    _ => $"{argument} requires a directory.",
+                });
             }
 
             string value = args[++index];
@@ -62,6 +86,10 @@ internal sealed record CliOptions(
             else if (argument is OutputFlag)
             {
                 outputRoot = value;
+            }
+            else if (argument is PointsFlag)
+            {
+                points = value;
             }
             else
             {
@@ -75,6 +103,6 @@ internal sealed record CliOptions(
         }
 
         remaining = [.. rest];
-        return new CliOptions(dataRoot, outputRoot, csv, format);
+        return new CliOptions(dataRoot, outputRoot, csv, format, points, failOnUnmet);
     }
 }

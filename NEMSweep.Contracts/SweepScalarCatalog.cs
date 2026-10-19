@@ -33,7 +33,7 @@ public static class SweepScalarCatalog
         new("achievedRenewableShareGridScale", "Achieved renewable share (grid scale)", "fraction"),
         new("achievedRenewableShareNative", "Achieved renewable share (native)", "fraction"),
         new("storagePowerMw", "Storage power capacity", "MW"),
-        new("storageEnergyMwh", "Storage energy capacity", "MWh"),
+        new("storageEnergyMwh", "Storage energy capacity (all technologies)", "MWh"),
         new("unservedEnergyMwh", "Unserved energy", "MWh"),
         new("unservedEnergyPercentageOfDemand", "Unserved energy", "% of demand"),
         new("unservedHours", "Unserved hours", "h"),
@@ -45,6 +45,12 @@ public static class SweepScalarCatalog
         new("transmissionSlcotAudPerMwh", "Transmission levelised cost", "AUD/MWh served", "AUD"),
         new("transmissionCostStatus", "Transmission cost status", "status", Chartable: false),
         new("netImportedEnergyMwh", "Net imported energy", "MWh"),
+        new("declaredBatteryEnergyMwh", "Battery energy capacity declared", "MWh"),
+        new("addedBatteryEnergyMwh", "Battery energy capacity added by sizing", "MWh"),
+        new("totalBatteryEnergyMwh", "Battery energy capacity", "MWh"),
+        new("totalBatteryPowerMw", "Battery power capacity", "MW"),
+        new("pumpedHydroEnergyMwh", "Pumped-hydro energy capacity", "MWh"),
+        new("otherStorageEnergyMwh", "Other storage energy capacity", "MWh"),
     ];
 
     private static readonly ReadOnlyDictionary<string, SweepScalarDescriptor> ByName =

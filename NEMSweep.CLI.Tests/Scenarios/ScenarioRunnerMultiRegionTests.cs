@@ -310,12 +310,12 @@ public sealed class ScenarioRunnerMultiRegionTests
         RegionDispatchOverviewDTO vicOverview = JsonSerializer.Deserialize<RegionDispatchOverviewDTO>(
             File.ReadAllBytes(Path.Combine(outputDirectory, "results-vic1-overview.json")), JsonFile.ReadOptions)!;
 
-        system.SchemaVersion.Should().Be(17);
-        overview.SchemaVersion.Should().Be(6);
-        nsw.SchemaVersion.Should().Be(12);
-        vic.SchemaVersion.Should().Be(12);
-        nswOverview.SchemaVersion.Should().Be(5);
-        vicOverview.SchemaVersion.Should().Be(5);
+        system.SchemaVersion.Should().Be(18);
+        overview.SchemaVersion.Should().Be(7);
+        nsw.SchemaVersion.Should().Be(13);
+        vic.SchemaVersion.Should().Be(13);
+        nswOverview.SchemaVersion.Should().Be(6);
+        vicOverview.SchemaVersion.Should().Be(6);
         system.StorageSizing!.Outcome.Should().Be(StorageSizingOutcome.BatteryCapacityLimitReached);
         nsw.StorageSizing!.Outcome.Should().Be(StorageSizingOutcome.StorageNoLongerImprovesReliability);
         vic.StorageSizing!.Outcome.Should().Be(StorageSizingOutcome.BatteryCapacityLimitReached);

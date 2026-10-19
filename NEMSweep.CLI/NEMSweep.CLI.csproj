@@ -94,6 +94,12 @@
     <EmbeddedResource Include="..\scenarios\nem-fy2026-all-regions.json" LogicalName="Starter.Advanced" />
     <EmbeddedResource Include="..\sweeps\datacentre-nameplate-fy2026.json" LogicalName="Starter.FullSweep" />
     <EmbeddedResource Include="QuickStart\samples.json" LogicalName="Starter.Catalogue" />
+    <!--
+      Embedded rather than fetched so the agent-guide command describes the binary it is printed
+      from. A guide pulled from main would tell an agent about commands the installed version
+      may not have, which is the failure this command exists to prevent.
+    -->
+    <EmbeddedResource Include="..\skills\nemsweep\SKILL.md" LogicalName="Agent.Guide" />
   </ItemGroup>
 
   <ItemGroup>

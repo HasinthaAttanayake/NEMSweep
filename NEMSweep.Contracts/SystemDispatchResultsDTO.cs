@@ -28,7 +28,9 @@ public sealed record SystemDispatchResultsDTO(
     [property: JsonRequired] DispatchInterconnectorDTO[] Interconnectors,
     DispatchCostBasisDTO? CostBasis = null,
     DispatchModelProvenanceDTO? Provenance = null,
-    [property: JsonRequired] SimulationExecutionMode ExecutionMode = SimulationExecutionMode.SizeBattery);
+    [property: JsonRequired] SimulationExecutionMode ExecutionMode = SimulationExecutionMode.SizeBattery,
+    StorageCapacityBreakdownDTO? StorageCapacity = null,
+    RunLimitationsDTO? Limitations = null);
 
 /// <summary>
 /// The model build that produced a result. <see cref="DispatchSourcesDTO"/> already pins the input
@@ -73,4 +75,5 @@ public sealed record RegionDispatchSummaryDTO(
     [property: JsonRequired] string OverviewPath,
     [property: JsonRequired] SimulationExecutionMode ExecutionMode = SimulationExecutionMode.SizeBattery,
     [property: JsonRequired] double StoragePowerMw = 0,
-    [property: JsonRequired] double StorageEnergyMwh = 0);
+    [property: JsonRequired] double StorageEnergyMwh = 0,
+    StorageCapacityBreakdownDTO? StorageCapacity = null);

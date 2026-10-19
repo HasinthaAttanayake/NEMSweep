@@ -37,7 +37,8 @@
       {
         "files": [
           "images/**",
-          "_headers"
+          "_headers",
+          "llms.txt"
         ]
       }
     ],

@@ -251,7 +251,16 @@ public enum SweepFailureStage
 /// as a fraction in [0, 1]; null when it could not be computed.
 /// </param>
 /// <param name="StoragePowerMw">Installed storage power capacity, in MW.</param>
-/// <param name="StorageEnergyMwh">Installed storage energy capacity, in MWh.</param>
+/// <param name="StorageEnergyMwh">
+/// Installed storage energy capacity across every storage technology, in MWh. Not a battery
+/// figure: see <paramref name="TotalBatteryEnergyMwh"/>.
+/// </param>
+/// <param name="DeclaredBatteryEnergyMwh">Battery energy the scenario declared, before sizing, in MWh.</param>
+/// <param name="AddedBatteryEnergyMwh">Battery energy the sizing search added, in MWh. Zero for a fixed-fleet point.</param>
+/// <param name="TotalBatteryEnergyMwh">Battery energy installed in the dispatched system, in MWh.</param>
+/// <param name="TotalBatteryPowerMw">Battery power installed in the dispatched system, in MW.</param>
+/// <param name="PumpedHydroEnergyMwh">Declared pumped-hydro energy, in MWh. Never sized.</param>
+/// <param name="OtherStorageEnergyMwh">Declared energy of any other storage technology, in MWh. Never sized.</param>
 /// <param name="UnservedEnergyMwh">Energy that could not be served over the dispatch period, in MWh.</param>
 /// <param name="UnservedEnergyPercentageOfDemand">Unserved energy as a percentage of demand energy.</param>
 /// <param name="UnservedHours">Count of intervals with any unserved energy.</param>
@@ -288,7 +297,13 @@ public sealed record SweepPointScalarResultsDTO(
     [property: JsonRequired] double EmissionsIntensityTonnesCO2ePerMwh,
     [property: JsonRequired] decimal TransmissionSlcotAudPerMwh,
     [property: JsonRequired] TransmissionCostStatus TransmissionCostStatus,
-    [property: JsonRequired] double NetImportedEnergyMwh);
+    [property: JsonRequired] double NetImportedEnergyMwh,
+    [property: JsonRequired] double DeclaredBatteryEnergyMwh = 0,
+    [property: JsonRequired] double AddedBatteryEnergyMwh = 0,
+    [property: JsonRequired] double TotalBatteryEnergyMwh = 0,
+    [property: JsonRequired] double TotalBatteryPowerMw = 0,
+    [property: JsonRequired] double PumpedHydroEnergyMwh = 0,
+    [property: JsonRequired] double OtherStorageEnergyMwh = 0);
 
 /// <summary>
 /// A base-demand or similar series externalised to <c>series/base-demand-{sha256}.json</c> and

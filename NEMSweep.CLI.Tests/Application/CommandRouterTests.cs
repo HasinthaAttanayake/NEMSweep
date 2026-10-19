@@ -74,6 +74,34 @@ public sealed class CommandRouterTests
     [Theory]
     [InlineData("--help")]
     [InlineData("-h")]
+    [InlineData("--usage")]
+    [InlineData("--version")]
+    [InlineData("--new-scenario")]
+    [InlineData("--agent-guide")]
+    [InlineData("--describe-schema", "scenario")]
+    public void Run_RejectsRunOnlyFlagsBeforeWorkspaceIndependentCommands(
+        string command,
+        string? argument = null)
+    {
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        string missingDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var application = new CommandRouter(missingDirectory, missingDirectory, output, error);
+        string[] commandArgs = argument is null ? [command] : [command, argument];
+
+        application.Run([.. commandArgs, "--points", "p0"]).Should().Be(2);
+        error.ToString().Should().Contain("--points applies to --run-sweep only.");
+        output.ToString().Should().BeEmpty();
+
+        error.GetStringBuilder().Clear();
+        application.Run([.. commandArgs, "--fail-on-unmet"]).Should().Be(2);
+        error.ToString().Should().Contain("--fail-on-unmet applies to --run-scenario and --run-sweep only.");
+        output.ToString().Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("--help")]
+    [InlineData("-h")]
     public void Run_PrintsUsageToOutputAndSucceedsWhenHelpIsRequested(string flag)
     {
         using var fixture = new CliFixture();
