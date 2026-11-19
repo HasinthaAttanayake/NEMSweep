@@ -119,9 +119,11 @@ public sealed class GeneratingFleet
         _monthlyCapacityFactors;
     /// <summary>
     /// Whether this fleet's output depends on an intermittent weather resource (Solar or
-    /// Wind) rather than being fully controllable subject to fuel or budget constraints.
+    /// Wind) rather than being fully controllable subject to fuel or budget constraints. The
+    /// rule belongs to the technology; see
+    /// <see cref="GenerationTechnologyClassification.IsIntermittentRenewable"/>.
     /// </summary>
-    public bool IsIntermittentRenewable => GenerationTechnology is GenerationTechnology.Solar or GenerationTechnology.Wind; // TODO: move to TechnologyProfile as appropriate
+    public bool IsIntermittentRenewable => GenerationTechnology.IsIntermittentRenewable();
 
     /// <summary>
     /// Available capacity for the last timeline and resource profile this fleet was asked about.

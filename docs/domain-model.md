@@ -193,6 +193,11 @@ classDiagram
   `ScenarioGeneratingFleet.ToGeneratingFleet` transformation derives typed
   short-run marginal cost as variable operating cost plus fuel price multiplied
   by heat rate. The realised `GeneratingFleet` owns that dispatch-relevant value.
+- `GenerationTechnologyClassification` holds rules fixed by the
+  `GenerationTechnology` value alone, not by scenario assumptions.
+  `IsIntermittentRenewable` is true for Solar and Wind only; Hydro is renewable
+  but dispatchable within its monthly budget. `GeneratingFleet.IsIntermittentRenewable`
+  delegates to it.
 - `DataCentreDemand` expands a validated nameplate into a flat,
   full-load-factor component for the scenario period.
 - `PowerSystem` is the realised grid aggregate and cites its source scenario by

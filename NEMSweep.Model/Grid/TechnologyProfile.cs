@@ -42,6 +42,29 @@ public enum GenerationTechnology
 }
 
 /// <summary>
+/// Classifications that follow from a <see cref="GenerationTechnology"/> alone, so they hold for
+/// every fleet of that technology in every scenario.
+/// </summary>
+/// <remarks>
+/// These live beside the enum rather than on <see cref="GenerationTechnologyProfile"/> because a
+/// profile carries scenario-supplied assumptions with no technology-name defaults, and does not
+/// know which technology it describes. A classification fixed by the technology is part of the
+/// closed vocabulary instead, and changes only when the vocabulary does.
+/// </remarks>
+public static class GenerationTechnologyClassification
+{
+    /// <summary>
+    /// Whether output from this technology follows an intermittent weather resource (Solar or
+    /// Wind) rather than being controllable subject to fuel or budget constraints. Hydro is
+    /// renewable but not intermittent: it is dispatchable within a monthly energy budget.
+    /// </summary>
+    /// <param name="technology">The generation technology to classify.</param>
+    /// <returns><see langword="true"/> for Solar and Wind; otherwise <see langword="false"/>.</returns>
+    public static bool IsIntermittentRenewable(this GenerationTechnology technology) =>
+        technology is GenerationTechnology.Solar or GenerationTechnology.Wind;
+}
+
+/// <summary>
 /// The storage archetypes the model operates. Both use the same fleet abstraction and differ
 /// only in their assumptions, but storage sizing treats them differently: Battery capacity is
 /// what the sizing loop may grow, and pumped hydro is held fixed.
